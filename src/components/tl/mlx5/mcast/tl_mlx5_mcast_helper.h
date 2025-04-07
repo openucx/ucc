@@ -48,7 +48,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_poll_send(ucc_tl_mlx5_mcast_coll_co
                     comm->pending_send--;
                     break;
                 default:
-                    tl_trace(comm->lib, "completion of mcast send for allgather, opcode %d",
+                    tl_trace(comm->lib, "completion of mcast send for zero-copy collective, opcode %d",
                              wc[i].opcode);
                     comm->pending_send--;
                     pp = (struct pp_packet*)wc[i].wr_id;
@@ -75,7 +75,6 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
     int                 rc;
     int                 length;
     ucc_status_t        status;
-    int                 mcast_group_index;
     ucc_memory_type_t   mem_type = comm->cuda_mem_enabled ? UCC_MEMORY_TYPE_CUDA
                                                           : UCC_MEMORY_TYPE_HOST;
 
@@ -117,8 +116,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
 
         ssg[0].length     = length;
         ssg[0].lkey       = req->mr->lkey;
-        mcast_group_index = i % comm->mcast_group_count;
-        swr[0].wr.ud.ah   = comm->mcast.groups[mcast_group_index].ah;
+        swr[0].wr.ud.ah   = comm->mcast.groups[0].ah;
         swr[0].wr_id      = MCAST_BCASTSEND_WR;
         swr[0].imm_data   = htonl(pp->psn);
         swr[0].send_flags = (length <= comm->max_inline) ? IBV_SEND_INLINE : 0;
@@ -138,7 +136,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
         tl_trace(comm->lib, "post_send, psn %d, length %d, zcopy %d, signaled %d",
                  pp->psn, pp->length, zcopy, swr[0].send_flags & IBV_SEND_SIGNALED);
 
-        if (0 != (rc = ibv_post_send(comm->mcast.groups[mcast_group_index].qp, &swr[0], &bad_wr))) {
+        if (0 != (rc = ibv_post_send(comm->mcast.groups[0].qp, &swr[0], &bad_wr))) {
             tl_error(comm->lib, "post send failed: ret %d, start_psn %d, to_send %d, "
                     "to_recv %d, length %d, psn %d, inline %d",
                      rc, req->start_psn, req->to_send, req->to_recv,
@@ -287,22 +285,21 @@ static inline int ucc_tl_mlx5_mcast_recv(ucc_tl_mlx5_mcast_coll_comm_t *comm,
 static inline ucc_status_t ucc_tl_mlx5_mcast_send_collective(ucc_tl_mlx5_mcast_coll_comm_t*
                                                              comm, ucc_tl_mlx5_mcast_coll_req_t *req,
                                                              int num_packets, const int zcopy,
-                                                             int coll_type, int group_id, size_t send_offset)
+                                                             int mcast_group_index,
+                                                             size_t send_offset)
 {
     struct ibv_send_wr *swr            = &comm->mcast.swr;
     struct ibv_sge     *ssg            = &comm->mcast.ssg;
-    int                 max_per_packet = comm->max_per_packet;
     size_t              offset         = (send_offset == SIZE_MAX) ? req->offset : send_offset;
     int                 max_commsize   = ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE;
-    int                 max_ag_counter = ONE_SIDED_MAX_ALLGATHER_COUNTER;
+    int                 max_ag_counter = ONE_SIDED_MAX_ZCOPY_COLL_COUNTER;
     int                 i;
     struct ibv_send_wr *bad_wr;
     struct pp_packet   *pp;
     int                 rc;
     int                 length;
-    int                 mcast_group_index;
 
-    ucc_assert(group_id <= comm->mcast_group_count && UCC_COLL_TYPE_ALLGATHER == coll_type);
+    ucc_assert(mcast_group_index <= comm->mcast_group_count);
 
     swr->num_sge           = 1;
     swr->sg_list           = & comm->mcast.ssg;
@@ -320,7 +317,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send_collective(ucc_tl_mlx5_mcast_c
         __builtin_prefetch((void*) pp->buf);
         __builtin_prefetch(req->ptr + offset);
 
-        length      = req->to_send == 1 ? req->last_pkt_len : max_per_packet;
+        length      = comm->max_per_packet;
         pp->length  = length;
 
         // generate psn to be used as immediate data
@@ -353,22 +350,16 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send_collective(ucc_tl_mlx5_mcast_c
         swr[0].send_flags |= IBV_SEND_SIGNALED;
         comm->pending_send++;
 
-        if (group_id < 0) {
-            mcast_group_index = i % comm->mcast_group_count; // schedule sends with round-robin
-        } else {
-            mcast_group_index = group_id;
-        }
-
         swr[0].wr.ud.ah = comm->mcast.groups[mcast_group_index].ah;
 
-        tl_trace(comm->lib, "mcast allgather post_send, psn %d, length %d, "
+        tl_trace(comm->lib, "mcast  post_send, psn %d, length %d, "
                 "zcopy %d, signaled %d qp->state %d qp->qp_num %d qp->pd %p "
-                "coll_type %d mcast_group_index %d",
+                "mcast_group_index %d",
                  pp->psn, pp->length, zcopy, swr[0].send_flags &
                  IBV_SEND_SIGNALED,
                  comm->mcast.groups[mcast_group_index].qp->state,
                  comm->mcast.groups[mcast_group_index].qp->qp_num,
-                 comm->mcast.groups[mcast_group_index].qp->pd, coll_type,
+                 comm->mcast.groups[mcast_group_index].qp->pd,
                  mcast_group_index);
 
         if (0 != (rc = ibv_post_send(comm->mcast.groups[mcast_group_index].qp, &swr[0], &bad_wr))) {
@@ -392,7 +383,7 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
                                                     num_left, int coll_type)
 {
     int               max_commsize   = ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE;
-    int               max_ag_counter = ONE_SIDED_MAX_ALLGATHER_COUNTER;
+    int               max_ag_counter = ONE_SIDED_MAX_ZCOPY_COLL_COUNTER;
     struct pp_packet *pp;
     struct pp_packet *next;
     uint64_t          id;
