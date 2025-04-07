@@ -137,6 +137,11 @@ static inline ucc_rank_t ucc_topo_max_ppn(ucc_topo_t *topo)
     return topo->max_ppn;
 }
 
+static inline int ucc_topo_is_single_ppn(ucc_topo_t *topo)
+{
+    return ucc_topo_max_ppn(topo) == 1;
+}
+
 /* Returns true if PPN is the same across all the nodes */
 static inline int ucc_topo_isoppn(ucc_topo_t *topo)
 {
