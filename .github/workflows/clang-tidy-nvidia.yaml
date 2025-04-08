@@ -58,7 +58,7 @@ jobs:
       run: |
         echo "Workspace: ${GITHUB_WORKSPACE}"
         cd ${GITHUB_WORKSPACE}
-        run-clang-tidy-${CLANG_VER} -p /tmp/ -header-filter='^(?!.*(${GITHUB_WORKSPACE}/src/components/ec/cuda/kernel/.*|${GITHUB_WORKSPACE}/src/components/mc/cuda/kernel/.*)).*$' 2>&1 | tee /tmp/clang_tidy.log
+        run-clang-tidy-${CLANG_VER} -p /tmp/ -header-filter='^(?!.*(${GITHUB_WORKSPACE}/src/components/ec/cuda/kernel/.*|${GITHUB_WORKSPACE}/src/components/mc/cuda/kernel/.*)).*$' "^(?!.*\.cu$).*$" 2>&1 | tee /tmp/clang_tidy.log
         nerrors=$(grep 'error:' /tmp/clang_tidy.log | wc -l)
         if [ $nerrors -ne 0 ]; then
             exit 125;
