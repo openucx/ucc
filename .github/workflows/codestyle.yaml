@@ -6,7 +6,7 @@ env:
   GIT_CF: https://raw.githubusercontent.com/llvm/llvm-project/release/11.x/clang/tools/clang-format/git-clang-format
 jobs:
   check-codestyle:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     name: Check code style
     steps:
     - name: Install dependencies
