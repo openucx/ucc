@@ -6,7 +6,7 @@ env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
   CLANG_VER: 17
-  ROCM_VER: 6.0
+  ROCM_VER: 6.3
   LIBRARY_PATH: /tmp/ucx/install/lib
   LD_LIBRARY_PATH: /tmp/ucx/install/lib
 jobs:
@@ -17,13 +17,15 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends wget lsb-core software-properties-common gpg curl
-        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| sudo apt-key add -
-        sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main"
+        sudo mkdir -p /etc/apt/keyrings
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
+        sudo apt-get update
         sudo apt-get install -y --no-install-recommends doxygen doxygen-latex clang-tidy-${CLANG_VER} bear
     - name: Install extra dependencies
       run: |
         sudo mkdir -p /etc/apt/keyrings
-        curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
+        wget https://repo.radeon.com/rocm/rocm.gpg.key -O - | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
         echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${ROCM_VER} jammy main" | sudo tee /etc/apt/sources.list.d/rocm.list
         echo -e 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 600' | sudo tee /etc/apt/preferences.d/rocm-pin-600
         echo 'export PATH=$PATH:/opt/rocm/bin' | sudo tee -a /etc/profile.d/rocm.sh
