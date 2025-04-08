@@ -59,7 +59,7 @@ jobs:
         echo "Workspace: ${GITHUB_WORKSPACE}"
         cd ${GITHUB_WORKSPACE}
         run-clang-tidy-${CLANG_VER} -p /tmp/ -header-filter='.*' \
-          -ignore="${GITHUB_WORKSPACE}/src/components/ec/cuda/kernel/*,${GITHUB_WORKSPACE}/src/components/mc/cuda/kernel/*" \
+          -line-filter='[{"name":".*cuda/kernel/.*","lines":[[1,1000000]]}]' \
           2>&1 | tee /tmp/clang_tidy.log
         nerrors=$(grep 'error:' /tmp/clang_tidy.log | wc -l)
         if [ $nerrors -ne 0 ]; then
