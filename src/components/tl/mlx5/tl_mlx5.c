@@ -152,6 +152,11 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.mcast_group_count),
      UCC_CONFIG_TYPE_INT},
 
+    {"MCAST_ZERO_COPY_COLL_MIN_MSG", "65536",
+     "Min msg size to be used for zero copy collectives",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.truly_zero_copy_coll_min_msg),
+     UCC_CONFIG_TYPE_UINT},
+
     {"ALLTOALL_SEND_BATCH_SIZE", "2",
      "Number of blocks that are transposed "
      "on the NIC before being sent as a batch to a remote peer",
