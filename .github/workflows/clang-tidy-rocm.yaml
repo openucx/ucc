@@ -28,9 +28,11 @@ jobs:
         wget https://repo.radeon.com/rocm/rocm.gpg.key -O - | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
         echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${ROCM_VER} jammy main" | sudo tee /etc/apt/sources.list.d/rocm.list
         echo -e 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 600' | sudo tee /etc/apt/preferences.d/rocm-pin-600
-        echo 'export PATH=$PATH:/opt/rocm/bin' | sudo tee -a /etc/profile.d/rocm.sh
+        echo 'export PATH=$PATH:/opt/rocm/bin:/opt/rocm/llvm/bin' | sudo tee -a /etc/profile.d/rocm.sh
+        source /etc/profile.d/rocm.sh
         sudo apt-get update
-        sudo apt-get install -y rocm-hip-sdk
+        sudo apt-get install -y hip-base hip-runtime-amd hip-dev rocm-device-libs rccl-dev
+        sudo ln -sf /opt/rocm-${ROCM_VER} /opt/rocm
     - name: Get UCX
       run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
@@ -42,7 +44,9 @@ jobs:
     - name: Build UCC
       run: |
         ./autogen.sh
-        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-rocm=/opt/rocm --with-rccl=/opt/rocm --enable-assert
+        # gfx1102 is the latest RDNA3 architecture
+        export HIPFLAGS="--offload-arch=gfx1102"
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-rocm=/opt/rocm --with-rccl=/opt/rocm --enable-assert CXXFLAGS="$HIPFLAGS" CFLAGS="$HIPFLAGS"
         bear --output /tmp/compile_commands.json -- make -j
     - name: Run clang-tidy
       run: |
