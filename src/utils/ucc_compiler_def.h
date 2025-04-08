@@ -126,17 +126,17 @@ static inline ucs_status_t ucc_status_to_ucs_status(ucc_status_t status)
 
 
 #if defined(__clang__)
-    #define UCC_ASSUME(x) __builtin_assume(x)
+    #define ucc_assume(x) __builtin_assume(x)
 #elif defined(__GNUC__)
     #if (__GNUC__ >= 13)
         /* GCC 13+ has __attribute__((assume)) */
-        #define UCC_ASSUME(x) __attribute__((assume(x)))
+        #define ucc_assume(x) __attribute__((assume(x)))
     #else
         /* For older GCC versions, we can use __builtin_unreachable() as a fallback */
-        #define UCC_ASSUME(x) ((x) ? (void)0 : __builtin_unreachable())
+        #define ucc_assume(x) ((x) ? (void)0 : __builtin_unreachable())
     #endif
 #else
-    #define UCC_ASSUME(x) do {} while (0)  /* No-op for unsupported compilers */
+    #define ucc_assume(x) do {} while (0)  /* No-op for unsupported compilers */
 #endif    
 
 #endif
