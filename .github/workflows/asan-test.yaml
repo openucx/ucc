@@ -1,4 +1,4 @@
-name: Linter
+name: ASAN Tests
 
 on: [push, pull_request]
 
@@ -6,8 +6,9 @@ env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
   CLANG_VER: 12
+
 jobs:
-  clang-tidy:
+  gtest-asan:
     runs-on: ubuntu-22.04
     steps:
     - name: Install dependencies
@@ -16,7 +17,7 @@ jobs:
         sudo apt-get install -y --no-install-recommends wget lsb-core software-properties-common
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| sudo apt-key add -
         sudo apt-add-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-${CLANG_VER} main"
-        sudo apt-get install -y --no-install-recommends doxygen doxygen-latex clang-tidy-${CLANG_VER} bear
+        sudo apt-get install -y --no-install-recommends clang-${CLANG_VER}
     - name: Get UCX
       run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
@@ -25,17 +26,11 @@ jobs:
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
         make -j install
     - uses: actions/checkout@v1
-    - name: Build UCC
+    - name: Run gtest ASAN
       run: |
+        export ASAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=1:print_suppressions=0
+        export LSAN_OPTIONS=report_objects=1
         ./autogen.sh
-        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-assert
-        bear --output /tmp/compile_commands.json -- make -j
-    - name: Run clang-tidy
-      run: |
-        echo "Workspace: ${GITHUB_WORKSPACE}"
-        cd ${GITHUB_WORKSPACE}
-        run-clang-tidy-${CLANG_VER} -p /tmp/ 2>&1 | tee /tmp/clang_tidy.log
-        nerrors=$(grep 'error:' /tmp/clang_tidy.log | wc -l)
-        if [ $nerrors -ne 0 ]; then
-            exit 125;
-        fi
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure CFLAGS="-fsanitize=address" --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
+        make -j install
+        ./test/gtest/gtest 
