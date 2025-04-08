@@ -12,6 +12,10 @@
 /* need to query for datatype support at runtime */
 #define SHARP_DTYPE_UNKNOWN 0xFFFF
 
+#define UCC_TL_SHARP_N_DEFAULT_ALG_SELECT_STR 2
+extern const char
+    *ucc_tl_sharp_default_alg_select_str[UCC_TL_SHARP_N_DEFAULT_ALG_SELECT_STR];
+
 extern enum sharp_datatype ucc_to_sharp_dtype[];
 
 ucc_status_t ucc_tl_sharp_allreduce_init(ucc_tl_sharp_task_t *task);

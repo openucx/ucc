@@ -12,6 +12,20 @@
 #include <sharp/api/version.h>
 #include <sharp/api/sharp_coll.h>
 
+/* Disable allgather and reduce_scatter for message sizes 0-16k since SHARP SAT is only enabled by default for messages larger than 16k.
+ * TODO: update with precise threshold once SHARP query can return SAT threshold.
+ */
+#define UCC_TL_SHARP_ALLGATHER_DEFAULT_ALG_SELECT_STR                          \
+    "allgather:0-16k:0"
+
+#define UCC_TL_SHARP_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR                     \
+    "reduce_scatter:0-16k:0"
+
+const char
+    *ucc_tl_sharp_default_alg_select_str[UCC_TL_SHARP_N_DEFAULT_ALG_SELECT_STR] = {
+        UCC_TL_SHARP_ALLGATHER_DEFAULT_ALG_SELECT_STR,
+        UCC_TL_SHARP_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR};
+
 enum sharp_datatype ucc_to_sharp_dtype[] = {
     [UCC_DT_PREDEFINED_ID(UCC_DT_INT16)]            = SHARP_DTYPE_SHORT,
     [UCC_DT_PREDEFINED_ID(UCC_DT_INT32)]            = SHARP_DTYPE_INT,
