@@ -29,7 +29,7 @@ jobs:
       run: |
         ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-assert
-        bear --cdb /tmp/compile_commands.json make
+        bear --output /tmp/compile_commands.json -- make -j
     - name: Run clang-tidy
       run: |
         echo "Workspace: ${GITHUB_WORKSPACE}"
