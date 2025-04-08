@@ -45,7 +45,7 @@ jobs:
     - name: Download HPCX
       run: |
         cd /tmp
-        wget ${HPCX_LINK}
+        wget --no-verbose ${HPCX_LINK}
         tar xjf hpcx-v2.17.1-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64.tbz
         mv hpcx-v2.17.1-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64 hpcx
     - uses: actions/checkout@v1
@@ -53,15 +53,15 @@ jobs:
       run: |
         ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --with-tls=ucp,mlx5,cuda,self,sharp --with-sharp=/tmp/hpcx/sharp --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-cuda=/usr/local/cuda --with-nvcc-gencode="-gencode=arch=compute_80,code=sm_80" --enable-assert
-        bear --output /tmp/compile_commands.json --exclude ${GITHUB_WORKSPACE}/src/components/ec/cuda/kernel/ --exclude ${GITHUB_WORKSPACE}/src/components/mc/cuda/kernel/ -- make
+        bear --output /tmp/compile_commands.json -- make -j
     - name: Run clang-tidy
       run: |
         echo "Workspace: ${GITHUB_WORKSPACE}"
         cd ${GITHUB_WORKSPACE}
-        run-clang-tidy-${CLANG_VER} -p /tmp/ 2>&1 | tee /tmp/clang_tidy.log
+        run-clang-tidy-${CLANG_VER} -p /tmp/ -header-filter='.*' \
+          -ignore="${GITHUB_WORKSPACE}/src/components/ec/cuda/kernel/*,${GITHUB_WORKSPACE}/src/components/mc/cuda/kernel/*" \
+          2>&1 | tee /tmp/clang_tidy.log
         nerrors=$(grep 'error:' /tmp/clang_tidy.log | wc -l)
         if [ $nerrors -ne 0 ]; then
             exit 125;
         fi
-        make clean
-        rm -rf /tmp/ucc
