@@ -216,13 +216,13 @@ ucc_tl_mlx5_mcast_prepare_zero_copy_bcast(ucc_tl_mlx5_mcast_coll_comm_t *comm,
     ucc_tl_mlx5_mcast_pipelined_ag_schedule_t *prev_schedule;
     ucc_assert(comm->bcast_comm.truly_zero_copy_bcast_enabled);
 
-    req->concurrency_level = comm->mcast_group_count / 2;
-    req->concurrency_level = ucc_min(req->concurrency_level, ONE_SIDED_MAX_CONCURRENT_LEVEL);
-    req->concurrency_level = ucc_min(req->concurrency_level, comm->commsize);
-    if (req->concurrency_level == 0) {
-        tl_warn(comm->lib, "not enough concurreny level to enable zcopy pipeline bcast");
+    if (comm->commsize == 1) return UCC_OK;
+
+    if (comm->mcast_group_count != 2) {
+        tl_warn(comm->lib, "need exactly two mcast groups to enable zcopy bcast");
         return UCC_ERR_NOT_SUPPORTED;
     }
+    req->concurrency_level = 1;
 
     req->mcast_prepost_bucket_size =
         ucc_min(req->num_packets, comm->bcast_comm.mcast_prepost_bucket_size);
@@ -469,9 +469,9 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_zero_copy_pipelined_bcast(void *
                 group_id     = sched[req->step].multicast_op[j].group_id;
                 to_send_left = sched[req->step].multicast_op[j].to_send_left;
                 offset_left  = sched[req->step].multicast_op[j].offset_left;
-                num_packets  = ucc_min(comm->allgather_comm.max_push_send - comm->pending_send, to_send_left);
+                num_packets  = ucc_min(comm->bcast_comm.max_push_send - comm->pending_send, to_send_left);
                 if (to_send_left &&
-                    (comm->allgather_comm.max_push_send - comm->pending_send) > 0) {
+                    (comm->bcast_comm.max_push_send - comm->pending_send) > 0) {
                     ucc_assert(req->am_root);
                     status = ucc_tl_mlx5_mcast_send_collective(comm, req, num_packets,
                                                                zcopy, group_id, offset_left);
@@ -515,7 +515,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_zero_copy_pipelined_bcast(void *
                 if (req->to_recv) {
                     num_recvd = ucc_tl_mlx5_mcast_recv_collective(comm, req,
                                                                   req->to_recv,
-                                                                  UCC_COLL_TYPE_ALLGATHER);
+                                                                  UCC_COLL_TYPE_BCAST);
                     if (num_recvd < 0) {
                         tl_error(comm->lib, "a failure happend during cq polling");
                         status = UCC_ERR_NO_MESSAGE;
@@ -532,7 +532,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_zero_copy_pipelined_bcast(void *
         if (req->to_recv) {
             num_recvd = ucc_tl_mlx5_mcast_recv_collective(comm, req,
                                                           req->to_recv,
-                                                          UCC_COLL_TYPE_ALLGATHER);
+                                                          UCC_COLL_TYPE_BCAST);
             if (num_recvd < 0) {
                 tl_error(comm->lib, "a failure happend during cq polling");
                 status = UCC_ERR_NO_MESSAGE;
@@ -707,44 +707,107 @@ static inline void ucc_tl_mlx5_mcast_bcast_progress(ucc_coll_task_t *coll_task)
     }
 }
 
-static inline ucc_status_t ucc_tl_mlx5_mcast_check_cap(ucc_base_coll_args_t *coll_args,
-                                                                   ucc_base_team_t *team)
+static inline ucc_status_t
+ucc_tl_mlx5_mcast_check_comm_level_cap(ucc_base_coll_args_t *coll_args,
+                                       ucc_base_team_t *team)
 {
-    ucc_tl_mlx5_team_t            *mlx5_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
-    ucc_tl_mlx5_mcast_coll_comm_t *comm      = mlx5_team->mcast->mcast_comm;
-    ucc_coll_args_t               *args      = &coll_args->args;
-    int buf_size                             =
+    ucc_tl_mlx5_team_t            *mlx5_team           =
+        ucc_derived_of(team, ucc_tl_mlx5_team_t);
+    ucc_tl_mlx5_mcast_coll_comm_t *comm                =
+        mlx5_team->mcast->mcast_comm;
+    ucc_coll_args_t               *args                = &coll_args->args;
+    size_t                         buf_size            =
         ucc_dt_size(args->src.info.datatype) * args->src.info.count;
+    ucc_memory_type_t              mem_type            = args->src.info.mem_type;
+    ucc_coll_type_t                coll_type           = args->coll_type;
+    bool                           mcast_enabled       = false;
+    bool                           zero_copy_supported = false;
 
-    if (!((comm->context->mcast_bcast_enabled &&
-           (coll_args->args.coll_type == UCC_COLL_TYPE_BCAST)) ||
-        (comm->context->mcast_allgather_enabled &&
-          (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHER)))) {
-        tl_trace(team->context->lib, "please enable the mcast for the collective");
+    /* Check supported memory types */
+    if (mem_type != UCC_MEMORY_TYPE_CUDA &&
+        mem_type != UCC_MEMORY_TYPE_HOST) {
+        tl_trace(comm->lib,
+                 "unsupported memory type %d for mlx5 multicast",
+                 mem_type);
         return UCC_ERR_NO_RESOURCE;
     }
 
-    if (buf_size < ZERO_COPY_MCAST_MIN_MSG_SIZE ||
-        buf_size % comm->max_per_packet != 0) {
+    /* Check CUDA memory enablement consistency */
+    if ((comm->cuda_mem_enabled && mem_type == UCC_MEMORY_TYPE_HOST) ||
+        (!comm->cuda_mem_enabled && mem_type == UCC_MEMORY_TYPE_CUDA)) {
+        tl_trace(comm->lib,
+                 "CUDA memory usage inconsistent with configuration "
+                 "(enabled: %d, requested: %d)",
+                 comm->cuda_mem_enabled,
+                 mem_type == UCC_MEMORY_TYPE_CUDA);
         return UCC_ERR_NO_RESOURCE;
     }
 
-    if ((comm->cuda_mem_enabled &&
-            args->src.info.mem_type == UCC_MEMORY_TYPE_CUDA) ||
-        (!comm->cuda_mem_enabled &&
-                args->src.info.mem_type == UCC_MEMORY_TYPE_HOST)) {
-        return UCC_OK;
+    /* Check if multicast is enabled for the specific collective type */
+    if (coll_type == UCC_COLL_TYPE_BCAST &&
+        comm->context->mcast_bcast_enabled) {
+        mcast_enabled = true;
+    } else if (coll_type == UCC_COLL_TYPE_ALLGATHER &&
+               comm->context->mcast_allgather_enabled) {
+        mcast_enabled = true;
     }
-        
-    return UCC_ERR_NO_RESOURCE;
+
+    if (!mcast_enabled) {
+        tl_trace(comm->lib,
+                 "multicast for collective type %s is disabled",
+                 ucc_coll_type_str(coll_type));
+        return UCC_ERR_NO_RESOURCE;
+    }
+
+    /* Check zero-copy requirements */
+    if (coll_type == UCC_COLL_TYPE_BCAST &&
+        comm->bcast_comm.truly_zero_copy_bcast_enabled) {
+        zero_copy_supported = true;
+    } else if (coll_type == UCC_COLL_TYPE_ALLGATHER &&
+               comm->allgather_comm.truly_zero_copy_allgather_enabled) {
+        zero_copy_supported = true;
+    }
+
+    if (zero_copy_supported &&
+        (buf_size < comm->truly_zero_copy_coll_min_msg ||
+         buf_size % comm->max_per_packet != 0)) {
+        tl_trace(comm->lib,
+                 "zero-copy requirements not met for collective %s "
+                 "(buf_size: %zu, min_msg: %d, max_packet: %d)",
+                 ucc_coll_type_str(coll_type), buf_size,
+                 comm->truly_zero_copy_coll_min_msg,
+                 comm->max_per_packet);
+        return UCC_ERR_NO_RESOURCE;
+    }
+
+    /* Specific checks for CUDA BCAST without zero-copy */
+    if (mem_type == UCC_MEMORY_TYPE_CUDA &&
+        coll_type == UCC_COLL_TYPE_BCAST &&
+        buf_size > CUDA_MEM_MCAST_BCAST_MAX_MSG &&
+        !comm->bcast_comm.truly_zero_copy_bcast_enabled) {
+        tl_trace(comm->lib,
+                 "mcast cuda bcast with size %zu not supported without "
+                 "zero copy enabled (max size: %d)",
+                 buf_size, CUDA_MEM_MCAST_BCAST_MAX_MSG);
+        return UCC_ERR_NO_RESOURCE;
+    }
+
+    /* Specific checks for CUDA ALLGATHER without zero-copy */
+    if (mem_type == UCC_MEMORY_TYPE_CUDA &&
+        coll_type == UCC_COLL_TYPE_ALLGATHER &&
+        !comm->allgather_comm.truly_zero_copy_allgather_enabled) {
+        tl_trace(comm->lib,
+                 "mcast cuda allgather not supported without zero copy "
+                 "enabled");
+        return UCC_ERR_NO_RESOURCE;
+    }
+
+    return UCC_OK;
 }
 
 ucc_status_t ucc_tl_mlx5_mcast_check_support(ucc_base_coll_args_t *coll_args,
                                              ucc_base_team_t *team)
 {
-    ucc_coll_args_t *args     = &coll_args->args;
-    int              buf_size = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
-
     if (UCC_COLL_ARGS_ACTIVE_SET(&coll_args->args) ||
         ((coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHER) &&
          (UCC_IS_INPLACE(coll_args->args) || UCC_IS_PERSISTENT(coll_args->args)))) {
@@ -752,18 +815,9 @@ ucc_status_t ucc_tl_mlx5_mcast_check_support(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (UCC_OK != ucc_tl_mlx5_mcast_check_cap(coll_args, team)) {
+    if (UCC_OK != ucc_tl_mlx5_mcast_check_comm_level_cap(coll_args, team)) {
         tl_trace(team->context->lib, "mcast collective not supported");
         return UCC_ERR_NOT_SUPPORTED;
-    }
-
-    if (args->src.info.mem_type == UCC_MEMORY_TYPE_CUDA &&
-            coll_args->args.coll_type == UCC_COLL_TYPE_BCAST &&
-            buf_size > CUDA_MEM_MCAST_BCAST_MAX_MSG) {
-        /* for large messages (more than one mtu) we need zero-copy design which
-         * is not implemented yet */
-        tl_trace(team->context->lib, "mcast cuda bcast not supported for large messages");
-        return UCC_ERR_NOT_IMPLEMENTED;
     }
 
     return UCC_OK;
