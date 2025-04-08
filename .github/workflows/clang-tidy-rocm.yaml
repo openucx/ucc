@@ -6,7 +6,7 @@ env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
   CLANG_VER: 12
-  ROCM_VER: 5.6.1
+  ROCM_VER: 5.7.1
   LIBRARY_PATH: /tmp/ucx/install/lib
   LD_LIBRARY_PATH: /tmp/ucx/install/lib
 jobs:
@@ -23,7 +23,8 @@ jobs:
     - name: Install extra dependencies
       run: |
         curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/rocm-keyring.gpg
-        echo 'deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/rocm-keyring.gpg] https://repo.radeon.com/rocm/apt/5.6.1 focal main' | sudo tee /etc/apt/sources.list.d/rocm.list
+        echo "deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/rocm-keyring.gpg] https://repo.radeon.com/rocm/apt/${ROCM_VER} jammy main" | sudo tee /etc/apt/sources.list.d/rocm.list
+        echo 'export PATH=$PATH:/opt/rocm/bin' | sudo tee -a /etc/profile.d/rocm.sh
         sudo apt-get update
         sudo apt-get install -y rocm-hip-sdk
     - name: Get UCX
@@ -38,15 +39,13 @@ jobs:
       run: |
         ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-rocm=/opt/rocm --with-rccl=/opt/rocm --enable-assert
-        bear --exclude ${GITHUB_WORKSPACE}/src/components/ec/rocm/kernel/ --exclude ${GITHUB_WORKSPACE}/src/components/mc/rocm/kernel/ --cdb /tmp/compile_commands.json make
+        bear --output /tmp/compile_commands.json -- make -j
     - name: Run clang-tidy
       run: |
         echo "Workspace: ${GITHUB_WORKSPACE}"
         cd ${GITHUB_WORKSPACE}
-        run-clang-tidy-${CLANG_VER} -p /tmp/ 2>&1 | tee /tmp/clang_tidy.log
+        run-clang-tidy-${CLANG_VER} -p /tmp/ -header-filter='^(?!.*(${GITHUB_WORKSPACE}/src/components/ec/cuda/kernel/.*|${GITHUB_WORKSPACE}/src/components/mc/cuda/kernel/.*|${GITHUB_WORKSPACE}/src/components/ec/rocm/kernel/.*|${GITHUB_WORKSPACE}/src/components/mc/rocm/kernel/.*)).*$' 2>&1 | tee /tmp/clang_tidy.log
         nerrors=$(grep 'error:' /tmp/clang_tidy.log | wc -l)
         if [ $nerrors -ne 0 ]; then
             exit 125;
         fi
-        make clean
-        rm -rf /tmp/ucc
