@@ -166,6 +166,7 @@ typedef ucc_status_t (*ucc_tl_ucp_send_nb_fn_t)(void *buffer, size_t msglen,
                                                 ucc_rank_t dest_group_rank,
                                                 ucc_tl_ucp_team_t *team,
                                                 ucc_tl_ucp_task_t *task);
+
 typedef ucc_status_t (*ucc_tl_ucp_recv_nb_fn_t)(void *buffer, size_t msglen,
                                                 ucc_memory_type_t mtype,
                                                 ucc_rank_t dest_group_rank,
@@ -183,6 +184,7 @@ typedef ucc_status_t (*ucc_tl_ucp_send_nz_fn_t)(void *buffer, size_t msglen,
                                                 ucc_rank_t dest_group_rank,
                                                 ucc_tl_ucp_team_t *team,
                                                 ucc_tl_ucp_task_t *task);
+
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t            super;
     ucc_tl_ucp_context_config_t cfg;
@@ -193,7 +195,7 @@ typedef struct ucc_tl_ucp_context {
         ucc_tl_ucp_recv_nb_fn_t ucc_tl_ucp_recv_nb;
         ucc_tl_ucp_send_nz_fn_t ucc_tl_ucp_send_nz;
         ucc_tl_ucp_recv_nz_fn_t ucc_tl_ucp_recv_nz;
-    } callbacks;
+    } sendrecv_cbs;
     uint32_t                    service_worker_throttling_count;
     ucc_mpool_t                 req_mp;
     ucc_tl_ucp_remote_info_t *  remote_info;

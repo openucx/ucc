@@ -100,16 +100,17 @@ ucc_tl_ucp_send_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     return ucp_tag_send_nbx(ep, buffer, 1, ucp_tag, &req_param);
 }
 
-static inline ucc_status_t
-ucc_tl_ucp_send_nb_st(void *buffer, size_t msglen, ucc_memory_type_t mtype,
-                   ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
-                   ucc_tl_ucp_task_t *task)
+static inline ucc_status_t ucc_tl_ucp_send_nb_st(void *buffer, size_t msglen,
+                                                 ucc_memory_type_t mtype,
+                                                 ucc_rank_t dest_group_rank,
+                                                 ucc_tl_ucp_team_t *team,
+                                                 ucc_tl_ucp_task_t *task)
 {
     ucs_status_ptr_t ucp_status;
 
-    ucp_status = ucc_tl_ucp_send_common(buffer, msglen, mtype, dest_group_rank,
-                                        team, task, ucc_tl_ucp_send_completion_cb_st,
-                                        (void *)task);
+    ucp_status = ucc_tl_ucp_send_common(
+        buffer, msglen, mtype, dest_group_rank, team, task,
+        ucc_tl_ucp_send_completion_cb_st, (void *)task);
     if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
     } else {
@@ -118,16 +119,17 @@ ucc_tl_ucp_send_nb_st(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     return UCC_OK;
 }
 
-static inline ucc_status_t
-ucc_tl_ucp_send_nb_mt(void *buffer, size_t msglen, ucc_memory_type_t mtype,
-                   ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
-                   ucc_tl_ucp_task_t *task)
+static inline ucc_status_t ucc_tl_ucp_send_nb_mt(void *buffer, size_t msglen,
+                                                 ucc_memory_type_t mtype,
+                                                 ucc_rank_t dest_group_rank,
+                                                 ucc_tl_ucp_team_t *team,
+                                                 ucc_tl_ucp_task_t *task)
 {
     ucs_status_ptr_t ucp_status;
 
-    ucp_status = ucc_tl_ucp_send_common(buffer, msglen, mtype, dest_group_rank,
-                                        team, task, ucc_tl_ucp_send_completion_cb_mt,
-                                        (void *)task);
+    ucp_status = ucc_tl_ucp_send_common(
+        buffer, msglen, mtype, dest_group_rank, team, task,
+        ucc_tl_ucp_send_completion_cb_mt, (void *)task);
     if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
     } else {
@@ -136,13 +138,14 @@ ucc_tl_ucp_send_nb_mt(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     return UCC_OK;
 }
 
-static inline ucc_status_t
-ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
-                   ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
-                   ucc_tl_ucp_task_t *task)
+static inline ucc_status_t ucc_tl_ucp_send_nb(void *buffer, size_t msglen,
+                                              ucc_memory_type_t mtype,
+                                              ucc_rank_t        dest_group_rank,
+                                              ucc_tl_ucp_team_t *team,
+                                              ucc_tl_ucp_task_t *task)
 {
-    return UCC_TL_UCP_TEAM_CTX(team)->callbacks.ucc_tl_ucp_send_nb(buffer, msglen, mtype,
-        dest_group_rank, team, task);
+    return UCC_TL_UCP_TEAM_CTX(team)->sendrecv_cbs.ucc_tl_ucp_send_nb(
+        buffer, msglen, mtype, dest_group_rank, team, task);
 }
 
 static inline ucc_status_t
@@ -190,16 +193,17 @@ ucc_tl_ucp_recv_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                             ucp_tag_mask, &req_param);
 }
 
-static inline ucc_status_t
-ucc_tl_ucp_recv_nb_mt(void *buffer, size_t msglen, ucc_memory_type_t mtype,
-                   ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
-                   ucc_tl_ucp_task_t *task)
+static inline ucc_status_t ucc_tl_ucp_recv_nb_mt(void *buffer, size_t msglen,
+                                                 ucc_memory_type_t mtype,
+                                                 ucc_rank_t dest_group_rank,
+                                                 ucc_tl_ucp_team_t *team,
+                                                 ucc_tl_ucp_task_t *task)
 {
     ucs_status_ptr_t ucp_status;
 
-    ucp_status = ucc_tl_ucp_recv_common(buffer, msglen, mtype, dest_group_rank,
-                                        team, task, ucc_tl_ucp_recv_completion_cb_mt,
-                                        (void *)task);
+    ucp_status = ucc_tl_ucp_recv_common(
+        buffer, msglen, mtype, dest_group_rank, team, task,
+        ucc_tl_ucp_recv_completion_cb_mt, (void *)task);
     if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
     } else {
@@ -208,16 +212,17 @@ ucc_tl_ucp_recv_nb_mt(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     return UCC_OK;
 }
 
-static inline ucc_status_t
-ucc_tl_ucp_recv_nb_st(void *buffer, size_t msglen, ucc_memory_type_t mtype,
-                   ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
-                   ucc_tl_ucp_task_t *task)
+static inline ucc_status_t ucc_tl_ucp_recv_nb_st(void *buffer, size_t msglen,
+                                                 ucc_memory_type_t mtype,
+                                                 ucc_rank_t dest_group_rank,
+                                                 ucc_tl_ucp_team_t *team,
+                                                 ucc_tl_ucp_task_t *task)
 {
     ucs_status_ptr_t ucp_status;
 
-    ucp_status = ucc_tl_ucp_recv_common(buffer, msglen, mtype, dest_group_rank,
-                                        team, task, ucc_tl_ucp_recv_completion_cb_st,
-                                        (void *)task);
+    ucp_status = ucc_tl_ucp_recv_common(
+        buffer, msglen, mtype, dest_group_rank, team, task,
+        ucc_tl_ucp_recv_completion_cb_st, (void *)task);
     if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
     } else {
@@ -226,19 +231,21 @@ ucc_tl_ucp_recv_nb_st(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     return UCC_OK;
 }
 
-static inline ucc_status_t
-ucc_tl_ucp_recv_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
-                   ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
-                   ucc_tl_ucp_task_t *task)
+static inline ucc_status_t ucc_tl_ucp_recv_nb(void *buffer, size_t msglen,
+                                              ucc_memory_type_t mtype,
+                                              ucc_rank_t        dest_group_rank,
+                                              ucc_tl_ucp_team_t *team,
+                                              ucc_tl_ucp_task_t *task)
 {
-    return UCC_TL_UCP_TEAM_CTX(team)->callbacks.ucc_tl_ucp_recv_nb(buffer, msglen, mtype,
-        dest_group_rank, team, task);
+    return UCC_TL_UCP_TEAM_CTX(team)->sendrecv_cbs.ucc_tl_ucp_recv_nb(
+        buffer, msglen, mtype, dest_group_rank, team, task);
 }
 
 static inline ucc_status_t
 ucc_tl_ucp_recv_cb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                    ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
-                   ucc_tl_ucp_task_t *task, ucp_tag_recv_nbx_callback_t cb, void *user_data)
+                   ucc_tl_ucp_task_t *task, ucp_tag_recv_nbx_callback_t cb,
+                   void *user_data)
 {
     ucs_status_ptr_t ucp_status;
 
@@ -322,7 +329,7 @@ static inline ucc_status_t ucc_tl_ucp_send_nz(void *buffer, size_t msglen,
                                               ucc_tl_ucp_team_t *team,
                                               ucc_tl_ucp_task_t *task)
 {
-    return UCC_TL_UCP_TEAM_CTX(team)->callbacks.ucc_tl_ucp_send_nz(
+    return UCC_TL_UCP_TEAM_CTX(team)->sendrecv_cbs.ucc_tl_ucp_send_nz(
         buffer, msglen, mtype, dest_group_rank, team, task);
 }
 
@@ -332,7 +339,7 @@ static inline ucc_status_t ucc_tl_ucp_recv_nz(void *buffer, size_t msglen,
                                               ucc_tl_ucp_team_t *team,
                                               ucc_tl_ucp_task_t *task)
 {
-    return UCC_TL_UCP_TEAM_CTX(team)->callbacks.ucc_tl_ucp_recv_nz(
+    return UCC_TL_UCP_TEAM_CTX(team)->sendrecv_cbs.ucc_tl_ucp_recv_nz(
         buffer, msglen, mtype, dest_group_rank, team, task);
 }
 
