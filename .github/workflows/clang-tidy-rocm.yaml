@@ -6,9 +6,11 @@ env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
   CLANG_VER: 17
-  ROCM_VER: 6.3
+  ROCM_VER: 5.6.1
   LIBRARY_PATH: /tmp/ucx/install/lib
   LD_LIBRARY_PATH: /tmp/ucx/install/lib
+  ROCM_PATH: /opt/rocm
+  ROCM_DEVICE_LIB_PATH: /opt/rocm/amdgcn/bitcode
 jobs:
   clang-tidy:
     runs-on: ubuntu-22.04
@@ -16,22 +18,25 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends wget lsb-core software-properties-common gpg curl
+        # Install basic dependencies
+        sudo apt-get install -y --no-install-recommends wget gpg
+        # Setup LLVM repository
         sudo mkdir -p /etc/apt/keyrings
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg
         echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends doxygen doxygen-latex clang-tidy-${CLANG_VER} bear
-    - name: Install extra dependencies
-      run: |
-        sudo mkdir -p /etc/apt/keyrings
+        # Setup ROCm repository
         wget https://repo.radeon.com/rocm/rocm.gpg.key -O - | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
         echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${ROCM_VER} jammy main" | sudo tee /etc/apt/sources.list.d/rocm.list
         echo -e 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 600' | sudo tee /etc/apt/preferences.d/rocm-pin-600
+        # Update PATH for ROCm
         echo 'export PATH=$PATH:/opt/rocm/bin:/opt/rocm/llvm/bin' | sudo tee -a /etc/profile.d/rocm.sh
         source /etc/profile.d/rocm.sh
+        # Install all required packages
         sudo apt-get update
-        sudo apt-get install -y hip-base hip-runtime-amd hip-dev rocm-device-libs rccl-dev
+        sudo apt-get install -y --no-install-recommends \
+          clang-tidy-${CLANG_VER} \
+          bear \
+          rocm-hip-sdk
         sudo ln -sf /opt/rocm-${ROCM_VER} /opt/rocm
     - name: Get UCX
       run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
@@ -45,8 +50,9 @@ jobs:
       run: |
         ./autogen.sh
         # gfx1102 is the latest RDNA3 architecture
-        export HIPFLAGS="--offload-arch=gfx1102"
-        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-rocm=/opt/rocm --with-rccl=/opt/rocm --enable-assert CXXFLAGS="$HIPFLAGS" CFLAGS="$HIPFLAGS"
+        # export HIPFLAGS="--offload-arch=gfx1102"
+        # export HIPCC_COMPILE_FLAGS_APPEND="$HIPFLAGS"
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-rocm=/opt/rocm --with-rccl=/opt/rocm --enable-assert
         bear --output /tmp/compile_commands.json -- make -j
     - name: Run clang-tidy
       run: |
