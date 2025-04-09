@@ -6,7 +6,7 @@ env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
   HPCX_LINK: https://content.mellanox.com/hpc/hpc-x/v2.17.1rc2/hpcx-v2.17.1-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64.tbz
-  CLANG_VER: 15
+  CLANG_VER: 17
   MLNX_OFED_VER: 23.10-1.1.9.0
   CUDA_VER: 12-8
   LIBRARY_PATH: /tmp/ucx/install/lib
@@ -18,9 +18,11 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends wget lsb-core software-properties-common gpg
-        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+        sudo apt-get install -y --no-install-recommends wget gpg
+        # Setup LLVM repository
+        sudo mkdir -p /etc/apt/keyrings
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends doxygen doxygen-latex clang-tidy-${CLANG_VER} bear clang-${CLANG_VER} clang++-${CLANG_VER}
     - name: Install extra rdma dependencies

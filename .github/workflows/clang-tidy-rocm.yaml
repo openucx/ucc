@@ -5,7 +5,7 @@ on: [push, pull_request]
 env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
-  CLANG_VER: 20
+  CLANG_VER: 17
   ROCM_VER: 5.6.1
   LIBRARY_PATH: /tmp/ucx/install/lib
   LD_LIBRARY_PATH: /tmp/ucx/install/lib
@@ -47,9 +47,6 @@ jobs:
     - name: Build UCC
       run: |
         ./autogen.sh
-        # gfx1102 is the latest RDNA3 architecture
-        # export HIPFLAGS="--offload-arch=gfx1102"
-        # export HIPCC_COMPILE_FLAGS_APPEND="$HIPFLAGS"
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-rocm=/opt/rocm --with-rccl=/opt/rocm --enable-assert
         bear --output /tmp/compile_commands.json -- make -j
     - name: Run clang-tidy
