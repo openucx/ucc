@@ -338,6 +338,9 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
         case UCC_TL_UCP_ALLTOALL_ALG_ONESIDED:
             *init = ucc_tl_ucp_alltoall_onesided_init;
             break;
+        case UCC_TL_UCP_ALLTOALL_ALG_LINEAR:
+            *init = ucc_tl_ucp_alltoall_linear_init;
+            break;
         default:
             status = UCC_ERR_INVALID_PARAM;
             break;
@@ -353,6 +356,9 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
             break;
         case UCC_TL_UCP_ALLTOALLV_ALG_ONESIDED:
             *init = ucc_tl_ucp_alltoallv_onesided_init;
+            break;
+        case UCC_TL_UCP_ALLTOALLV_ALG_LINEAR:
+            *init = ucc_tl_ucp_alltoallv_linear_init;
             break;
         default:
             status = UCC_ERR_INVALID_PARAM;
