@@ -127,6 +127,8 @@ static inline ucs_status_t ucc_status_to_ucs_status(ucc_status_t status)
 
 #if defined(__clang__)
     #define ucc_assume(x) __builtin_assume(x)
+#elif defined(__NVCOMPILER)
+    #define ucc_assume(x) __builtin_assume(x)
 #elif defined(__GNUC__)
     #if (__GNUC__ >= 13)
         /* GCC 13+ has __attribute__((assume)) */
