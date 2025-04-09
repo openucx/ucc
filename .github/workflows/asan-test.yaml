@@ -20,7 +20,7 @@ jobs:
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg
         echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends clang-${CLANG_VER}
+        sudo apt-get install -y --no-install-recommends clang-${CLANG_VER} clang++-${CLANG_VER} libclang-rt-${CLANG_VER}-dev
     - name: Get UCX
       run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
@@ -34,6 +34,6 @@ jobs:
         export ASAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=1:print_suppressions=0
         export LSAN_OPTIONS=report_objects=1
         ./autogen.sh
-        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure CFLAGS="-fsanitize=address" --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
+        CFLAGS="-fsanitize=address" CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
         make -j install
         ./test/gtest/gtest
