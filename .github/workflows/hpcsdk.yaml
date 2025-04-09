@@ -3,15 +3,15 @@ name: NVIDIA HPC SDK
 on: [push, pull_request]
 
 env:
-  HPCXDIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2025/comm_libs/12.8/hpcx/latest/
-  NCCLDIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2025/comm_libs/12.8/nccl/
-  CUDADIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2025/cuda/12.8/
+  HPCXDIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2025/comm_libs/12.6/hpcx/latest/
+  NCCLDIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2025/comm_libs/12.6/nccl/
+  CUDADIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2025/cuda/12.6/
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: nvcr.io/nvidia/nvhpc:25.3-devel-cuda12.8-ubuntu24.04
+      image: nvcr.io/nvidia/nvhpc:25.1-devel-cuda12.6-ubuntu24.04
     steps:
     - name: Install dependencies
       run: |
