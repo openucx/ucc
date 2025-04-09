@@ -16,7 +16,7 @@ jobs:
     - name: Install dependencies
       run: |
         apt-get update
-        apt-get install -y --no-install-recommends libiberty-dev
+        apt-get install -y --no-install-recommends libiberty-dev libibverbs-dev libumad-dev
     - uses: actions/checkout@v1
     - name: Build UCC
       run: |
