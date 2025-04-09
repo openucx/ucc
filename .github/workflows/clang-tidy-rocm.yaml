@@ -5,12 +5,10 @@ on: [push, pull_request]
 env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
-  CLANG_VER: 17
+  CLANG_VER: 20
   ROCM_VER: 5.6.1
   LIBRARY_PATH: /tmp/ucx/install/lib
   LD_LIBRARY_PATH: /tmp/ucx/install/lib
-  ROCM_PATH: /opt/rocm
-  ROCM_DEVICE_LIB_PATH: /opt/rocm/amdgcn/bitcode
 jobs:
   clang-tidy:
     runs-on: ubuntu-22.04
