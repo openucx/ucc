@@ -72,11 +72,11 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
         if (with_onesided) {
             onesided_ctx_params = ctx_params;
             for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
-                onesided_buffers[i] = ucc_calloc(UCC_TEST_MEM_SEGMENT_SIZE * 2,
+                onesided_buffers[i] = ucc_calloc(UCC_TEST_MEM_SEGMENT_SIZE,
                                                  size, "onesided buffers");
                 UCC_MALLOC_CHECK(onesided_buffers[i]);
                 segments[i].address = onesided_buffers[i];
-                segments[i].len     = 2 * UCC_TEST_MEM_SEGMENT_SIZE * size;
+                segments[i].len     = UCC_TEST_MEM_SEGMENT_SIZE * size;
             }
             onesided_ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS;
             onesided_ctx_params.mem_params.segments   = segments;
@@ -495,6 +495,9 @@ std::vector<ucc_test_mpi_result_t> UccTestMpi::exec_tests(
                        std::cout << tc->str() << std::endl;
                     }
                 }
+                if (tc->args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS) {
+                    MPI_Barrier(MPI_COMM_WORLD);
+                }
                 tc->run(triggered);
             } else {
                 if (verbose && 0 == world_rank) {
@@ -523,9 +526,6 @@ std::vector<ucc_test_mpi_result_t> UccTestMpi::exec_tests(
             }
         } while (num_done != tcs.size());
         for (auto tc: tcs) {
-            if (tc->args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS) {
-                MPI_Barrier(MPI_COMM_WORLD);
-            }
             status = tc->check();
             tc->set_input(i + 1);
             if (UCC_OK != status) {

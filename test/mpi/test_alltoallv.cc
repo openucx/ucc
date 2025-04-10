@@ -27,7 +27,6 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     int                        rank, nprocs, rank_count;
     bool                       is_onesided;
     void                      *work_buf;
-    size_t                     offset;
 
     dt          = params.dt;
     dt_size     = ucc_dt_size(dt);
@@ -110,10 +109,9 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
         sbuf = sbuf_mc_header->addr;
         rbuf = rbuf_mc_header->addr;
     } else {
-        offset                  = nprocs * UCC_TEST_MEM_SEGMENT_SIZE * (params.id & 1);
-        sbuf                    = PTR_OFFSET(params.buffers[MEM_SEND_SEGMENT], offset);
-        rbuf                    = PTR_OFFSET(params.buffers[MEM_RECV_SEGMENT], offset);
-        work_buf                = PTR_OFFSET(params.buffers[MEM_WORK_SEGMENT], offset);
+        sbuf                    = params.buffers[MEM_SEND_SEGMENT];
+        rbuf                    = params.buffers[MEM_RECV_SEGMENT];
+        work_buf                = params.buffers[MEM_WORK_SEGMENT];
         args.global_work_buffer = work_buf;
     }
 
