@@ -257,7 +257,6 @@ struct TestCaseParams {
     void **buffers;
     ucc_test_vsize_flag_t count_bits;
     ucc_test_vsize_flag_t displ_bits;
-    uint32_t id;
 };
 
 class TestCase {

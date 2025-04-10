@@ -540,7 +540,6 @@ std::vector<ucc_test_mpi_result_t> UccTestMpi::exec_tests(
 void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
                                  std::vector<ucc_test_mpi_result_t> &rst)
 {
-    uint32_t       id = 0;
     TestCaseParams params;
 
     params.max_size   = test_max_size;
@@ -630,7 +629,6 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
                                         params.count_bits = count_bits;
                                         params.displ_bits = displ_bits;
                                         params.buffers    = onesided_bufs;
-                                        params.id         = id++;
 
                                         auto tcs = TestCase::init(team, c, nt, params);
                                         auto res = exec_tests(tcs, triggered, persistent);
