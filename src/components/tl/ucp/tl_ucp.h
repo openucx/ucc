@@ -143,27 +143,6 @@ typedef ucc_status_t (*ucc_tl_ucp_copy_test_fn_t)(ucc_tl_ucp_context_t *ctx,
                                                   ucc_tl_ucp_copy_task_t *copy_task);
 typedef ucc_status_t (*ucc_tl_ucp_copy_finalize_fn_t)(ucc_tl_ucp_copy_task_t *copy_task);
 
-typedef struct ucc_tl_ucp_context {
-    ucc_tl_context_t            super;
-    ucc_tl_ucp_context_config_t cfg;
-    ucc_tl_ucp_worker_t         worker;
-    ucc_tl_ucp_worker_t         service_worker;
-    uint32_t                    service_worker_throttling_count;
-    ucc_mpool_t                 req_mp;
-    ucc_tl_ucp_remote_info_t *  remote_info;
-    ucp_rkey_h *                rkeys;
-    uint64_t                    n_rinfo_segs;
-    uint64_t                    ucp_memory_types;
-    int                         topo_required;
-    struct {
-        ucc_tl_ucp_copy_post_fn_t     post;
-        ucc_tl_ucp_copy_test_fn_t     test;
-        ucc_tl_ucp_copy_finalize_fn_t finalize;
-    } copy;
-} ucc_tl_ucp_context_t;
-UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
-                  const ucc_base_config_t *);
-
 typedef struct ucc_tl_ucp_team {
     ucc_tl_team_t              super;
     ucc_status_t               status;
@@ -182,6 +161,57 @@ typedef struct ucc_tl_ucp_team {
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
+typedef ucc_status_t (*ucc_tl_ucp_send_nb_fn_t)(void *buffer, size_t msglen,
+                                                ucc_memory_type_t mtype,
+                                                ucc_rank_t dest_group_rank,
+                                                ucc_tl_ucp_team_t *team,
+                                                ucc_tl_ucp_task_t *task);
+
+typedef ucc_status_t (*ucc_tl_ucp_recv_nb_fn_t)(void *buffer, size_t msglen,
+                                                ucc_memory_type_t mtype,
+                                                ucc_rank_t dest_group_rank,
+                                                ucc_tl_ucp_team_t *team,
+                                                ucc_tl_ucp_task_t *task);
+
+typedef ucc_status_t (*ucc_tl_ucp_recv_nz_fn_t)(void *buffer, size_t msglen,
+                                                ucc_memory_type_t mtype,
+                                                ucc_rank_t dest_group_rank,
+                                                ucc_tl_ucp_team_t *team,
+                                                ucc_tl_ucp_task_t *task);
+
+typedef ucc_status_t (*ucc_tl_ucp_send_nz_fn_t)(void *buffer, size_t msglen,
+                                                ucc_memory_type_t mtype,
+                                                ucc_rank_t dest_group_rank,
+                                                ucc_tl_ucp_team_t *team,
+                                                ucc_tl_ucp_task_t *task);
+
+typedef struct ucc_tl_ucp_context {
+    ucc_tl_context_t            super;
+    ucc_tl_ucp_context_config_t cfg;
+    ucc_tl_ucp_worker_t         worker;
+    ucc_tl_ucp_worker_t         service_worker;
+    struct {
+        ucc_tl_ucp_send_nb_fn_t ucc_tl_ucp_send_nb;
+        ucc_tl_ucp_recv_nb_fn_t ucc_tl_ucp_recv_nb;
+        ucc_tl_ucp_send_nz_fn_t ucc_tl_ucp_send_nz;
+        ucc_tl_ucp_recv_nz_fn_t ucc_tl_ucp_recv_nz;
+    } sendrecv_cbs;
+    uint32_t                    service_worker_throttling_count;
+    ucc_mpool_t                 req_mp;
+    ucc_tl_ucp_remote_info_t *  remote_info;
+    ucp_rkey_h *                rkeys;
+    uint64_t                    n_rinfo_segs;
+    uint64_t                    ucp_memory_types;
+    int                         topo_required;
+    struct {
+        ucc_tl_ucp_copy_post_fn_t     post;
+        ucc_tl_ucp_copy_test_fn_t     test;
+        ucc_tl_ucp_copy_finalize_fn_t finalize;
+    } copy;
+} ucc_tl_ucp_context_t;
+UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
+                    const ucc_base_config_t *);
+  
 extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 
 #define UCC_TL_UCP_SUPPORTED_COLLS                                             \

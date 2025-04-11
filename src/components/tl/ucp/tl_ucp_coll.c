@@ -97,8 +97,21 @@ void ucc_tl_ucp_team_default_score_str_free(
     }
 }
 
-void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
-                                   void *user_data)
+void ucc_tl_ucp_send_completion_cb_st(void *request, ucs_status_t status,
+                                      void *user_data)
+{
+    ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
+    if (ucc_unlikely(UCS_OK != status)) {
+        tl_error(UCC_TASK_LIB(task), "failure in send completion %s",
+                 ucs_status_string(status));
+        task->super.status = ucs_status_to_ucc_status(status);
+    }
+    ++task->tagged.send_completed;
+    ucp_request_free(request);
+}
+
+void ucc_tl_ucp_send_completion_cb_mt(void *request, ucs_status_t status,
+                                      void *user_data)
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
     if (ucc_unlikely(UCS_OK != status)) {
@@ -136,9 +149,9 @@ void ucc_tl_ucp_get_completion_cb(void *request, ucs_status_t status,
     ucp_request_free(request);
 }
 
-void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
-                                   const ucp_tag_recv_info_t *info, /* NOLINT */
-                                   void *user_data)
+void ucc_tl_ucp_recv_completion_cb_mt(void *request, ucs_status_t status,
+                                      const ucp_tag_recv_info_t *info, /* NOLINT */
+                                      void *user_data)
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
     if (ucc_unlikely(UCS_OK != status)) {
@@ -147,6 +160,20 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
         task->super.status = ucs_status_to_ucc_status(status);
     }
     ucc_atomic_add32(&task->tagged.recv_completed, 1);
+    ucp_request_free(request);
+}
+
+void ucc_tl_ucp_recv_completion_cb_st(void *request, ucs_status_t status,
+                                      const ucp_tag_recv_info_t *info, /* NOLINT */
+                                      void *user_data)
+{
+    ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
+    if (ucc_unlikely(UCS_OK != status)) {
+        tl_error(UCC_TASK_LIB(task), "failure in recv completion %s",
+                 ucs_status_string(status));
+        task->super.status = ucs_status_to_ucc_status(status);
+    }
+    ++task->tagged.recv_completed;
     ucp_request_free(request);
 }
 
