@@ -677,9 +677,12 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
     req->rreg   = NULL;
     /* - zero copy protocol only provides zero copy design at sender side
      * - truly zero copy protocol provides zero copy design at receiver side as well
-     * here we select the sender side protocol */
-    req->proto  = (req->length < comm->max_eager) ? MCAST_PROTO_EAGER :
-                                                    MCAST_PROTO_ZCOPY;
+     * here we select the sender side protocol
+     * - cost of cuda memcpy is high so we always choose zcopy when cuda is enabled
+     */
+    req->proto  = (req->length < comm->max_eager && !comm->cuda_mem_enabled) ?
+                   MCAST_PROTO_EAGER :
+                   MCAST_PROTO_ZCOPY;
 
     assert(comm->commsize <= ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE);
 

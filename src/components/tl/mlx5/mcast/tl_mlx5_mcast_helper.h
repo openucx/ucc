@@ -403,7 +403,7 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
             ucc_list_del(&pp->super);
             status = ucc_tl_mlx5_mcast_process_packet_collective(comm, req, pp, coll_type);
             if (UCC_OK != status) {
-                tl_error(comm->lib, "process allgather packet failed, status %d",
+                tl_error(comm->lib, "process mcast packet failed, status %d",
                          status);
                 return -1;
             }
@@ -451,7 +451,7 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
 
             status = ucc_tl_mlx5_mcast_process_packet_collective(comm, req, pp, coll_type);
             if (UCC_OK != status) {
-                tl_error(comm->lib, "process allgather packet failed, status %d",
+                tl_error(comm->lib, "process mcast packet failed, status %d",
                          status);
                 ucc_free(wc);
                 return -1;
