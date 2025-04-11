@@ -5,33 +5,36 @@ on: [push, pull_request]
 env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
-  HPCX_LINK: https://content.mellanox.com/hpc/hpc-x/v2.17.1rc2/hpcx-v2.17.1-gcc-mlnx_ofed-ubuntu20.04-cuda12-x86_64.tbz
-  CLANG_VER: 12
-  MLNX_OFED_VER: 5.9-0.5.6.0
-  CUDA_VER: 11-4
+  HPCX_LINK: https://content.mellanox.com/hpc/hpc-x/v2.22.1rc4/hpcx-v2.22.1-gcc-doca_ofed-ubuntu22.04-cuda12-x86_64.tbz
+  CLANG_VER: 17
+  MLNX_OFED_VER: 24.10-2.1.8.0
+  CUDA_VER: 12-8
   LIBRARY_PATH: /tmp/ucx/install/lib
   LD_LIBRARY_PATH: /tmp/ucx/install/lib
 jobs:
   clang-tidy:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends wget lsb-core software-properties-common
-        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| sudo apt-key add -
-        sudo apt-add-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-${CLANG_VER} main"
-        sudo apt-get install -y --no-install-recommends doxygen doxygen-latex clang-tidy-${CLANG_VER} bear
+        sudo apt-get install -y --no-install-recommends wget gpg
+        # Setup LLVM repository
+        sudo mkdir -p /etc/apt/keyrings
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends clang-tidy-${CLANG_VER} bear clang-${CLANG_VER} clang++-${CLANG_VER}
     - name: Install extra rdma dependencies
       run: |
-        wget --no-verbose http://content.mellanox.com/ofed/MLNX_OFED-${MLNX_OFED_VER}/MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu20.04-x86_64.tgz
-        sudo tar -xvzf MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu20.04-x86_64.tgz
-        sudo chmod -R a+rwx MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu20.04-x86_64
-        sudo MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu20.04-x86_64/mlnxofedinstall --skip-unsupported-devices-check --user-space-only --without-fw-update --force --basic -vvv
+        wget --no-verbose http://content.mellanox.com/ofed/MLNX_OFED-${MLNX_OFED_VER}/MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu22.04-x86_64.tgz
+        sudo tar -xvzf MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu22.04-x86_64.tgz
+        sudo chmod -R a+rwx MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu22.04-x86_64
+        sudo MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu22.04-x86_64/mlnxofedinstall --skip-unsupported-devices-check --user-space-only --without-fw-update --force --basic -vvv
     - name: Install extra cuda dependencies
       run: |
-        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb
-        sudo dpkg -i cuda-keyring_1.0-1_all.deb
+        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+        sudo dpkg -i cuda-keyring_1.1-1_all.deb
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends cuda-cudart-dev-${CUDA_VER} cuda-nvcc-${CUDA_VER} cuda-nvml-dev-${CUDA_VER}
     - name: Get UCX
@@ -44,23 +47,21 @@ jobs:
     - name: Download HPCX
       run: |
         cd /tmp
-        wget ${HPCX_LINK}
-        tar xjf hpcx-v2.17.1-gcc-mlnx_ofed-ubuntu20.04-cuda12-x86_64.tbz
-        mv hpcx-v2.17.1-gcc-mlnx_ofed-ubuntu20.04-cuda12-x86_64 hpcx
+        wget --no-verbose ${HPCX_LINK}
+        tar xjf hpcx-v2.22.1-gcc-doca_ofed-ubuntu22.04-cuda12-x86_64.tbz
+        mv hpcx-v2.22.1-gcc-doca_ofed-ubuntu22.04-cuda12-x86_64 hpcx
     - uses: actions/checkout@v1
     - name: Build UCC
       run: |
         ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --with-tls=ucp,mlx5,cuda,self,sharp --with-sharp=/tmp/hpcx/sharp --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-cuda=/usr/local/cuda --with-nvcc-gencode="-gencode=arch=compute_80,code=sm_80" --enable-assert
-        bear --exclude ${GITHUB_WORKSPACE}/src/components/ec/cuda/kernel/ --exclude ${GITHUB_WORKSPACE}/src/components/mc/cuda/kernel/ --cdb /tmp/compile_commands.json make
+        bear --output /tmp/compile_commands.json -- make -j
     - name: Run clang-tidy
       run: |
         echo "Workspace: ${GITHUB_WORKSPACE}"
         cd ${GITHUB_WORKSPACE}
-        run-clang-tidy-${CLANG_VER} -p /tmp/ 2>&1 | tee /tmp/clang_tidy.log
+        run-clang-tidy-${CLANG_VER} -p /tmp/ -header-filter='^(?!.*(${GITHUB_WORKSPACE}/src/components/ec/cuda/kernel/.*|${GITHUB_WORKSPACE}/src/components/mc/cuda/kernel/.*)).*$' "^(?!.*\.cu$).*$" 2>&1 | tee /tmp/clang_tidy.log
         nerrors=$(grep 'error:' /tmp/clang_tidy.log | wc -l)
         if [ $nerrors -ne 0 ]; then
             exit 125;
         fi
-        make clean
-        rm -rf /tmp/ucc
