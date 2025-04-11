@@ -19,6 +19,7 @@ class test_tl_mlx5_qp : public test_tl_mlx5 {
         qp_conf.qp_retry_cnt  = 7;
         qp_conf.qp_timeout    = 18;
         qp_conf.qp_max_atomic = 1;
+        qp_conf.qp_sl         = 1;
     }
 };
 
