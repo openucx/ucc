@@ -330,6 +330,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     if (SBGP_ENABLED(cl_team, NODE_LEADERS)) {
         ucc_assert(cl_team->top_sbgp == UCC_HIER_SBGP_NODE_LEADERS);
         args.args.coll_type                = UCC_COLL_TYPE_ALLGATHERV;
+        args.args.mask                    |= UCC_COLL_ARGS_FIELD_FLAGS;
         args.args.flags                   |= UCC_COLL_ARGS_FLAG_IN_PLACE;
         args.args.flags                   |= UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
         args.args.dst.info_v.buffer        = buffer;
@@ -345,6 +346,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
         args                        = args_old;
         if (SBGP_ENABLED(cl_team, NODE)) {
             args.args.coll_type         = UCC_COLL_TYPE_BCAST;
+            args.args.mask             |= UCC_COLL_ARGS_FIELD_FLAGS;
             args.args.flags            |= UCC_COLL_ARGS_FLAG_IN_PLACE;
             args.args.root              = topo->node_leader_rank_id;
             args.args.src.info.buffer   = buffer;
