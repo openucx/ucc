@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -35,6 +35,10 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_ALLGATHER_ALG_SPARBIT,
              .name = "sparbit",
              .desc = "O(log(N)) SPARBIT algorithm"},
+        [UCC_TL_UCP_ALLGATHER_ALG_LINEAR_XGVMI] =
+            {.id   = UCC_TL_UCP_ALLGATHER_ALG_LINEAR_XGVMI,
+             .name = "linear_xgvmi",
+             .desc = "Offloaded linear xgvmi algorithm"},
         [UCC_TL_UCP_ALLGATHER_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
