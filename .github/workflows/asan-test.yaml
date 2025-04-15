@@ -1,4 +1,4 @@
-name: Linter
+name: ASAN Tests
 
 on: [push, pull_request]
 
@@ -6,8 +6,9 @@ env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
   CLANG_VER: 17
+
 jobs:
-  clang-tidy:
+  gtest-asan:
     runs-on: ubuntu-22.04
     steps:
     - name: Install dependencies
@@ -19,7 +20,7 @@ jobs:
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg
         echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends clang-tidy-${CLANG_VER} bear
+        sudo apt-get install -y --no-install-recommends clang-${CLANG_VER} clang++-${CLANG_VER} libclang-rt-${CLANG_VER}-dev
     - name: Get UCX
       run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
@@ -28,17 +29,11 @@ jobs:
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
         make -j install
     - uses: actions/checkout@v1
-    - name: Build UCC
+    - name: Run gtest ASAN
       run: |
+        export ASAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=1:print_suppressions=0
+        export LSAN_OPTIONS=report_objects=1
         ./autogen.sh
-        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-assert
-        bear --output /tmp/compile_commands.json -- make -j
-    - name: Run clang-tidy
-      run: |
-        echo "Workspace: ${GITHUB_WORKSPACE}"
-        cd ${GITHUB_WORKSPACE}
-        run-clang-tidy-${CLANG_VER} -p /tmp/ 2>&1 | tee /tmp/clang_tidy.log
-        nerrors=$(grep 'error:' /tmp/clang_tidy.log | wc -l)
-        if [ $nerrors -ne 0 ]; then
-            exit 125;
-        fi
+        CFLAGS="-fsanitize=address" CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
+        make -j install
+        ./test/gtest/gtest

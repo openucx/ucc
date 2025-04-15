@@ -5,27 +5,37 @@ on: [push, pull_request]
 env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
-  CLANG_VER: 12
+  CLANG_VER: 17
   ROCM_VER: 5.6.1
   LIBRARY_PATH: /tmp/ucx/install/lib
   LD_LIBRARY_PATH: /tmp/ucx/install/lib
 jobs:
   clang-tidy:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends wget lsb-core software-properties-common gpg curl
-        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| sudo apt-key add -
-        sudo apt-add-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-${CLANG_VER} main"
-        sudo apt-get install -y --no-install-recommends doxygen doxygen-latex clang-tidy-${CLANG_VER} bear
-    - name: Install extra dependencies
-      run: |
-        curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/rocm-keyring.gpg
-        echo 'deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/rocm-keyring.gpg] https://repo.radeon.com/rocm/apt/5.6.1 focal main' | sudo tee /etc/apt/sources.list.d/rocm.list
+        # Install basic dependencies
+        sudo apt-get install -y --no-install-recommends wget gpg
+        # Setup LLVM repository
+        sudo mkdir -p /etc/apt/keyrings
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
+        # Setup ROCm repository
+        wget https://repo.radeon.com/rocm/rocm.gpg.key -O - | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
+        echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${ROCM_VER} jammy main" | sudo tee /etc/apt/sources.list.d/rocm.list
+        echo -e 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 600' | sudo tee /etc/apt/preferences.d/rocm-pin-600
+        # Update PATH for ROCm
+        echo 'export PATH=$PATH:/opt/rocm/bin:/opt/rocm/llvm/bin' | sudo tee -a /etc/profile.d/rocm.sh
+        source /etc/profile.d/rocm.sh
+        # Install all required packages
         sudo apt-get update
-        sudo apt-get install -y rocm-hip-sdk
+        sudo apt-get install -y --no-install-recommends \
+          clang-tidy-${CLANG_VER} \
+          bear \
+          rocm-hip-sdk
+        sudo ln -sf /opt/rocm-${ROCM_VER} /opt/rocm
     - name: Get UCX
       run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
@@ -38,15 +48,13 @@ jobs:
       run: |
         ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-rocm=/opt/rocm --with-rccl=/opt/rocm --enable-assert
-        bear --exclude ${GITHUB_WORKSPACE}/src/components/ec/rocm/kernel/ --exclude ${GITHUB_WORKSPACE}/src/components/mc/rocm/kernel/ --cdb /tmp/compile_commands.json make
+        bear --output /tmp/compile_commands.json -- make -j
     - name: Run clang-tidy
       run: |
         echo "Workspace: ${GITHUB_WORKSPACE}"
         cd ${GITHUB_WORKSPACE}
-        run-clang-tidy-${CLANG_VER} -p /tmp/ 2>&1 | tee /tmp/clang_tidy.log
+        run-clang-tidy-${CLANG_VER} -p /tmp/ -header-filter='^(?!.*(${GITHUB_WORKSPACE}/src/components/ec/rocm/kernel/.*|${GITHUB_WORKSPACE}/src/components/mc/rocm/kernel/.*)).*$' "^(?!.*\.cu$).*$" 2>&1 | tee /tmp/clang_tidy.log
         nerrors=$(grep 'error:' /tmp/clang_tidy.log | wc -l)
         if [ $nerrors -ne 0 ]; then
             exit 125;
         fi
-        make clean
-        rm -rf /tmp/ucc
