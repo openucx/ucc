@@ -72,10 +72,8 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.status = UCC_OK;
 
-    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_done", 0);
-
 out:
-    task->super.status = UCC_ERR_NO_MESSAGE;
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_done", 0);
 }
 
 ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task)
@@ -95,6 +93,7 @@ ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task)
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_start",
                                      0);
+
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     /* Copy local data to the receive buffer if not in-place */
