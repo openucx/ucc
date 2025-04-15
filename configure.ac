@@ -12,7 +12,7 @@
 
 AC_PREREQ([2.63])
 define([ucc_ver_major], 1)
-define([ucc_ver_minor], 4)
+define([ucc_ver_minor], 5)
 define([ucc_ver_patch], 0)
 define([ucc_ver_micro], esyscmd([sh -c "git rev-list HEAD | wc -l | sed -e 's/ *//g' | xargs -n1 printf"]))
 define([ucc_git_sha], esyscmd([sh -c "git rev-parse --short HEAD"]))
