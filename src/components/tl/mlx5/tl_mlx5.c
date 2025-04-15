@@ -88,6 +88,10 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, qp_conf.qp_max_atomic),
      UCC_CONFIG_TYPE_UINT},
 
+     {"QP_SL", "0", "IB QP Service Level",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, qp_conf.qp_sl),
+     UCC_CONFIG_TYPE_UINT},
+
     {"MCAST_SX_DEPTH", "512", "Send context depth of the Mcast comm",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.sx_depth),
      UCC_CONFIG_TYPE_INT},
