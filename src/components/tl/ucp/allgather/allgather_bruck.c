@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -11,6 +11,8 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 #include "components/mc/ucc_mc.h"
+
+ucc_status_t ucc_tl_ucp_allgather_bruck_start(ucc_coll_task_t *coll_task);
 
 ucc_status_t ucc_tl_ucp_allgather_bruck_init(ucc_base_coll_args_t *coll_args,
                                              ucc_base_team_t      *team,
