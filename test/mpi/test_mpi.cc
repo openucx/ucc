@@ -495,6 +495,9 @@ std::vector<ucc_test_mpi_result_t> UccTestMpi::exec_tests(
                        std::cout << tc->str() << std::endl;
                     }
                 }
+                if (tc->args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS) {
+                    MPI_Barrier(MPI_COMM_WORLD);
+                }
                 tc->run(triggered);
             } else {
                 if (verbose && 0 == world_rank) {
