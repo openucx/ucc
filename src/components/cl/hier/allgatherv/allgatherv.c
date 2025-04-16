@@ -304,6 +304,8 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
             args.args.dst.info_v.displacements = node_disps;
             args.args.dst.info_v.counts        = node_counts;
             args.args.dst.info_v.buffer        = node_gathered_data;
+            /* Indicate to gatherv it can read the dst counts on nonroots */
+            args.mask                         |= UCC_BASE_CARGS_NONROOT_INFO;
         }
         UCC_CHECK_GOTO(
             ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]),
