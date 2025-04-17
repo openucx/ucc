@@ -42,14 +42,14 @@ ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task)
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
-/* Get the number of requests in flight to be used for the allgather linear algorithm 
+/* Get the number of requests in flight to be used for the allgather batched algorithm 
  * If the number of requests is not specified, use the number of team size - 1
  * If number of request is bigger than the team size - 1, use the team size - 1
  */
 static unsigned long get_num_reqs(const ucc_tl_ucp_team_t *team)
 {
     unsigned long reqs =
-        UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_linear_num_posts;
+        UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_batched_num_posts;
     ucc_rank_t max_req = UCC_TL_TEAM_SIZE(team) - 1;
     reqs = (reqs > max_req || reqs == UCC_ULUNITS_AUTO) ? max_req : reqs;
     return reqs;
