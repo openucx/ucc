@@ -10,7 +10,37 @@
 #include "tl_ucp_sendrecv.h"
 #include "components/mc/ucc_mc.h"
 
-ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task);
+ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
+    size_t             count     = TASK_ARGS(task).dst.info.count;
+    void              *sbuf      = TASK_ARGS(task).src.info.buffer;
+    void              *rbuf      = TASK_ARGS(task).dst.info.buffer;
+    ucc_memory_type_t  smem      = TASK_ARGS(task).src.info.mem_type;
+    ucc_memory_type_t  rmem      = TASK_ARGS(task).dst.info.mem_type;
+    ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
+    ucc_rank_t         trank     = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         tsize     = UCC_TL_TEAM_SIZE(team);
+    size_t             data_size = (count / tsize) * ucc_dt_size(dt);
+    ucc_status_t       status;
+
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_start",
+                                     0);
+
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
+
+    /* Copy local data to the receive buffer if not in-place */
+    if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
+        status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
+                               data_size, rmem, smem);
+        if (ucc_unlikely(UCC_OK != status)) {
+            return status;
+        }
+    }
+
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+}
 
 /* Get the number of requests in flight to be used for the allgather linear algorithm 
  * If the number of requests is not specified, use the number of team size - 1
@@ -123,42 +153,8 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
 
     task->super.status = ucc_tl_ucp_test(task);
 out:
-    if (task->super.status != UCC_INPROGRESS) {
-        ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
+    if (task->super.status == UCC_OK) {
         UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_done",
                                          0);
-        return;
     }
-}
-
-ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task)
-{
-    ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
-    size_t             count     = TASK_ARGS(task).dst.info.count;
-    void              *sbuf      = TASK_ARGS(task).src.info.buffer;
-    void              *rbuf      = TASK_ARGS(task).dst.info.buffer;
-    ucc_memory_type_t  smem      = TASK_ARGS(task).src.info.mem_type;
-    ucc_memory_type_t  rmem      = TASK_ARGS(task).dst.info.mem_type;
-    ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
-    ucc_rank_t         trank     = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t         tsize     = UCC_TL_TEAM_SIZE(team);
-    size_t             data_size = (count / tsize) * ucc_dt_size(dt);
-    ucc_status_t       status;
-
-    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_start",
-                                     0);
-
-    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-
-    /* Copy local data to the receive buffer if not in-place */
-    if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-        status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
-                               data_size, rmem, smem);
-        if (ucc_unlikely(UCC_OK != status)) {
-            return status;
-        }
-    }
-
-    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
