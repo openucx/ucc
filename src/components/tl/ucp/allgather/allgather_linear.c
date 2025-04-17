@@ -29,7 +29,8 @@ ucc_status_t ucc_tl_ucp_allgather_linear_init_batched(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
     ucc_coll_task_t **task_h, unsigned long nreqs)
 {
-    ucc_tl_ucp_task_t *task = ucc_tl_ucp_init_task(coll_args, team);
+    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_task_t *task    = ucc_tl_ucp_init_task(coll_args, team);
 
     if (!ucc_coll_args_is_predefined_dt(&TASK_ARGS(task), UCC_RANK_INVALID)) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
@@ -40,7 +41,7 @@ ucc_status_t ucc_tl_ucp_allgather_linear_init_batched(
     task->super.post     = ucc_tl_ucp_allgather_linear_start;
     task->super.progress = ucc_tl_ucp_allgather_linear_progress;
     task->allgather_linear.nreqs =
-        nreqs == 0 ? UCC_TL_TEAM_SIZE(TASK_TEAM(task)) : nreqs;
+        nreqs == 0 ? UCC_TL_TEAM_SIZE(tl_team) - 1 : nreqs;
     *task_h = &task->super;
 
     return UCC_OK;
@@ -54,7 +55,7 @@ ucc_tl_ucp_allgather_linear_batched_init(ucc_base_coll_args_t *coll_args,
 {
     return ucc_tl_ucp_allgather_linear_init_batched(
         coll_args, team, task_h,
-        get_num_reqs(TASK_TEAM(ucc_tl_ucp_init_task(coll_args, team))));
+        get_num_reqs(ucc_derived_of(team, ucc_tl_ucp_team_t)));
 }
 
 /* Linear One-Shot version of allgather */
@@ -96,7 +97,7 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
             peer    = (trank + 1 + task->tagged.send_posted) % tsize;
             tmpsend = PTR_OFFSET(rbuf, trank * data_size);
             /* Send my data to peer */
-            UCPCHECK_GOTO(
+            UCPCHECK_GOTO_ERR(
                 ucc_tl_ucp_send_nb(tmpsend, data_size, rmem, peer, team, task),
                 task, out);
             polls = 0;
@@ -108,7 +109,7 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
                 nreqs)) {
             peer    = (trank + 1 + task->tagged.recv_posted) % tsize;
             tmprecv = PTR_OFFSET(rbuf, peer * data_size);
-            UCPCHECK_GOTO(
+            UCPCHECK_GOTO_ERR(
                 ucc_tl_ucp_recv_nb(tmprecv, data_size, rmem, peer, team, task),
                 task, out);
             polls = 0;
