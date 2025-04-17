@@ -187,7 +187,6 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
     uint32_t     ag_counter;
 
     ucc_assert(pp->context == 0); // making sure it's a recv packet not send
-    ucc_assert(UCC_COLL_TYPE_ALLGATHER == coll_type);
 
     // process the immediate value saved in pp->psn
     source_rank = pp->psn % ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE;
@@ -216,6 +215,7 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
             }
         } else if (pp->length) {
             /* staging based allgather */
+            ucc_assert(coll_type == UCC_COLL_TYPE_ALLGATHER);
             if (pp->length == comm->max_per_packet) {
                 dest = PTR_OFFSET(req->rptr, (offset * pp->length + source_rank * req->length));
             } else {

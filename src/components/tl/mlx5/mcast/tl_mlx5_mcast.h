@@ -55,8 +55,7 @@ enum ucc_tl_mlx5_mcast_one_sided_reliability_scheme {
     ONE_SIDED_ASYNCHRONOUS_PROTO
 };
 
-#define CUDA_MEM_MCAST_BCAST_MAX_MSG 4000
-#define ZERO_COPY_MCAST_MIN_MSG_SIZE 131072
+#define CUDA_MEM_MCAST_BCAST_MAX_MSG 4096
 
 enum {
     MCAST_PROTO_EAGER,     /* Internal staging buffers */
@@ -124,6 +123,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm_init_spec {
     int                               reliability_scheme_msg_threshold;
     int                               truly_zero_copy_allgather_enabled;
     int                               truly_zero_copy_bcast_enabled;
+    int                               truly_zero_copy_coll_min_msg;
     int                               mcast_prepost_bucket_size;
     void                             *oob;
 } ucc_tl_mlx5_mcast_coll_comm_init_spec_t;
@@ -320,6 +320,7 @@ typedef struct ucc_tl_mlx5_mcast_bcast_comm {
     int           wsize;
     uint32_t      mcast_prepost_bucket_size;
     uint8_t       truly_zero_copy_bcast_enabled;
+    uint32_t      max_push_send;
 } ucc_tl_mlx5_mcast_bcast_comm_t;
 
 typedef struct ucc_tl_mlx5_mcast_coll_comm {
@@ -362,6 +363,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                             mcast_group_count;
     ucc_tl_mlx5_mcast_allgather_comm_t              allgather_comm;
     ucc_tl_mlx5_mcast_bcast_comm_t                  bcast_comm;
+    uint32_t                                        truly_zero_copy_coll_min_msg;
     ucc_tl_mlx5_mcast_context_t                    *context;
     struct pp_packet                               *r_window[1]; // note: do not add any new variable after here
 } ucc_tl_mlx5_mcast_coll_comm_t;

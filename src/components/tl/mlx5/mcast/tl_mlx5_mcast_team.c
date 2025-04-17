@@ -102,7 +102,9 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
                                         = conf_params->reliability_scheme_msg_threshold;
     comm->bcast_comm.wsize              = conf_params->wsize;
     comm->allgather_comm.max_push_send  = conf_params->max_push_send;
+    comm->bcast_comm.max_push_send      = conf_params->max_push_send;
     comm->max_eager                     = conf_params->max_eager;
+    comm->truly_zero_copy_coll_min_msg  = conf_params->truly_zero_copy_coll_min_msg;
     comm->cuda_mem_enabled              = conf_params->cuda_mem_enabled;
     comm->comm_id                       = team_params->id;
     comm->ctx                           = mcast_context;
