@@ -38,7 +38,11 @@ ucc_base_coll_alg_info_t
         [UCC_TL_UCP_ALLGATHER_ALG_LINEAR] =
             {.id   = UCC_TL_UCP_ALLGATHER_ALG_LINEAR,
              .name = "linear",
-             .desc = "O(N) Linear algorithm"},
+             .desc = "O(N - 1) Linear algorithm, one-shot"},
+        [UCC_TL_UCP_ALLGATHER_ALG_LINEAR_BATCHED] =
+            {.id   = UCC_TL_UCP_ALLGATHER_ALG_LINEAR_BATCHED,
+             .name = "linear_batched",
+             .desc = "O(N - 1) Linear algorithm, K-send/receive in flight"},
         [UCC_TL_UCP_ALLGATHER_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
