@@ -129,7 +129,7 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
             /* Send my data to peer */
             UCPCHECK_GOTO_ERR(
                 ucc_tl_ucp_send_nb(tmpsend, data_size, rmem, peer, team, task),
-                task, out);
+                task, err);
             polls = 0;
         }
 
@@ -141,7 +141,7 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
             tmprecv = PTR_OFFSET(rbuf, peer * data_size);
             UCPCHECK_GOTO_ERR(
                 ucc_tl_ucp_recv_nb(tmprecv, data_size, rmem, peer, team, task),
-                task, out);
+                task, err);
             polls = 0;
         }
     }
@@ -152,9 +152,13 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
     }
 
     task->super.status = ucc_tl_ucp_test(task);
-out:
+
     if (task->super.status == UCC_OK) {
         UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_done",
                                          0);
     }
+    return;
+err:
+    ucc_error("allgather linear progress failed with status %d: %s",
+              task->super.status, ucc_status_string(task->super.status));
 }
