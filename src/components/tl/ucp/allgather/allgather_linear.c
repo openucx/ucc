@@ -12,9 +12,22 @@
 
 ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task);
 
-ucc_status_t ucc_tl_ucp_allgather_linear_init(ucc_base_coll_args_t *coll_args,
-                                              ucc_base_team_t      *team,
-                                              ucc_coll_task_t     **task_h)
+/* Get the number of requests in flight to be used for the allgather linear algorithm 
+ * If the number of requests is not specified, use the number of team size - 1
+ * If number of request is bigger than the team size - 1, use the team size - 1
+ */
+static unsigned long get_num_reqs(const ucc_tl_ucp_team_t *team)
+{
+    unsigned long reqs =
+        UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_linear_num_posts;
+    ucc_rank_t max_req = UCC_TL_TEAM_SIZE(team) - 1;
+    reqs = (reqs > max_req || reqs == UCC_ULUNITS_AUTO) ? max_req : reqs;
+    return reqs;
+}
+
+ucc_status_t ucc_tl_ucp_allgather_linear_init_batched(
+    ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
+    ucc_coll_task_t **task_h, unsigned long nreqs)
 {
     ucc_tl_ucp_task_t *task = ucc_tl_ucp_init_task(coll_args, team);
 
@@ -26,9 +39,31 @@ ucc_status_t ucc_tl_ucp_allgather_linear_init(ucc_base_coll_args_t *coll_args,
 
     task->super.post     = ucc_tl_ucp_allgather_linear_start;
     task->super.progress = ucc_tl_ucp_allgather_linear_progress;
-    *task_h              = &task->super;
+    task->allgather_linear.nreqs =
+        nreqs == 0 ? UCC_TL_TEAM_SIZE(TASK_TEAM(task)) : nreqs;
+    *task_h = &task->super;
 
     return UCC_OK;
+}
+
+/* Linear Batched K-send/receive in flight */
+ucc_status_t
+ucc_tl_ucp_allgather_linear_batched_init(ucc_base_coll_args_t *coll_args,
+                                         ucc_base_team_t      *team,
+                                         ucc_coll_task_t     **task_h)
+{
+    return ucc_tl_ucp_allgather_linear_init_batched(
+        coll_args, team, task_h,
+        get_num_reqs(TASK_TEAM(ucc_tl_ucp_init_task(coll_args, team))));
+}
+
+/* Linear One-Shot version of allgather */
+ucc_status_t ucc_tl_ucp_allgather_linear_init(ucc_base_coll_args_t *coll_args,
+                                              ucc_base_team_t      *team,
+                                              ucc_coll_task_t     **task_h)
+{
+    // 0 means one-shot, team size request will be used
+    return ucc_tl_ucp_allgather_linear_init_batched(coll_args, team, task_h, 0);
 }
 
 void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
@@ -42,38 +77,57 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
     ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
     size_t             count     = TASK_ARGS(task).dst.info.count;
     size_t             data_size = (count / tsize) * ucc_dt_size(dt);
+    int                nreqs     = task->allgather_linear.nreqs;
+    int                polls     = 0;
     void              *tmprecv, *tmpsend;
     ucc_rank_t         peer;
 
-    if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-        return;
-    }
+    while ((task->tagged.send_posted < tsize - 1 ||
+            task->tagged.recv_posted < tsize - 1) &&
+           (polls++ < task->n_polls)) {
 
-    while (task->tagged.send_posted < tsize - 1) {
-        peer    = (trank + 1 + task->tagged.send_posted) % tsize;
-        tmpsend = PTR_OFFSET(rbuf, trank * data_size);
-        tmprecv = PTR_OFFSET(rbuf, peer * data_size);
+        /* Progress UCP worker */
+        ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->worker.ucp_worker);
 
-        /* Send my data to peer */
-        UCPCHECK_GOTO(
-            ucc_tl_ucp_send_nb(tmpsend, data_size, rmem, peer, team, task),
-            task, out);
+        /* try to send data */
+        while ((task->tagged.send_posted < tsize - 1) &&
+               ((task->tagged.send_posted - task->tagged.send_completed) <
+                nreqs)) {
+            peer    = (trank + 1 + task->tagged.send_posted) % tsize;
+            tmpsend = PTR_OFFSET(rbuf, trank * data_size);
+            /* Send my data to peer */
+            UCPCHECK_GOTO(
+                ucc_tl_ucp_send_nb(tmpsend, data_size, rmem, peer, team, task),
+                task, out);
+            polls = 0;
+        }
+
         /* Receive peer's data at peer's offset */
-        UCPCHECK_GOTO(
-            ucc_tl_ucp_recv_nb(tmprecv, data_size, rmem, peer, team, task),
-            task, out);
+        while ((task->tagged.recv_posted < tsize - 1) &&
+               ((task->tagged.recv_posted - task->tagged.recv_completed) <
+                nreqs)) {
+            peer    = (trank + 1 + task->tagged.recv_posted) % tsize;
+            tmprecv = PTR_OFFSET(rbuf, peer * data_size);
+            UCPCHECK_GOTO(
+                ucc_tl_ucp_recv_nb(tmprecv, data_size, rmem, peer, team, task),
+                task, out);
+            polls = 0;
+        }
     }
 
-    /* check if ucp task is complete if it is not complete, yield task */
-    if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+    if (task->tagged.send_posted < tsize - 1 ||
+        task->tagged.recv_posted < tsize - 1) {
         return;
     }
 
-    ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
-    task->super.status = UCC_OK;
-
+    task->super.status = ucc_tl_ucp_test(task);
 out:
-    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_done", 0);
+    if (task->super.status != UCC_INPROGRESS) {
+        ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
+        UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_done",
+                                         0);
+        return;
+    }
 }
 
 ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task)
