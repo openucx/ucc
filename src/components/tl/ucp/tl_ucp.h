@@ -67,6 +67,7 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t                 scatterv_linear_num_posts;
     unsigned long            alltoall_pairwise_num_posts;
     unsigned long            alltoallv_pairwise_num_posts;
+    unsigned long            allgather_batched_num_posts;
     ucc_pipeline_params_t    allreduce_sra_kn_pipeline;
     int                      reduce_avg_pre_op;
     int                      reduce_scatter_ring_bidirectional;

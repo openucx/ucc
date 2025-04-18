@@ -16,6 +16,7 @@ allgather =                        \
 	allgather/allgather_neighbor.c \
 	allgather/allgather_bruck.c    \
 	allgather/allgather_sparbit.c  \
+	allgather/allgather_linear.c   \
 	allgather/allgather_knomial.c
 
 allgatherv =                        \

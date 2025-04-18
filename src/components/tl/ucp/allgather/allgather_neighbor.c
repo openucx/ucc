@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -15,7 +15,7 @@
 static ucc_rank_t get_recv_from_rank(ucc_rank_t rank, ucc_rank_t size, int i)
 {
     const int  i_parity = i % 2;
-    int offset_at_step[2];
+    int        offset_at_step[2];
     ucc_rank_t recv_data_from;
 
     if (rank % 2) {
@@ -28,10 +28,10 @@ static ucc_rank_t get_recv_from_rank(ucc_rank_t rank, ucc_rank_t size, int i)
         offset_at_step[1] = (-2);
     }
 
-    return (recv_data_from + offset_at_step[i_parity] * ucc_div_round_up(i, 2) +
-            size) %
-           size;
+    return (recv_data_from + offset_at_step[i_parity] * ucc_div_round_up(i, 2) + size) % size;
 }
+
+ucc_status_t ucc_tl_ucp_allgather_neighbor_start(ucc_coll_task_t *coll_task);
 
 ucc_status_t ucc_tl_ucp_allgather_neighbor_init(ucc_base_coll_args_t *coll_args,
                                                 ucc_base_team_t      *team,
