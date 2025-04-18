@@ -338,11 +338,16 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
 
     args = args_old;
 
-    /* Need to pack in case its not inplace or the buf isnt contig and we didnt do the gatherv */
+    /* Need to pack in case it's not inplace or the buf isnt contig and we didnt do the gatherv */
     if (ldr_sbgp_only) {
+        /* Linter assumes true for ldr_sbgp_only, but takes false branch for
+            if (SBGP_ENABLED(cl_team, NODE_LEADERS)) node_gathered_data = ... */
+        ucc_assert(node_gathered_data != NULL);
         if (!in_place) {
+            //NOLINTNEXTLINE
             memcpy(node_gathered_data, args.args.src.info.buffer, args.args.src.info.count * ucc_dt_size(args.args.src.info.datatype));
         } else if (!is_contig) {
+            //NOLINTNEXTLINE
             memcpy(node_gathered_data,
                 PTR_OFFSET(args.args.dst.info_v.buffer,
                             dt_size * ucc_coll_args_get_displacement(&args.args, args.args.dst.info_v.displacements, rank)),
