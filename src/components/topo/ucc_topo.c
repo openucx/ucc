@@ -186,7 +186,6 @@ ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *ctx_topo,
     topo->all_numas           = NULL;
     topo->all_nodes           = NULL;
     topo->node_leaders        = NULL;
-    topo->per_node_leaders    = NULL;
 
     *_topo = topo;
     return UCC_OK;
@@ -228,9 +227,6 @@ void ucc_topo_cleanup(ucc_topo_t *topo)
         }
         if (topo->node_leaders) {
             ucc_free(topo->node_leaders);
-        }
-        if (topo->per_node_leaders) {
-            ucc_free(topo->per_node_leaders);
         }
         ucc_free(topo);
     }
@@ -324,27 +320,24 @@ ucc_status_t ucc_sbgp_create_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
         ucc_rank_t ldr_team_rank = ucc_ep_map_eval(leader_sbgp->map, i);
         topo->set.myrank = ldr_team_rank;
         if (ucc_rank_on_local_node(myrank, topo)) {
-            /* Skip creating sbgp, we have this node's sbgp already */
-            sbgps[i] = *(ucc_topo_get_sbgp(topo, UCC_SBGP_NODE));
             leader_rank = topo->node_leader_rank;
-        } else {
-            status = ucc_sbgp_create_node(topo, &sbgps[i]);
-            if (status == UCC_ERR_NOT_FOUND) {
-                /* ucc_sbgp_create_node returned because 0 == node_size */
-                sbgps[i].status = UCC_SBGP_NOT_EXISTS;
-                continue;
-            } else if (status != UCC_OK) {
-                ucc_error("failed to create all_node subgroup %d", i);
-                goto error;
-            }
-            if (sbgps[i].rank_map && sbgps[i].type != UCC_SBGP_FULL) {
-                sbgps[i].map = ucc_ep_map_from_array(
-                                    &sbgps[i].rank_map, sbgps[i].group_size,
-                                    ucc_subset_size(&topo->set), 1);
-            }
-            if (sbgps[i].rank_map && sbgps[i].status == UCC_SBGP_NOT_EXISTS) {
-                ucc_free(sbgps[i].rank_map);
-            }
+        }
+        status = ucc_sbgp_create_node(topo, &sbgps[i]);
+        if (status == UCC_ERR_NOT_FOUND) {
+            /* ucc_sbgp_create_node returned because 0 == node_size */
+            sbgps[i].status = UCC_SBGP_NOT_EXISTS;
+            continue;
+        } else if (status != UCC_OK) {
+            ucc_error("failed to create all_node subgroup %d", i);
+            goto error;
+        }
+        if (sbgps[i].rank_map && sbgps[i].type != UCC_SBGP_FULL) {
+            sbgps[i].map = ucc_ep_map_from_array(
+                                &sbgps[i].rank_map, sbgps[i].group_size,
+                                ucc_subset_size(&topo->set), 1);
+        }
+        if (sbgps[i].rank_map && sbgps[i].status == UCC_SBGP_NOT_EXISTS) {
+            ucc_free(sbgps[i].rank_map);
         }
     }
 
@@ -384,8 +377,7 @@ ucc_status_t ucc_topo_get_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
     return status;
 }
 
-ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leaders_out,
-                                      ucc_rank_t **per_node_leaders_out)
+ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leaders_out)
 {
     ucc_subset_t *set    = &topo->set;
     ucc_rank_t    size   = ucc_subset_size(set);
@@ -397,17 +389,6 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
 
     if (topo->node_leaders) {
         *node_leaders_out = topo->node_leaders;
-        if (per_node_leaders_out) {
-            *per_node_leaders_out = topo->per_node_leaders;
-        }
-        return UCC_OK;
-    }
-
-    // If we just want the per_node_leaders, return them
-    if (!node_leaders_out && topo->per_node_leaders) {
-        ucc_assert(topo->per_node_leaders != NULL);
-        ucc_assert(per_node_leaders_out != NULL);
-        *per_node_leaders_out = topo->per_node_leaders;
         return UCC_OK;
     }
 
@@ -461,13 +442,9 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
     }
 
     topo->node_leaders = node_leaders;
-    topo->per_node_leaders = per_node_leaders;
     //NOLINTNEXTLINE
     *node_leaders_out = node_leaders;
-    if (per_node_leaders_out) {
-        //NOLINTNEXTLINE
-        *per_node_leaders_out = per_node_leaders;
-    }
     ucc_free(ranks_seen_per_node);
+    ucc_free(per_node_leaders);
     return UCC_OK;
 }
