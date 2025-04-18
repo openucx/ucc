@@ -54,7 +54,7 @@ static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
     ucc_assert(team_rank >= 0 && team_rank < UCC_CL_TEAM_SIZE(cl_team));
     ucc_assert(SBGP_EXISTS(cl_team, NODE_LEADERS));
 
-    status = ucc_topo_get_node_leaders(core_team->topo, &node_leaders, NULL);
+    status = ucc_topo_get_node_leaders(core_team->topo, &node_leaders);
     if (UCC_OK != status) {
         cl_error(team->context->lib, "Could not get node leaders");
         return status;
@@ -117,6 +117,30 @@ static inline ucc_status_t is_host_ordered(ucc_cl_hier_team_t *cl_team, int *ord
 
     *ordered = is_host_ordered;
 
+    return UCC_OK;
+}
+
+/* Check if the displacements are contig, whether or not the user passed
+   UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER in coll args */
+static inline ucc_status_t is_disp_contig(ucc_cl_hier_team_t *cl_team, ucc_base_coll_args_t *coll_args, int *contig)
+{
+    ucc_rank_t team_size         = UCC_CL_TEAM_SIZE(cl_team);
+    size_t     count_accumulator = 0;
+    size_t     disps;
+    int        i;
+    
+    if (!UCC_COLL_IS_DST_CONTIG(&coll_args->args)) {
+        for (i = 0; i < team_size; i++) {
+            disps = ucc_coll_args_get_displacement(&coll_args->args, coll_args->args.dst.info_v.displacements, i);
+            if (disps != count_accumulator) {
+                *contig = 0;
+                return UCC_OK;
+            }
+            count_accumulator += ucc_coll_args_get_count(&coll_args->args, coll_args->args.dst.info_v.counts, i);
+        }
+    }
+
+    *contig = 1;
     return UCC_OK;
 }
 
@@ -184,7 +208,8 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     n_tasks   = 0;
     UCC_CHECK_GOTO(is_block_ordered(cl_team, &block_ordered), free_sched, status);
     UCC_CHECK_GOTO(is_host_ordered(cl_team, &host_ordered), free_sched, status);
-    is_contig = UCC_COLL_IS_DST_CONTIG(&args.args) && block_ordered && host_ordered;
+    UCC_CHECK_GOTO(is_disp_contig(cl_team, coll_args, &is_contig), free_sched, status);
+    is_contig = is_contig && block_ordered && host_ordered;
     /* handle the case where this rank may be the only one on this node */
     ldr_sbgp_only = !SBGP_ENABLED(cl_team, NODE) && SBGP_ENABLED(cl_team, NODE_LEADERS);
     
