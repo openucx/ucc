@@ -120,7 +120,7 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
         /* Progress UCP worker */
         ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->worker.ucp_worker);
 
-        /* try to send data */
+        /* try to send data to clockwise peer */
         while ((task->tagged.send_posted < tsize - 1) &&
                ((task->tagged.send_posted - task->tagged.send_completed) <
                 nreqs)) {
@@ -133,11 +133,11 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
             polls = 0;
         }
 
-        /* Receive peer's data at peer's offset */
+        /* Receive peer's data from counter-clockwise peer to avoid deadlock*/
         while ((task->tagged.recv_posted < tsize - 1) &&
                ((task->tagged.recv_posted - task->tagged.recv_completed) <
                 nreqs)) {
-            peer    = (trank + 1 + task->tagged.recv_posted) % tsize;
+            peer    = (tsize + trank - 1 - task->tagged.recv_posted) % tsize;
             tmprecv = PTR_OFFSET(rbuf, peer * data_size);
             UCPCHECK_GOTO_ERR(
                 ucc_tl_ucp_recv_nb(tmprecv, data_size, rmem, peer, team, task),
