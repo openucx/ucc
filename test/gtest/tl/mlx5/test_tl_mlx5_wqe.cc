@@ -39,11 +39,8 @@ UCC_TEST_P(test_tl_mlx5_transpose, transposeWqe)
     struct ibv_wc  wcs[1];
     struct ibv_mr *src_mr, *dst_mr;
     int            i, j, k;
-    struct ibv_device_attr device_attr;
 
-    GTEST_ASSERT_EQ(ibv_query_device(ctx, &device_attr), 0);
-    // Check for Mellanox/NVIDIA vendor ID (0x02c9) and CX7 (MT4129) vendor_part_id
-    if (device_attr.vendor_id != 0x02c9 || device_attr.vendor_part_id != 4129) {
+    if (is_cx7_vendor_id()) {
         GTEST_SKIP() << "The test needs CX7 but got vendor_id="
                      << device_attr.vendor_id
                      << ", vendor_part_id=" << device_attr.vendor_part_id;
@@ -272,6 +269,12 @@ UCC_TEST_P(test_tl_mlx5_wait_on_data, waitOnDataWqe)
     struct ibv_mr *    buffer_mr;
     struct ibv_sge     sg;
     struct ibv_send_wr wr;
+
+    if (is_cx7_vendor_id()) {
+        GTEST_SKIP() << "The test needs CX7 but got vendor_id="
+                     << device_attr.vendor_id
+                     << ", vendor_part_id=" << device_attr.vendor_part_id;
+    }
 
     memset(buffer, 0, 3 * sizeof(uint64_t));
     buffer_mr = ibv_reg_mr(pd, buffer, 3 * sizeof(uint64_t),
