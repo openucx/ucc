@@ -269,7 +269,7 @@ UCC_TEST_P(test_allgather_alg, alg)
     sprintf(tune, "allgather:@%s:inf", std::get<4>(GetParam()).c_str());
     ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
                              {"UCC_TL_UCP_TUNE", tune},
-                             {"UCC_TL_UCP_ALLGATHER_ALG_LINEAR_BATCHED", "1"}};
+                             {"UCC_TL_UCP_ALLGATHER_BATCHED_NUM_POSTS", "1"}};
     UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
     UccTeam_h     team    = job.create_team(n_procs);
     UccCollCtxVec ctxs;

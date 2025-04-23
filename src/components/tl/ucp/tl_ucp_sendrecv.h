@@ -138,7 +138,6 @@ static inline ucc_status_t ucc_tl_ucp_send_nb_mt(void *buffer, size_t msglen,
     return UCC_OK;
 }
 
-/* Returns UCC_OK if send is completed immediately, UCC_INPROGRESS if it succeeds but is not completed */
 static inline ucc_status_t ucc_tl_ucp_send_nb(void *buffer, size_t msglen,
                                               ucc_memory_type_t mtype,
                                               ucc_rank_t        dest_group_rank,
@@ -232,7 +231,6 @@ static inline ucc_status_t ucc_tl_ucp_recv_nb_st(void *buffer, size_t msglen,
     return UCC_OK;
 }
 
-/* Returns UCC_OK if recv is completed immediately, UCC_INPROGRESS if it succeeds but is not completed */
 static inline ucc_status_t ucc_tl_ucp_recv_nb(void *buffer, size_t msglen,
                                               ucc_memory_type_t mtype,
                                               ucc_rank_t        dest_group_rank,
@@ -573,16 +571,5 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
             goto _label;                                                       \
         }                                                                      \
     } while (0)
-
-/* Accept only UCC_OK or UCC_INPROGRESS */
-#define UCPCHECK_GOTO_ERR(_cmd, _task, _label)                                     \
-    do {                                                                       \
-        ucc_status_t _status = (_cmd);                                         \
-        if (UCC_OK != _status && UCC_INPROGRESS != _status) {                  \
-            _task->super.status = _status;                                     \
-            goto _label;                                                       \
-        }                                                                      \
-    } while (0)
-
 
 #endif

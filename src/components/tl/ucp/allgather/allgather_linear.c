@@ -30,6 +30,7 @@ ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task)
                                      0);
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
+    task->allgather_linear.copy_task = NULL;
 
     /* Copy local data to the receive buffer if not in-place */
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
@@ -101,20 +102,24 @@ ucc_status_t ucc_tl_ucp_allgather_linear_init(ucc_base_coll_args_t *coll_args,
 
 void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
-    ucc_rank_t         trank     = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t         tsize     = UCC_TL_TEAM_SIZE(team);
-    void              *rbuf      = TASK_ARGS(task).dst.info.buffer;
-    ucc_memory_type_t  rmem      = TASK_ARGS(task).dst.info.mem_type;
-    ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
-    size_t             count     = TASK_ARGS(task).dst.info.count;
-    size_t             data_size = (count / tsize) * ucc_dt_size(dt);
-    int                nreqs     = task->allgather_linear.nreqs;
-    int                polls     = 0;
-    void              *tmpsend   = PTR_OFFSET(rbuf, trank * data_size);
+    ucc_tl_ucp_task_t    *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t    *team      = TASK_TEAM(task);
+    ucc_tl_ucp_context_t *ctx       = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_rank_t            trank     = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t            tsize     = UCC_TL_TEAM_SIZE(team);
+    void                 *rbuf      = TASK_ARGS(task).dst.info.buffer;
+    ucc_memory_type_t     rmem      = TASK_ARGS(task).dst.info.mem_type;
+    ucc_datatype_t        dt        = TASK_ARGS(task).dst.info.datatype;
+    size_t                count     = TASK_ARGS(task).dst.info.count;
+    size_t                data_size = (count / tsize) * ucc_dt_size(dt);
+    int                   nreqs     = task->allgather_linear.nreqs;
+    int                   polls     = 0;
+    void                 *tmpsend   = UCC_IS_INPLACE(TASK_ARGS(task))
+                                          ? PTR_OFFSET(rbuf, trank * data_size)
+                                          : TASK_ARGS(task).src.info.buffer;
     void              *tmprecv;
     ucc_rank_t         peer;
+    ucc_status_t       status;
 
     while ((task->tagged.send_posted < tsize - 1 ||
             task->tagged.recv_posted < tsize - 1) &&
@@ -129,7 +134,7 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
                 nreqs)) {
             peer    = (trank + 1 + task->tagged.send_posted) % tsize;
             /* Send my data to peer */
-            UCPCHECK_GOTO_ERR(
+            UCPCHECK_GOTO(
                 ucc_tl_ucp_send_nb(tmpsend, data_size, rmem, peer, team, task),
                 task, err);
             polls = 0;
@@ -141,7 +146,7 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
                 nreqs)) {
             peer    = (tsize + trank - 1 - task->tagged.recv_posted) % tsize;
             tmprecv = PTR_OFFSET(rbuf, peer * data_size);
-            UCPCHECK_GOTO_ERR(
+            UCPCHECK_GOTO(
                 ucc_tl_ucp_recv_nb(tmprecv, data_size, rmem, peer, team, task),
                 task, err);
             polls = 0;
@@ -154,11 +159,23 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
     }
 
     task->super.status = ucc_tl_ucp_test(task);
-
-    if (task->super.status == UCC_OK) {
-        UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_done",
-                                         0);
+    if (task->super.status != UCC_OK) {
+        return;
     }
+
+    /* Need to check copy task if it is not in-place */
+    if (task->allgather_linear.copy_task != NULL) {
+        status = ctx->copy.test(ctx, task->allgather_linear.copy_task);
+        if (status > 0) {
+            task->super.status = UCC_INPROGRESS;
+            return;
+        }
+        task->super.status = status;
+        ctx->copy.finalize(task->allgather_linear.copy_task);
+        task->allgather_linear.copy_task = NULL;
+    }
+
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_done", 0);
     return;
 err:
     ucc_error("allgather linear progress failed with status %d: %s",
