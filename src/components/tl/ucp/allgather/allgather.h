@@ -66,8 +66,8 @@ void ucc_tl_ucp_allgather_neighbor_progress(ucc_coll_task_t *task);
 
 /* Bruck */
 ucc_status_t ucc_tl_ucp_allgather_bruck_init(ucc_base_coll_args_t *coll_args,
-                                                ucc_base_team_t      *team,
-                                                ucc_coll_task_t     **task_h);
+                                             ucc_base_team_t      *team,
+                                             ucc_coll_task_t     **task_h);
 
 void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *task);
 
@@ -75,20 +75,21 @@ ucc_status_t ucc_tl_ucp_allgather_bruck_finalize(ucc_coll_task_t *coll_task);
 
 /* Sparbit */
 ucc_status_t ucc_tl_ucp_allgather_sparbit_init(ucc_base_coll_args_t *coll_args,
-                                                ucc_base_team_t      *team,
-                                                ucc_coll_task_t     **task_h);
+                                               ucc_base_team_t      *team,
+                                               ucc_coll_task_t     **task_h);
 
 /* Linear One-Shot version of allgather */
 ucc_status_t ucc_tl_ucp_allgather_linear_init(ucc_base_coll_args_t *coll_args,
-                                                ucc_base_team_t      *team,
-                                                ucc_coll_task_t     **task_h);
+                                              ucc_base_team_t      *team,
+                                              ucc_coll_task_t     **task_h);
 
 void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *task);
 
 /* Linear Batched K-send/receive in flight */
-ucc_status_t ucc_tl_ucp_allgather_linear_batched_init(ucc_base_coll_args_t *coll_args,
-                                                ucc_base_team_t      *team,
-                                                ucc_coll_task_t     **task_h);
+ucc_status_t
+ucc_tl_ucp_allgather_linear_batched_init(ucc_base_coll_args_t *coll_args,
+                                         ucc_base_team_t      *team,
+                                         ucc_coll_task_t     **task_h);
 
 /* Uses allgather_kn_radix from config */
 ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,

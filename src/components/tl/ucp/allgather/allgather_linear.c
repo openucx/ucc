@@ -12,18 +12,19 @@
 
 ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
-    size_t             count     = TASK_ARGS(task).dst.info.count;
-    void              *sbuf      = TASK_ARGS(task).src.info.buffer;
-    void              *rbuf      = TASK_ARGS(task).dst.info.buffer;
-    ucc_memory_type_t  smem      = TASK_ARGS(task).src.info.mem_type;
-    ucc_memory_type_t  rmem      = TASK_ARGS(task).dst.info.mem_type;
-    ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
-    ucc_rank_t         trank     = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t         tsize     = UCC_TL_TEAM_SIZE(team);
-    size_t             data_size = (count / tsize) * ucc_dt_size(dt);
-    ucc_status_t       status;
+    ucc_tl_ucp_task_t    *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t    *team      = TASK_TEAM(task);
+    ucc_tl_ucp_context_t *ctx       = UCC_TL_UCP_TEAM_CTX(team);
+    size_t                count     = TASK_ARGS(task).dst.info.count;
+    void                 *sbuf      = TASK_ARGS(task).src.info.buffer;
+    void                 *rbuf      = TASK_ARGS(task).dst.info.buffer;
+    ucc_memory_type_t     smem      = TASK_ARGS(task).src.info.mem_type;
+    ucc_memory_type_t     rmem      = TASK_ARGS(task).dst.info.mem_type;
+    ucc_datatype_t        dt        = TASK_ARGS(task).dst.info.datatype;
+    ucc_rank_t            trank     = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t            tsize     = UCC_TL_TEAM_SIZE(team);
+    size_t                data_size = (count / tsize) * ucc_dt_size(dt);
+    ucc_status_t          status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_linear_start",
                                      0);
@@ -32,8 +33,9 @@ ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task)
 
     /* Copy local data to the receive buffer if not in-place */
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-        status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
-                               data_size, rmem, smem);
+        status = ctx->copy.post(PTR_OFFSET(rbuf, data_size * trank), rmem,
+                                sbuf, smem, data_size, task,
+                                &task->allgather_linear.copy_task);
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }
@@ -55,7 +57,7 @@ static unsigned long get_num_reqs(const ucc_tl_ucp_team_t *team)
     return reqs;
 }
 
-ucc_status_t ucc_tl_ucp_allgather_linear_init_batched(
+ucc_status_t ucc_tl_ucp_allgather_batched_init(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
     ucc_coll_task_t **task_h, unsigned long nreqs)
 {
@@ -83,7 +85,7 @@ ucc_tl_ucp_allgather_linear_batched_init(ucc_base_coll_args_t *coll_args,
                                          ucc_base_team_t      *team,
                                          ucc_coll_task_t     **task_h)
 {
-    return ucc_tl_ucp_allgather_linear_init_batched(
+    return ucc_tl_ucp_allgather_batched_init(
         coll_args, team, task_h,
         get_num_reqs(ucc_derived_of(team, ucc_tl_ucp_team_t)));
 }
@@ -94,7 +96,7 @@ ucc_status_t ucc_tl_ucp_allgather_linear_init(ucc_base_coll_args_t *coll_args,
                                               ucc_coll_task_t     **task_h)
 {
     // 0 means one-shot, team size request will be used
-    return ucc_tl_ucp_allgather_linear_init_batched(coll_args, team, task_h, 0);
+    return ucc_tl_ucp_allgather_batched_init(coll_args, team, task_h, 0);
 }
 
 void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
@@ -110,7 +112,8 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
     size_t             data_size = (count / tsize) * ucc_dt_size(dt);
     int                nreqs     = task->allgather_linear.nreqs;
     int                polls     = 0;
-    void              *tmprecv, *tmpsend;
+    void              *tmpsend   = PTR_OFFSET(rbuf, trank * data_size);
+    void              *tmprecv;
     ucc_rank_t         peer;
 
     while ((task->tagged.send_posted < tsize - 1 ||
@@ -125,7 +128,6 @@ void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
                ((task->tagged.send_posted - task->tagged.send_completed) <
                 nreqs)) {
             peer    = (trank + 1 + task->tagged.send_posted) % tsize;
-            tmpsend = PTR_OFFSET(rbuf, trank * data_size);
             /* Send my data to peer */
             UCPCHECK_GOTO_ERR(
                 ucc_tl_ucp_send_nb(tmpsend, data_size, rmem, peer, team, task),
