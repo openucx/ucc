@@ -70,7 +70,6 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
     size_t                      dst_dt_size       = ucc_dt_size(
                                                     args->dst.info_v.datatype);
     ucc_rank_t                 *node_leaders      = NULL;
-    ucc_rank_t                 *per_node_leaders  = NULL;
     ucc_sbgp_t                 *all_nodes         = NULL;
     ucc_sbgp_t                 *node_leaders_sbgp = NULL;
     ucc_topo_t                 *topo              = task->team->params.team->topo;
@@ -93,7 +92,7 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
 
     // Get the node leaders
     UCC_CHECK_GOTO(
-        ucc_topo_get_node_leaders(topo, &node_leaders, &per_node_leaders),
+        ucc_topo_get_node_leaders(topo, &node_leaders),
         out, status);
     
     // Get the node leaders subgroup for proper rank mapping
@@ -125,7 +124,6 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
         src_rank_disp = ucc_coll_args_get_displacement(
             args, args->src.info_v.displacements, node_leader_idx);
 
-        ucc_assert(per_node_leaders[node_leader_idx] == leader_team_rank);
         for (ucc_rank_t j = 0; j < all_nodes[node_leader_idx].group_size; j++) {
             if (all_nodes[node_leader_idx].group_size == 1) {
                 // Node sbgp wont exist for just a single rank on a node
