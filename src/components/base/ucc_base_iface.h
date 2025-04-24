@@ -163,7 +163,9 @@ typedef struct ucc_base_team_iface {
 } ucc_base_team_iface_t;
 
 enum {
-    UCC_BASE_CARGS_MAX_FRAG_COUNT = UCC_BIT(0)
+    UCC_BASE_CARGS_MAX_FRAG_COUNT = UCC_BIT(0),
+    /* Info is available on nonroot ranks */
+    UCC_BASE_CARGS_NONROOT_INFO   = UCC_BIT(1)
 };
 
 typedef struct ucc_buffer_info_asymmetric_memtype {
@@ -179,6 +181,7 @@ typedef struct ucc_base_coll_args {
     ucc_coll_args_t                      args;
     ucc_team_t                          *team;
     size_t                               max_frag_count;
+    /* For asymmetric mem types across ranks */
     ucc_buffer_info_asymmetric_memtype_t asymmetric_save_info;
 } ucc_base_coll_args_t;
 
