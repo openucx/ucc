@@ -71,6 +71,13 @@ ucc_status_t ucc_tl_ucp_allgather_batched_init(
         return UCC_ERR_NOT_SUPPORTED;
     }
 
+    if (!UCC_IS_INPLACE(coll_args->args)) {
+        if (UCC_TL_UCP_TEAM_CTX(tl_team)->cfg.local_copy_type ==
+            UCC_TL_UCP_LOCAL_COPY_TYPE_EC) {
+            task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+        }
+    }
+
     task->super.post     = ucc_tl_ucp_allgather_linear_start;
     task->super.progress = ucc_tl_ucp_allgather_linear_progress;
     task->allgather_linear.nreqs =
