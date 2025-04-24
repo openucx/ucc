@@ -247,7 +247,11 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
         ucc_debug("failed to init collective: not supported");
         goto free_scratch;
     } else if (ucc_unlikely(status < 0)) {
-        ucc_error("failed to init collective: %s", ucc_status_string(status));
+        char coll_args_str[256] = {0};
+        ucc_coll_args_str(&op_args.args, team->rank, team->size, coll_args_str,
+                          sizeof(coll_args_str));
+        ucc_error("failed to init collective: %s, err: (%d) %s", coll_args_str,
+                  status, ucc_status_string(status));
         goto free_scratch;
     }
 

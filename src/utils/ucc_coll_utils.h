@@ -275,6 +275,9 @@ typedef struct ucc_coll_task ucc_coll_task_t;
 void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
                   int verbosity);
 
+void ucc_coll_args_str(const ucc_coll_args_t *args, ucc_rank_t trank,
+                       ucc_rank_t tsize, char *str, size_t len);
+
 /* Creates a rank map that reverses rank order, ie
    rank r -> size - 1 - r */
 ucc_ep_map_t ucc_ep_map_create_reverse(ucc_rank_t size);
