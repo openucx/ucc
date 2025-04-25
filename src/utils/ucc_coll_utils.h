@@ -167,6 +167,30 @@ ucc_coll_args_get_total_count(const ucc_coll_args_t *args,
     return count;
 }
 
+/* Check if the displacements are contig, whether or not the user passed
+   UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER in coll args */
+static inline int ucc_coll_args_is_disp_contig(const ucc_coll_args_t *args,
+                                               ucc_rank_t size)
+{
+    size_t     count_accumulator = 0;
+    size_t     disps;
+    ucc_rank_t i;
+
+    if (!UCC_COLL_IS_DST_CONTIG(args)) {
+        for (i = 0; i < size; i++) {
+            disps = ucc_coll_args_get_displacement(
+                        args, args->dst.info_v.displacements, i);
+            if (disps != count_accumulator) {
+                return 0;
+            }
+            count_accumulator += ucc_coll_args_get_count(
+                                    args, args->dst.info_v.counts, i);
+        }
+    }
+
+    return 1;
+}
+
 static inline size_t
 ucc_coll_args_get_v_buffer_size(const ucc_coll_args_t *args,
                                 const ucc_count_t *counts,

@@ -54,7 +54,7 @@ static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
     ucc_assert(team_rank >= 0 && team_rank < UCC_CL_TEAM_SIZE(cl_team));
     ucc_assert(SBGP_EXISTS(cl_team, NODE_LEADERS));
 
-    status = ucc_topo_get_node_leaders(core_team->topo, &node_leaders, NULL);
+    status = ucc_topo_get_node_leaders(core_team->topo, &node_leaders);
     if (UCC_OK != status) {
         cl_error(team->context->lib, "Could not get node leaders");
         return status;
@@ -184,7 +184,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     n_tasks   = 0;
     UCC_CHECK_GOTO(is_block_ordered(cl_team, &block_ordered), free_sched, status);
     UCC_CHECK_GOTO(is_host_ordered(cl_team, &host_ordered), free_sched, status);
-    is_contig = UCC_COLL_IS_DST_CONTIG(&args.args) && block_ordered && host_ordered;
+    is_contig = block_ordered && host_ordered && ucc_coll_args_is_disp_contig(&args.args, team_size);
     /* handle the case where this rank may be the only one on this node */
     ldr_sbgp_only = !SBGP_ENABLED(cl_team, NODE) && SBGP_ENABLED(cl_team, NODE_LEADERS);
     
@@ -304,6 +304,8 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
             args.args.dst.info_v.displacements = node_disps;
             args.args.dst.info_v.counts        = node_counts;
             args.args.dst.info_v.buffer        = node_gathered_data;
+            /* Indicate to gatherv it can read the dst counts on nonroots */
+            args.mask                         |= UCC_BASE_CARGS_NONROOT_INFO;
         }
         UCC_CHECK_GOTO(
             ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]),
@@ -313,11 +315,16 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
 
     args = args_old;
 
-    /* Need to pack in case its not inplace or the buf isnt contig and we didnt do the gatherv */
+    /* Need to pack in case it's not inplace or the buf isnt contig and we didnt do the gatherv */
     if (ldr_sbgp_only) {
+        /* Linter assumes true for ldr_sbgp_only, but takes false branch for
+            if (SBGP_ENABLED(cl_team, NODE_LEADERS)) node_gathered_data = ... */
+        ucc_assert(node_gathered_data != NULL);
         if (!in_place) {
+            //NOLINTNEXTLINE
             memcpy(node_gathered_data, args.args.src.info.buffer, args.args.src.info.count * ucc_dt_size(args.args.src.info.datatype));
         } else if (!is_contig) {
+            //NOLINTNEXTLINE
             memcpy(node_gathered_data,
                 PTR_OFFSET(args.args.dst.info_v.buffer,
                             dt_size * ucc_coll_args_get_displacement(&args.args, args.args.dst.info_v.displacements, rank)),
