@@ -63,8 +63,8 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_ca_start(ucc_coll_task_t *ctask)
         for (peer = start; task->onesided.put_posted < gsize;
             peer = (peer + 1) % gsize) {
 
-            UCPCHECK_GOTO(ucc_tl_ucp_put_nb((void *)(src + grank * count), //PTR_OFFSET(dest, peer * count),
-                                            (void *)(dest + peer * count),//PTR_OFFSET(src, grank * count),
+            UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, grank * count),
+                                            PTR_OFFSET(dest, peer * count),
                                             count, peer, team, task),
                           task, out);
             ucc_tl_ucp_ep_flush(peer, team);
@@ -85,8 +85,8 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_ca_start(ucc_coll_task_t *ctask)
         for (peer = start; task->onesided.get_posted < gsize;
              peer = (peer + 1) % gsize) {
 
-            UCPCHECK_GOTO(ucc_tl_ucp_get_nb((void *)(dest + peer * count), //PTR_OFFSET(dest, peer * count),
-                                            (void *)(src + grank * count),//PTR_OFFSET(src, grank * count),
+            UCPCHECK_GOTO(ucc_tl_ucp_get_nb(PTR_OFFSET(dest, peer * count),
+                                            PTR_OFFSET(src, grank * count),
                                             count, peer, team, task),
                           task, out);
             ucc_tl_ucp_ep_flush(peer, team);
@@ -113,18 +113,18 @@ out:
 
 void ucc_tl_ucp_alltoall_onesided_ca_progress(ucc_coll_task_t *ctask)
 {
-    ucc_tl_ucp_task_t *task  = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
-    ptrdiff_t          src      = (ptrdiff_t)TASK_ARGS(task).src.info.buffer;
-    ptrdiff_t          dest     = (ptrdiff_t)TASK_ARGS(task).dst.info.buffer;
-    ucc_rank_t         grank    = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t         gsize    = UCC_TL_TEAM_SIZE(team);
-    ucc_rank_t         start = (grank + 1) % gsize;
-    ucc_rank_t         peer = (start + task->alltoall_onesided_ca.iteration) % gsize;
+    ucc_tl_ucp_task_t *task      = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
+    ptrdiff_t          src       = (ptrdiff_t)TASK_ARGS(task).src.info.buffer;
+    ptrdiff_t          dest      = (ptrdiff_t)TASK_ARGS(task).dst.info.buffer;
+    ucc_rank_t         grank     = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         gsize     = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t         start     = (grank + 1) % gsize;
+    ucc_rank_t         peer      = (start + task->alltoall_onesided_ca.iteration) % gsize;
     int                iteration = task->alltoall_onesided_ca.iteration;
-    size_t             nreqs = task->alltoall_onesided_ca.tokens;
-    int                polls = 0;
-    size_t             npolls = task->n_polls;
+    size_t             nreqs     = task->alltoall_onesided_ca.tokens;
+    int                polls     = 0;
+    size_t             npolls    = task->n_polls;
     size_t             count;
 
     count = TASK_ARGS(task).src.info.count / gsize;
@@ -132,8 +132,8 @@ void ucc_tl_ucp_alltoall_onesided_ca_progress(ucc_coll_task_t *ctask)
 
     if (gsize < 256) {
         for (; task->onesided.put_posted < gsize; peer = (peer + 1) % gsize) {
-            UCPCHECK_GOTO(ucc_tl_ucp_put_nb((void *)(src + grank * count),//PTR_OFFSET(dest, peer * count),
-                                            (void *)(dest + peer * count),//PTR_OFFSET(src, grank * count),
+            UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, grank * count),
+                                            PTR_OFFSET(dest, peer * count),
                                             count, peer, team, task),
                           task, out);
             ucc_tl_ucp_ep_flush(peer, team);
@@ -158,8 +158,8 @@ void ucc_tl_ucp_alltoall_onesided_ca_progress(ucc_coll_task_t *ctask)
         }
 
         for (; task->onesided.get_posted < gsize; peer = (peer + 1) % gsize) {
-            UCPCHECK_GOTO(ucc_tl_ucp_get_nb((void *)(dest + peer * count),//PTR_OFFSET(dest, peer * count),
-                                            (void *)(src + grank * count),//PTR_OFFSET(src, grank * count),
+            UCPCHECK_GOTO(ucc_tl_ucp_get_nb(PTR_OFFSET(dest, peer * count),
+                                            PTR_OFFSET(src, grank * count),
                                             count, peer, team, task),
                           task, out);
             ++iteration;
@@ -205,7 +205,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_ca_init(ucc_base_coll_args_t *coll_arg
     ucc_tl_ucp_team_t     *tl_team   = ucc_derived_of(team, ucc_tl_ucp_team_t);
     size_t                 frac_rate = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_ca_frac_rate;
     ucc_base_coll_args_t   barrier_coll_args = {
-        .team = team->params.team,
+        .team           = team->params.team,
         .args.coll_type = UCC_COLL_TYPE_BARRIER,
     };
     ucc_coll_task_t       *barrier_task;
@@ -213,6 +213,9 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_ca_init(ucc_base_coll_args_t *coll_arg
     ucc_coll_task_t       *a2a_task;
     ucc_status_t           status;
     ucc_tl_ucp_schedule_t *tl_schedule;
+    size_t                 nelems;
+    size_t                 rate;
+    size_t                 ratio;
 
     ALLTOALL_TASK_CHECK(coll_args->args, tl_team);
 
@@ -223,7 +226,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_ca_init(ucc_base_coll_args_t *coll_arg
 
     schedule = &tl_schedule->super.super;
     ucc_schedule_init(schedule, coll_args, team);
-    schedule->super.post = ucc_tl_ucp_alltoall_onesided_ca_sched_start;
+    schedule->super.post     = ucc_tl_ucp_alltoall_onesided_ca_sched_start;
     schedule->super.progress = NULL;
     schedule->super.finalize = ucc_tl_ucp_alltoall_onesided_ca_sched_finalize;
 
@@ -240,16 +243,15 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_ca_init(ucc_base_coll_args_t *coll_arg
     if (frac_rate > 100) {
         frac_rate = 100;
     }  
-    size_t nelems = (TASK_ARGS(task).src.info.count / UCC_TL_TEAM_SIZE(tl_team));
-    size_t rate = (UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_ca_nic_rate);
-    rate = rate * (double)((UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_ca_frac_rate / 100.0));
-    size_t cs_ratio = nelems * UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_ca_ppn;
+    nelems = (TASK_ARGS(task).src.info.count / UCC_TL_TEAM_SIZE(tl_team));
+    rate   = (UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_ca_nic_rate);
+    rate   = rate * (double)(frac_rate / 100.0);
+    ratio  = nelems * UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_ca_ppn;
 
-    task->alltoall_onesided_ca.tokens = (rate) / (cs_ratio);
+    task->alltoall_onesided_ca.tokens = rate / ratio;
     if (task->alltoall_onesided_ca.tokens < 1) {
         task->alltoall_onesided_ca.tokens = 1;
     }
-
     task->alltoall_onesided_ca.iteration = 0;
 
     ucc_schedule_add_task(schedule, a2a_task);
