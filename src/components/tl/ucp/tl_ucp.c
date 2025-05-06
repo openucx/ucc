@@ -36,6 +36,12 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_ucp_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
 
+    {"ALLGATHER_BATCHED_NUM_POSTS", "auto",
+     "Maximum number of outstanding send and receive messages in allgather "
+     "batched algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allgather_batched_num_posts),
+     UCC_CONFIG_TYPE_ULUNITS},
+
     {"ALLTOALL_PAIRWISE_NUM_POSTS", "auto",
      "Maximum number of outstanding send and receive messages in alltoall "
      "pairwise algorithm",

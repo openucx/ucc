@@ -562,7 +562,7 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
     }
     return UCC_OK;
 }
-
+/* Accept only UCC_OK */
 #define UCPCHECK_GOTO(_cmd, _task, _label)                                     \
     do {                                                                       \
         ucc_status_t _status = (_cmd);                                         \

@@ -268,7 +268,8 @@ UCC_TEST_P(test_allgather_alg, alg)
 
     sprintf(tune, "allgather:@%s:inf", std::get<4>(GetParam()).c_str());
     ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
-                             {"UCC_TL_UCP_TUNE", tune}};
+                             {"UCC_TL_UCP_TUNE", tune},
+                             {"UCC_TL_UCP_ALLGATHER_BATCHED_NUM_POSTS", "1"}};
     UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
     UccTeam_h     team    = job.create_team(n_procs);
     UccCollCtxVec ctxs;
@@ -296,7 +297,7 @@ INSTANTIATE_TEST_CASE_P(
 #endif
         ::testing::Values(1,3,8192), // count
         ::testing::Values(TEST_INPLACE, TEST_NO_INPLACE),
-        ::testing::Values("knomial", "ring", "neighbor", "bruck", "sparbit")),
+        ::testing::Values("knomial", "ring", "neighbor", "bruck", "sparbit", "linear", "batched")),
         [](const testing::TestParamInfo<test_allgather_alg::ParamType>& info) {
             std::string name;
             name += ucc_datatype_str(std::get<0>(info.param));

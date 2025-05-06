@@ -199,6 +199,10 @@ typedef struct ucc_tl_ucp_task {
                                          int step);
         } allgather_ring;
         struct {
+            int                     nreqs; // number of send/recv requests in progress
+            ucc_tl_ucp_copy_task_t *copy_task;
+        } allgather_linear;
+        struct {
             ucc_mc_buffer_header_t *scratch_header;
             size_t                  scratch_size;
         } allgather_bruck;
