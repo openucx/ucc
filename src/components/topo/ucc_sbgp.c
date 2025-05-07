@@ -313,6 +313,15 @@ static ucc_status_t sbgp_create_node_leaders(ucc_topo_t *topo, ucc_sbgp_t *sbgp,
 
     /* order the node leader sbgp by team rank instead of host id */
     qsort(nl_array_1, n_node_leaders, sizeof(ucc_rank_t), ucc_compare_nl_ranks);
+    if (i_am_node_leader) {
+        for (i = 0; i < n_node_leaders; i++) {
+            // my index in nl_array_1 was swapped, find where it was swapped to
+            if (nl_array_1[i] == comm_rank) {
+                sbgp->group_rank = i;
+                break;
+            }
+        }
+    }
 
 skip:
     ucc_free(nl_array_2);
