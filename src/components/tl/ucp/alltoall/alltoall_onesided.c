@@ -28,6 +28,10 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
     ucc_mem_map_mem_h *dst_memh = TASK_ARGS(task).dst_memh.global_memh;
     ucc_rank_t         peer;
 
+    if (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL) {
+        src_memh = TASK_ARGS(task).src_memh.global_memh[grank];
+    }
+
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
     /* TODO: change when support for library-based work buffers is complete */
     nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);

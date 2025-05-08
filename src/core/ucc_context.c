@@ -1150,17 +1150,14 @@ ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
     return status;
 }
 
-ucc_status_t ucc_mem_map_import(ucc_context_h         context,
-                                ucc_mem_map_mode_t   flags,
-                                ucc_mem_map_params_t *params, size_t *memh_size,
+ucc_status_t ucc_mem_map_import(ucc_context_h        context,
+                                ucc_mem_map_mode_t   mode,
+                                const ucc_mem_map_params_t *params, size_t *memh_size,
                                 ucc_mem_map_mem_h *memh)
 {
     ucc_context_t            *ctx    = (ucc_context_t *)context;
     ucc_status_t              status = UCC_OK;
     ucc_config_names_array_t *tls    = &ctx->all_tls;
-    ucc_mem_map_type_t        type   = (flags == UCC_MEM_MAP_IMPORT)
-                                           ? UCC_MEM_MAP_TYPE_GLOBAL
-                                           : UCC_MEM_MAP_TYPE_OFFLOAD_IMPORT;
     size_t                    offset = 0;
     int                       i;
     ucc_mem_map_memh_t       *local_memh;
@@ -1189,7 +1186,7 @@ ucc_status_t ucc_mem_map_import(ucc_context_h         context,
                 tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
                 strncpy(local_memh->tl_h[j].tl_name, tls->names[i], UCC_MEM_MAP_TL_NAME_LEN - 1);
                 status = tl_lib->iface->context.mem_map(
-                    (const ucc_base_context_t *)ctx->tl_ctx[i], type,
+                    (const ucc_base_context_t *)ctx->tl_ctx[i], mode,
                     local_memh, &local_memh->tl_h[j]);
                 if (status < UCC_ERR_NOT_IMPLEMENTED) {
                     ucc_error("failed to import mem map memh %d", status);
@@ -1199,7 +1196,7 @@ ucc_status_t ucc_mem_map_import(ucc_context_h         context,
             offset += UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t) + *packed_size;
         }
     }
-    local_memh->type    = type;
+    local_memh->mode    = mode;
     /* fix context as it will be incorrect on a different system */
     local_memh->context = ctx;
     *memh_size          = 0;
@@ -1208,8 +1205,8 @@ ucc_status_t ucc_mem_map_import(ucc_context_h         context,
 }
 
 ucc_status_t ucc_mem_map_export(ucc_context_h         context,
-                                ucc_mem_map_mode_t    flags,
-                                ucc_mem_map_params_t *params,
+                                ucc_mem_map_mode_t    mode,
+                                const ucc_mem_map_params_t *params,
                                 size_t               *memh_size,
                                 ucc_mem_map_mem_h    *memh)
 {
@@ -1224,9 +1221,8 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     ucc_tl_lib_t             *tl_lib;
     int                       i;
     int                       tls;
-    ucc_mem_map_type_t        type;
 
-    if (flags == UCC_MEM_MAP_EXPORT) {
+    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
         local_memh = (ucc_mem_map_memh_t *)ucc_calloc(1, sizeof(ucc_mem_map_memh_t),
                                                       "local memh");
         if (!local_memh) {
@@ -1243,19 +1239,17 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
         }
         local_memh->address = params->segments[0].address;
         local_memh->len     = params->segments[0].len;
-        type                = UCC_MEM_MAP_TYPE_LOCAL;
     } else {
         if (!memh) {
             ucc_error("unable to export map NULL memory handle");
             return UCC_ERR_INVALID_PARAM;
         }
         local_memh = *memh;
-        type       = UCC_MEM_MAP_TYPE_OFFLOAD_EXPORT;
     }
     packed_buffers =
         (void **)ucc_calloc(ctx->n_tl_ctx, sizeof(void *), "packed buffers");
     if (!packed_buffers) {
-        if (flags == UCC_MEM_MAP_EXPORT) {
+        if (mode == UCC_MEM_MAP_MODE_EXPORT) {
             ucc_free(local_memh->tl_h);
             ucc_free(local_memh);
         }
@@ -1268,7 +1262,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
         tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
         /* always treat as a local mem handle */
         status = tl_lib->iface->context.mem_map(
-            (const ucc_base_context_t *)ctx->tl_ctx[i], type,
+            (const ucc_base_context_t *)ctx->tl_ctx[i], mode,
             local_memh, &local_memh->tl_h[i]);
         if (status != UCC_OK) {
             if (status < UCC_ERR_NOT_IMPLEMENTED) {
@@ -1288,7 +1282,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
         /* tl should set packed_size, allocate buffer, pack memh */
         status = tl_lib->iface->context.memh_pack(
             (const ucc_base_context_t *)ctx->tl_ctx[i],
-            type, &local_memh->tl_h[i], &packed_buffers[i]);
+            mode, &local_memh->tl_h[i], &packed_buffers[i]);
         if (status != UCC_OK) {
             if (status < UCC_ERR_NOT_IMPLEMENTED) {
                 ucc_error("failed to pack memory handles");
@@ -1343,7 +1337,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
                    sizeof(ucc_mem_map_tl_t));
         }
     }
-    exported_memh->type        = type;
+    exported_memh->mode        = mode;
     exported_memh->context     = ctx;
     exported_memh->address     = local_memh->address;
     exported_memh->len         = local_memh->len;
@@ -1363,7 +1357,7 @@ failed_mem_map:
     for (int j = 0; j < i; j++) {
         tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
         tl_lib->iface->context.mem_unmap((const ucc_base_context_t *)ctx,
-                                         UCC_MEM_MAP_TYPE_LOCAL,
+                                         UCC_MEM_MAP_MODE_EXPORT,
                                          &local_memh->tl_h[j]);
     }
     ucc_free(local_memh);
@@ -1373,18 +1367,21 @@ failed_mem_map:
     return status;
 }
 
-ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_mode_t flags,
-                         ucc_mem_map_params_t *params, size_t *memh_size,
+ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_mode_t mode,
+                         const ucc_mem_map_params_t *params, size_t *memh_size,
                          ucc_mem_map_mem_h *memh)
 {
-    if (flags == UCC_MEM_MAP_IMPORT || flags == UCC_MEM_MAP_IMPORT_OFFLOAD) {
-        return ucc_mem_map_import(context, flags, params, memh_size, memh);
+    if (mode >= UCC_MEM_MAP_MODE_LAST) {
+        ucc_error("Invalid memory map mode: %d", mode);
+        return UCC_ERR_INVALID_PARAM;
+    } else if (mode == UCC_MEM_MAP_MODE_IMPORT || mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
+        return ucc_mem_map_import(context, mode, params, memh_size, memh);
     } else {
         if (params->n_segments > 1) {
             ucc_error("UCC only supports one mapping per call");
             return UCC_ERR_INVALID_PARAM;
         }
-        return ucc_mem_map_export(context, flags, params, memh_size, memh);
+        return ucc_mem_map_export(context, mode, params, memh_size, memh);
     }
 }
 
@@ -1411,7 +1408,7 @@ ucc_status_t ucc_mem_unmap(ucc_mem_map_mem_h *memh)
             if (strcmp(lmemh->tl_h[j].tl_name, tls->names[i]) == 0) {
                 tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
                 status = tl_lib->iface->context.mem_unmap(
-                    (const ucc_base_context_t *)ctx->tl_ctx[i], lmemh->type,
+                    (const ucc_base_context_t *)ctx->tl_ctx[i], lmemh->mode,
                     &lmemh->tl_h[j]);
                 if (status < UCC_ERR_NOT_IMPLEMENTED) {
                     ucc_error("error during unmap operation on TL %s",

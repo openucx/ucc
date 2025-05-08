@@ -65,14 +65,14 @@ static ucs_config_field_t ucc_tl_cuda_context_config_table[] = {
 ucc_status_t ucc_tl_cuda_get_context_attr(const ucc_base_context_t *context,
                                           ucc_base_ctx_attr_t *base_attr);
 
-ucc_status_t ucc_tl_cuda_mem_map(const ucc_base_context_t *context, int type,
-                                 void *memh, void *tl_h);
+ucc_status_t ucc_tl_cuda_mem_map(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+                                 ucc_mem_map_memh_t *memh, ucc_mem_map_tl_t *tl_h);
 
-ucc_status_t ucc_tl_cuda_mem_unmap(const ucc_base_context_t *context, int type,
-                                   void *memh);
+ucc_status_t ucc_tl_cuda_mem_unmap(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+                                   ucc_mem_map_tl_t *tl_h);
 
 ucc_status_t ucc_tl_cuda_memh_pack(const ucc_base_context_t *context,
-                                   int type, void *memh, void **pack_buffer);
+                                   ucc_mem_map_mode_t mode, ucc_mem_map_tl_t *tl_h, void **pack_buffer);
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_cuda_context_t, ucc_base_context_t,
                           const ucc_base_context_params_t *,
