@@ -43,6 +43,7 @@ typedef struct ucc_tl_mlx5_iface {
 extern ucc_tl_mlx5_iface_t ucc_tl_mlx5;
 
 typedef struct ucc_tl_mlx5_ib_qp_conf {
+    uint8_t             qp_sl;
     uint32_t            qp_rnr_retry;
     uint32_t            qp_rnr_timer;
     uint32_t            qp_retry_cnt;
