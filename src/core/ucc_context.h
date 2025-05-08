@@ -96,13 +96,6 @@ typedef struct ucc_context_config {
     uint32_t                  throttle_progress;
 } ucc_context_config_t;
 
-typedef enum {
-    UCC_MEM_MAP_TYPE_LOCAL,
-    UCC_MEM_MAP_TYPE_GLOBAL,
-    UCC_MEM_MAP_TYPE_OFFLOAD_IMPORT,   /* special case */
-    UCC_MEM_MAP_TYPE_OFFLOAD_EXPORT
-} ucc_mem_map_type_t;
-
 typedef struct ucc_mem_map_tl_t {
     size_t packed_size;
     char   tl_name[UCC_MEM_MAP_TL_NAME_LEN];
@@ -110,7 +103,7 @@ typedef struct ucc_mem_map_tl_t {
 } ucc_mem_map_tl_t;
 
 typedef struct ucc_mem_map_memh_t {
-    ucc_mem_map_type_t type;
+    ucc_mem_map_mode_t mode;
     ucc_context_h      context;
     void              *address;
     size_t             len;

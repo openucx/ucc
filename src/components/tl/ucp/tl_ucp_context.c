@@ -638,7 +638,7 @@ ucc_status_t ucc_tl_ucp_mem_map_memhbuf(ucc_tl_ucp_context_t *ctx,
 
 ucc_status_t ucc_tl_ucp_mem_map_export(ucc_tl_ucp_context_t *ctx, void *address,
                                        size_t len,
-                                       ucc_mem_map_type_t type,
+                                       ucc_mem_map_mode_t mode,
                                        ucc_tl_ucp_memh_data_t *m_data)
 {
     ucc_status_t           ucc_status = UCC_OK;
@@ -646,7 +646,7 @@ ucc_status_t ucc_tl_ucp_mem_map_export(ucc_tl_ucp_context_t *ctx, void *address,
     ucp_mem_map_params_t   mmap_params;
     ucs_status_t           status;
 
-    if (type == UCC_MEM_MAP_TYPE_LOCAL) {
+    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
         mmap_params.address    = address;
         mmap_params.length     = len;
         mmap_params.field_mask =
@@ -708,7 +708,7 @@ ucc_status_t ucc_tl_ucp_mem_map_offload_import(ucc_tl_ucp_context_t *ctx,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, ucc_mem_map_type_t type,
+ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
                                 ucc_mem_map_memh_t *memh, ucc_mem_map_tl_t *tl_h)
 {
     ucc_tl_ucp_context_t   *ctx        = ucc_derived_of(context, ucc_tl_ucp_context_t);
@@ -724,13 +724,13 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, ucc_mem_map_t
     // copy name information for look ups later
     strncpy(tl_h->tl_name, "ucp", UCC_MEM_MAP_TL_NAME_LEN - 1);
 
-    /* nothing to do for UCC_MEM_MAP_TYPE_OFFLOAD_EXPORT and UCC_MEM_MAP_TYPE_IMPORT */
-    if (type == UCC_MEM_MAP_TYPE_LOCAL) {
-        ucc_status = ucc_tl_ucp_mem_map_export(ctx, memh->address, memh->len, type, m_data);
+    /* nothing to do for UCC_MEM_MAP_MODE_EXPORT_OFFLOAD and UCC_MEM_MAP_MODE_IMPORT */
+    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
+        ucc_status = ucc_tl_ucp_mem_map_export(ctx, memh->address, memh->len, mode, m_data);
         if (UCC_OK != ucc_status) {
             tl_error(ctx->super.super.lib, "failed to export memory handles");
         }
-    } else if (type == UCC_MEM_MAP_TYPE_OFFLOAD_IMPORT) {
+    } else if (mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
         ucc_status = ucc_tl_ucp_mem_map_offload_import(ctx, memh->address, memh->len,
                                                        m_data, memh, tl_h);
         if (UCC_OK != ucc_status) {
@@ -742,7 +742,7 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, ucc_mem_map_t
     return ucc_status;
 }
 
-ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map_type_t type,
+ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
                                   ucc_mem_map_tl_t *memh)
 {
     ucc_tl_ucp_context_t   *ctx = ucc_derived_of(context, ucc_tl_ucp_context_t);
@@ -754,14 +754,14 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
     }
 
     data = (ucc_tl_ucp_memh_data_t *)memh->tl_data;
-    if (type == UCC_MEM_MAP_TYPE_LOCAL || type == UCC_MEM_MAP_TYPE_OFFLOAD_EXPORT) {
+    if (mode == UCC_MEM_MAP_MODE_EXPORT || mode == UCC_MEM_MAP_MODE_EXPORT_OFFLOAD) {
         status = ucp_mem_unmap(ctx->worker.ucp_context, data->rinfo.mem_h);
         if (status != UCS_OK) {
             tl_error(ctx->super.super.lib,
                      "ucp_mem_unmap failed with error code %d", status);
             return ucs_status_to_ucc_status(status);
         }
-    } else if (type == UCC_MEM_MAP_TYPE_GLOBAL || type == UCC_MEM_MAP_TYPE_OFFLOAD_IMPORT) {
+    } else if (mode == UCC_MEM_MAP_MODE_IMPORT || mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
         // need to free rkeys (data->rkey) , packed memh (data->packed_memh)
         if (data->packed_memh) {
             ucp_memh_buffer_release(data->packed_memh, NULL);
@@ -773,14 +773,14 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
             ucp_rkey_destroy(data->rkey);
         }
     } else {
-        ucc_error("Unknown type entered");
+        ucc_error("Unknown mem map mode entered: %d", mode);
         return UCC_ERR_INVALID_PARAM;
     }
     return UCC_OK;
 }
 
 ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
-                                  ucc_mem_map_type_t type, ucc_mem_map_tl_t *tl_h,
+                                  ucc_mem_map_mode_t mode, ucc_mem_map_tl_t *tl_h,
                                   void **pack_buffer)
 {
     ucc_tl_ucp_context_t   *ctx        = ucc_derived_of(context, ucc_tl_ucp_context_t);
@@ -796,7 +796,7 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
         tl_error(ctx->super.super.lib, "unable to pack memory handle without TL handles");
         return UCC_ERR_INVALID_PARAM;
     }
-    if (type == UCC_MEM_MAP_TYPE_LOCAL) {
+    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
         pack_params.field_mask = UCP_MEMH_PACK_PARAM_FIELD_FLAGS;
         pack_params.flags      = UCP_MEMH_PACK_FLAG_EXPORT;
 
@@ -838,14 +838,14 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
     *key_size  = data->rinfo.packed_key_len;
     memh_size  = PTR_OFFSET(packed_buffer, sizeof(size_t));
     *memh_size = data->packed_memh_len;
-    memcpy(PTR_OFFSET(packed_buffer, sizeof(size_t) * 2),
+    memcpy(PTR_OFFSET(packed_buffer, UCC_TL_UCP_MEMH_TL_HEADER_SIZE),
            data->rinfo.packed_key, *key_size);
     memcpy(PTR_OFFSET(packed_buffer,
-                      sizeof(size_t) * 2 + data->rinfo.packed_key_len),
+                      UCC_TL_UCP_MEMH_TL_HEADER_SIZE + UCC_TL_UCP_MEMH_TL_KEY_SIZE(packed_buffer)),
            data->packed_memh, *memh_size);
 
     tl_h->packed_size =
-        sizeof(size_t) * 2 + data->packed_memh_len + data->rinfo.packed_key_len;
+        UCC_TL_UCP_MEMH_TL_HEADER_SIZE + data->packed_memh_len + data->rinfo.packed_key_len;
     *pack_buffer = packed_buffer;
     return ucc_status;
 

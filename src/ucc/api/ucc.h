@@ -1710,12 +1710,20 @@ typedef enum {
                                                             Note, the status is not guaranteed
                                                             to be global on all the processes
                                                             participating in the collective.*/
-    UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS   = UCC_BIT(7)  /*!< If set, both src
+    UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS   = UCC_BIT(7), /*!< If set, both src
                                                             and dst buffers
                                                             reside in a memory
                                                             mapped region.
                                                             Useful for one-sided
                                                             collectives. */
+    UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL      = UCC_BIT(8), /*!< If set, indicates
+                                                            the src_memh memory
+                                                            handle is an array of
+                                                            global handles. */
+    UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL      = UCC_BIT(9), /*!< If set, indicates
+                                                            the dst_memh memory
+                                                            handle is an array of
+                                                            global handles. */
 } ucc_coll_args_flags_t;
 
 /**
@@ -2255,18 +2263,19 @@ ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ee_event);
  * @ingroup UCC_DATATYPE
  */
 typedef enum {
-    UCC_MEM_MAP_EXPORT         = 0, /*!< Indicate ucc_mem_map() should export
+    UCC_MEM_MAP_MODE_EXPORT         = 0, /*!< Indicate ucc_mem_map() should export
                                          memory handles from TLs used by
                                          context */
-    UCC_MEM_MAP_IMPORT         = 1,  /*!< Indicate ucc_mem_map() should import
+    UCC_MEM_MAP_MODE_IMPORT         = 1,  /*!< Indicate ucc_mem_map() should import
                                           memory handles from user memory handle */
-    UCC_MEM_MAP_EXPORT_OFFLOAD = 2, /*!< Indicate ucc_mem_map() should
+    UCC_MEM_MAP_MODE_EXPORT_OFFLOAD = 2, /*!< Indicate ucc_mem_map() should
                                          export memory handles from TLs used
                                          by a context on an offloaded
                                          device */
-    UCC_MEM_MAP_IMPORT_OFFLOAD = 3 /*!< Indicate ucc_mem_map() should import
-                                        memory handles from a host's memory
-                                        handle to an offloaded device */
+    UCC_MEM_MAP_MODE_IMPORT_OFFLOAD = 3, /*!< Indicate ucc_mem_map() should import
+                                         memory handles from a host's memory
+                                         handle to an offloaded device */
+    UCC_MEM_MAP_MODE_LAST           = 4
 } ucc_mem_map_mode_t;
 
 /**
@@ -2277,13 +2286,13 @@ typedef enum {
  * ucc_context_h. The segment is considered "mapped" with the context until
  * the user calls ucc_mem_unmap. It is the user's responsibility to unmap all
  * mapped segments prior to calling ucc_context_destroy(). A handle to the
- * mapped memory is provided in memh. If the flag UCC_MEM_MAP_EXPORT is used,
+ * mapped memory is provided in memh. If the mode UCC_MEM_MAP_MODE_EXPORT is used,
  * the memory will be mapped and memory handles from TLs will be generated and
- * stored in the memh. If the flag UCC_MEM_MAP_IMPORT is used, the user must
+ * stored in the memh. If the mode UCC_MEM_MAP_MODE_IMPORT is used, the user must
  * provide a valid memh, otherwise behavior is undefined.
  *
  * @param [in] context     Context mapped memory is associated with
- * @param [in] flags       flags dictating the behavior of the routine
+ * @param [in] mode        mode dictating the behavior of the routine
  * @param [in] params      parameters indicating the address and length of
  *                          memory to map
  * @param [out] memh_size  Size of memory handle when exported
@@ -2292,8 +2301,8 @@ typedef enum {
  * @return Error code as defined by ucc_status_t.
  */
 
-ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_mode_t flags,
-                         ucc_mem_map_params_t *params, size_t *memh_size,
+ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_mode_t mode,
+                         const ucc_mem_map_params_t *params, size_t *memh_size,
                          ucc_mem_map_mem_h *memh);
 
 /**
