@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -27,8 +27,7 @@ void test_tl_mlx5::SetUp()
         std::string(ucc_global_config.component_path) + "/libucc_tl_mlx5.so";
     tl_mlx5_so_handle = dlopen(path.c_str(), RTLD_NOW);
     if (!tl_mlx5_so_handle) {
-        std::cerr << "cannot open ucc_tl_mlx5 library" << std::endl;
-        GTEST_SKIP();
+        GTEST_SKIP() << "cannot open ucc_tl_mlx5 library" ;
     }
 
     create_ibv_ctx = (ucc_tl_mlx5_create_ibv_ctx_fn_t)dlsym(
@@ -41,13 +40,12 @@ void test_tl_mlx5::SetUp()
 
     status = create_ibv_ctx(&devname, &ctx, &lib);
     if (UCC_OK != status) {
-        std::cerr << "no ib devices";
-        GTEST_SKIP();
+        GTEST_SKIP() << "no ib devices";
     }
     port = get_active_port(ctx);
     ASSERT_GE(port, 0);
 
-    ibv_query_port(ctx, port, &port_attr);
+    ASSERT_EQ(ibv_query_port(ctx, port, &port_attr), 0);
 
     pd = ibv_alloc_pd(ctx);
     ASSERT_NE(nullptr, pd);

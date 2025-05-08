@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -35,6 +35,12 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
 ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_ucp_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
+
+    {"ALLGATHER_BATCHED_NUM_POSTS", "auto",
+     "Maximum number of outstanding send and receive messages in allgather "
+     "batched algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allgather_batched_num_posts),
+     UCC_CONFIG_TYPE_ULUNITS},
 
     {"ALLTOALL_PAIRWISE_NUM_POSTS", "auto",
      "Maximum number of outstanding send and receive messages in alltoall "
@@ -136,9 +142,9 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatter_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"ALLGATHER_KN_RADIX", "4", "Radix of the knomial allgather algorithm",
+    {"ALLGATHER_KN_RADIX", "auto", "Radix of the knomial allgather algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allgather_kn_radix),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_UINT_RANGED},
 
     {"BCAST_KN_RADIX", "4", "Radix of the recursive-knomial bcast algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_kn_radix),
@@ -152,6 +158,16 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
     {"REDUCE_KN_RADIX", "4", "Radix of the knomial tree reduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_kn_radix),
      UCC_CONFIG_TYPE_UINT},
+
+    {"REDUCE_SRG_KN_PIPELINE", "auto",
+     "Pipelining settings for SRG Knomial reduce algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_srg_kn_pipeline),
+     UCC_CONFIG_TYPE_PIPELINE_PARAMS},
+
+    {"REDUCE_SRG_KN_RADIX", "auto",
+     "Radix of the scatter-reduce-gather (SRG) knomial reduce algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_srg_kn_radix),
+     UCC_CONFIG_TYPE_UINT_RANGED},
 
     {"GATHER_KN_RADIX", "4", "Radix of the knomial tree reduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, gather_kn_radix),
@@ -208,6 +224,14 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
 
     {NULL}};
 
+const char* ucc_tl_ucp_local_copy_names[] = {
+    [UCC_TL_UCP_LOCAL_COPY_TYPE_UCP]  = "ucp",
+    [UCC_TL_UCP_LOCAL_COPY_TYPE_MC]   = "mc",
+    [UCC_TL_UCP_LOCAL_COPY_TYPE_EC]   = "ec",
+    [UCC_TL_UCP_LOCAL_COPY_TYPE_AUTO] = "auto",
+    [UCC_TL_UCP_LOCAL_COPY_TYPE_LAST] = NULL
+};
+
 static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_ucp_context_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_context_config_table)},
@@ -245,6 +269,18 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      "calls to service worker progress function",
      ucc_offsetof(ucc_tl_ucp_context_config_t, service_throttling_thresh),
      UCC_CONFIG_TYPE_UINT},
+
+    {"LOCAL_COPY_TYPE", "auto",
+     "Determines what component is responsible for doing local copy "
+     "during collective execution",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, local_copy_type),
+     UCC_CONFIG_TYPE_ENUM(ucc_tl_ucp_local_copy_names)},
+
+    {"MEMTYPE_COPY_ENABLE", "y",
+     "Allows memory type copies. This option influences protocol selection in UCX. "
+     "See https://github.com/openucx/ucx/pull/10490 for more details.",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, memtype_copy_enable),
+     UCC_CONFIG_TYPE_BOOL},
 
     {NULL}};
 

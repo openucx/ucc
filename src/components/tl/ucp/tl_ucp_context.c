@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -12,7 +12,10 @@
 #include "utils/ucc_string.h"
 #include "utils/arch/cpu.h"
 #include "schedule/ucc_schedule_pipelined.h"
+#include "tl_ucp_copy.h"
 #include <limits.h>
+
+#include "tl_ucp_sendrecv.h"
 
 #define UCP_CHECK(function, msg, go, ctx)                                      \
     status = function;                                                         \
@@ -163,6 +166,21 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     prefix[strlen(prefix) - 1] = '\0';
     UCP_CHECK(ucp_config_read(prefix, NULL, &ucp_config),
               "failed to read ucp configuration", err_cfg_read, self);
+    if (!tl_ucp_config->memtype_copy_enable) {
+        UCP_CHECK(ucp_config_modify(ucp_config, "MEMTYPE_COPY_ENABLE", "no"),
+                  "failed to set memtype copy enable option for UCX",
+                  err_cfg, self);
+        if (tl_ucp_config->local_copy_type == UCC_TL_UCP_LOCAL_COPY_TYPE_MC) {
+            tl_info(self->super.super.lib, "memtype copy is disabled in UCX, "
+                    "using local copy type MC might lead to deadlocks in CUDA "
+                    "applications");
+        } else if (tl_ucp_config->local_copy_type == UCC_TL_UCP_LOCAL_COPY_TYPE_EC) {
+            tl_info(self->super.super.lib, "memtype copy is disabled in UCX, "
+                    "using local copy type EC might lead to deadlocks in CUDA "
+                    "applications when CUDA kernel depends on collective "
+                    "communication and stream is not provided to the collective");
+        }
+    }
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK | UCP_PARAM_FIELD_NAME;
@@ -199,9 +217,17 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     case UCC_THREAD_SINGLE:
     case UCC_THREAD_FUNNELED:
         worker_params.thread_mode = UCS_THREAD_MODE_SINGLE;
+        self->sendrecv_cbs.ucc_tl_ucp_send_nb = ucc_tl_ucp_send_nb_st;
+        self->sendrecv_cbs.ucc_tl_ucp_recv_nb = ucc_tl_ucp_recv_nb_st;
+        self->sendrecv_cbs.ucc_tl_ucp_send_nz = ucc_tl_ucp_send_nz_st;
+        self->sendrecv_cbs.ucc_tl_ucp_recv_nz = ucc_tl_ucp_recv_nz_st;
         break;
     case UCC_THREAD_MULTIPLE:
         worker_params.thread_mode = UCS_THREAD_MODE_MULTI;
+        self->sendrecv_cbs.ucc_tl_ucp_send_nb = ucc_tl_ucp_send_nb_mt;
+        self->sendrecv_cbs.ucc_tl_ucp_recv_nb = ucc_tl_ucp_recv_nb_mt;
+        self->sendrecv_cbs.ucc_tl_ucp_send_nz = ucc_tl_ucp_send_nz_mt;
+        self->sendrecv_cbs.ucc_tl_ucp_recv_nz = ucc_tl_ucp_recv_nz_mt;        
         break;
     default:
         /* unreachable */
@@ -277,6 +303,36 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     }
     ucc_free(prefix);
     prefix = NULL;
+
+    switch (self->cfg.local_copy_type) {
+    case UCC_TL_UCP_LOCAL_COPY_TYPE_MC:
+        self->copy.post     = ucc_tl_ucp_mc_copy_post;
+        self->copy.test     = ucc_tl_ucp_mc_copy_test;
+        self->copy.finalize = ucc_tl_ucp_mc_copy_finalize;
+        tl_debug(self->super.super.lib, "using MC for local copy");
+        break;
+    case UCC_TL_UCP_LOCAL_COPY_TYPE_EC:
+    case UCC_TL_UCP_LOCAL_COPY_TYPE_AUTO:
+        self->cfg.local_copy_type = UCC_TL_UCP_LOCAL_COPY_TYPE_EC;
+        self->copy.post     = ucc_tl_ucp_ec_copy_post;
+        self->copy.test     = ucc_tl_ucp_ec_copy_test;
+        self->copy.finalize = ucc_tl_ucp_ec_copy_finalize;
+        tl_debug(self->super.super.lib, "using EC for local copy");
+        break;
+    case UCC_TL_UCP_LOCAL_COPY_TYPE_UCP:
+        self->copy.post     = ucc_tl_ucp_ucp_copy_post;
+        self->copy.test     = ucc_tl_ucp_ucp_copy_test;
+        self->copy.finalize = ucc_tl_ucp_ucp_copy_finalize;
+        tl_debug(self->super.super.lib, "using UCP for local copy");
+        break;
+    default:
+        self->copy.post     = ucc_tl_ucp_ec_copy_post;
+        self->copy.test     = ucc_tl_ucp_ec_copy_test;
+        self->copy.finalize = ucc_tl_ucp_ec_copy_finalize;
+        tl_error(self->super.super.lib,
+                "not valid copy type: %d, using EC copy instead",
+                 self->cfg.local_copy_type);
+    };
 
     tl_debug(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;

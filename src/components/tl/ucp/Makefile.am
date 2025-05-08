@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 if TL_UCP_ENABLED
@@ -16,6 +16,7 @@ allgather =                        \
 	allgather/allgather_neighbor.c \
 	allgather/allgather_bruck.c    \
 	allgather/allgather_sparbit.c  \
+	allgather/allgather_linear.c   \
 	allgather/allgather_knomial.c
 
 allgatherv =                        \
@@ -78,11 +79,12 @@ gatherv =                    \
 	gatherv/gatherv.c        \
 	gatherv/gatherv_linear.c
 
-reduce =                    \
-	reduce/reduce.h         \
-	reduce/reduce.c         \
-	reduce/reduce_knomial.c \
-	reduce/reduce_dbt.c
+reduce =                        \
+	reduce/reduce.h             \
+	reduce/reduce.c             \
+	reduce/reduce_knomial.c     \
+	reduce/reduce_dbt.c         \
+	reduce/reduce_srg_knomial.c
 
 reduce_scatter =                            \
 	reduce_scatter/reduce_scatter.h         \
@@ -116,6 +118,7 @@ sources =                 \
 	tl_ucp_service_coll.c \
 	tl_ucp_dpu_offload.h  \
 	tl_ucp_dpu_offload.c  \
+	tl_ucp_copy.c         \
 	$(allgather)          \
 	$(allgatherv)         \
 	$(alltoall)           \

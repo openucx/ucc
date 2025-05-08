@@ -39,8 +39,15 @@ ucc_coll_type_t ucc_coll_type_from_str(const char *str)
     return UCC_COLL_TYPE_LAST;
 }
 
-#define STR_MEM_TYPE_CHECK(_str, _p) STR_TYPE_CHECK(_str, _p,UCC_MEMORY_TYPE_)
-
+#define STR_MEM_TYPE_CHECK(_str, _p)                                           \
+    do {                                                                       \
+        if (0 == strcasecmp("CudaManaged", _str)) {                            \
+            STR_TYPE_CHECK("cuda_managed", _p, UCC_MEMORY_TYPE_);              \
+        } else if (0 == strcasecmp("RocmManaged", _str)) {                     \
+            STR_TYPE_CHECK("rocm_managed", _p, UCC_MEMORY_TYPE_);              \
+        }                                                                      \
+        STR_TYPE_CHECK(_str, _p, UCC_MEMORY_TYPE_);                            \
+    } while (0)
 
 ucc_memory_type_t ucc_mem_type_from_str(const char *str)
 {

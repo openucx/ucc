@@ -106,6 +106,8 @@ typedef struct ucc_cl_hier_team {
     ucc_coll_score_t        *score;
     ucc_hier_sbgp_t          sbgps[UCC_HIER_SBGP_LAST];
     ucc_hier_sbgp_type_t     top_sbgp;
+    int                      is_block_ordered;
+    int                      is_host_ordered;
 } ucc_cl_hier_team_t;
 UCC_CLASS_DECLARE(ucc_cl_hier_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
@@ -113,6 +115,7 @@ UCC_CLASS_DECLARE(ucc_cl_hier_team_t, ucc_base_context_t *,
 #define UCC_CL_HIER_SUPPORTED_COLLS                                            \
     (UCC_COLL_TYPE_ALLTOALL |                                                  \
      UCC_COLL_TYPE_ALLTOALLV |                                                 \
+     UCC_COLL_TYPE_ALLGATHERV |                                                 \
      UCC_COLL_TYPE_ALLREDUCE |                                                 \
      UCC_COLL_TYPE_BARRIER |                                                   \
      UCC_COLL_TYPE_BCAST |                                                     \
@@ -133,6 +136,12 @@ ucc_status_t ucc_cl_hier_coll_init(ucc_base_coll_args_t *coll_args,
 
 #define SBGP_RANK(_team, _sbgp)                                                \
     ((_team)->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp->group_rank)
+
+#define SBGP_SIZE(_team, _sbgp)                                                \
+    ((_team)->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp->group_size)
+
+#define SBGP_MAP(_team, _sbgp)                                                 \
+    ((_team)->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp->map)
 
 #define SBGP_EXISTS(_team, _sbgp)                                              \
     ((NULL != (_team)->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp) &&                   \

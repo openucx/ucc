@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -99,16 +99,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
          SHARP_DTYPE_UNKNOWN) ||
         (ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(SHARP_DTYPE_BFLOAT16)] ==
          SHARP_DTYPE_UNKNOWN)) {
-        struct sharp_coll_caps sharp_caps;
-        ret = sharp_coll_caps_query(sharp_ctx, &sharp_caps);
-        if (ret < 0) {
-            status = sharp_status_to_ucc_status(ret);
-            tl_error(ctx->super.super.lib, "sharp_coll_caps_query failed: %s(%d)",
-                    sharp_coll_strerror(ret), ret);
-            goto cleanup;
-        }
 
-        if (sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_INT8)) {
+        if (ctx->sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_INT8)) {
             tl_debug(ctx->super.super.lib, "enabling support for UCC_DT_INT8");
             ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_INT8)] = SHARP_DTYPE_INT8;
         } else {
@@ -116,7 +108,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
             ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_INT8)] = SHARP_DTYPE_NULL;
         }
 
-        if (sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_UINT8)) {
+        if (ctx->sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_UINT8)) {
             tl_debug(ctx->super.super.lib, "enabling support for UCC_DT_UINT8");
             ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_UINT8)] = SHARP_DTYPE_UINT8;
         } else {
@@ -125,7 +117,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
         }
 
 
-        if (sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_BFLOAT16)) {
+        if (ctx->sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_BFLOAT16)) {
             tl_debug(ctx->super.super.lib, "enabling support for UCC_DT_BFLOAT16");
             ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = SHARP_DTYPE_BFLOAT16;
         } else {
@@ -255,6 +247,11 @@ ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
         status = ucc_tl_sharp_reduce_scatter_init(task);
         break;
 #endif
+#if HAVE_DECL_SHARP_COLL_DO_ALLGATHER
+    case UCC_COLL_TYPE_ALLGATHER:
+        status = ucc_tl_sharp_allgather_init(task);
+        break;
+#endif
     default:
         tl_debug(UCC_TASK_LIB(task),
                  "collective %d is not supported by sharp tl",
@@ -282,6 +279,7 @@ ucc_status_t ucc_tl_sharp_team_get_scores(ucc_base_team_t  *tl_team,
     ucc_coll_score_t    *score;
     ucc_status_t         status;
     ucc_coll_score_team_info_t team_info;
+    int i;
 
     team_info.alg_fn              = NULL;
     team_info.default_score       = UCC_TL_SHARP_DEFAULT_SCORE;
@@ -299,6 +297,18 @@ ucc_status_t ucc_tl_sharp_team_get_scores(ucc_base_team_t  *tl_team,
                                      NULL, 0, &score);
     if (UCC_OK != status) {
         return status;
+    }
+
+    for (i = 0; i < UCC_TL_SHARP_N_DEFAULT_ALG_SELECT_STR; i++) {
+        status = ucc_coll_score_update_from_str(
+            ucc_tl_sharp_default_alg_select_str[i], &team_info,
+            &team->super.super, score);
+        if (UCC_OK != status) {
+            tl_error(tl_team->context->lib,
+                     "failed to apply default coll select setting: %s",
+                     ucc_tl_sharp_default_alg_select_str[i]);
+            goto err;
+        }
     }
 
     if (strlen(ctx->score_str) > 0) {

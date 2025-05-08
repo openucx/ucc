@@ -140,4 +140,13 @@ static inline uint32_t ucc_ilog2_ceil(uint32_t n)
     return 31 - x + 1;
 }
 
+/* return the lowest greater or equal power of 2 */
+static inline int ucc_round_up_power2(int value)
+{
+    if (value <= 1) {
+        return 1;
+    }
+    return 1 << (32 - ucc_count_leading_zero_bits(value - 1));
+}
+
 #endif

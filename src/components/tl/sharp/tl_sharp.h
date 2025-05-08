@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -53,6 +53,7 @@ typedef struct ucc_tl_sharp_context_config {
     int                      context_per_team;
     int                      enable_lazy_group_alloc;
     int                      team_max_ppn;
+    int                      use_multi_channel;
 } ucc_tl_sharp_context_config_t;
 
 typedef struct ucc_tl_sharp_lib {
@@ -87,6 +88,7 @@ typedef struct ucc_tl_sharp_context {
     ucc_mpool_t                   req_mp;
     ucc_tl_sharp_oob_ctx_t        oob_ctx;
     ucc_rcache_t                 *rcache;
+    struct sharp_coll_caps        sharp_caps;
 } ucc_tl_sharp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_sharp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -104,6 +106,10 @@ typedef struct ucc_tl_sharp_task {
     ucc_coll_task_t             super;
     void                       *req_handle;
     union {
+        struct {
+            ucc_tl_sharp_reg_t *s_mem_h;
+            ucc_tl_sharp_reg_t *r_mem_h;
+        } allgather;
         struct {
             ucc_tl_sharp_reg_t *s_mem_h;
             ucc_tl_sharp_reg_t *r_mem_h;
@@ -138,12 +144,11 @@ ucc_status_t sharp_status_to_ucc_status(int status);
 #define UCC_TL_BASIC_SHARP_SUPPORTED_COLLS                                     \
     (UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BARRIER | UCC_COLL_TYPE_BCAST)
 
-#if HAVE_DECL_SHARP_COLL_DO_REDUCE_SCATTER
-#define UCC_TL_SHARP_SUPPORTED_COLLS                                           \
-    (UCC_TL_BASIC_SHARP_SUPPORTED_COLLS | UCC_COLL_TYPE_REDUCE_SCATTER)
-#else
-#define UCC_TL_SHARP_SUPPORTED_COLLS (UCC_TL_BASIC_SHARP_SUPPORTED_COLLS)
-#endif
+
+#define UCC_TL_SHARP_SUPPORTED_COLLS \
+    (UCC_TL_BASIC_SHARP_SUPPORTED_COLLS | \
+    (HAVE_DECL_SHARP_COLL_DO_REDUCE_SCATTER ? UCC_COLL_TYPE_REDUCE_SCATTER : 0) | \
+    (HAVE_DECL_SHARP_COLL_DO_ALLGATHER ? UCC_COLL_TYPE_ALLGATHER : 0))
 
 UCC_CLASS_DECLARE(ucc_tl_sharp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -46,7 +46,6 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     ucc_tl_context_t          *tl_ctx;
     ucc_tl_lib_t              *tl_lib;
     ucc_base_lib_attr_t        attr;
-
 
     if (!params->team->topo) {
         cl_debug(cl_context->lib,
@@ -263,7 +262,9 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
         return status;
     }
 
-    team->n_tl_teams = 0;
+    team->is_block_ordered = -1;
+    team->is_host_ordered  = -1;
+    team->n_tl_teams       =  0;
 
     /* TL teams are created: get scores and merge them to produce
      * score map for each sbgp
@@ -397,7 +398,7 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
         0, UCC_MSG_MAX, UCC_CL_HIER_DEFAULT_SCORE,
         ucc_cl_hier_barrier_init, cl_team);
     if (UCC_OK != status) {
-        cl_error(lib, "faild to add range to score_t");
+        cl_error(lib, "failed to add range to score_t");
         return status;
 
     }

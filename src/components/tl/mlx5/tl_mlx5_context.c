@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -16,6 +16,38 @@
 #define PD_OWNER_RANK 0
 #define TL_MLX5_IB_PORT_INVALID -1
 
+static ucc_status_t ucc_tl_mlx5_check_gpudirect_driver(ucc_base_lib_t *lib,
+                                                       const char *file)
+{
+    ucc_status_t status = UCC_ERR_NO_RESOURCE;
+
+    if (!access(file, F_OK)) {
+        status = UCC_OK;
+    }
+
+    tl_debug(lib, "checking gpudirect driver: %s, status: %d %s", file,
+             status, ucc_status_string(status));
+    return status;
+}
+
+static ucc_status_t ucc_tl_mlx5_check_gpudirect_driver_cuda(ucc_base_lib_t *lib)
+{
+    /* Check peer memory driver is loaded, different driver versions use
+     * different paths */
+    if (UCC_OK == ucc_tl_mlx5_check_gpudirect_driver(lib,
+                            "/sys/kernel/mm/memory_peers/nv_mem/version")) {
+        return UCC_OK;
+    } else if (UCC_OK == ucc_tl_mlx5_check_gpudirect_driver(lib,
+                            "/sys/module/nvidia_peermem/version")) {
+        return UCC_OK;
+    } else if (UCC_OK == ucc_tl_mlx5_check_gpudirect_driver(lib,
+                            "/sys/module/nv_peer_mem/version")) {
+        return UCC_OK;
+    }
+    tl_debug(lib, "no gpudirect driver found, cuda memory is not supported");
+    return UCC_ERR_NOT_SUPPORTED;
+}
+
 UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
                     const ucc_base_context_params_t *params,
                     const ucc_base_config_t *        config)
@@ -27,10 +59,15 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_mlx5_config->super,
                               params->context);
     memcpy(&self->cfg, tl_mlx5_config, sizeof(*tl_mlx5_config));
-    self->sock       = 0;
-    self->rcache     = NULL;
-    self->shared_pd  = NULL;
-    self->shared_ctx = NULL;
+    self->sock                = 0;
+    self->rcache              = NULL;
+    self->shared_pd           = NULL;
+    self->shared_ctx          = NULL;
+    self->supported_mem_types = UCC_BIT(UCC_MEMORY_TYPE_HOST);
+
+    if (UCC_OK == ucc_tl_mlx5_check_gpudirect_driver_cuda(self->super.super.lib)) {
+        self->supported_mem_types |= UCC_BIT(UCC_MEMORY_TYPE_CUDA);
+    }
 
     status = ucc_mpool_init(
         &self->req_mp, 0,
@@ -43,10 +80,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
         return status;
     }
 
-    status = tl_mlx5_rcache_create(self);
-    if (UCC_OK != status) {
-        tl_debug(self->super.super.lib, "failed to create rcache");
-        goto err_rcache;
+    if (!self->cfg.enable_alltoall) {
+        tl_debug(self->super.super.lib, "alltoall is disabled by the env variable "
+                 "`UCC_TL_MLX5_ALLTOALL_ENABLE`");
     }
 
     self->mcast.mcast_ctx_ready = 0;
@@ -59,10 +95,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
         }
     }
     return UCC_OK;
-
-err_rcache:
-    ucc_mpool_cleanup(&self->req_mp, 1);
-    return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
@@ -129,7 +161,8 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
 
     status = ucc_tl_mlx5_create_ibv_ctx(&ib_devname, &ctx->shared_ctx, ctx->super.super.lib);
     if (UCC_OK != status) {
-        tl_debug(ctx->super.super.lib, "failed to allocate ibv_context");
+        tl_debug(ctx->super.super.lib, "failed to allocate ibv_context status %d",
+                 status);
         return status;
     }
     if (port == -1) {
@@ -171,14 +204,18 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
     size_t           sock_dir_len       = strlen(template) + 1;
     size_t           sock_path_len      = sock_dir_len + strlen(sockname);
     size_t           sbcast_data_length = sizeof(int) + sock_path_len;
+    ucc_topo_t *     topo               = NULL;
+    ucc_tl_team_t *  steam              = core_ctx->service_team;
     char             sock_path[sock_path_len];
     ucc_subset_t     s;
-    ucc_status_t     status;
-    ucc_topo_t *     topo;
+    ucc_status_t     status, global_status, local_status;
     ucc_sbgp_t *     sbgp;
-    ucc_tl_team_t *  steam;
     ucc_coll_task_t *req;
     ucc_tl_mlx5_context_create_sbcast_data_t *sbcast_data;
+
+    if (!ctx->cfg.enable_alltoall) {
+        return UCC_OK;
+    }
 
     if (!core_ctx->service_team) {
         tl_debug(context->lib, "failed to init ctx: need service team");
@@ -199,14 +236,43 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
     s.map.ep_num = core_ctx->params.oob.n_oob_eps;
     s.myrank     = core_ctx->rank;
 
-    status = ucc_topo_init(s, core_ctx->topo, &topo);
+    status = tl_mlx5_rcache_create(ctx);
     if (UCC_OK != status) {
-        tl_debug(context->lib, "failed to init mlx5 ctx topo");
-        goto err_topo;
+        tl_debug(context->lib, "failed to create rcache status %d", status);
+        goto start_allreduce;
     }
 
-    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
+    status = ucc_topo_init(s, core_ctx->topo, &topo);
+    if (UCC_OK != status) {
+        tl_debug(context->lib, "failed to init mlx5 ctx topo %d", status);
+        goto start_allreduce;
+    }
 
+start_allreduce:
+    local_status = status;
+    status = UCC_TL_TEAM_IFACE(steam)->scoll.allreduce(
+        &steam->super, &local_status, &global_status, UCC_DT_INT32, 1, UCC_OP_LOR,
+        s, &req);
+    if (UCC_OK != status) {
+        tl_debug(context->lib, "failed to start mlx5 ctx allreduce");
+        goto err_global_status;
+    }
+    while (UCC_INPROGRESS == (status = ucc_collective_test(&req->super))) {
+        ucc_context_progress(core_ctx);
+    }
+    ucc_collective_finalize_internal(req);
+    if (UCC_OK != status) {
+        tl_debug(context->lib, "failure during mlx5 ctx allreduce");
+        goto err_global_status;
+    }
+    if (global_status != UCC_OK || local_status != UCC_OK) {
+        tl_debug(context->lib,
+                 "context creation failed - error detected in one "
+                 "or more ranks");
+        status = global_status;
+        goto err_global_status;
+    }
+    sbgp             = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     ctx->shared_ctx  = NULL;
     ctx->shared_pd   = NULL;
     ctx->is_imported = sbgp->group_rank != PD_OWNER_RANK;
@@ -222,7 +288,8 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
         }
         ucc_strncpy_safe(sock_path, template, sock_dir_len);
         if (mkdtemp(sock_path) != NULL) {
-            strncat(sock_path, sockname, sizeof(sock_path) - strlen(sock_path) - 1);
+            strncat(sock_path, sockname,
+                    sizeof(sock_path) - strlen(sock_path) - 1);
             status = ucc_tl_mlx5_socket_init(ctx, sbgp->group_size, &ctx->sock,
                                              sock_path);
             if (UCC_OK != status) {
@@ -237,7 +304,6 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
     }
 start_bcast:
     sbcast_data->ib_port = ctx->ib_port;
-    steam = core_ctx->service_team;
     s.map    = sbgp->map;
     s.myrank = sbgp->group_rank;
 
@@ -291,8 +357,14 @@ err:
     rmdir(sock_path);
     close(ctx->sock);
 err_ib_ctx_pd_init:
-    ucc_topo_cleanup(topo);
-err_topo:
+err_global_status:
+    if (topo) {
+        ucc_topo_cleanup(topo);
+    }
+    if (ctx->rcache) {
+        ucc_rcache_destroy(ctx->rcache);
+        ctx->rcache = NULL;
+    }
     ucc_free(sbcast_data);
     tl_debug(ctx->super.super.lib, "failed initialize tl context: %p", ctx);
     return status;

@@ -50,12 +50,16 @@ typedef struct ucc_topo {
     int         n_sockets;
     ucc_sbgp_t *all_numas;            /*< array of numa sbgps, init on demand */
     int         n_numas;
+    ucc_sbgp_t *all_nodes;            /*< array of node sbgps, init on demand */
+    int         n_nodes;
     ucc_rank_t  node_leader_rank_id;  /*< defines which rank on a node will be
                                           node leader. Similar to local node rank.
                                           currently set to 0, can be selected differently
                                           in the future */
     ucc_rank_t   node_leader_rank;    /*< actual rank of the node leader in the original
                                           (ucc_team) ranking */
+    ucc_rank_t  *node_leaders;        /*< array mapping each rank to its node leader in the original
+                                          (ucc_team) ranking, initialized on demand */
     ucc_subset_t set;     /*< subset of procs from the ucc_context_topo.
                          for ucc_team topo it is team->ctx_map */
     ucc_rank_t   min_ppn; /*< min ppn across the nodes for a team */
@@ -95,6 +99,10 @@ ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
 ucc_status_t ucc_topo_get_all_numas(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
                                     int *n_sbgps);
 
+/* Returns the array of ALL existing node subgroups of given topo */
+ucc_status_t ucc_topo_get_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
+                                    int *n_sbgps);
+
 static inline int ucc_rank_on_local_node(ucc_rank_t team_rank, ucc_topo_t *topo)
 {
     ucc_proc_info_t *procs    = topo->topo->procs;
@@ -126,6 +134,11 @@ static inline ucc_rank_t ucc_topo_max_ppn(ucc_topo_t *topo)
         return ucc_subset_size(&topo->set);
     }
     return topo->max_ppn;
+}
+
+static inline int ucc_topo_is_single_ppn(ucc_topo_t *topo)
+{
+    return ucc_topo_max_ppn(topo) == 1;
 }
 
 /* Returns true if PPN is the same across all the nodes */
@@ -244,5 +257,10 @@ static inline ucc_rank_t ucc_topo_nnodes(ucc_topo_t *topo)
     }
     return sbgp->group_size;
 }
+
+/* Returns node leaders array - array that maps each rank to the TEAM RANK that 
+   is the leader of that rank's node. Also returns per-node leaders array - array
+   mapping node_id to the TEAM RANK of that node's leader */
+ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leaders_out);
 
 #endif

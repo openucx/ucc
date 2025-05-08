@@ -1,22 +1,22 @@
-name: HPC_SDK
+name: NVIDIA HPC SDK
 
 on: [push, pull_request]
 
 env:
-  HPCXDIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2023/comm_libs/12.2/hpcx/latest/
-  NCCLDIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2023/comm_libs/12.2/nccl/
-  CUDADIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2023/cuda/12.2/
+  HPCXDIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2025/comm_libs/12.6/hpcx/latest/
+  NCCLDIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2025/comm_libs/12.6/nccl/
+  CUDADIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2025/cuda/12.6/
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     container:
-      image: nvcr.io/nvidia/nvhpc:23.9-devel-cuda12.2-ubuntu22.04
+      image: nvcr.io/nvidia/nvhpc:25.1-devel-cuda12.6-ubuntu24.04
     steps:
     - name: Install dependencies
       run: |
         apt-get update
-        apt-get install -y --no-install-recommends libiberty-dev
+        apt-get install -y --no-install-recommends libiberty-dev libibverbs-dev libibumad-dev
     - uses: actions/checkout@v1
     - name: Build UCC
       run: |
