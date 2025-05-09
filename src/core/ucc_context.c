@@ -1214,6 +1214,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     size_t                    total_pack_size = 0;
     int                       packed_tls      = 0;
     size_t                    offset          = 0;
+    ucc_config_names_array_t *tls_names       = &ctx->all_tls;
     ucc_mem_map_memh_t       *local_memh;
     ucc_mem_map_memh_t       *exported_memh;
     void                    **packed_buffers;
@@ -1221,6 +1222,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     ucc_tl_lib_t             *tl_lib;
     int                       i;
     int                       tls;
+    int                       tlh_index;
 
     if (mode == UCC_MEM_MAP_MODE_EXPORT) {
         local_memh = (ucc_mem_map_memh_t *)ucc_calloc(1, sizeof(ucc_mem_map_memh_t),
@@ -1257,42 +1259,59 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
         return UCC_ERR_NO_MEMORY;
     }
 
-    /* map all the memory */
-    for (i = 0; i < ctx->n_tl_ctx; i++) {
-        tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
-        /* always treat as a local mem handle */
-        status = tl_lib->iface->context.mem_map(
-            (const ucc_base_context_t *)ctx->tl_ctx[i], mode,
-            local_memh, &local_memh->tl_h[i]);
-        if (status != UCC_OK) {
-            if (status < UCC_ERR_NOT_IMPLEMENTED) {
-                ucc_error("failed to map memory");
-                goto failed_mem_map;
-            }
-            if (status == UCC_ERR_NOT_IMPLEMENTED ||
-                status == UCC_ERR_NOT_SUPPORTED) {
-                /* either not implemented or not supported, set memh to null */
-                local_memh->tl_h[i].packed_size = 0;
+    if (mode != UCC_MEM_MAP_MODE_EXPORT_OFFLOAD) {
+        /* map all the memory */
+        for (i = 0; i < ctx->n_tl_ctx; i++) {
+            tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
+            /* always treat as a local mem handle */
+            status = tl_lib->iface->context.mem_map(
+                (const ucc_base_context_t *)ctx->tl_ctx[i], mode,
+                local_memh, &local_memh->tl_h[i]);
+            if (status != UCC_OK) {
+                if (status < UCC_ERR_NOT_IMPLEMENTED) {
+                    ucc_error("failed to map memory");
+                    goto failed_mem_map;
+                }
+                if (status == UCC_ERR_NOT_IMPLEMENTED ||
+                    status == UCC_ERR_NOT_SUPPORTED) {
+                    /* either not implemented or not supported, set memh to null */
+                    local_memh->tl_h[i].packed_size = 0;
+                }
             }
         }
     }
     /* now pack all the memories */
     for (i = 0; i < ctx->n_tl_ctx; i++) {
         tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
+        if (mode != UCC_MEM_MAP_MODE_EXPORT_OFFLOAD) {
+            tlh_index = i;
+        } else {
+            tlh_index = -1;
+            for (int j = 0; j < local_memh->num_tls; j++) {
+                if (strcmp(local_memh->tl_h[j].tl_name, tls_names->names[i]) == 0) {
+                    tlh_index = j;
+                    break;
+                }
+            }
+            if (tlh_index == -1) {
+                /* this TL is not in the memory handle, goto next */
+                continue;
+            }
+        }
         /* tl should set packed_size, allocate buffer, pack memh */
         status = tl_lib->iface->context.memh_pack(
             (const ucc_base_context_t *)ctx->tl_ctx[i],
-            mode, &local_memh->tl_h[i], &packed_buffers[i]);
+            mode, &local_memh->tl_h[tlh_index], &packed_buffers[tlh_index]);
         if (status != UCC_OK) {
             if (status < UCC_ERR_NOT_IMPLEMENTED) {
                 ucc_error("failed to pack memory handles");
                 goto failed_pack;
             }
         }
-        if (local_memh->tl_h[i].packed_size) {
+        if (local_memh->tl_h[tlh_index].packed_size) {
             ++packed_tls;
         }
-        total_pack_size += local_memh->tl_h[i].packed_size;
+        total_pack_size += local_memh->tl_h[tlh_index].packed_size;
     }
     if (packed_tls == 0) {
         ucc_debug("No TLs available for packing");
@@ -1311,18 +1330,37 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
         goto failed_pack;
     }
 
-    /* copying */
-    exported_memh->tl_h = (ucc_mem_map_tl_t *)ucc_calloc(
-            packed_tls, sizeof(ucc_mem_map_tl_t), "packed tl memh");
-    if (!exported_memh->tl_h) {
-        ucc_error("failed to allocate handle for exported buffers' tl handles");
-        status = UCC_ERR_NO_MEMORY;
-        ucc_free(exported_memh);
-        goto failed_pack;
-    }
+    /* copy or allocate depending on the mode */
+    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
+        exported_memh->tl_h = (ucc_mem_map_tl_t *)ucc_calloc(
+                packed_tls, sizeof(ucc_mem_map_tl_t), "packed tl memh");
+        if (!exported_memh->tl_h) {
+            ucc_error("failed to allocate handle for exported buffers' tl handles");
+            status = UCC_ERR_NO_MEMORY;
+            ucc_free(exported_memh);
+            goto failed_pack;
+        }
+        for (i = 0, offset = 0, tls = 0; i < ctx->n_tl_ctx; i++) {
+            if (local_memh->tl_h[i].packed_size) {
+                strncpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
+                       local_memh->tl_h[i].tl_name, UCC_MEM_MAP_TL_NAME_LEN);
+                offset += UCC_MEM_MAP_TL_NAME_LEN;
+                memcpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
+                       &local_memh->tl_h[i].packed_size, sizeof(size_t));
+                offset += sizeof(size_t);
+                memcpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
+                       packed_buffers[i], local_memh->tl_h[i].packed_size);
+                ucc_free(packed_buffers[i]);
+                offset += local_memh->tl_h[i].packed_size;
+                memcpy(&exported_memh->tl_h[tls++], &local_memh->tl_h[i],
+                       sizeof(ucc_mem_map_tl_t));
+            }
+        }
+    } else {
+        exported_memh->tl_h = local_memh->tl_h;
 
-    for (i = 0, offset = 0, tls = 0; i < ctx->n_tl_ctx; i++) {
-        if (local_memh->tl_h[i].packed_size) {
+        for (i = 0; i < local_memh->num_tls; i++) {
+            /* these are already packed in order */
             strncpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
                    local_memh->tl_h[i].tl_name, UCC_MEM_MAP_TL_NAME_LEN);
             offset += UCC_MEM_MAP_TL_NAME_LEN;
@@ -1333,10 +1371,12 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
                    packed_buffers[i], local_memh->tl_h[i].packed_size);
             ucc_free(packed_buffers[i]);
             offset += local_memh->tl_h[i].packed_size;
-            memcpy(&exported_memh->tl_h[tls++], &local_memh->tl_h[i],
-                   sizeof(ucc_mem_map_tl_t));
+        }
+        for (; i < ctx->n_tl_ctx; i++) {
+            ucc_free(packed_buffers[i]);
         }
     }
+
     exported_memh->mode        = mode;
     exported_memh->context     = ctx;
     exported_memh->address     = local_memh->address;
@@ -1344,7 +1384,9 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     exported_memh->num_tls     = packed_tls;
     *memh                      = exported_memh;
     *memh_size                 = sizeof(ucc_mem_map_memh_t) + offset;
-    ucc_free(local_memh->tl_h);
+    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
+        ucc_free(local_memh->tl_h);
+    }
     ucc_free(local_memh);
     ucc_free(packed_buffers);
     return UCC_OK;
