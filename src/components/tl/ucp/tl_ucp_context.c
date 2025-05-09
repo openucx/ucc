@@ -796,7 +796,7 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
         tl_error(ctx->super.super.lib, "unable to pack memory handle without TL handles");
         return UCC_ERR_INVALID_PARAM;
     }
-    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
+    if (ctx->cfg.exported_memory_handle && mode == UCC_MEM_MAP_MODE_EXPORT) {
         pack_params.field_mask = UCP_MEMH_PACK_PARAM_FIELD_FLAGS;
         pack_params.flags      = UCP_MEMH_PACK_FLAG_EXPORT;
 
@@ -804,10 +804,11 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
                                &data->packed_memh_len);
         if (status != UCS_OK) {
             // we don't support memory pack, or it failed
-            tl_debug(ctx->super.super.lib, "ucp_memh_pack() returned error %s",
+            tl_error(ctx->super.super.lib, "ucp_memh_pack() returned error %s",
                      ucs_status_string(status));
             data->packed_memh     = NULL;
             data->packed_memh_len = 0;
+            return ucs_status_to_ucc_status(status);
         }
     }
     status =
@@ -841,7 +842,7 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
     memcpy(PTR_OFFSET(packed_buffer, UCC_TL_UCP_MEMH_TL_HEADER_SIZE),
            data->rinfo.packed_key, *key_size);
     memcpy(PTR_OFFSET(packed_buffer,
-                      UCC_TL_UCP_MEMH_TL_HEADER_SIZE + UCC_TL_UCP_MEMH_TL_KEY_SIZE(packed_buffer)),
+                      UCC_TL_UCP_MEMH_TL_HEADER_SIZE + data->rinfo.packed_key_len),
            data->packed_memh, *memh_size);
 
     tl_h->packed_size =
