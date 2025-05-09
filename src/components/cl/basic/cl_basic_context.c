@@ -61,6 +61,24 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_context_t)
     ucc_free(self->super.tl_ctxs);
 }
 
+ucc_status_t ucc_cl_basic_mem_map(const ucc_base_context_t *context, int type, /* NOLINT */
+                                  void *memh, void *tl_h) /* NOLINT */
+{
+    return UCC_ERR_NOT_SUPPORTED;
+}
+
+ucc_status_t ucc_cl_basic_mem_unmap(const ucc_base_context_t *context, int type, /* NOLINT */
+                                    void *tl_h) /* NOLINT */
+{
+    return UCC_ERR_NOT_SUPPORTED;
+}
+
+ucc_status_t ucc_cl_basic_memh_pack(const ucc_base_context_t *context, /* NOLINT */
+                                    int type, void *memh, void **packed_buffer) /* NOLINT */
+{
+    return UCC_ERR_NOT_SUPPORTED;
+}
+
 UCC_CLASS_DEFINE(ucc_cl_basic_context_t, ucc_cl_context_t);
 
 ucc_status_t
