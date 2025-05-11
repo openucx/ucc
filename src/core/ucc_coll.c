@@ -4,6 +4,7 @@
  * See file LICENSE for terms.
  */
 
+#include <nvtx3/nvToolsExt.h>
 #include "config.h"
 #include "ucc_team.h"
 #include "ucc_context.h"
@@ -473,6 +474,8 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
 static ucc_status_t ucc_triggered_task_finalize(ucc_coll_task_t *task)
 {
     ucc_trace("finalizing triggered ev task %p", task);
+    nvtxRangePop();
+
     ucc_free(task);
     return UCC_OK;
 }
@@ -487,6 +490,9 @@ static ucc_status_t ucc_trigger_complete(ucc_coll_task_t *parent_task,
                                          ucc_coll_task_t *task)
 {
     ucc_status_t status;
+
+    const char* coll_str = ucc_coll_type_str(task->bargs.args.coll_type);
+    nvtxRangePushA( coll_str);
 
     ucc_trace("event triggered, ev_task %p, coll_task %p, seq_num %u",
               parent_task, task, task->seq_num);
