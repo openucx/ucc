@@ -1315,6 +1315,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     }
     if (packed_tls == 0) {
         ucc_debug("No TLs available for packing");
+        ucc_free(packed_buffers);
         return UCC_OK;
     }
 
