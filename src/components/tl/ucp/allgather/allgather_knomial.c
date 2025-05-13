@@ -225,18 +225,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
                  ucc_dt_size(args->dst.info.datatype);
         rbuf   = args->dst.info.buffer;
         if (!UCC_IS_INPLACE(*args)) {
-            status = ctx->copy.post(PTR_OFFSET(args->dst.info.buffer, offset),
-                                               args->dst.info.mem_type,
-                                               args->src.info.buffer,
-                                               args->src.info.mem_type,
-                                               args->src.info.count *
-                                                  ucc_dt_size(args->src.info.datatype),
-                                               task,
-                                               &task->allgather_kn.copy_task);
-            if (ucc_unlikely(status != UCC_OK)) {
-                task->super.status = status;
-                return status;
-            }
+            task->allgather_kn.copy_task = NULL;
         }
     } else if (ct == UCC_COLL_TYPE_ALLGATHERV) {
         ucc_kn_agv_pattern_init(size, rank, radix, args->dst.info_v.counts,
