@@ -81,7 +81,7 @@ ucc_status_t ucc_tl_ucp_allgather_batched_init(
     task->super.post     = ucc_tl_ucp_allgather_linear_start;
     task->super.progress = ucc_tl_ucp_allgather_linear_progress;
     task->allgather_linear.nreqs =
-        nreqs == UCC_ULUNITS_AUTO ? UCC_TL_TEAM_SIZE(tl_team) - 1 : nreqs;
+        nreqs == 0 ? UCC_TL_TEAM_SIZE(tl_team) - 1 : nreqs;
     *task_h = &task->super;
 
     return UCC_OK;
@@ -93,13 +93,9 @@ ucc_tl_ucp_allgather_linear_batched_init(ucc_base_coll_args_t *coll_args,
                                          ucc_base_team_t      *team,
                                          ucc_coll_task_t     **task_h)
 {
-    unsigned long num_req =
-        get_num_reqs(ucc_derived_of(team, ucc_tl_ucp_team_t));
-    if (num_req == 0) {
-        ucc_error("ALLGATHER_BATCHED_NUM_POSTS needs to be more than 0");
-        return UCC_ERR_INVALID_PARAM;
-    }
-    return ucc_tl_ucp_allgather_batched_init(coll_args, team, task_h, num_req);
+    return ucc_tl_ucp_allgather_batched_init(
+        coll_args, team, task_h,
+        get_num_reqs(ucc_derived_of(team, ucc_tl_ucp_team_t)));
 }
 
 /* Linear One-Shot version of allgather */
@@ -107,8 +103,8 @@ ucc_status_t ucc_tl_ucp_allgather_linear_init(ucc_base_coll_args_t *coll_args,
                                               ucc_base_team_t      *team,
                                               ucc_coll_task_t     **task_h)
 {
-    // UCC_ULUNITS_AUTO means one-shot, team size - 1 request will be used
-    return ucc_tl_ucp_allgather_batched_init(coll_args, team, task_h, UCC_ULUNITS_AUTO);
+    // 0 means one-shot, team size - 1 request will be used
+    return ucc_tl_ucp_allgather_batched_init(coll_args, team, task_h, 0);
 }
 
 void ucc_tl_ucp_allgather_linear_progress(ucc_coll_task_t *coll_task)
