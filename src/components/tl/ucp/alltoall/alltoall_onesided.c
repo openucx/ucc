@@ -133,7 +133,7 @@ void ucc_tl_ucp_alltoall_onesided_ca_progress(ucc_coll_task_t *ctask)
     int                iteration = task->alltoall_onesided.iteration;
     size_t             nreqs     = task->alltoall_onesided.tokens;
     int                polls     = 0;
-    int64_t            npolls    = task->n_polls;
+    int64_t            npolls;
     size_t             count;
 
     count = TASK_ARGS(task).src.info.count / gsize;
