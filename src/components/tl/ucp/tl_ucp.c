@@ -80,6 +80,12 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_chunk_byte_limit),
      UCC_CONFIG_TYPE_MEMUNITS},
 
+    {"ALLTOALL_ONESIDED_PERCENT_BW", "100",
+     "Percentage (1-100) of NIC bandwidth to use for congestion avoidance "
+     "(default: 100)",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_percent_bw),
+     UCC_CONFIG_TYPE_UINT},
+
     {"KN_RADIX", "0",
      "Radix of all algorithms based on knomial pattern. When set to a "
      "positive value it is used as a convenience parameter to set all "

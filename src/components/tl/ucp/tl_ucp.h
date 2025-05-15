@@ -77,6 +77,7 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t                 alltoallv_hybrid_pairwise_num_posts;
     ucc_ternary_auto_value_t use_topo;
     int                      use_reordering;
+    uint32_t                 alltoall_onesided_percent_bw;
 } ucc_tl_ucp_lib_config_t;
 
 typedef enum ucc_tl_ucp_local_copy_type {
