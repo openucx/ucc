@@ -17,6 +17,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
 {
     ucc_tl_cuda_context_config_t *tl_cuda_config =
         ucc_derived_of(config, ucc_tl_cuda_context_config_t);
+    ucc_tl_cuda_lib_t *lib = ucc_derived_of(params->context->lib, ucc_tl_cuda_lib_t);
     ucc_status_t status;
     int num_devices;
     cudaError_t cuda_st;
@@ -55,12 +56,18 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
     }
 
     CUDA_CHECK_GOTO(cudaGetDevice(&self->device), free_mpool, status);
-    status = ucc_tl_cuda_topo_create(self->super.super.lib, &self->topo);
-    if (status != UCC_OK) {
-        tl_error(self->super.super.lib,
-                 "failed to initialize tl_cuda_topo");
-        goto free_mpool;
+
+    /* Lazily initialize topology if not already initialized */
+    if (lib->topo == NULL) {
+        status = ucc_tl_cuda_topo_create((const ucc_base_lib_t *)&lib->super,
+                                         &lib->topo);
+        if (status != UCC_OK) {
+            tl_error(self->super.super.lib, "failed to initialize topology");
+            goto free_mpool;
+        }
     }
+    self->topo = lib->topo;
+
     status = ucc_tl_cuda_topo_get_pci_id(self->device, &self->device_id);
     if (status != UCC_OK) {
         tl_error(self->super.super.lib, "failed to get pci id");
@@ -97,7 +104,6 @@ ucc_status_t ucc_tl_cuda_memh_pack(const ucc_base_context_t *context, /* NOLINT 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_context_t)
 {
     tl_debug(self->super.super.lib, "finalizing tl context: %p", self);
-    ucc_tl_cuda_topo_destroy(self->topo);
     ucc_mpool_cleanup(&self->req_mp, 1);
 }
 
