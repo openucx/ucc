@@ -83,6 +83,7 @@ typedef struct ucc_tl_cuda_lib_config {
     unsigned long       allgather_ring_max_rings;
     uint32_t            allgather_ring_num_chunks;
     unsigned long       reduce_scatter_ring_max_rings;
+    int                 alltoall_use_copy_engine;
 } ucc_tl_cuda_lib_config_t;
 
 typedef struct ucc_tl_cuda_context_config {
@@ -214,6 +215,11 @@ struct ucc_tl_cuda_task {
                                ucc_rank_t block);
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
                                  size_t *displ_bytes, ucc_rank_t block);
+            ucc_status_t (*copy_post)(void *dst, void *src, size_t len,
+                                      ucc_ee_executor_t       *executor,
+                                      ucc_ee_executor_task_t **task,
+                                      cudaStream_t             stream);
+            cudaEvent_t          evtCompletion;
         } alltoallv_ce;
         struct {
             int                     stage;

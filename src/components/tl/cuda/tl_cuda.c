@@ -43,6 +43,11 @@ static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
      ucc_offsetof(ucc_tl_cuda_lib_config_t, reduce_scatter_ring_max_rings),
      UCC_CONFIG_TYPE_ULUNITS},
 
+    {"ALLTOALL_USE_COPY_ENGINE", "y",
+     "Use copy engine for alltoallv",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, alltoall_use_copy_engine),
+     UCC_CONFIG_TYPE_BOOL},
+
     {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_cuda_lib_t, ucc_base_lib_t,
