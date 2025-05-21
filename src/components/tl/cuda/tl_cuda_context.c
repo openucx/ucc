@@ -11,13 +11,25 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 
+/**
+ * Initialize CUDA transport layer context
+ *
+ * This function initializes a CUDA TL context which requires an active CUDA context.
+ * It sets up memory pools for CUDA tasks and initializes the topology information.
+ *
+ * @param [in]  params      Base context initialization parameters
+ * @param [in]  config      Configuration for CUDA context
+ *
+ * @return UCC_OK on success or error code on failure
+ */
 UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
                     const ucc_base_context_params_t *params,
                     const ucc_base_config_t *config)
 {
     ucc_tl_cuda_context_config_t *tl_cuda_config =
         ucc_derived_of(config, ucc_tl_cuda_context_config_t);
-    ucc_tl_cuda_lib_t *lib = ucc_derived_of(params->context->lib, ucc_tl_cuda_lib_t);
+    ucc_tl_cuda_lib_t *lib =
+        ucc_derived_of(params->context->lib, ucc_tl_cuda_lib_t);
     ucc_status_t status;
     int num_devices;
     cudaError_t cuda_st;
@@ -30,8 +42,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
 
     cuda_st = cudaGetDeviceCount(&num_devices);
     if (cuda_st != cudaSuccess) {
-        tl_debug(self->super.super.lib, "failed to get number of GPU devices"
-                 "%d %s", cuda_st, cudaGetErrorName(cuda_st));
+        tl_debug(self->super.super.lib,
+                 "failed to get number of GPU devices: %d (%s)", cuda_st,
+                 cudaGetErrorName(cuda_st));
         return UCC_ERR_NO_RESOURCE;
     } else if (num_devices == 0) {
         tl_debug(self->super.super.lib, "no GPU devices found");
@@ -50,7 +63,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
                             &ucc_coll_task_mpool_ops, params->thread_mode,
                             "tl_cuda_req_mp");
     if (status != UCC_OK) {
-        tl_error(self->super.super.lib,
+        tl_error(self->super.super.lib, 
                  "failed to initialize tl_cuda_req mpool");
         return status;
     }
@@ -70,7 +83,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
 
     status = ucc_tl_cuda_topo_get_pci_id(self->device, &self->device_id);
     if (status != UCC_OK) {
-        tl_error(self->super.super.lib, "failed to get pci id");
+        tl_error(self->super.super.lib,
+                 "failed to get pci id for device %d, status: %s", self->device,
+                 ucc_status_string(status));
         goto free_mpool;
     }
 
@@ -101,9 +116,45 @@ ucc_status_t ucc_tl_cuda_memh_pack(const ucc_base_context_t *context, /* NOLINT 
     return UCC_ERR_NOT_IMPLEMENTED;
 }
 
+ucc_status_t ucc_tl_cuda_mem_map(const ucc_base_context_t *context, /* NOLINT */
+                                 int type, void *memh, void *tl_h) /* NOLINT */
+{
+    return UCC_ERR_NOT_IMPLEMENTED;
+}
+
+ucc_status_t ucc_tl_cuda_mem_unmap(const ucc_base_context_t *context, /* NOLINT */
+                                   int type, void *tl_h) /* NOLINT */
+{
+    return UCC_ERR_NOT_IMPLEMENTED;
+}
+
+ucc_status_t ucc_tl_cuda_memh_pack(const ucc_base_context_t *context, /* NOLINT */
+                                   int type, void *memh, void **pack_buffer) /* NOLINT */
+{
+    return UCC_ERR_NOT_IMPLEMENTED;
+}
+
+/**
+ * @brief Cleanup function for CUDA TL context
+ * 
+ * This function is responsible for cleaning up resources associated with a CUDA TL context.
+ * It performs the following operations:
+ * 1. Logs the context finalization with debug information
+ * 2. Destroys the IPC cache hash table if it exists
+ * 3. Cleans up the request memory pool
+ * 
+ * @param self Pointer to the CUDA TL context structure to be cleaned up
+ */
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_context_t)
 {
+    // Log context finalization for debugging purposes
     tl_debug(self->super.super.lib, "finalizing tl context: %p", self);
+    // Clean up IPC cache if it exists
+    if (self->ipc_cache != NULL) {
+        kh_destroy(tl_cuda_ep_hash, self->ipc_cache);
+        self->ipc_cache = NULL;
+    }
+    // Clean up the request memory pool with force leak check
     ucc_mpool_cleanup(&self->req_mp, 1);
 }
 
