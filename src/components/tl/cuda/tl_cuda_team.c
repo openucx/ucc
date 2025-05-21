@@ -252,13 +252,15 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
                                            team->ids[i].scratch_info.handle,
                                            &team->scratch.rem[i],
                                            ucc_tl_cuda_get_cache(team, i));
-        memcpy(&team->scratch.rem_info[i], &team->ids[i].scratch_info,
-               sizeof(ucc_tl_cuda_mem_info_t));
         if (status != UCC_OK) {
+            tl_error(tl_team->context->lib, "failed to map memhandle");
             goto exit_err;
         }
+        ucc_print("map memhandle done %d", i);
+        memcpy(&team->scratch.rem_info[i], &team->ids[i].scratch_info,
+               sizeof(ucc_tl_cuda_mem_info_t));
     }
-
+    
     if (UCC_TL_TEAM_LIB(team)->log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
         ucc_tl_cuda_team_topo_print_proxies(&team->super, team->topo);
         ucc_tl_cuda_team_topo_print_rings(&team->super, team->topo);

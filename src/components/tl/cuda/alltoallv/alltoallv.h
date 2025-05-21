@@ -24,4 +24,11 @@ ucc_status_t ucc_tl_cuda_alltoallv_init(ucc_base_coll_args_t *coll_args,
                                         ucc_base_team_t      *tl_team,
                                         ucc_coll_task_t     **task_p);
 
+ucc_status_t cuda_copy_post(void *dst, void *src, size_t len,
+                       ucc_ee_executor_t       *executor,
+                       ucc_ee_executor_task_t **task, cudaStream_t stream);
+
+ucc_status_t ee_copy_post(void *dst, void *src, size_t len,
+                       ucc_ee_executor_t       *executor,
+                       ucc_ee_executor_task_t **task, cudaStream_t stream);
 #endif
