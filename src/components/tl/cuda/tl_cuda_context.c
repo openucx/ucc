@@ -153,19 +153,33 @@ ucc_status_t ucc_tl_cuda_memh_pack(const ucc_base_context_t *context, /* NOLINT 
  * It performs the following operations:
  * 1. Logs the context finalization with debug information
  * 2. Destroys the IPC cache hash table if it exists
- * 3. Cleans up the request memory pool
+ * 3. Cleans up topology if it's context-specific (not cached)
+ * 4. Cleans up the request memory pool
  * 
  * @param self Pointer to the CUDA TL context structure to be cleaned up
  */
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_context_t)
 {
+    ucc_tl_cuda_lib_t *lib =
+        ucc_derived_of(self->super.super.lib, ucc_tl_cuda_lib_t);
+
     // Log context finalization for debugging purposes
     tl_debug(self->super.super.lib, "finalizing tl context: %p", self);
+
     // Clean up IPC cache if it exists
     if (self->ipc_cache != NULL) {
         kh_destroy(tl_cuda_ep_hash, self->ipc_cache);
         self->ipc_cache = NULL;
     }
+
+    // Only destroy topology if it's context-specific (not cached)
+    // For cached topology, it will be destroyed when the library is cleaned up
+    if (self->topo != NULL &&
+        (!lib->cfg.use_topo_cache || self->topo != lib->topo)) {
+        ucc_tl_cuda_topo_destroy(self->topo);
+        self->topo = NULL;
+    }
+
     // Clean up the request memory pool with force leak check
     ucc_mpool_cleanup(&self->req_mp, 1);
 }
