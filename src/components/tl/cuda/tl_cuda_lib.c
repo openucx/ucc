@@ -32,12 +32,19 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_lib_t, const ucc_base_lib_params_t *params,
     if (self->cfg.scratch_size < min_scratch_size) {
         self->cfg.scratch_size = min_scratch_size;
     }
+
+    /* Initialize topology pointer to NULL - will be lazily initialized */
+    self->topo = NULL;
+
     tl_debug(&self->super, "initialized lib object: %p", self);
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_lib_t)
 {
+    if (self->topo) {
+        ucc_tl_cuda_topo_destroy(self->topo);
+    }
     tl_debug(&self->super, "finalizing lib object: %p", self);
 }
 

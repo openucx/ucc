@@ -92,6 +92,7 @@ typedef struct ucc_tl_cuda_context_config {
 typedef struct ucc_tl_cuda_lib {
     ucc_tl_lib_t             super;
     ucc_tl_cuda_lib_config_t cfg;
+    ucc_tl_cuda_topo_t      *topo;  /* Shared topology information */
 } ucc_tl_cuda_lib_t;
 UCC_CLASS_DECLARE(ucc_tl_cuda_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
