@@ -171,17 +171,17 @@ exit_err:
 
 ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t         *team = TASK_TEAM(task);
-    ucc_tl_cuda_lib_t          *lib  = UCC_TL_CUDA_TEAM_LIB(team);
-    ucc_rank_t                  rank = UCC_TL_TEAM_RANK(team);
-    ucc_tl_cuda_sync_t         *sync = TASK_SYNC(task, rank);
-    ucc_tl_cuda_sync_t         *peer_sync;
-    ucc_ee_executor_t          *exec;
-    void                       *src, *dst;
-    size_t                      data_size, data_displ;
-    ucc_rank_t                  i, peer, psrc, pdst;
-    ucc_status_t                status;
-    cudaStream_t                stream;
+    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_tl_cuda_lib_t  *lib  = UCC_TL_CUDA_TEAM_LIB(team);
+    ucc_rank_t          rank = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
+    ucc_tl_cuda_sync_t *peer_sync;
+    ucc_ee_executor_t  *exec;
+    void               *src, *dst;
+    size_t              data_size, data_displ;
+    ucc_rank_t          i, peer, psrc, pdst;
+    ucc_status_t        status;
+    cudaStream_t        stream;
 
     if (task->alltoallv_ce.evtCompletion) {
         CUDA_CHECK_GOTO(cudaEventDestroy(task->alltoallv_ce.evtCompletion),
