@@ -70,16 +70,28 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
 
     CUDA_CHECK_GOTO(cudaGetDevice(&self->device), free_mpool, status);
 
-    /* Lazily initialize topology if not already initialized */
-    if (lib->topo == NULL) {
+    /* Handle CUDA topology initialization based on caching configuration */
+    if (lib->cfg.use_topo_cache && lib->topo != NULL) {
+        /* If topology caching is enabled and a cached topology exists,
+           reuse the existing topology from the library */
+        self->topo = lib->topo;
+    } else {
+        /* Determine where to store the topology:
+           - If caching is enabled: store in lib->topo for reuse
+           - If caching is disabled: store in self->topo (context-specific) */
+        ucc_tl_cuda_topo_t **topo_ptr =
+            lib->cfg.use_topo_cache ? &lib->topo : &self->topo;
+
+        /* Create new topology instance and store it in the appropriate location */
         status = ucc_tl_cuda_topo_create((const ucc_base_lib_t *)&lib->super,
-                                         &lib->topo);
+                                         topo_ptr);
         if (status != UCC_OK) {
             tl_error(self->super.super.lib, "failed to initialize topology");
             goto free_mpool;
         }
+        /* Update the context's topology pointer to point to the newly created topology */
+        self->topo = *topo_ptr;
     }
-    self->topo = lib->topo;
 
     status = ucc_tl_cuda_topo_get_pci_id(self->device, &self->device_id);
     if (status != UCC_OK) {
