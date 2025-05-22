@@ -184,9 +184,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK | UCP_PARAM_FIELD_NAME;
-    ucp_params.features = UCP_FEATURE_TAG | UCP_FEATURE_AM;
-    if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS) {
-        ucp_params.features |= UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
+    ucp_params.features =
+        UCP_FEATURE_TAG | UCP_FEATURE_AM | UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
+    if (self->cfg.exported_memory_handle) {
+        ucp_params.features |= UCP_FEATURE_EXPORTED_MEMH;
     }
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
     ucp_params.name = "UCC_UCP_CONTEXT";
@@ -609,6 +610,253 @@ static void ucc_tl_ucp_ctx_remote_pack_data(ucc_tl_ucp_context_t *ctx,
                ctx->remote_info[i].packed_key_len);
         offset += ctx->remote_info[i].packed_key_len;
     }
+}
+
+ucc_status_t ucc_tl_ucp_mem_map_memhbuf(ucc_tl_ucp_context_t *ctx,
+                                        void *pack_buffer, ucp_mem_h *mh)
+{
+    ucp_mem_map_params_t mmap_params;
+    ucs_status_t         status;
+    void                *packed_memh;
+
+    *mh = NULL;
+    /* unpack here */
+    packed_memh = UCC_TL_UCP_MEMH_TL_PACKED_MEMH(pack_buffer);
+
+    mmap_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_EXPORTED_MEMH_BUFFER;
+    mmap_params.exported_memh_buffer = packed_memh;
+
+    status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, mh);
+    if (UCS_OK != status) {
+        tl_error(ctx->super.super.lib,
+                 "ucp_mem_map failed with error code: %s",
+                 ucs_status_string(status));
+        return ucs_status_to_ucc_status(status);
+    }
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_ucp_mem_map_export(ucc_tl_ucp_context_t *ctx, void *address,
+                                       size_t len,
+                                       ucc_mem_map_mode_t mode,
+                                       ucc_tl_ucp_memh_data_t *m_data)
+{
+    ucc_status_t           ucc_status = UCC_OK;
+    ucp_mem_h              mh;
+    ucp_mem_map_params_t   mmap_params;
+    ucs_status_t           status;
+
+    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
+        mmap_params.address    = address;
+        mmap_params.length     = len;
+        mmap_params.field_mask =
+            UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
+
+        status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
+        if (UCS_OK != status) {
+            tl_error(ctx->super.super.lib, "ucp_mem_map failed with error code: %d",
+                     status);
+            ucc_status = ucs_status_to_ucc_status(status);
+            return ucc_status;
+        }
+        m_data->rinfo.mem_h   = mh;
+        m_data->rinfo.va_base = address;
+        m_data->rinfo.len     = len;
+    }
+    return ucc_status;
+}
+
+ucc_status_t ucc_tl_ucp_mem_map_offload_import(ucc_tl_ucp_context_t *ctx,
+                                               void *address, size_t len,
+                                               ucc_tl_ucp_memh_data_t *m_data,
+                                               ucc_mem_map_memh_t     *l_memh,
+                                               ucc_mem_map_tl_t *tl_h)
+{
+    int               i      = 0;
+    size_t            offset = 0;
+    ucp_mem_h         mh;
+    ucc_status_t      ucc_status;
+    char             *name;
+    size_t           *packed_size;
+
+    for (; i < l_memh->num_tls; i++) {
+        name        = (char *)PTR_OFFSET(l_memh->pack_buffer, offset);
+        packed_size = (size_t *)PTR_OFFSET(l_memh->pack_buffer,
+                        offset + UCC_MEM_MAP_TL_NAME_LEN);
+
+        if (strncmp(tl_h->tl_name, name, UCC_MEM_MAP_TL_NAME_LEN - 1) == 0) {
+            break;
+        }
+        /* this is not the index, skip this section of buffer if exists */
+        offset += *packed_size;
+    }
+    if (i == l_memh->num_tls) {
+        tl_error(ctx->super.super.lib, "unable to find TL UCP in memory handle");
+        return UCC_ERR_NOT_FOUND;
+    }
+
+    ucc_status = ucc_tl_ucp_mem_map_memhbuf(
+        ctx, PTR_OFFSET(l_memh->pack_buffer, offset), &mh);
+    if (ucc_status != UCC_OK) {
+        tl_error(ctx->super.super.lib, "ucp_mem_map failed to map memh");
+        return ucc_status;
+    }
+    m_data->rinfo.mem_h   = mh; /* used for xgvmi */
+    m_data->rinfo.va_base = address;
+    m_data->rinfo.len     = len;
+
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+                                ucc_mem_map_memh_t *memh, ucc_mem_map_tl_t *tl_h)
+{
+    ucc_tl_ucp_context_t   *ctx        = ucc_derived_of(context, ucc_tl_ucp_context_t);
+    ucc_status_t            ucc_status = UCC_OK;
+    ucc_tl_ucp_memh_data_t *m_data;
+
+    m_data = ucc_calloc(1, sizeof(ucc_tl_ucp_memh_data_t), "tl data");
+    if (!m_data) {
+        tl_error(ctx->super.super.lib, "failed to allocate tl data");
+        return UCC_ERR_NO_MEMORY;
+    }
+    tl_h->tl_data = m_data;
+    // copy name information for look ups later
+    strncpy(tl_h->tl_name, "ucp", UCC_MEM_MAP_TL_NAME_LEN - 1);
+
+    /* nothing to do for UCC_MEM_MAP_MODE_EXPORT_OFFLOAD and UCC_MEM_MAP_MODE_IMPORT */
+    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
+        ucc_status = ucc_tl_ucp_mem_map_export(ctx, memh->address, memh->len, mode, m_data);
+        if (UCC_OK != ucc_status) {
+            tl_error(ctx->super.super.lib, "failed to export memory handles");
+        }
+    } else if (mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
+        ucc_status = ucc_tl_ucp_mem_map_offload_import(ctx, memh->address, memh->len,
+                                                       m_data, memh, tl_h);
+        if (UCC_OK != ucc_status) {
+            tl_error(ctx->super.super.lib, "failed to import memory handle");
+            ucc_free(m_data);
+            return ucc_status;
+        }
+    }
+    return ucc_status;
+}
+
+ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+                                  ucc_mem_map_tl_t *memh)
+{
+    ucc_tl_ucp_context_t   *ctx = ucc_derived_of(context, ucc_tl_ucp_context_t);
+    ucc_tl_ucp_memh_data_t *data;
+    ucs_status_t            status;
+
+    if (!memh) {
+        return UCC_OK;
+    }
+
+    data = (ucc_tl_ucp_memh_data_t *)memh->tl_data;
+    if (mode == UCC_MEM_MAP_MODE_EXPORT || mode == UCC_MEM_MAP_MODE_EXPORT_OFFLOAD) {
+        status = ucp_mem_unmap(ctx->worker.ucp_context, data->rinfo.mem_h);
+        if (status != UCS_OK) {
+            tl_error(ctx->super.super.lib,
+                     "ucp_mem_unmap failed with error code %d", status);
+            return ucs_status_to_ucc_status(status);
+        }
+    } else if (mode == UCC_MEM_MAP_MODE_IMPORT || mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
+        // need to free rkeys (data->rkey) , packed memh (data->packed_memh)
+        if (data->packed_memh) {
+            ucp_memh_buffer_release(data->packed_memh, NULL);
+        }
+        if (data->rinfo.packed_key) {
+            ucp_rkey_buffer_release(data->rinfo.packed_key);
+        }
+        if (data->rkey) {
+            ucp_rkey_destroy(data->rkey);
+        }
+    } else {
+        ucc_error("Unknown mem map mode entered: %d", mode);
+        return UCC_ERR_INVALID_PARAM;
+    }
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
+                                  ucc_mem_map_mode_t mode, ucc_mem_map_tl_t *tl_h,
+                                  void **pack_buffer)
+{
+    ucc_tl_ucp_context_t   *ctx        = ucc_derived_of(context, ucc_tl_ucp_context_t);
+    ucc_tl_ucp_memh_data_t *data       = tl_h->tl_data;
+    ucc_status_t            ucc_status = UCC_OK;
+    void                   *packed_buffer;
+    size_t                 *key_size;
+    size_t                 *memh_size;
+    ucp_memh_pack_params_t  pack_params;
+    ucs_status_t            status;
+
+    if (!data || !data->rinfo.mem_h) {
+        tl_error(ctx->super.super.lib, "unable to pack memory handle without TL handles");
+        return UCC_ERR_INVALID_PARAM;
+    }
+    if (ctx->cfg.exported_memory_handle && mode == UCC_MEM_MAP_MODE_EXPORT) {
+        pack_params.field_mask = UCP_MEMH_PACK_PARAM_FIELD_FLAGS;
+        pack_params.flags      = UCP_MEMH_PACK_FLAG_EXPORT;
+
+        status = ucp_memh_pack(data->rinfo.mem_h, &pack_params, &data->packed_memh,
+                               &data->packed_memh_len);
+        if (status != UCS_OK) {
+            // we don't support memory pack, or it failed
+            tl_error(ctx->super.super.lib, "ucp_memh_pack() returned error %s",
+                     ucs_status_string(status));
+            data->packed_memh     = NULL;
+            data->packed_memh_len = 0;
+            return ucs_status_to_ucc_status(status);
+        }
+    }
+    status =
+        ucp_rkey_pack(ctx->worker.ucp_context, data->rinfo.mem_h,
+                      &data->rinfo.packed_key, &data->rinfo.packed_key_len);
+    if (status != UCS_OK) {
+        tl_error(ctx->super.super.lib, "unable to pack rkey with error %s",
+                 ucs_status_string(status));
+        ucc_status = ucs_status_to_ucc_status(status);
+        goto failed_rkey_pack;
+    }
+    /*
+     * data order
+     *
+     * packed_key_size | packed_memh_size | packed_key | packed_memh
+     */
+    packed_buffer = ucc_malloc(sizeof(size_t) * 2 + data->packed_memh_len +
+                                   data->rinfo.packed_key_len,
+                               "packed buffer");
+    if (!packed_buffer) {
+        tl_error(ctx->super.super.lib,
+                 "failed to allocate a packed buffer of size %lu",
+                 data->packed_memh_len + data->rinfo.packed_key_len + 2 * sizeof(size_t));
+        ucc_status = UCC_ERR_NO_MEMORY;
+        goto failed_alloc_buffer;
+    }
+    key_size   = packed_buffer;
+    *key_size  = data->rinfo.packed_key_len;
+    memh_size  = PTR_OFFSET(packed_buffer, sizeof(size_t));
+    *memh_size = data->packed_memh_len;
+    memcpy(PTR_OFFSET(packed_buffer, UCC_TL_UCP_MEMH_TL_HEADER_SIZE),
+           data->rinfo.packed_key, *key_size);
+    memcpy(PTR_OFFSET(packed_buffer,
+                      UCC_TL_UCP_MEMH_TL_HEADER_SIZE + data->rinfo.packed_key_len),
+           data->packed_memh, *memh_size);
+
+    tl_h->packed_size =
+        UCC_TL_UCP_MEMH_TL_HEADER_SIZE + data->packed_memh_len + data->rinfo.packed_key_len;
+    *pack_buffer = packed_buffer;
+    return ucc_status;
+
+failed_alloc_buffer:
+    ucp_rkey_buffer_release(data->rinfo.packed_key);
+failed_rkey_pack:
+    if (data->packed_memh) {
+        ucp_memh_buffer_release(data->packed_memh, NULL);
+    }
+    return ucc_status;
 }
 
 ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
