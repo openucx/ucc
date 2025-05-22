@@ -723,7 +723,9 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
             status = ucc_core_addr_exchange(ctx, &ctx->params.oob,
                                             &ctx->addr_storage);
             if (status < 0) {
-                ucc_error("failed to exchange addresses during context creation");
+                ucc_error("failed to exchange addresses during context "
+                          "creation with status: %s",
+                          ucc_status_string(status));
                 goto error_ctx_create;
             }
         } while (status == UCC_INPROGRESS);
@@ -780,7 +782,8 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                              ->team.create_post(&ctx->service_ctx->super,
                                                 &t_params, &b_team);
                 if (UCC_OK != status) {
-                    ucc_error("ctx service team create post failed");
+                    ucc_error("ctx service team create post failed with status: %s",
+                              ucc_status_string(status));
                     goto error_ctx_create;
                 }
                 do {
@@ -788,7 +791,8 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                                  ->team.create_test(b_team);
                 } while (UCC_INPROGRESS == status);
                 if (status < 0) {
-                    ucc_error("failed to create ctx service team");
+                    ucc_error("failed to create ctx service team with status: %s",
+                              ucc_status_string(status));
                     goto error_ctx_create;
                 }
                 ctx->service_team = ucc_derived_of(b_team, ucc_tl_team_t);
@@ -810,11 +814,11 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                 created_ctx_counter++;
             } else {
                 if (ucc_tl_is_required(lib, tl_lib->iface, 1)) {
-                    ucc_error("ctx create epilog for %s failed: %s",
+                    ucc_error("ctx create epilog for %s failed with status: %s",
                               tl_lib->iface->super.name, ucc_status_string(status));
                     goto error_ctx_create_epilog;
                 } else {
-                    ucc_debug("ctx create epilog for %s failed: %s",
+                    ucc_debug("ctx create epilog for %s failed with status: %s",
                               tl_lib->iface->super.name, ucc_status_string(status));
                     tl_lib->iface->context.destroy(&tl_ctx->super);
                     for (j = 0; j < ctx->n_cl_ctx; j++) {
