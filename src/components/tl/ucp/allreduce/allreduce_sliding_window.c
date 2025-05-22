@@ -573,6 +573,15 @@ ucc_tl_ucp_allreduce_sliding_window_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_task_t                        *rdma_task;
     ucc_coll_task_t                          *barrier_task;
 
+    if (!(coll_args->args.mask  & UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER) ||
+        !(coll_args->args.mask  & UCC_COLL_ARGS_FIELD_FLAGS)              ||
+        !(coll_args->args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS)) {
+        tl_debug(UCC_TL_TEAM_LIB(tl_team), "sliding window allreduce requires "
+                                           "exported memh to be passed via "
+                                           "global work buffer");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     status = ucc_tl_ucp_get_schedule(tl_team, coll_args,
                                     (ucc_tl_ucp_schedule_t **)&schedule);
     if (ucc_unlikely(UCC_OK != status)) {
