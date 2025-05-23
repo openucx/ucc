@@ -607,7 +607,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
         for (i = 0; i < team->num_streams; i++) {
             CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&task->alltoallv_ce.evtCompletions[i], cudaEventDisableTiming), exit_err, status);
         }
-        task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR; // need for triggered post?
     } else {
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: executor");
         task->alltoallv_ce.copy_post = ee_copy_post;
