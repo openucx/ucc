@@ -269,7 +269,6 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
             tl_error(tl_team->context->lib, "failed to map memhandle");
             goto exit_err;
         }
-        ucc_print("map memhandle done %d", i);
         memcpy(&team->scratch.rem_info[i], &team->ids[i].scratch_info,
                sizeof(ucc_tl_cuda_mem_info_t));
     }

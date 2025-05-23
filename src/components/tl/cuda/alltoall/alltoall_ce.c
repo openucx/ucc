@@ -70,6 +70,7 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
 
     if (lib->cfg.alltoall_use_copy_engine) {
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: copy engine");
+        task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
         task->alltoallv_ce.copy_post = cuda_copy_post;
         task->alltoallv_ce.evtCompletions = (cudaEvent_t*)ucc_malloc(team->num_streams * sizeof(cudaEvent_t), "alltoallv_ce.evtCompletions");
         for (i = 0; i < team->num_streams; i++) {
