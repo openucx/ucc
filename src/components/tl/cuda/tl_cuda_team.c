@@ -15,6 +15,130 @@
 #include "utils/ucc_sys.h"
 #include <sys/shm.h>
 
+static ucc_status_t
+ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
+                                     ucc_base_context_t *tl_context)
+{
+    size_t symmetric_size = 1024ULL * 1024ULL * 512ULL;
+    // multicast
+    CUmemAllocationHandleType handleType = CU_MEM_HANDLE_TYPE_FABRIC;
+    CUmulticastObjectProp mcProp = {};
+    mcProp.numDevices            = UCC_TL_TEAM_SIZE(self);
+    mcProp.size                  = symmetric_size;
+    mcProp.handleTypes           = handleType;
+
+    size_t minGran, gran;
+    gran    = 0;
+    minGran = 0;
+
+    CUcontext cu_ctx;
+    CUresult cu_st;
+    cu_st = cuCtxGetCurrent(&cu_ctx);
+    if (cu_st != CUDA_SUCCESS) {
+        ucc_error("failed to get current CUDA context");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    int device;
+    CUDA_CHECK(cudaGetDevice(&device));
+    int supported;
+    cuDeviceGetAttribute(&supported, CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED, device);
+    ucc_print("MULTICAST_SUPPORTED: %d\n", supported);
+
+    // Try to initialize NVLS multicast, but continue if not supported
+    ucc_status_t mc_status = CUDADRV_FUNC(cuMulticastGetGranularity(&minGran, &mcProp, CU_MULTICAST_GRANULARITY_MINIMUM));
+    if (mc_status != UCC_OK) {
+        ucc_error("failed to get multicast granularity minimum");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    mc_status = CUDADRV_FUNC(cuMulticastGetGranularity(&gran, &mcProp, CU_MULTICAST_GRANULARITY_RECOMMENDED));
+    if (mc_status != UCC_OK) {
+        ucc_error("failed to get multicast granularity recommended");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (UCC_TL_TEAM_RANK(self) == 0) {
+        ucc_print("NVLS multicast granularity: gran = %lu, minGrad = %lu\n",
+                  gran, minGran);
+    }
+
+    size_t mcSize = ((symmetric_size + gran - 1) / gran) * gran;
+    mcProp.size   = mcSize;
+    
+    // only one rank creates the multicast object
+    CUmemGenericAllocationHandle mcHandle;
+    if (UCC_TL_TEAM_RANK(self) == 0) {
+        mc_status = CUDADRV_FUNC(cuMulticastCreate(&mcHandle, &mcProp));
+        if (mc_status != UCC_OK) {
+            ucc_error("failed to create multicast object");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+    CUmemFabricHandle fh;
+    if (mc_status == UCC_OK && UCC_TL_TEAM_RANK(self) == 0) {
+        mc_status = CUDADRV_FUNC(cuMemExportToShareableHandle(
+            &fh, mcHandle, handleType, 0 /*flags*/));
+    }
+
+    self->shared_fhs = ucc_malloc(UCC_TL_TEAM_SIZE(self) * sizeof(CUmemFabricHandle), "shared_fhs");
+    if (!self->shared_fhs) {
+        ucc_error("failed to alloc shared_fhs");
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    // send the handle to all ranks using allgather and wait for all ranks to receive it
+    if (UCC_TL_TEAM_RANK(self) == 0) {
+        self->shared_fhs[UCC_TL_TEAM_RANK(self)] = fh;
+    }
+    ucc_status_t status = self->oob.allgather(self->shared_fhs, self->shared_fhs, sizeof(CUmemFabricHandle), self->oob.coll_info, &self->oob_req);
+    if (UCC_OK != status) {
+        tl_error(tl_context->lib, "failed to start oob allgather");
+        return status;
+    }
+
+    while (UCC_OK != (status = self->oob.req_test(self->oob_req))) {
+        if (status < 0) {
+            tl_error(tl_context->lib, "failed to test oob req");
+            return status;
+        }
+    }
+    self->oob.req_free(self->oob_req);
+    self->oob_req = NULL;
+
+    if (UCC_TL_TEAM_RANK(self) != 0) {
+        // receive the handle from rank 0
+        fh = self->shared_fhs[0];
+        status = CUDADRV_FUNC(cuMemImportFromShareableHandle(
+            &mcHandle, &fh, handleType));
+        if (status != UCC_OK) {
+            ucc_error("failed to import handle from rank 0");
+            return status;
+        }
+    }
+    
+    status = CUDADRV_FUNC(cuMulticastAddDevice(mcHandle, device));
+    if (status != UCC_OK) {
+        ucc_error("failed to add device to multicast");
+        return status;
+    }
+
+    // wait for all ranks to add the device to the multicast object
+    // TODO: rework this to use a more efficient barrier
+    ucc_tl_cuda_shm_barrier_t *bar = UCC_TL_CUDA_TEAM_BARRIER(self, 0);
+    status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(self), bar);
+    if (status != UCC_OK) {
+        ucc_error("failed to start shm barrier");
+        return status;
+    }
+    status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(self), bar);
+    while (status == UCC_INPROGRESS) {
+        status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(self), bar);
+    }
+
+    
+
+    return UCC_OK;
+}
+
 UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
@@ -45,6 +169,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     if (!self->ids) {
         tl_error(tl_context->lib, "failed to alloc ranks id");
         return UCC_ERR_NO_MEMORY;
+    }
+
+    status = ucc_tl_cuda_team_init_nvls_multicast(self, tl_context);
+    if (status != UCC_OK) {
+        goto free_ids;
     }
 
     // active set
