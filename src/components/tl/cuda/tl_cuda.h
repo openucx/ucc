@@ -17,6 +17,7 @@
 #include "tl_cuda_topo.h"
 #include "tl_cuda_team_topo.h"
 #include <cuda_runtime.h>
+#include <cuda.h>
 
 #ifndef UCC_TL_CUDA_DEFAULT_SCORE
 #define UCC_TL_CUDA_DEFAULT_SCORE 40
@@ -169,6 +170,7 @@ typedef struct ucc_tl_cuda_team {
     ucc_tl_cuda_scratch_t      scratch;
     cudaStream_t               stream;
     ucc_tl_cuda_rank_id_t     *ids;
+    CUmemFabricHandle         *shared_fhs;
     ucc_team_oob_coll_t        oob;
     void                      *oob_req;
 } ucc_tl_cuda_team_t;
