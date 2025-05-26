@@ -63,7 +63,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
                             &ucc_coll_task_mpool_ops, params->thread_mode,
                             "tl_cuda_req_mp");
     if (status != UCC_OK) {
-        tl_error(self->super.super.lib, 
+        tl_error(self->super.super.lib,
                  "failed to initialize tl_cuda_req mpool");
         return status;
     }
