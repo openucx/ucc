@@ -36,14 +36,14 @@ reduce_scatter =                           \
 	reduce_scatter/reduce_scatter.h        \
 	reduce_scatter/reduce_scatter.c        \
 	reduce_scatter/reduce_scatter_ring.c   \
-	reduce_scatter/reduce_scatter_linear.c
+	reduce_scatter/reduce_scatter_linear.c \
+	reduce_scatter/reduce_scatter_nvls.c
 
 reduce_scatterv =                            \
 	reduce_scatterv/reduce_scatterv.h        \
 	reduce_scatterv/reduce_scatterv.c        \
 	reduce_scatterv/reduce_scatterv_ring.c   \
-	reduce_scatterv/reduce_scatterv_linear.c
-
+	reduce_scatterv/reduce_scatterv_linear.c	
 
 sources =               \
 	tl_cuda.h           \

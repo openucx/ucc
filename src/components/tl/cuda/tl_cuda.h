@@ -277,6 +277,17 @@ struct ucc_tl_cuda_task {
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
                                  ucc_rank_t                block);
         } reduce_scatterv_linear;
+        struct {
+            int                     stage;
+            int                     num_frags;
+            ucc_datatype_t          dt;
+            void *                  sbuf;
+            void *                  rbuf;
+            size_t (*get_count)(const ucc_tl_cuda_task_t *task,
+                                ucc_rank_t                block);
+            size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
+                                 ucc_rank_t                block);
+        } reduce_scatterv_nvls;
     };
 };
 
