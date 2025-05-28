@@ -18,6 +18,7 @@
 #include "tl_cuda_team_topo.h"
 #include <cuda_runtime.h>
 #include <cuda.h>
+#include <cudaTypedefs.h>  // For CU_MEM_CREATE_USAGE_MULTICAST
 
 #ifndef UCC_TL_CUDA_DEFAULT_SCORE
 #define UCC_TL_CUDA_DEFAULT_SCORE 40
@@ -170,9 +171,14 @@ typedef struct ucc_tl_cuda_team {
     ucc_tl_cuda_scratch_t      scratch;
     cudaStream_t               stream;
     ucc_tl_cuda_rank_id_t     *ids;
-    CUmemFabricHandle         *shared_fhs;
+    int                       *shared_handles;
     ucc_team_oob_coll_t        oob;
     void                      *oob_req;
+    CUmemGenericAllocationHandle mc_handle;        // Multicast handle for NVLS
+    CUmemGenericAllocationHandle mc_memhandle;     // Multicast memory handle for NVLS
+    CUdeviceptr               mc_dptr;             // Device pointer for multicast memory
+    size_t                    mc_size;             // Size of multicast memory
+    size_t                    mc_offset;           // Offset of the multicast memory
 } ucc_tl_cuda_team_t;
 
 UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
