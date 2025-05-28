@@ -1417,15 +1417,15 @@ ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_mode_t mode,
     if (mode >= UCC_MEM_MAP_MODE_LAST) {
         ucc_error("Invalid memory map mode: %d", mode);
         return UCC_ERR_INVALID_PARAM;
-    } else if (mode == UCC_MEM_MAP_MODE_IMPORT || mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
+    } 
+    if (mode == UCC_MEM_MAP_MODE_IMPORT || mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
         return ucc_mem_map_import(context, mode, params, memh_size, memh);
-    } else {
-        if (params->n_segments > 1) {
-            ucc_error("UCC only supports one mapping per call");
-            return UCC_ERR_INVALID_PARAM;
-        }
-        return ucc_mem_map_export(context, mode, params, memh_size, memh);
+    } 
+    if (params->n_segments > 1) {
+        ucc_error("UCC only supports one mapping per call");
+        return UCC_ERR_INVALID_PARAM;
     }
+    return ucc_mem_map_export(context, mode, params, memh_size, memh);
 }
 
 ucc_status_t ucc_mem_unmap(ucc_mem_map_mem_h *memh)
