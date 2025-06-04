@@ -42,6 +42,11 @@ static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
      "reduce_scatterv ring algorithms",
      ucc_offsetof(ucc_tl_cuda_lib_config_t, reduce_scatter_ring_max_rings),
      UCC_CONFIG_TYPE_ULUNITS},
+    
+    {"USE_TOPO_CACHE", "y",
+     "Use the NVLINK topology cache",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, use_topo_cache),
+     UCC_CONFIG_TYPE_BOOL},
 
     {NULL}};
 
