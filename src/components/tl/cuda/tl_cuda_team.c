@@ -211,14 +211,9 @@ ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
         ucc_error("failed to create memory allocation for multicast");
         goto error;
     }
-    size_t mcOffset = 0;
-    size_t memOffset = 0;
-    status = CUDADRV_FUNC(cuMulticastBindMem(mcHandle, mcOffset, memhandle, memOffset, mcSize, 0));
-    if (status != UCC_OK) {
-        ucc_error("failed to bind memory to multicast");
-        goto error;
-    }
 
+
+    void* uc_va;
     void* mc_va;
     CUmemAccessDesc accessDesc = {};
     accessDesc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
@@ -227,36 +222,71 @@ ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
 
     // Map a VA to MC space
     status = CUDADRV_FUNC(
-        cuMemAddressReserve((CUdeviceptr *)&mc_va, mcSize, minGran, 0U, 0));
+        cuMemAddressReserve((CUdeviceptr *)&uc_va, mcSize, minGran, 0U, 0));
     if (status != UCC_OK) {
         ucc_error("failed to reserve virtual address space");
         goto error;
     }
-    status = CUDADRV_FUNC(cuMemMap((CUdeviceptr)mc_va, mcSize, 0, memhandle, 0));
+    // CUDA_CHECK(cudaMemset(uc_va, 0, mcSize));
+
+    status = CUDADRV_FUNC(cuMemMap((CUdeviceptr)uc_va, mcSize, 0, memhandle, 0));
     if (status != UCC_OK) {
         ucc_error("failed to map memory allocation");
         goto error;
     }
-    status = CUDADRV_FUNC(cuMemSetAccess((CUdeviceptr)mc_va, mcSize, &accessDesc, 1));
+    status = CUDADRV_FUNC(cuMemSetAccess((CUdeviceptr)uc_va, mcSize, &accessDesc, 1));
     if (status != UCC_OK) {
         ucc_error("failed to set memory access");
         goto error;
     }
 
+    size_t mcOffset = 0;
+    status = CUDADRV_FUNC(cuMulticastBindAddr(mcHandle, mcOffset, (CUdeviceptr)uc_va, mcSize, 0));
+    if (status != UCC_OK) {
+        ucc_error("failed to bind memory to multicast");
+        goto error;
+    }
+
+    status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(self), bar);
+    if (status != UCC_OK) {
+        ucc_error("failed to start shm barrier after init");
+        goto error;
+    }
+    status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(self), bar);
+    while (status == UCC_INPROGRESS) {
+        status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(self), bar);
+    }
+    if (status != UCC_OK) {
+        ucc_error("failed to test shm barrier after init");
+        goto error;
+    }
+
+    ucc_print("rank %d: barrier after init ok\n", UCC_TL_TEAM_RANK(self));
+
+    // Map a VA to MC space
+    CUDADRV_FUNC(
+        cuMemAddressReserve((CUdeviceptr *)&mc_va, mcSize, minGran, 0U, 0));
+    CUDADRV_FUNC(cuMemMap((CUdeviceptr)mc_va, mcSize, 0, mcHandle, 0));
+    // set access on MC address
+    CUDADRV_FUNC(cuMemSetAccess((CUdeviceptr)mc_va, mcSize, &accessDesc, 1));
+
     ucc_print("Rank: %d symmetric memory is set: %p [%ld bytes]\n", UCC_TL_TEAM_RANK(self), mc_va, mcSize);
 
     // Store the handles for cleanup in team destroy
     self->mc_handle = mcHandle;
-    self->mc_dptr = (CUdeviceptr) mc_va;
+    self->mc_va = (CUdeviceptr) mc_va;
+    self->uc_va = (CUdeviceptr) uc_va;
     self->mc_memhandle = memhandle;
     self->mc_size = mcSize;
     self->mc_offset = mcOffset;
+
+
     return UCC_OK;
 error:
     if (UCC_TL_TEAM_RANK(self) == 0) {
-        CUDADRV_FUNC(cuMemUnmap(self->mc_dptr, self->mc_size));
+        CUDADRV_FUNC(cuMemUnmap(self->mc_va, self->mc_size));
         CUDADRV_FUNC(cuMemRelease(self->mc_handle));
-        CUDADRV_FUNC(cuMemAddressFree(self->mc_dptr, self->mc_size));
+        CUDADRV_FUNC(cuMemAddressFree(self->mc_va, self->mc_size));
     }
     return status;
 }
@@ -395,12 +425,12 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
             CUDADRV_FUNC(cuMulticastUnbind(self->mc_handle, 0 /* device */, self->mc_offset, self->mc_size));
             CUDADRV_FUNC(cuMemRelease(self->mc_memhandle));
             
-            CUDADRV_FUNC(cuMemUnmap(self->mc_dptr, self->mc_size));
-            CUDADRV_FUNC(cuMemAddressFree(self->mc_dptr, self->mc_size));
+            CUDADRV_FUNC(cuMemUnmap(self->mc_va, self->mc_size));
+            CUDADRV_FUNC(cuMemAddressFree(self->mc_va, self->mc_size));
             CUDADRV_FUNC(cuMemRelease(self->mc_handle));
         }
         // self->mc_handle = NULL;
-        self->mc_dptr = 0;
+        self->mc_va = 0;
         self->mc_size = 0;
     }
     if (self->ids) {

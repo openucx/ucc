@@ -176,7 +176,8 @@ typedef struct ucc_tl_cuda_team {
     void                      *oob_req;
     CUmemGenericAllocationHandle mc_handle;        // Multicast handle for NVLS
     CUmemGenericAllocationHandle mc_memhandle;     // Multicast memory handle for NVLS
-    CUdeviceptr               mc_dptr;             // Device pointer for multicast memory
+    CUdeviceptr               mc_va;             // Device pointer for multicast memory
+    CUdeviceptr               uc_va;             // Device pointer for unicast memory
     size_t                    mc_size;             // Size of multicast memory
     size_t                    mc_offset;           // Offset of the multicast memory
 } ucc_tl_cuda_team_t;
@@ -287,6 +288,7 @@ struct ucc_tl_cuda_task {
                                 ucc_rank_t                block);
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
                                  ucc_rank_t                block);
+            cudaEvent_t             evtCompletion;
         } reduce_scatterv_nvls;
     };
 };
