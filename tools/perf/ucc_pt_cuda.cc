@@ -22,6 +22,7 @@ ucc_pt_cuda_iface_t ucc_pt_cuda_iface = {
                 reinterpret_cast<decltype(ucc_pt_cuda_iface. _pt_sym)>(h); \
         })
 
+
 void ucc_pt_cuda_init(void)
 {
     void *handle;
@@ -40,6 +41,8 @@ void ucc_pt_cuda_init(void)
     LOAD_CUDA_SYM("cudaFree", cudaFree);
     LOAD_CUDA_SYM("cudaMemset", cudaMemset);
     LOAD_CUDA_SYM("cudaMallocManaged", cudaMallocManaged);
+    LOAD_CUDA_SYM("cudaGetDeviceProperties", cudaGetDeviceProperties);
+    LOAD_CUDA_SYM("cudaDeviceGetPCIBusId", cudaDeviceGetPCIBusId);
 
     ucc_pt_cuda_iface.available = 1;
 }

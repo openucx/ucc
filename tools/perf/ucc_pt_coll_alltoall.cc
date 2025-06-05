@@ -12,8 +12,9 @@
 
 ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
                         ucc_memory_type mt, bool is_inplace,
-                         bool is_persistent,
-                        ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
+                        bool is_persistent,
+                        ucc_pt_comm *communicator,
+                        ucc_pt_generator_base *generator) : ucc_pt_coll(communicator, generator)
 {
     has_inplace_   = true;
     has_reduction_ = false;
@@ -40,23 +41,24 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_alltoall::init_args(size_t single_rank_count,
-                                             ucc_pt_test_args_t &test_args)
+ucc_status_t ucc_pt_coll_alltoall::init_args(ucc_pt_test_args_t &test_args)
 {
     ucc_coll_args_t &args      = test_args.coll_args;
-    int              comm_size = comm->get_size();
     size_t           dt_size   = ucc_dt_size(coll_args.src.info.datatype);
-    size_t           size      = comm_size * single_rank_count * dt_size;
     ucc_status_t     st        = UCC_OK;
 
     args = coll_args;
-    args.dst.info.count = single_rank_count * comm_size;
-    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header, size, args.dst.info.mem_type), exit,
-                  st);
+    args.dst.info.count = generator->get_dst_count();
+    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header,
+                               args.dst.info.count * dt_size,
+                               args.dst.info.mem_type),
+                  exit, st);
     args.dst.info.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
-        args.src.info.count = single_rank_count * comm_size;
-        UCCCHECK_GOTO(ucc_pt_alloc(&src_header, size, args.src.info.mem_type),
+        args.src.info.count = generator->get_src_count();
+        UCCCHECK_GOTO(ucc_pt_alloc(&src_header,
+                                   args.src.info.count * dt_size,
+                                   args.src.info.mem_type),
                       free_dst, st);
         args.src.info.buffer = src_header->addr;
     }
