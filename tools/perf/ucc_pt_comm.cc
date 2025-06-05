@@ -1,5 +1,7 @@
+#include <ios>
 #include <iostream>
 #include <cstring>
+#include <iomanip>
 #include "ucc_pt_comm.h"
 #include "ucc_pt_bootstrap_mpi.h"
 #include "ucc_perftest.h"
@@ -26,7 +28,14 @@ void ucc_pt_comm::set_gpu_device()
     int dev_count = 0;
 
     if (ucc_pt_cudaGetDeviceCount(&dev_count) == 0 && dev_count != 0) {
-        ucc_pt_cudaSetDevice(bootstrap->get_local_rank() % dev_count);
+        int dev   = bootstrap->get_local_rank() % dev_count;
+        ucc_pt_cudaSetDevice(dev);
+        std::string info;
+        ucc_pt_cudaGetDeviceInfo(dev, info);
+        std::cout << std::left << std::setw(8) << "Rank "
+                  << std::setw(8) << bootstrap->get_rank() << ": " << info
+                  << std::endl;
+        std::cout << std::right;
         return;
     }
 

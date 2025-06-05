@@ -13,7 +13,9 @@
 ucc_pt_coll_scatterv::ucc_pt_coll_scatterv(ucc_datatype_t dt,
                          ucc_memory_type mt, bool is_inplace,
                          bool is_persistent, int root_shift,
-                         ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
+                         ucc_pt_comm *communicator,
+                         ucc_pt_generator_base *generator)
+                   : ucc_pt_coll(communicator, generator)
 {
     has_inplace_   = true;
     has_reduction_ = false;
@@ -40,14 +42,10 @@ ucc_pt_coll_scatterv::ucc_pt_coll_scatterv(ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_scatterv::init_args(size_t count,
-                                             ucc_pt_test_args_t &test_args)
+ucc_status_t ucc_pt_coll_scatterv::init_args(ucc_pt_test_args_t &test_args)
 {
     ucc_coll_args_t &args      = test_args.coll_args;
-    int              comm_size = comm->get_size();
     size_t           dt_size   = ucc_dt_size(coll_args.dst.info.datatype);
-    size_t           size_dst  = count * dt_size;
-    size_t           size_src  = comm_size * count * dt_size;
     ucc_status_t st;
     bool is_root;
 
@@ -55,24 +53,20 @@ ucc_status_t ucc_pt_coll_scatterv::init_args(size_t count,
     args           = coll_args;
     is_root        = (comm->get_rank() == args.root);
     if (is_root || root_shift_) {
-        args.src.info_v.counts = (ucc_count_t *)
-            ucc_malloc(comm_size * sizeof(uint32_t), "counts buf");
-        UCC_MALLOC_CHECK_GOTO(args.src.info_v.counts, exit, st);
-        args.src.info_v.displacements = (ucc_aint_t *)
-            ucc_malloc(comm_size * sizeof(uint32_t), "displacements buf");
-        UCC_MALLOC_CHECK_GOTO(args.src.info_v.displacements, free_count, st);
+        args.src.info_v.counts        = generator->get_src_counts();
+        args.src.info_v.displacements = generator->get_src_displs();
         UCCCHECK_GOTO(
-            ucc_pt_alloc(&src_header, size_src, args.src.info_v.mem_type),
-            free_displ, st);
+            ucc_pt_alloc(&src_header,
+                         generator->get_src_count() * dt_size,
+                         args.src.info_v.mem_type),
+            exit, st);
         args.src.info_v.buffer = src_header->addr;
-        for (int i = 0; i < comm->get_size(); i++) {
-            ((uint32_t*)args.src.info_v.counts)[i] = count;
-            ((uint32_t*)args.src.info_v.displacements)[i] = count * i;
-        }
     }
     if (!is_root || !UCC_IS_INPLACE(args) || root_shift_) {
-        args.dst.info.count = count;
-        st = ucc_pt_alloc(&dst_header, size_dst, args.dst.info.mem_type);
+        args.dst.info.count = generator->get_dst_count();
+        st = ucc_pt_alloc(&dst_header,
+                          generator->get_dst_count() * dt_size,
+                          args.dst.info.mem_type);
         if (UCC_OK != st) {
             std::cerr << "UCC perftest error: " << ucc_status_string(st)
                       << " in " << STR(_call) << "\n";
@@ -87,10 +81,6 @@ ucc_status_t ucc_pt_coll_scatterv::init_args(size_t count,
     }
 free_src:
     ucc_pt_free(src_header);
-free_displ:
-    ucc_free(args.src.info_v.displacements);
-free_count:
-    ucc_free(args.src.info_v.counts);
 exit:
     return st;
 }
@@ -105,7 +95,5 @@ void ucc_pt_coll_scatterv::free_args(ucc_pt_test_args_t &test_args)
     }
     if (is_root || root_shift_) {
         ucc_pt_free(src_header);
-        ucc_free(args.src.info_v.displacements);
-        ucc_free(args.src.info_v.counts);
     }
 }

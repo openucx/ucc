@@ -13,7 +13,8 @@
 ucc_pt_coll_allreduce::ucc_pt_coll_allreduce(ucc_datatype_t dt,
                          ucc_memory_type mt, ucc_reduction_op_t op,
                          bool is_inplace, bool is_persistent,
-                         ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
+                         ucc_pt_comm *communicator,
+                         ucc_pt_generator_base *generator) : ucc_pt_coll(communicator, generator)
 {
     has_inplace_   = true;
     has_reduction_ = true;
@@ -42,22 +43,24 @@ ucc_pt_coll_allreduce::ucc_pt_coll_allreduce(ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_allreduce::init_args(size_t count,
-                                              ucc_pt_test_args_t &test_args)
+ucc_status_t ucc_pt_coll_allreduce::init_args(ucc_pt_test_args_t &test_args)
 {
     ucc_coll_args_t &args    = test_args.coll_args;
     size_t           dt_size = ucc_dt_size(coll_args.src.info.datatype);
-    size_t           size    = count * dt_size;
     ucc_status_t     st      = UCC_OK;
 
     args = coll_args;
-    args.src.info.count = count;
-    args.dst.info.count = count;
-    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header, size, args.dst.info.mem_type), exit,
-                  st);
+    args.src.info.count = generator->get_src_count();
+    args.dst.info.count = generator->get_dst_count();
+    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header,
+                               generator->get_dst_count() * dt_size,
+                               args.dst.info.mem_type),
+                  exit, st);
     args.dst.info.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
-        UCCCHECK_GOTO(ucc_pt_alloc(&src_header, size, args.src.info.mem_type),
+        UCCCHECK_GOTO(ucc_pt_alloc(&src_header,
+                                   generator->get_src_count() * dt_size,
+                                   args.src.info.mem_type),
                       free_dst, st);
         args.src.info.buffer = src_header->addr;
     }

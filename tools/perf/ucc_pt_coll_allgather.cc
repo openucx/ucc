@@ -13,7 +13,8 @@
 ucc_pt_coll_allgather::ucc_pt_coll_allgather(ucc_datatype_t dt,
                          ucc_memory_type mt, bool is_inplace,
                          bool is_persistent,
-                         ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
+                         ucc_pt_comm *communicator,
+                         ucc_pt_generator_base *generator) : ucc_pt_coll(communicator, generator)
 
 {
     has_inplace_   = true;
@@ -41,11 +42,11 @@ ucc_pt_coll_allgather::ucc_pt_coll_allgather(ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_allgather::init_args(size_t single_rank_count,
-                                              ucc_pt_test_args_t &test_args)
+ucc_status_t ucc_pt_coll_allgather::init_args(ucc_pt_test_args_t &test_args)
 {
     ucc_coll_args_t &args     = test_args.coll_args;
     size_t           dt_size  = ucc_dt_size(coll_args.src.info.datatype);
+    size_t           single_rank_count = generator->get_src_count();
     size_t           size_src = single_rank_count * dt_size;
     size_t           size_dst = comm->get_size() * single_rank_count * dt_size;
     ucc_status_t     st;

@@ -11,22 +11,44 @@
 #include <utils/ucc_coll_utils.h>
 
 ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
-                         ucc_memory_type mt, bool is_inplace,
-                         bool is_persistent,
-                         ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
+                                             ucc_memory_type mt,
+                                             bool is_inplace,
+                                             bool is_persistent,
+                                             ucc_pt_comm *communicator,
+                                             ucc_pt_generator_base *generator)
+                                             : ucc_pt_coll(communicator, generator)
 {
+    size_t src_count_max = generator->get_src_count_max();
+    size_t dst_count_max = generator->get_dst_count_max();
+    ucc_status_t st;
+
     has_inplace_   = true;
     has_reduction_ = false;
     has_range_     = true;
-    has_bw_        = false;
+    has_bw_        = true;
     root_shift_    = 0;
+
+
+    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header,
+                               dst_count_max * ucc_dt_size(dt),
+                               mt),
+                exit, st);
+
+    if (!is_inplace) {
+        UCCCHECK_GOTO(ucc_pt_alloc(&src_header,
+                                src_count_max * ucc_dt_size(dt),
+                                mt),
+                      exit, st);
+    }
 
     coll_args.mask                = UCC_COLL_ARGS_FIELD_FLAGS;
     coll_args.coll_type           = UCC_COLL_TYPE_ALLTOALLV;
     coll_args.src.info_v.datatype = dt;
     coll_args.src.info_v.mem_type = mt;
+    coll_args.src.info_v.buffer   = src_header->addr;
     coll_args.dst.info_v.datatype = dt;
     coll_args.dst.info_v.mem_type = mt;
+    coll_args.dst.info_v.buffer   = dst_header->addr;
     coll_args.flags               = UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER |
                                     UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
     if (is_inplace) {
@@ -37,65 +59,46 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
         coll_args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
 
-}
-
-ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count,
-                                              ucc_pt_test_args_t &test_args)
-{
-    ucc_coll_args_t &args      = test_args.coll_args;
-    int              comm_size = comm->get_size();
-    size_t           dt_size   = ucc_dt_size(coll_args.src.info_v.datatype);
-    size_t           size      = comm_size * count * dt_size;
-    ucc_status_t     st        = UCC_OK;
-
-    args = coll_args;
-    args.src.info_v.counts = (ucc_count_t *) ucc_malloc(comm_size * sizeof(uint32_t), "counts buf");
-    UCC_MALLOC_CHECK_GOTO(args.src.info_v.counts, exit, st);
-    args.src.info_v.displacements = (ucc_aint_t *) ucc_malloc(comm_size * sizeof(uint32_t), "displacements buf");
-    UCC_MALLOC_CHECK_GOTO(args.src.info_v.displacements, free_src_count, st);
-    args.dst.info_v.counts = (ucc_count_t *) ucc_malloc(comm_size * sizeof(uint32_t), "counts buf");
-    UCC_MALLOC_CHECK_GOTO(args.dst.info_v.counts, free_src_displ, st);
-    args.dst.info_v.displacements = (ucc_aint_t *) ucc_malloc(comm_size * sizeof(uint32_t), "displacements buf");
-    UCC_MALLOC_CHECK_GOTO(args.dst.info_v.displacements, free_dst_count, st);
-    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header, size, args.dst.info_v.mem_type),
-                  free_dst_displ, st);
-    args.dst.info_v.buffer = dst_header->addr;
-    if (!UCC_IS_INPLACE(args)) {
-        UCCCHECK_GOTO(ucc_pt_alloc(&src_header, size, args.src.info_v.mem_type),
-                      free_dst, st);
-        args.src.info_v.buffer = src_header->addr;
-    }
-    for (int i = 0; i < comm_size; i++) {
-        ((uint32_t*)args.src.info_v.counts)[i] = count;
-        ((uint32_t*)args.src.info_v.displacements)[i] = count * i;
-        ((uint32_t*)args.dst.info_v.counts)[i] = count;
-        ((uint32_t*)args.dst.info_v.displacements)[i] = count * i;
-    }
-    return UCC_OK;
-free_dst:
-    ucc_pt_free(dst_header);
-free_dst_displ:
-    ucc_free(args.dst.info_v.displacements);
-free_dst_count:
-    ucc_free(args.dst.info_v.counts);
-free_src_displ:
-    ucc_free(args.src.info_v.displacements);
-free_src_count:
-    ucc_free(args.src.info_v.counts);
+    return;
 exit:
-    return st;
-}
-
-void ucc_pt_coll_alltoallv::free_args(ucc_pt_test_args_t &test_args)
-{
-    ucc_coll_args_t &args = test_args.coll_args;
-
-    if (!UCC_IS_INPLACE(args)) {
+    if (dst_header) {
+        ucc_pt_free(dst_header);
+    }
+    if (src_header) {
         ucc_pt_free(src_header);
     }
-    ucc_pt_free(dst_header);
-    ucc_free(args.dst.info_v.counts);
-    ucc_free(args.dst.info_v.displacements);
-    ucc_free(args.src.info_v.counts);
-    ucc_free(args.src.info_v.displacements);
+    throw std::runtime_error("failed to initialize alltoallv arguments");
+}
+
+ucc_status_t ucc_pt_coll_alltoallv::init_args(ucc_pt_test_args_t &test_args)
+{
+    ucc_coll_args_t &args      = test_args.coll_args;
+
+    args = coll_args;
+    args.src.info_v.counts        = (ucc_count_t *) generator->get_src_counts();
+    args.src.info_v.displacements = (ucc_aint_t *) generator->get_src_displs();
+    args.dst.info_v.counts        = (ucc_count_t *) generator->get_dst_counts();
+    args.dst.info_v.displacements = (ucc_aint_t *) generator->get_dst_displs();
+
+    return UCC_OK;
+}
+
+float ucc_pt_coll_alltoallv::get_bw(float time_ms, int grsize,
+                                    ucc_pt_test_args_t test_args)
+{
+    ucc_coll_args_t &args = test_args.coll_args;
+    float            N    = grsize;
+    float            S    = 0;
+    size_t src_size = 0, dst_size = 0;
+
+
+    for (int i = 0; i < grsize; i++) {
+        src_size += ucc_coll_args_get_count(&args, args.src.info_v.counts, i);
+        dst_size += ucc_coll_args_get_count(&args, args.dst.info_v.counts, i);
+    }
+    src_size *= ucc_dt_size(args.src.info_v.datatype);
+    dst_size *= ucc_dt_size(args.dst.info_v.datatype);
+    S = src_size > dst_size ? src_size : dst_size;
+
+    return (S / time_ms) * ((N - 1) / N) / 1000.0;
 }
