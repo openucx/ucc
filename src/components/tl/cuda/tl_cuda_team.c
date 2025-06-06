@@ -30,7 +30,7 @@ ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
     mcProp.handleTypes           = handleType;
     mcProp.flags                 = 0;
 
-    ucc_print("RANK %d: numDevices: %d, size: %zu, handleTypes: %lld, flags: %lld\n", UCC_TL_TEAM_RANK(self), mcProp.numDevices, mcProp.size, mcProp.handleTypes, mcProp.flags);
+    ucc_debug("RANK %d: numDevices: %d, size: %zu, handleTypes: %lld, flags: %lld\n", UCC_TL_TEAM_RANK(self), mcProp.numDevices, mcProp.size, mcProp.handleTypes, mcProp.flags);
     size_t minGran, gran;
     gran    = 0;
     minGran = 0;
@@ -45,13 +45,13 @@ ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
     }
     int device;
     CUDA_CHECK(cudaGetDevice(&device));
-    ucc_print("RANK %d: device: %d\n", UCC_TL_TEAM_RANK(self), device);
+    ucc_debug("RANK %d: device: %d\n", UCC_TL_TEAM_RANK(self), device);
     int supported;
     cuDeviceGetAttribute(&supported, CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED, device);
-    ucc_print("MULTICAST_SUPPORTED: %d\n", supported);
+    ucc_debug("MULTICAST_SUPPORTED: %d\n", supported);
     int fabric_supported;
     cuDeviceGetAttribute(&fabric_supported, CU_DEVICE_ATTRIBUTE_HANDLE_TYPE_FABRIC_SUPPORTED, device);
-    ucc_print("HANDLE_TYPE_FABRIC_SUPPORTED: %d\n", fabric_supported);
+    ucc_debug("HANDLE_TYPE_FABRIC_SUPPORTED: %d\n", fabric_supported);
 
     // Try to initialize NVLS multicast, but continue if not supported
     ucc_status_t mc_status = CUDADRV_FUNC(cuMulticastGetGranularity(&minGran, &mcProp, CU_MULTICAST_GRANULARITY_MINIMUM));
@@ -66,7 +66,7 @@ ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
     }
 
     if (UCC_TL_TEAM_RANK(self) == 0) {
-        ucc_print("NVLS multicast granularity: gran = %lu, minGrad = %lu\n",
+        ucc_debug("NVLS multicast granularity: gran = %lu, minGrad = %lu\n",
                   gran, minGran);
     }
 
@@ -80,7 +80,7 @@ ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
 
     int myDevice;
     cuCtxGetDevice(&myDevice);
-    ucc_print("RANK %d: myDevice: %d\n", UCC_TL_TEAM_RANK(self), myDevice);
+    ucc_debug("RANK %d: myDevice: %d\n", UCC_TL_TEAM_RANK(self), myDevice);
 
     if (UCC_TL_TEAM_RANK(self) == 0) {
         // Now create the multicast object
@@ -143,10 +143,10 @@ ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
     self->oob_req = NULL;
 
     if (UCC_TL_TEAM_RANK(self) == 0) {
-        ucc_print("rank %d: export_handle: %d\n", UCC_TL_TEAM_RANK(self),
+        ucc_debug("rank %d: export_handle: %d\n", UCC_TL_TEAM_RANK(self),
                   export_handle);
     } else {
-        ucc_print("rank %d: export_handle: %d\n", UCC_TL_TEAM_RANK(self),
+        ucc_debug("rank %d: export_handle: %d\n", UCC_TL_TEAM_RANK(self),
                   self->shared_handles[0]);
         export_handle = self->shared_handles[0];
     }
@@ -161,7 +161,7 @@ ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
     if (UCC_TL_TEAM_RANK(self) != 0) {
         // receive the handle from rank 0
         void * p = (void*) ((uint64_t) peerFd);
-        ucc_print("rank %d: export_handle: %d\n", UCC_TL_TEAM_RANK(self),
+        ucc_debug("rank %d: export_handle: %d\n", UCC_TL_TEAM_RANK(self),
                   export_handle);
         status = CUDADRV_FUNC(cuMemImportFromShareableHandle(
             &mcHandle, p, handleType));
@@ -195,7 +195,7 @@ ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
         goto error;
     }
 
-    ucc_print("rank %d: barrier ok\n", UCC_TL_TEAM_RANK(self));
+    ucc_debug("rank %d: barrier ok\n", UCC_TL_TEAM_RANK(self));
 
     // allocate memory and bind to the multicast object
     CUmemGenericAllocationHandle memhandle;
@@ -261,7 +261,7 @@ ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
         goto error;
     }
 
-    ucc_print("rank %d: barrier after init ok\n", UCC_TL_TEAM_RANK(self));
+    ucc_debug("rank %d: barrier after init ok\n", UCC_TL_TEAM_RANK(self));
 
     // Map a VA to MC space
     CUDADRV_FUNC(
@@ -270,7 +270,7 @@ ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
     // set access on MC address
     CUDADRV_FUNC(cuMemSetAccess((CUdeviceptr)mc_va, mcSize, &accessDesc, 1));
 
-    ucc_print("Rank: %d symmetric memory is set: %p [%ld bytes]\n", UCC_TL_TEAM_RANK(self), mc_va, mcSize);
+    ucc_debug("Rank: %d symmetric memory is set: %p [%ld bytes]\n", UCC_TL_TEAM_RANK(self), mc_va, mcSize);
 
     // Store the handles for cleanup in team destroy
     self->mc_handle = mcHandle;
@@ -620,7 +620,7 @@ barrier:
 
     status = ucc_tl_cuda_team_init_nvls_multicast(team, tl_team->context);
     if (status != UCC_OK) {
-        ucc_print("failed to init nvls multicast");
+        ucc_error("failed to init nvls multicast");
         goto exit_err;
     }
 
