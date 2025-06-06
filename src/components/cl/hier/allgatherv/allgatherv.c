@@ -99,13 +99,14 @@ static inline ucc_status_t is_block_ordered(ucc_cl_hier_team_t *cl_team, int *or
                     // If ranks are not consecutive, not block ordered
                     if (curr_rank != prev_rank + 1) {
                         is_block_ordered = 0;
-                        break;
+                        goto break_outer;
                     }
                     prev_rank = curr_rank;
                 }
             }
         }
 
+break_outer:
         // Save for next time
         cl_team->is_block_ordered = is_block_ordered;
     }
