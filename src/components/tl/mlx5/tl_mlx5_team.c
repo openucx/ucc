@@ -196,11 +196,6 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
 
                 if (tl_team->local_mcast_team_ready) {
                     comm = tl_team->mcast->mcast_comm;
-                    /* release the resources */
-                    if (ibv_dereg_mr(comm->grh_mr)) {
-                        tl_warn(UCC_TL_TEAM_LIB(tl_team),
-                                "ibv_dereg_mr failed");
-                    }
                     if (ibv_destroy_cq(comm->mcast.rcq)) {
                         tl_warn(UCC_TL_TEAM_LIB(tl_team),
                                 "ibv_destroy_cq failed");
