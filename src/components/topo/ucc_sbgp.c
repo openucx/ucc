@@ -174,6 +174,22 @@ ucc_status_t ucc_sbgp_create_node(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
     return UCC_OK;
 }
 
+static int ucc_compare_nl_ranks(const void *a, const void *b)
+{
+    ucc_rank_t *r1 = (ucc_rank_t *)a;
+    ucc_rank_t *r2 = (ucc_rank_t *)b;
+
+    if(*r1 > *r2) {
+        return 1;
+    }
+    else if(*r1 == *r2) {
+        return 0;
+    }
+    else {
+        return -1;
+    }
+}
+
 static ucc_status_t sbgp_create_node_leaders(ucc_topo_t *topo, ucc_sbgp_t *sbgp,
                                              int ctx_nlr)
 {
@@ -294,6 +310,19 @@ static ucc_status_t sbgp_create_node_leaders(ucc_topo_t *topo, ucc_sbgp_t *sbgp,
             nl_array_1[n_node_leaders++] = nl_array_2[i];
         }
     }
+
+    /* order the node leader sbgp by team rank instead of host id */
+    qsort(nl_array_1, n_node_leaders, sizeof(ucc_rank_t), ucc_compare_nl_ranks);
+    if (i_am_node_leader) {
+        for (i = 0; i < n_node_leaders; i++) {
+            // my index in nl_array_1 was swapped, find where it was swapped to
+            if (nl_array_1[i] == comm_rank) {
+                sbgp->group_rank = i;
+                break;
+            }
+        }
+    }
+
 skip:
     ucc_free(nl_array_2);
 

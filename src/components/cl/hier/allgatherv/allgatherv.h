@@ -17,7 +17,7 @@ enum
 extern ucc_base_coll_alg_info_t
     ucc_cl_hier_allgatherv_algs[UCC_CL_HIER_ALLGATHERV_ALG_LAST + 1];
 
-#define UCC_CL_HIER_ALLGATHERV_DEFAULT_ALG_SELECT_STR "allgatherv:0-2k:host:@gab"
+#define UCC_CL_HIER_ALLGATHERV_DEFAULT_ALG_SELECT_STR "allgatherv:0-8m:host:@gab"
 
 ucc_status_t ucc_cl_hier_allgatherv_init(ucc_base_coll_args_t *coll_args,
                                         ucc_base_team_t       *team,
