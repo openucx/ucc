@@ -121,7 +121,6 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     comm->mcast.rcq = ibv_create_cq(mcast_context->ctx, comm->params.rx_depth, NULL, NULL, 0);
     if (!comm->mcast.rcq) {
-        ibv_dereg_mr(comm->grh_mr);
         tl_error(mcast_context->lib, "could not create recv cq, rx_depth %d, errno %d",
                   comm->params.rx_depth, errno);
         status = UCC_ERR_NO_RESOURCE;
@@ -130,7 +129,6 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     comm->mcast.scq = ibv_create_cq(mcast_context->ctx, comm->params.sx_depth, NULL, NULL, 0);
     if (!comm->mcast.scq) {
-        ibv_dereg_mr(comm->grh_mr);
         ibv_destroy_cq(comm->mcast.rcq);
         tl_error(mcast_context->lib, "could not create send cq, sx_depth %d, errno %d",
                   comm->params.sx_depth, errno);
