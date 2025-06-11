@@ -86,6 +86,11 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_percent_bw),
      UCC_CONFIG_TYPE_UINT},
 
+    {"ALLTOALL_ONESIDED_ENABLE_GET", "auto",
+     "Enable use of GET-based algorithm for onesided alltoall (default: auto)",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_enable_get),
+     UCC_CONFIG_TYPE_ON_OFF_AUTO},
+
     {"KN_RADIX", "0",
      "Radix of all algorithms based on knomial pattern. When set to a "
      "positive value it is used as a convenience parameter to set all "
