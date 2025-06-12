@@ -16,6 +16,15 @@ ucc_status_t ucc_tl_nccl_get_lib_properties(ucc_base_lib_properties_t *prop);
 ucc_status_t ucc_tl_nccl_get_context_attr(const ucc_base_context_t *context,
                                           ucc_base_ctx_attr_t      *base_attr);
 
+ucc_status_t ucc_tl_nccl_mem_map(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+                                 ucc_mem_map_memh_t *memh, ucc_mem_map_tl_t *tl_h);
+
+ucc_status_t ucc_tl_nccl_mem_unmap(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+                                   ucc_mem_map_tl_t *tl_h);
+
+ucc_status_t ucc_tl_nccl_memh_pack(const ucc_base_context_t *context,
+                                   ucc_mem_map_mode_t mode, ucc_mem_map_tl_t *tl_h, void **pack_buffer);
+
 static ucc_config_field_t ucc_tl_nccl_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_nccl_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},

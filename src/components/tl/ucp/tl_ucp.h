@@ -100,6 +100,7 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                     service_throttling_thresh;
     ucc_tl_ucp_local_copy_type_t local_copy_type;
     int                          memtype_copy_enable;
+    uint32_t                     exported_memory_handle;
 } ucc_tl_ucp_context_config_t;
 
 typedef ucc_tl_ucp_lib_config_t ucc_tl_ucp_team_config_t;
@@ -119,6 +120,13 @@ typedef struct ucc_tl_ucp_remote_info {
     void * packed_key;
     size_t packed_key_len;
 } ucc_tl_ucp_remote_info_t;
+
+typedef struct ucc_tl_ucp_memh_data {
+    ucc_tl_ucp_remote_info_t rinfo;
+    void                    *packed_memh;
+    size_t                   packed_memh_len;
+    ucp_rkey_h               rkey;
+} ucc_tl_ucp_memh_data_t;
 
 typedef struct ucc_tl_ucp_worker {
     ucp_context_h     ucp_context;
@@ -252,6 +260,33 @@ extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 
 #define UCC_TL_UCP_REMOTE_RKEY(_ctx, _rank, _seg)                              \
     ((_ctx)->rkeys[_rank * _ctx->n_rinfo_segs + _seg])
+
+/*
+ * For context, the data order of the MEMH Headers / Packed Headers
+ *
+ * MEMH headers for each TL:
+ * TL NAME (8 bytes) | packed size | packed TL
+ *
+ * Packed TL headers:
+ * packed_key_size | packed_memh_size | packed_key | packed_memh
+ */
+#define UCC_TL_UCP_MEMH_TL_HEADERS        2
+
+#define UCC_TL_UCP_MEMH_TL_PACKED_HEADERS 2
+
+#define UCC_TL_UCP_MEMH_TL_HEADER_SIZE                                         \
+    (sizeof(size_t) * UCC_TL_UCP_MEMH_TL_HEADERS)
+
+#define UCC_TL_UCP_MEMH_TL_PACKED_HEADER_SIZE                                  \
+    (sizeof(size_t) *                                                          \
+     (UCC_TL_UCP_MEMH_TL_HEADERS + UCC_TL_UCP_MEMH_TL_PACKED_HEADERS))
+
+#define UCC_TL_UCP_MEMH_TL_KEY_SIZE(buffer)                                    \
+    (*(size_t *)(PTR_OFFSET(buffer, UCC_TL_UCP_MEMH_TL_HEADER_SIZE)))
+
+#define UCC_TL_UCP_MEMH_TL_PACKED_MEMH(buffer)                                 \
+    (PTR_OFFSET(buffer, UCC_TL_UCP_MEMH_TL_PACKED_HEADER_SIZE +                \
+                            UCC_TL_UCP_MEMH_TL_KEY_SIZE(buffer)))
 
 extern ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1];
 
