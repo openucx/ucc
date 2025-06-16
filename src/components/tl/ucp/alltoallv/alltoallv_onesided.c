@@ -24,6 +24,8 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_start(ucc_coll_task_t *ctask)
     ucc_aint_t        *d_disp   = TASK_ARGS(task).dst.info_v.displacements;
     size_t             sdt_size = ucc_dt_size(TASK_ARGS(task).src.info_v.datatype);
     size_t             rdt_size = ucc_dt_size(TASK_ARGS(task).dst.info_v.datatype);
+    ucc_mem_map_mem_h  src_memh = TASK_ARGS(task).src_memh.local_memh;
+    ucc_mem_map_mem_h *dst_memh = TASK_ARGS(task).dst_memh.global_memh;
     ucc_rank_t         peer;
     size_t             sd_disp, dd_disp, data_size;
 
@@ -40,15 +42,18 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_start(ucc_coll_task_t *ctask)
             ucc_coll_args_get_displacement(&TASK_ARGS(task), d_disp, peer) *
             rdt_size;
         data_size =
-            ucc_coll_args_get_count(&TASK_ARGS(task),
-                                    TASK_ARGS(task).src.info_v.counts, peer) *
+            ucc_coll_args_get_count(
+                &TASK_ARGS(task), TASK_ARGS(task).src.info_v.counts, peer) *
             sdt_size;
 
         UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, sd_disp),
                                         PTR_OFFSET(dest, dd_disp),
-                                        data_size, peer, team, task),
+                                        data_size, peer, src_memh,
+                                        dst_memh, team, task),
                       task, out);
-        UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer, team), task, out);
+        UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer,
+                                            dst_memh, team),
+                      task, out);
     }
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 out:
@@ -92,6 +97,12 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
             status = UCC_ERR_NOT_SUPPORTED;
             goto out;
         }
+    }
+    if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH)) {
+        coll_args->args.src_memh.global_memh = NULL;
+    }
+    if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH)) {
+        coll_args->args.dst_memh.global_memh = NULL;
     }
 
     task                 = ucc_tl_ucp_init_task(coll_args, team);

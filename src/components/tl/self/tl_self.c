@@ -16,6 +16,15 @@ ucc_status_t ucc_tl_self_get_lib_attr(const ucc_base_lib_t *lib,
 ucc_status_t ucc_tl_self_get_context_attr(const ucc_base_context_t *context,
                                           ucc_base_ctx_attr_t      *base_attr);
 
+ucc_status_t ucc_tl_self_mem_map(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+                                 ucc_mem_map_memh_t *memh, ucc_mem_map_tl_t *tl_h);
+
+ucc_status_t ucc_tl_self_mem_unmap(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+                                   ucc_mem_map_tl_t *tl_h);
+
+ucc_status_t ucc_tl_self_memh_pack(const ucc_base_context_t *context,
+                                   ucc_mem_map_mode_t mode, ucc_mem_map_tl_t *tl_h, void **pack_buffer);
+
 ucc_status_t ucc_tl_self_get_lib_properties(ucc_base_lib_properties_t *prop);
 
 static ucc_config_field_t ucc_tl_self_lib_config_table[] = {

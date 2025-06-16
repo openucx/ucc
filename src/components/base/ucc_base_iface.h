@@ -21,6 +21,8 @@ typedef struct ucc_team ucc_team_t;
 typedef struct ucc_context ucc_context_t;
 typedef struct ucc_coll_score ucc_coll_score_t;
 typedef struct ucc_coll_task ucc_coll_task_t;
+typedef struct ucc_mem_map_memh_t ucc_mem_map_memh_t;
+typedef struct ucc_mem_map_tl_t ucc_mem_map_tl_t;
 
 typedef struct ucc_base_lib {
     ucc_log_component_config_t log_component;
@@ -123,6 +125,23 @@ typedef struct ucc_base_context_iface {
     void         (*destroy)(ucc_base_context_t *ctx);
     ucc_status_t (*get_attr)(const ucc_base_context_t *context,
                              ucc_base_ctx_attr_t      *attr);
+    /* maps a memory-region specified by memory handle, memh, to a tl specific
+       handle, tl_h, based on the mapping mode defined by mode. For the export
+       mode, the TL will map a local memory-region memory and store the
+       necessary information in the tl_h. For the import mode, the TL will
+       map, if necessary, memory handles provided by a peer and store the
+       necessary information in the tl_h. */
+    ucc_status_t (*mem_map)(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+                            ucc_mem_map_memh_t *memh, ucc_mem_map_tl_t *tl_h);
+    /* unmaps a memory-region previously mapped to a specific TL pointed to by tl_h
+       with a mode of mapping by mode. */
+    ucc_status_t (*mem_unmap)(const ucc_base_context_t *context, ucc_mem_map_mode_t mode, ucc_mem_map_tl_t *tl_h);
+    /* packs necessary TL specific elements for a mapped memory-region to a
+       packed buffer. Each TL implementing this function should set the
+       packed_size member of the tl_h, allocate memory for the pack_buffer, and
+       pack data in the buffer. */
+    ucc_status_t (*memh_pack)(const ucc_base_context_t *context, ucc_mem_map_mode_t mode, ucc_mem_map_tl_t *tl_h,
+                              void **pack_buffer);
 } ucc_base_context_iface_t;
 
 
@@ -236,6 +255,9 @@ typedef struct ucc_base_coll_alg_info {
         .super.context.destroy =                                               \
             UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_context_t),           \
         .super.context.get_attr = ucc_##_f##_name##_get_context_attr,          \
+        .super.context.mem_map = ucc_##_f##_name##_mem_map,                    \
+        .super.context.mem_unmap = ucc_##_f##_name##_mem_unmap,                \
+        .super.context.memh_pack = ucc_##_f##_name##_memh_pack,                \
         .super.team.create_post =                                              \
             UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_team_t),                 \
         .super.team.create_test = ucc_##_f##_name##_team_create_test,          \
