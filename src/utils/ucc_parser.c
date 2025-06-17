@@ -263,6 +263,30 @@ err:
     return UCC_ERR_NO_MEMORY;
 }
 
+ucc_status_t ucc_config_names_array_to_string(const ucc_config_names_array_t *array,
+                                              char *str, size_t max)
+{
+    size_t cur_len = 0;
+    size_t i;
+    int ret;
+
+    if (!str || !array || max == 0) {
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    for (i = 0; i < array->count; i++) {
+        ret = snprintf(str + cur_len, max - cur_len, "%s%s",
+                      array->names[i],
+                      (i < array->count - 1) ? "," : "");
+        if (ret < 0) {
+            return UCC_ERR_NO_MEMORY;
+        }
+        cur_len += ret;
+    }
+    return UCC_OK;
+}
+
+
 void ucc_config_names_array_free(ucc_config_names_array_t *array)
 {
     int i;

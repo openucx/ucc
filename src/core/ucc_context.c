@@ -50,6 +50,12 @@ static ucc_config_field_t ucc_context_config_table[] = {
      ucc_offsetof(ucc_context_config_t, throttle_progress),
      UCC_CONFIG_TYPE_UINT},
 
+    {"NET_DEVICES", "all",
+     "Specifies which network device(s) to use. The order is not meaningful.\n"
+     "\"all\" would use all available devices. Only TLs that support this "
+     "parameter will be affected. The parameter is only supported by UCX TL.",
+     ucc_offsetof(ucc_context_config_t, net_devices), UCC_CONFIG_TYPE_STRING_ARRAY},
+
     {NULL}};
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
                           ucc_context_config_t, &ucc_config_global_list);
@@ -302,6 +308,8 @@ void ucc_context_config_release(ucc_context_config_t *config)
     for (i = 0; i < config->n_cl_cfg; i++) {
         ucc_base_config_release(&config->cl_cfgs[i]->super.super);
     }
+
+    ucc_config_parser_release_opts(config, ucc_context_config_table);
     ucc_free(config->tl_cfgs);
     ucc_free(config->cl_cfgs);
     ucc_free(config);
@@ -619,6 +627,9 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
+    ctx->net_devices.count = 0;
+    ucc_config_names_array_dup(&ctx->net_devices, &config->net_devices);
+
     ctx->throttle_progress = config->throttle_progress;
     ctx->rank              = UCC_RANK_MAX;
     ctx->lib               = lib;
@@ -840,7 +851,13 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         goto error_ctx_create_epilog;
     }
 
-    ucc_debug("created ucc context %p for lib %s", ctx, lib->full_prefix);
+    ucc_debug("created ucc context %p for lib %s: type %s, thread mode %s, oob %s, num eps %d, num ppn %d",
+              ctx, lib->full_prefix,
+              params->mask & UCC_CONTEXT_PARAM_FIELD_TYPE ? ucc_context_type_str(params->type) : "n/a",
+              ucc_thread_mode_str(ctx->thread_mode),
+              params->mask & UCC_CONTEXT_PARAM_FIELD_OOB ? "true" : "false",
+              config->estimated_num_eps,
+              config->estimated_num_ppn);
     *context = ctx;
     return UCC_OK;
 
@@ -931,6 +948,7 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
         tl_lib->iface->context.destroy(&context->service_ctx->super);
     }
 
+    ucc_config_names_array_free(&context->net_devices);
     ucc_context_topo_cleanup(context->topo);
     ucc_progress_queue_finalize(context->pq);
     ucc_free(context->addr_storage.storage);
@@ -1417,10 +1435,10 @@ ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_mode_t mode,
     if (mode >= UCC_MEM_MAP_MODE_LAST) {
         ucc_error("Invalid memory map mode: %d", mode);
         return UCC_ERR_INVALID_PARAM;
-    } 
+    }
     if (mode == UCC_MEM_MAP_MODE_IMPORT || mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
         return ucc_mem_map_import(context, mode, params, memh_size, memh);
-    } 
+    }
     if (params->n_segments > 1) {
         ucc_error("UCC only supports one mapping per call");
         return UCC_ERR_INVALID_PARAM;

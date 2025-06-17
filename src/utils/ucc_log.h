@@ -230,4 +230,30 @@ static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
     return "invalid";
 }
 
+static inline const char* ucc_thread_mode_str(ucc_thread_mode_t tm)
+{
+    switch(tm) {
+    case UCC_THREAD_SINGLE:
+        return "single";
+    case UCC_THREAD_FUNNELED:
+        return "funneled";
+    case UCC_THREAD_MULTIPLE:
+        return "multiple";
+    }
+
+    return "invalid";
+}
+
+static inline const char* ucc_context_type_str(ucc_context_type_t ct)
+{
+    switch(ct) {
+    case UCC_CONTEXT_EXCLUSIVE:
+        return "exclusive";
+    case UCC_CONTEXT_SHARED:
+        return "shared";
+    }
+
+    return "invalid";
+}
+
 #endif
