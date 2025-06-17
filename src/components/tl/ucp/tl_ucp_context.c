@@ -32,6 +32,8 @@
         goto go;                                                               \
     }
 
+#define MAX_NET_DEVICES_STR_LEN 512
+
 unsigned ucc_tl_ucp_service_worker_progress(void *progress_arg)
 {
     ucc_tl_ucp_context_t *ctx = (ucc_tl_ucp_context_t *)progress_arg;
@@ -153,6 +155,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     ucp_worker_h        ucp_worker;
     ucs_status_t        status;
     char *              prefix;
+    char net_devices_str[MAX_NET_DEVICES_STR_LEN];
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_ucp_config->super,
                               params->context);
@@ -180,6 +183,19 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                     "applications when CUDA kernel depends on collective "
                     "communication and stream is not provided to the collective");
         }
+    }
+
+    if (!ucc_config_names_array_is_all(&self->super.super.ucc_context->net_devices)) {
+        ucc_status = ucc_config_names_array_to_string(
+            &self->super.super.ucc_context->net_devices, net_devices_str,
+            MAX_NET_DEVICES_STR_LEN);
+        if (UCC_OK != ucc_status) {
+            tl_error(self->super.super.lib, "failed to convert net devices to string");
+            goto err_cfg;
+        }
+        ucc_print("net_devices_str: %s", net_devices_str);
+        UCP_CHECK(ucp_config_modify(ucp_config, "NET_DEVICES", net_devices_str),
+                  "failed to set net devices", err_cfg, self);
     }
 
     ucp_params.field_mask =
@@ -228,7 +244,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         self->sendrecv_cbs.ucc_tl_ucp_send_nb = ucc_tl_ucp_send_nb_mt;
         self->sendrecv_cbs.ucc_tl_ucp_recv_nb = ucc_tl_ucp_recv_nb_mt;
         self->sendrecv_cbs.ucc_tl_ucp_send_nz = ucc_tl_ucp_send_nz_mt;
-        self->sendrecv_cbs.ucc_tl_ucp_recv_nz = ucc_tl_ucp_recv_nz_mt;        
+        self->sendrecv_cbs.ucc_tl_ucp_recv_nz = ucc_tl_ucp_recv_nz_mt;
         break;
     default:
         /* unreachable */
