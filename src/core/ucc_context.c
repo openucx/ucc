@@ -50,6 +50,12 @@ static ucc_config_field_t ucc_context_config_table[] = {
      ucc_offsetof(ucc_context_config_t, throttle_progress),
      UCC_CONFIG_TYPE_UINT},
 
+    {"NET_DEVICES", "all",
+     "Specifies which network device(s) to use. The order is not meaningful.\n"
+     "\"all\" would use all available devices. Only TLs that support this "
+     "parameter will be affected. The parameter is only supported by UCX TL.",
+     ucc_offsetof(ucc_context_config_t, net_devices), UCC_CONFIG_TYPE_STRING_ARRAY},
+
     {NULL}};
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
                           ucc_context_config_t, &ucc_config_global_list);
@@ -619,6 +625,9 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
+    ctx->net_devices.count = 0;
+    ucc_config_names_array_dup(&ctx->net_devices, &config->net_devices);
+
     ctx->throttle_progress = config->throttle_progress;
     ctx->rank              = UCC_RANK_MAX;
     ctx->lib               = lib;
@@ -931,6 +940,7 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
         tl_lib->iface->context.destroy(&context->service_ctx->super);
     }
 
+    ucc_config_names_array_free(&context->net_devices);
     ucc_context_topo_cleanup(context->topo);
     ucc_progress_queue_finalize(context->pq);
     ucc_free(context->addr_storage.storage);

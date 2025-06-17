@@ -67,6 +67,7 @@ typedef struct ucc_context {
  */
     int                      n_addr_packed;
     ucc_config_names_array_t all_tls;
+    ucc_config_names_array_t net_devices;
     ucc_list_link_t          progress_list;
     ucc_progress_queue_t    *pq;
     ucc_team_id_pool_t       ids;
@@ -94,6 +95,7 @@ typedef struct ucc_context_config {
     uint32_t                  lock_free_progress_q;
     uint32_t                  internal_oob;
     uint32_t                  throttle_progress;
+    ucs_config_names_array_t  net_devices;
 } ucc_context_config_t;
 
 typedef struct ucc_mem_map_tl_t {
