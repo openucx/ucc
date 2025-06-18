@@ -452,6 +452,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     if (status < 0) {
                         ucc_free(comm->group_setup_info);
                     }
+                    ucc_context_progress(((ucc_tl_mlx5_mcast_oob_p2p_context_t *)comm->p2p_ctx)->base_ctx);
                     return status;
                 }
 
@@ -536,6 +537,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     if (status < 0) {
                         ucc_free(comm->group_setup_info);
                     }
+                    ucc_context_progress(((ucc_tl_mlx5_mcast_oob_p2p_context_t *)comm->p2p_ctx)->base_ctx);
                     return status;
                 }
 
