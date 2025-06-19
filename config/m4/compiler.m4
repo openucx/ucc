@@ -517,3 +517,26 @@ AC_C_BIGENDIAN(
            [AC_DEFINE([UCC_BIG_ENDIAN],[0],[Words are stored with the most significant byte first])],
            [],
            [AC_MSG_ERROR([Universal Endian],[1])])
+
+#
+# Check for C++17 support
+#
+AC_MSG_CHECKING([c++17 support])
+AC_LANG_PUSH([C++])
+SAVE_CXXFLAGS="$CXXFLAGS"
+CXX17FLAGS="-std=c++17"
+CXXFLAGS="$CXXFLAGS $CXX17FLAGS"
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <iostream>
+					#include <string>
+					int main(int argc, char** argv) {
+						std::to_string(1);
+						return 0;
+					} ]])],
+                  [AC_MSG_RESULT([yes])
+                   AC_SUBST([CXX17FLAGS])
+                   cxx17_happy=yes],
+                  [AC_MSG_RESULT([no])
+                   cxx17_happy=no])
+CXXFLAGS="$SAVE_CXXFLAGS"
+AC_LANG_POP
+AM_CONDITIONAL([HAVE_CXX17], [test "x$cxx17_happy" != xno])
