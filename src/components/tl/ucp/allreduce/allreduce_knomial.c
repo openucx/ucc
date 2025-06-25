@@ -41,6 +41,7 @@ void ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_status_t           status;
     ucc_kn_radix_t         loop_step;
     int                    is_avg;
+    ucc_kn_radix_t         index;
 
     if (UCC_IS_INPLACE(*args)) {
         sbuf = rbuf;
@@ -111,9 +112,11 @@ UCC_KN_PHASE_EXTRA_REDUCE:
             peer = ucc_knomial_pattern_get_loop_peer(p, rank, loop_step);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
+            index = ucc_knomial_pattern_get_loop_index(p, peer);
             peer = ucc_ep_map_eval(task->subset.map, peer);
+            task->allreduce_kn.reduce_bufs[index] = PTR_OFFSET(scratch, recv_offset);
             UCPCHECK_GOTO(
-                ucc_tl_ucp_recv_nb((void *)((ptrdiff_t)scratch + recv_offset),
+                ucc_tl_ucp_recv_nb(PTR_OFFSET(scratch, recv_offset),
                                    data_size, mem_type, peer, team, task),
                 task, out);
             recv_offset += data_size;
@@ -132,16 +135,17 @@ UCC_KN_PHASE_EXTRA_REDUCE:
             } else {
                 send_buf = rbuf;
             }
+            index = ucc_knomial_pattern_get_loop_index(p, rank);
+            task->allreduce_kn.reduce_bufs[index] = send_buf;
             is_avg = args->op == UCC_OP_AVG &&
                      (avg_pre_op ? ucc_knomial_pattern_loop_first_iteration(p)
                                  : ucc_knomial_pattern_loop_last_iteration(p));
-            status = ucc_dt_reduce_strided(
-                send_buf, scratch, rbuf,
-                task->tagged.send_posted - p->iteration * (radix - 1), count,
-                data_size, dt, args,
-                is_avg ? UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA : 0,
-                AVG_ALPHA(task), task->allreduce_kn.executor,
-                &task->allreduce_kn.etask);
+
+            status = ucc_dt_reduce_multi(
+                task->allreduce_kn.reduce_bufs, rbuf, task->tagged.send_posted - p->iteration * (radix - 1) + 1,
+                count, dt, args,
+                is_avg ? UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA : 0, AVG_ALPHA(task),
+                task->allreduce_kn.executor, &task->allreduce_kn.etask);
             if (ucc_unlikely(UCC_OK != status)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
                 task->super.status = status;
@@ -191,7 +195,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
     size_t             data_size = count * ucc_dt_size(dt);
     ucc_mrange_uint_t *p         = &team->cfg.allreduce_kn_radix;
-    ucc_kn_radix_t     cfg_radix;
+    ucc_kn_radix_t     cfg_radix, radix;
     ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allreduce_kn_start", 0);
@@ -200,7 +204,10 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
                (TASK_ARGS(task).src.info.mem_type == mem_type));
     cfg_radix = ucc_tl_ucp_get_radix_from_range(team, data_size, mem_type, p,
                                                 UCC_UUNITS_AUTO_RADIX);
-    ucc_knomial_pattern_init(size, rank, ucc_min(cfg_radix, size),
+    radix = ucc_min(cfg_radix, size);
+    /* max radix is limited by the number of buffers in the executor */
+    radix = ucc_min(radix, UCC_EE_EXECUTOR_NUM_BUFS);
+    ucc_knomial_pattern_init(size, rank, radix,
                              &task->allreduce_kn.p);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
     status =
