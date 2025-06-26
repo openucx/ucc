@@ -128,24 +128,6 @@ ucc_status_t ucc_tl_cuda_memh_pack(const ucc_base_context_t *context, /* NOLINT 
     return UCC_ERR_NOT_IMPLEMENTED;
 }
 
-ucc_status_t ucc_tl_cuda_mem_map(const ucc_base_context_t *context, /* NOLINT */
-                                 int type, void *memh, void *tl_h) /* NOLINT */
-{
-    return UCC_ERR_NOT_IMPLEMENTED;
-}
-
-ucc_status_t ucc_tl_cuda_mem_unmap(const ucc_base_context_t *context, /* NOLINT */
-                                   int type, void *tl_h) /* NOLINT */
-{
-    return UCC_ERR_NOT_IMPLEMENTED;
-}
-
-ucc_status_t ucc_tl_cuda_memh_pack(const ucc_base_context_t *context, /* NOLINT */
-                                   int type, void *memh, void **pack_buffer) /* NOLINT */
-{
-    return UCC_ERR_NOT_IMPLEMENTED;
-}
-
 /**
  * @brief Cleanup function for CUDA TL context
  * 
@@ -174,8 +156,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_context_t)
 
     // Only destroy topology if it's context-specific (not cached)
     // For cached topology, it will be destroyed when the library is cleaned up
-    if (self->topo != NULL &&
-        (!lib->cfg.use_topo_cache || self->topo != lib->topo)) {
+    if (self->topo != NULL && !lib->cfg.use_topo_cache) {
         ucc_tl_cuda_topo_destroy(self->topo);
         self->topo = NULL;
     }
