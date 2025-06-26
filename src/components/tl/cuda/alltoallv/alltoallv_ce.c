@@ -554,6 +554,28 @@ size_t ucc_tl_cuda_alltoallv_get_offset(const ucc_tl_cuda_task_t *task,
     return displ[block];
 }
 
+ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
+                                        ucc_coll_task_t *coll_task)
+{
+    ucc_tl_cuda_task_t *task  = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_status_t        status;
+    ucc_ev_t            post_event;
+
+    ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
+    coll_task->ee = ee;
+    tl_debug(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
+    status = coll_task->post(coll_task);
+    if (ucc_likely(status == UCC_OK)) {
+        post_event.ev_type         = UCC_EVENT_COLLECTIVE_POST;
+        post_event.ev_context_size = 0;
+        post_event.ev_context      = NULL;
+        post_event.req             = &coll_task->super;
+        ucc_ee_set_event_internal(coll_task->ee, &post_event,
+                                  &coll_task->ee->event_out_queue);
+    }
+    return status;
+}
+
 ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
@@ -602,8 +624,11 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
 
     if (lib->cfg.alltoall_use_copy_engine) {
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: copy engine");
+        task->super.triggered_post = ucc_tl_cuda_alltoallv_ce_triggered_post;
+
         task->alltoallv_ce.copy_post = cuda_copy_post;
         task->alltoallv_ce.evtCompletions = (cudaEvent_t*)ucc_malloc(team->num_streams * sizeof(cudaEvent_t), "alltoallv_ce.evtCompletions");
+
         for (i = 0; i < team->num_streams; i++) {
             CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&task->alltoallv_ce.evtCompletions[i], cudaEventDisableTiming), exit_err, status);
         }
