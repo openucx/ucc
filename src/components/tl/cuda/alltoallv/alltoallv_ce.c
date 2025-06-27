@@ -26,6 +26,7 @@ ucc_status_t ee_copy_post(void *dst, void *src, size_t len,
                        ucc_ee_executor_t       *executor,
                        ucc_ee_executor_task_t **task, cudaStream_t stream)
 {
+    (void)stream; /* Unused parameter */
     ucc_ee_executor_task_args_t exec_args = {0};
     exec_args.task_type                   = UCC_EE_EXECUTOR_TASK_COPY;
     exec_args.copy.dst                    = dst;
@@ -39,6 +40,8 @@ ucc_status_t cuda_copy_post(void *dst, void *src, size_t len,
                        ucc_ee_executor_t       *executor,
                        ucc_ee_executor_task_t **task, cudaStream_t stream)
 {
+    (void)executor; /* Unused parameter */
+    (void)task;     /* Unused parameter */
     ucc_status_t status;
     CUDA_CHECK_GOTO(
         cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, stream),
