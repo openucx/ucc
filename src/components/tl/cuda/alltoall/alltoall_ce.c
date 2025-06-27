@@ -38,8 +38,6 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     size_t              data_len;
     int                 i;
 
-    task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
-
     task->alltoallv_ce.get_size   = ucc_tl_cuda_alltoall_get_size;
     task->alltoallv_ce.get_offset = ucc_tl_cuda_alltoall_get_offset;
     task->alltoallv_ce.sdt        = args->src.info.datatype;
@@ -70,6 +68,8 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
 
     if (lib->cfg.alltoall_use_copy_engine) {
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: copy engine");
+        task->super.triggered_post = ucc_tl_cuda_alltoallv_ce_triggered_post;
+
         task->alltoallv_ce.copy_post = cuda_copy_post;
         task->alltoallv_ce.evtCompletions = (cudaEvent_t*)ucc_malloc(team->num_streams * sizeof(cudaEvent_t), "alltoallv_ce.evtCompletions");
         for (i = 0; i < team->num_streams; i++) {

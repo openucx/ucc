@@ -562,7 +562,7 @@ size_t ucc_tl_cuda_alltoallv_get_offset(const ucc_tl_cuda_task_t *task,
 
 //NOLINTNEXTLINE(misc-unused-parameters): ev parameter unused as it's not needed for this implementation
 ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
-                                        ucc_coll_task_t *coll_task)
+                                                     ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task  = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_status_t        status;

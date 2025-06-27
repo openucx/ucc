@@ -62,4 +62,6 @@ ucc_status_t ee_copy_post(void *dst, void *src, size_t len,
                        ucc_ee_executor_t       *executor,
                        ucc_ee_executor_task_t **task, cudaStream_t stream);
 
+ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
+                                                     ucc_coll_task_t *coll_task);
 #endif
