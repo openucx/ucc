@@ -11,6 +11,7 @@
 #include "tl_cuda_cache.h"
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
+#include "utils/ucc_compiler_def.h"
 
 enum {
     ALLTOALL_CE_STAGE_SYNC,  /*< Wait for free SYNC segment */
@@ -196,7 +197,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
     void               *src, *dst;
     size_t              data_size, data_displ;
     ucc_rank_t          i, peer, psrc, pdst;
-    ucc_status_t        status;
+    ucc_status_t        status = UCC_OK;
     cudaStream_t        stream = 0;
 
     if (lib->cfg.alltoall_use_copy_engine) {
@@ -262,6 +263,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
             // Get the current stream
             stream = UCC_TL_CUDA_TEAM_STREAM_IDX(team, stream_idx);
             // Round-robin across available streams
+            ucc_assume(team->num_streams > 0);
             stream_idx = (stream_idx + 1) % team->num_streams;
         }
         
@@ -302,6 +304,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
             // Get the current stream
             stream = team->streams[stream_idx];
             // Round-robin across available streams
+            ucc_assume(team->num_streams > 0);
             stream_idx = (stream_idx + 1) % team->num_streams;
         }
 
@@ -554,6 +557,7 @@ size_t ucc_tl_cuda_alltoallv_get_offset(const ucc_tl_cuda_task_t *task,
     return displ[block];
 }
 
+//NOLINTNEXTLINE(misc-unused-parameters): ev parameter unused as it's not needed for this implementation
 ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
                                         ucc_coll_task_t *coll_task)
 {
