@@ -227,6 +227,9 @@ ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
         case UCC_TL_CUDA_REDUCE_SCATTER_ALG_LINEAR:
             *init = ucc_tl_cuda_reduce_scatter_linear_init;
             break;
+        case UCC_TL_CUDA_REDUCE_SCATTER_ALG_NVLS:
+            *init = ucc_tl_cuda_reduce_scatter_nvls_init;
+            break;
         default:
             status = UCC_ERR_INVALID_PARAM;
             break;
