@@ -8,288 +8,16 @@
 #include "tl_cuda_coll.h"
 #include "tl_cuda_topo.h"
 #include "tl_cuda_cache.h"
+#include "tl_cuda_nvls.h"
 #include "core/ucc_team.h"
 #include "coll_score/ucc_coll_score.h"
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 #include "utils/ucc_sys.h"
-#include <sys/shm.h>
 
+#include <sys/shm.h>
 #include <sys/syscall.h>
 
-static ucc_status_t
-ucc_tl_cuda_team_init_nvls_multicast(ucc_tl_cuda_team_t *self,
-                                     ucc_base_context_t *tl_context)
-{
-    size_t symmetric_size = 1024ULL * 1024ULL * 512ULL;
-    // multicast
-    CUmemAllocationHandleType handleType = CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR;
-    CUmulticastObjectProp mcProp = {};
-    mcProp.numDevices            = UCC_TL_TEAM_SIZE(self);
-    mcProp.size                  = symmetric_size;
-    mcProp.handleTypes           = handleType;
-    mcProp.flags                 = 0;
-
-    ucc_debug("RANK %d: numDevices: %d, size: %zu, handleTypes: %lld, flags: %lld\n", UCC_TL_TEAM_RANK(self), mcProp.numDevices, mcProp.size, mcProp.handleTypes, mcProp.flags);
-    size_t minGran, gran;
-    gran    = 0;
-    minGran = 0;
-
-
-    CUcontext cu_ctx;
-    CUresult cu_st;
-    cu_st = cuCtxGetCurrent(&cu_ctx);
-    if (cu_st != CUDA_SUCCESS) {
-        ucc_error("failed to get current CUDA context");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-    int device;
-    CUDA_CHECK(cudaGetDevice(&device));
-    ucc_debug("RANK %d: device: %d\n", UCC_TL_TEAM_RANK(self), device);
-    int supported;
-    cuDeviceGetAttribute(&supported, CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED, device);
-    ucc_debug("MULTICAST_SUPPORTED: %d\n", supported);
-    int fabric_supported;
-    cuDeviceGetAttribute(&fabric_supported, CU_DEVICE_ATTRIBUTE_HANDLE_TYPE_FABRIC_SUPPORTED, device);
-    ucc_debug("HANDLE_TYPE_FABRIC_SUPPORTED: %d\n", fabric_supported);
-
-    // Try to initialize NVLS multicast, but continue if not supported
-    ucc_status_t mc_status = CUDADRV_FUNC(cuMulticastGetGranularity(&minGran, &mcProp, CU_MULTICAST_GRANULARITY_MINIMUM));
-    if (mc_status != UCC_OK) {
-        ucc_error("failed to get multicast granularity minimum");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-    mc_status = CUDADRV_FUNC(cuMulticastGetGranularity(&gran, &mcProp, CU_MULTICAST_GRANULARITY_RECOMMENDED));
-    if (mc_status != UCC_OK) {
-        ucc_error("failed to get multicast granularity recommended");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
-    if (UCC_TL_TEAM_RANK(self) == 0) {
-        ucc_debug("NVLS multicast granularity: gran = %lu, minGrad = %lu\n",
-                  gran, minGran);
-    }
-
-    size_t mcSize = ((symmetric_size + gran - 1) / gran) * gran;
-    mcProp.size   = mcSize;
-    
-    // only one rank creates the multicast object
-    CUmemGenericAllocationHandle mcHandle;
-    int export_handle = 0;
-    ucc_status_t status = UCC_OK;
-
-    int myDevice;
-    cuCtxGetDevice(&myDevice);
-    ucc_debug("RANK %d: myDevice: %d\n", UCC_TL_TEAM_RANK(self), myDevice);
-
-    if (UCC_TL_TEAM_RANK(self) == 0) {
-        // Now create the multicast object
-        mc_status = CUDADRV_FUNC(cuMulticastCreate(&mcHandle, &mcProp));
-        if (mc_status != UCC_OK) {
-            ucc_error("failed to create multicast object");
-            return UCC_ERR_NOT_SUPPORTED;
-        }
-
-        mc_status = CUDADRV_FUNC(cuMemExportToShareableHandle(
-            &export_handle, mcHandle, handleType, 0 /*flags*/));
-        if (mc_status != UCC_OK) {
-            ucc_error("failed to export shareable handle");
-            goto error;
-        }
-    }
-
-    self->shared_handles = ucc_malloc(UCC_TL_TEAM_SIZE(self) * sizeof(export_handle), "shared_handles");
-    if (!self->shared_handles) {
-        goto error;
-    }
-
-    pid_t currentPid = getpid();
-    pid_t *shared_pids = ucc_malloc(UCC_TL_TEAM_SIZE(self) * sizeof(currentPid), "shared_pids");
-    if (!shared_pids) {
-        goto error;
-    }
-    status = self->oob.allgather(&currentPid, shared_pids, sizeof(currentPid), self->oob.coll_info, &self->oob_req);
-    if (UCC_OK != status) {
-        goto error;
-    }
-    while (UCC_OK != (status = self->oob.req_test(self->oob_req))) {
-        if (status < 0) {
-            goto error;
-        }
-    }
-    self->oob.req_free(self->oob_req);
-    self->oob_req = NULL;
-
-    if (UCC_TL_TEAM_RANK(self) != 0) {
-        currentPid = shared_pids[0];
-    }
-
-    int pidFd = syscall(SYS_pidfd_open, currentPid, 0);
-
-    // send the handle to all ranks using allgather and wait for all ranks to receive it
-    if (UCC_TL_TEAM_RANK(self) == 0) {
-        self->shared_handles[0] = export_handle;
-    }
-    status = self->oob.allgather(&export_handle, self->shared_handles, sizeof(export_handle), self->oob.coll_info, &self->oob_req);
-    if (UCC_OK != status) {
-        goto error;
-    }
-    while (UCC_OK != (status = self->oob.req_test(self->oob_req))) {
-        if (status < 0) {
-            goto error;
-        }
-    }
-    self->oob.req_free(self->oob_req);
-    self->oob_req = NULL;
-
-    if (UCC_TL_TEAM_RANK(self) == 0) {
-        ucc_debug("rank %d: export_handle: %d\n", UCC_TL_TEAM_RANK(self),
-                  export_handle);
-    } else {
-        ucc_debug("rank %d: export_handle: %d\n", UCC_TL_TEAM_RANK(self),
-                  self->shared_handles[0]);
-        export_handle = self->shared_handles[0];
-    }
-
-    int peerFd = 0;
-    peerFd = syscall(SYS_pidfd_getfd, pidFd, export_handle, 0);
-    if (peerFd < 0) {
-        ucc_error("failed to get peer fd");
-        goto error;
-    }
-
-    if (UCC_TL_TEAM_RANK(self) != 0) {
-        // receive the handle from rank 0
-        void * p = (void*) ((uint64_t) peerFd);
-        ucc_debug("rank %d: export_handle: %d\n", UCC_TL_TEAM_RANK(self),
-                  export_handle);
-        status = CUDADRV_FUNC(cuMemImportFromShareableHandle(
-            &mcHandle, p, handleType));
-        if (status != UCC_OK) {
-            ucc_error("failed to import handle from rank 0");
-            return status;
-        }
-    }
-    status = CUDADRV_FUNC(cuMulticastAddDevice(mcHandle, device));
-    if (status != UCC_OK) {
-        ucc_error("failed to add device to multicast");
-        goto error;
-    }
-    ucc_debug("rank %d: added device %d to multicast\n", UCC_TL_TEAM_RANK(self), device);
-
-    // wait for all ranks to add the device to the multicast object
-    // TODO: rework this to use a more efficient barrier
-    ucc_tl_cuda_shm_barrier_t *bar = UCC_TL_CUDA_TEAM_BARRIER(self, 0);
-
-    status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(self), bar);
-    if (status != UCC_OK) {
-        ucc_error("failed to start shm barrier");
-        goto error;
-    }
-    status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(self), bar);
-    while (status == UCC_INPROGRESS) {
-        status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(self), bar);
-    }
-    if (status != UCC_OK) {
-        ucc_error("failed to test shm barrier");
-        goto error;
-    }
-
-    ucc_debug("rank %d: barrier ok\n", UCC_TL_TEAM_RANK(self));
-
-    // allocate memory and bind to the multicast object
-    CUmemGenericAllocationHandle memhandle;
-    CUmemAllocationProp prop = {};
-    prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
-    prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-    prop.location.id = device;
-    prop.requestedHandleTypes = handleType;
-
-    // allocate physical memory (data buffer)
-    status = CUDADRV_FUNC(cuMemCreate(&memhandle, mcSize, &prop, 0 /*flags*/));
-    if (status != UCC_OK) {
-        ucc_error("failed to create memory allocation for multicast");
-        goto error;
-    }
-
-
-    void* uc_va;
-    void* mc_va;
-    CUmemAccessDesc accessDesc = {};
-    accessDesc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-    accessDesc.location.id = device;
-    accessDesc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
-
-    // Map a VA to MC space
-    status = CUDADRV_FUNC(
-        cuMemAddressReserve((CUdeviceptr *)&uc_va, mcSize, minGran, 0U, 0));
-    if (status != UCC_OK) {
-        ucc_error("failed to reserve virtual address space");
-        goto error;
-    }
-    // CUDA_CHECK(cudaMemset(uc_va, 0, mcSize));
-
-    status = CUDADRV_FUNC(cuMemMap((CUdeviceptr)uc_va, mcSize, 0, memhandle, 0));
-    if (status != UCC_OK) {
-        ucc_error("failed to map memory allocation");
-        goto error;
-    }
-    status = CUDADRV_FUNC(cuMemSetAccess((CUdeviceptr)uc_va, mcSize, &accessDesc, 1));
-    if (status != UCC_OK) {
-        ucc_error("failed to set memory access");
-        goto error;
-    }
-
-    size_t mcOffset = 0;
-    status = CUDADRV_FUNC(cuMulticastBindAddr(mcHandle, mcOffset, (CUdeviceptr)uc_va, mcSize, 0));
-    if (status != UCC_OK) {
-        ucc_error("failed to bind memory to multicast");
-        goto error;
-    }
-
-    status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(self), bar);
-    if (status != UCC_OK) {
-        ucc_error("failed to start shm barrier after init");
-        goto error;
-    }
-    status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(self), bar);
-    while (status == UCC_INPROGRESS) {
-        status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(self), bar);
-    }
-    if (status != UCC_OK) {
-        ucc_error("failed to test shm barrier after init");
-        goto error;
-    }
-
-    ucc_debug("rank %d: barrier after init ok\n", UCC_TL_TEAM_RANK(self));
-
-    // Map a VA to MC space
-    CUDADRV_FUNC(
-        cuMemAddressReserve((CUdeviceptr *)&mc_va, mcSize, minGran, 0U, 0));
-    CUDADRV_FUNC(cuMemMap((CUdeviceptr)mc_va, mcSize, 0, mcHandle, 0));
-    // set access on MC address
-    CUDADRV_FUNC(cuMemSetAccess((CUdeviceptr)mc_va, mcSize, &accessDesc, 1));
-
-    ucc_debug("Rank: %d symmetric memory is set: %p [%ld bytes]\n", UCC_TL_TEAM_RANK(self), mc_va, mcSize);
-
-    // Store the handles for cleanup in team destroy
-    self->mc_handle = mcHandle;
-    self->mc_va = (CUdeviceptr) mc_va;
-    self->uc_va = (CUdeviceptr) uc_va;
-    self->mc_memhandle = memhandle;
-    self->mc_size = mcSize;
-    self->mc_offset = mcOffset;
-
-
-    return UCC_OK;
-error:
-    if (UCC_TL_TEAM_RANK(self) == 0) {
-        CUDADRV_FUNC(cuMemUnmap(self->mc_va, self->mc_size));
-        CUDADRV_FUNC(cuMemRelease(self->mc_handle));
-        CUDADRV_FUNC(cuMemAddressFree(self->mc_va, self->mc_size));
-    }
-    return status;
-}
 
 UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
@@ -420,19 +148,10 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
     if (self->topo) {
         ucc_tl_cuda_team_topo_destroy(self->topo);
     }
-    if (self->mc_handle) {
-        if (UCC_TL_TEAM_RANK(self) == 0) {
-            CUDADRV_FUNC(cuMulticastUnbind(self->mc_handle, 0 /* device */, self->mc_offset, self->mc_size));
-            CUDADRV_FUNC(cuMemRelease(self->mc_memhandle));
-            
-            CUDADRV_FUNC(cuMemUnmap(self->mc_va, self->mc_size));
-            CUDADRV_FUNC(cuMemAddressFree(self->mc_va, self->mc_size));
-            CUDADRV_FUNC(cuMemRelease(self->mc_handle));
-        }
-        // self->mc_handle = NULL;
-        self->mc_va = 0;
-        self->mc_size = 0;
-    }
+    
+    // destroy the nvls context
+    ucc_tl_cuda_nvls_destroy(self, self->super.super.context);
+
     if (self->ids) {
         if (self->sync != (void*)-1) {
             for (i = 0; i < resource_num; i++) {
@@ -618,7 +337,7 @@ barrier:
     team->oob_req = NULL;
     tl_debug(tl_team->context->lib, "initialized tl team: %p", team);
 
-    status = ucc_tl_cuda_team_init_nvls_multicast(team, tl_team->context);
+    status = ucc_tl_cuda_nvls_init(team, tl_team->context);
     if (status != UCC_OK) {
         ucc_error("failed to init nvls multicast");
         goto exit_err;

@@ -57,6 +57,8 @@ sources =               \
 	tl_cuda_cache.c     \
 	tl_cuda_topo.c      \
 	tl_cuda_team_topo.c \
+	tl_cuda_nvls.h 		\
+	tl_cuda_nvls.c 		\
 	$(allgather)        \
 	$(allgatherv)       \
 	$(alltoall)         \

@@ -35,15 +35,16 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_start(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_task_t *task   = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team   = TASK_TEAM(task);
     ucc_coll_args_t    *args   = &TASK_ARGS(task);
-    ucc_datatype_t      dt     = task->reduce_scatterv_nvls.dt;
+    ucc_tl_cuda_nvls_t *nvls   = &team->nvls;
     cudaStream_t        stream = team->stream;
+    ucc_datatype_t      dt     = task->reduce_scatterv_nvls.dt;
 
     size_t src_size_bytes = args->src.info.count * ucc_dt_size(dt);
     size_t dst_size_bytes = args->dst.info.count * ucc_dt_size(dt);
 
     ucc_debug("reduce_scatterv_nvls_start symmetric uc addr: %lld mc addr: "
               "%lld src_size_bytes: %zu dst_size_bytes: %zu",
-              team->uc_va, team->mc_va, src_size_bytes, dst_size_bytes);
+              nvls->uc_va, nvls->mc_va, src_size_bytes, dst_size_bytes);
 
     if (args->coll_type == UCC_COLL_TYPE_REDUCE_SCATTER) {
         task->reduce_scatterv_nvls.rbuf = args->dst.info.buffer;
@@ -58,7 +59,7 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_start(ucc_coll_task_t *coll_task)
     task->reduce_scatterv_nvls.stage = STAGE_COPY;
    
     // copy src buffer to symmetric memory first
-    CUDA_CHECK(cudaMemcpyAsync((void *)team->uc_va, args->src.info.buffer,
+    CUDA_CHECK(cudaMemcpyAsync((void *)nvls->uc_va, args->src.info.buffer,
                                src_size_bytes, cudaMemcpyDeviceToDevice,
                                stream));
     CUDA_CHECK(cudaEventRecord(task->reduce_scatterv_nvls.evtCopy, stream));
@@ -68,10 +69,11 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_start(ucc_coll_task_t *coll_task)
 
 void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t *task  = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
-    ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
-    cudaEvent_t         evt   = task->reduce_scatterv_nvls.evtCompletion;
+    ucc_tl_cuda_task_t *task   = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_team_t *team   = TASK_TEAM(task);
+    ucc_rank_t          trank  = UCC_TL_TEAM_RANK(team);
+    cudaEvent_t         evt    = task->reduce_scatterv_nvls.evtCompletion;
+    ucc_tl_cuda_nvls_t *nvls   = &team->nvls;
     cudaStream_t        stream = team->stream;
 
     ucc_status_t        status;
@@ -110,7 +112,7 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
         task->reduce_scatterv_nvls.stage = STAGE_KERNEL_START;
         // fallthrough
     case STAGE_KERNEL_START:
-        status = post_reduce_scatter_kernel(stream, team->mc_va,
+        status = post_reduce_scatter_kernel(stream, nvls->mc_va,
                                             (CUdeviceptr) task->reduce_scatterv_nvls.rbuf,
                                             task->reduce_scatterv_nvls.src_size_bytes, trank,
                                             UCC_TL_TEAM_SIZE(team));
