@@ -4,11 +4,6 @@
  * See file LICENSE for terms.
  */
 
-#ifndef UINT32_MAX
-#define __STDC_LIMIT_MACROS
-#include <stdint.h>
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -22,11 +17,6 @@ extern "C" {
 
 #define MAX_THREADS 1024
 #define MAX_BLOCKS 10
-
-#define LOCAL_ST(val, ptr)                                                     \
-    asm volatile("st.global.v4.f32 [%0], {%1,%2,%3,%4};" ::"l"(ptr),           \
-                 "r"(val.x), "r"(val.y), "r"(val.z), "r"(val.w)                \
-                 : "memory");
 
 #define MULTIMEM_ST(val, ptr)                                                  \
     asm volatile("multimem.st.global.v4.f32 [%0], {%1,%2,%3,%4};" ::"l"(ptr),  \
@@ -43,7 +33,6 @@ __global__ void __launch_bounds__(MAX_THREADS)
     reduce_scatter_kernel(float *src_addr, float *dst_addr, size_t src_count,
                           uint32_t rank, uint32_t tsize)
 {
-
     size_t chunk_start = ((int64_t)src_count * (int64_t)rank) / (int64_t)tsize;
     size_t chunk_end =
         ((int64_t)src_count * (int64_t)(rank + 1)) / (int64_t)tsize;
@@ -53,9 +42,6 @@ __global__ void __launch_bounds__(MAX_THREADS)
 
     for (size_t idx = chunk_start + thread_offset; idx < chunk_end;
          idx += stride) {
-        // assert(((uintptr_t)(src_addr + idx) % 16) == 0);
-        // assert(((uintptr_t)(dst_addr + (idx - chunk_start)) % 16) == 0);
-
         uint4 val;
         MULTIMEM_LD(val, src_addr + idx);
         float *dst                         = dst_addr + (idx - chunk_start);
@@ -72,10 +58,11 @@ extern "C" {
 ucc_status_t post_reduce_scatter_kernel(cudaStream_t stream,
                                         CUdeviceptr  src_addr,
                                         CUdeviceptr  dst_addr,
-                                        size_t src_size_bytes, uint32_t rank,
-                                        uint32_t tsize)
+                                        size_t       src_size_bytes,
+                                        uint32_t     rank,
+                                        uint32_t     tsize)
 {
-    reduce_scatter_kernel<<<MAX_BLOCKS, MAX_THREADS, 0, stream>>>( 
+    reduce_scatter_kernel<<<MAX_BLOCKS, MAX_THREADS, 0, stream>>>(
         (float *)src_addr, (float *)dst_addr, src_size_bytes / sizeof(float),
         rank, tsize);
     CUDA_CHECK(cudaGetLastError());
