@@ -284,10 +284,13 @@ struct ucc_tl_cuda_task {
             ucc_datatype_t          dt;
             void *                  sbuf;
             void *                  rbuf;
+            size_t                  src_size_bytes;
+            size_t                  dst_size_bytes;
             size_t (*get_count)(const ucc_tl_cuda_task_t *task,
                                 ucc_rank_t                block);
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
                                  ucc_rank_t                block);
+            cudaEvent_t             evtCopy;
             cudaEvent_t             evtCompletion;
         } reduce_scatterv_nvls;
     };

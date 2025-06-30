@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 #define MAX_THREADS 1024
-#define MAX_BLOCKS 10
+#define MAX_BLOCKS 8
 
 #define MULTIMEM_ST(val, ptr)                                                  \
     asm volatile("multimem.st.global.v4.f32 [%0], {%1,%2,%3,%4};" ::"l"(ptr),  \
