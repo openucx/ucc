@@ -14,10 +14,7 @@
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 #include "utils/ucc_sys.h"
-
 #include <sys/shm.h>
-#include <sys/syscall.h>
-
 
 UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
