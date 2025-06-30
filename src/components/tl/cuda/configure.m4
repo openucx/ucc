@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 tl_cuda_enabled=n
@@ -18,5 +18,16 @@ AS_IF([test "$CHECKED_TL_REQUIRED" = "y"],
     fi
 ], [])
 
+# Check for NVLS support
+AS_IF([test "$tl_cuda_enabled" = "y" -a "$nvls_happy" = "yes"],
+[
+    AC_DEFINE([HAVE_TL_CUDA_NVLS], [1], [Enable NVLS support in TL CUDA])
+    AC_MSG_RESULT([TL CUDA NVLS support: enabled])
+],
+[
+    AC_MSG_RESULT([TL CUDA NVLS support: disabled])
+])
+
 AM_CONDITIONAL([TL_CUDA_ENABLED], [test "$tl_cuda_enabled" = "y"])
+AM_CONDITIONAL([TL_CUDA_NVLS_ENABLED], [test "$tl_cuda_enabled" = "y" -a "$nvls_happy" = "yes"])
 AC_CONFIG_FILES([src/components/tl/cuda/Makefile])

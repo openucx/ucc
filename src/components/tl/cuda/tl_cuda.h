@@ -16,7 +16,9 @@
 #include "tl_cuda_ep_hash.h"
 #include "tl_cuda_topo.h"
 #include "tl_cuda_team_topo.h"
+#ifdef HAVE_TL_CUDA_NVLS
 #include "tl_cuda_nvls.h"
+#endif
 
 #include <cuda_runtime.h>
 
@@ -174,7 +176,9 @@ typedef struct ucc_tl_cuda_team {
     int                       *shared_handles;
     ucc_team_oob_coll_t        oob;
     void                      *oob_req;
+#ifdef HAVE_TL_CUDA_NVLS
     ucc_tl_cuda_nvls_t         nvls;
+#endif
 } ucc_tl_cuda_team_t;
 
 UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,

@@ -38,8 +38,11 @@ reduce_scatter =                           \
 	reduce_scatter/reduce_scatter.h        \
 	reduce_scatter/reduce_scatter.c        \
 	reduce_scatter/reduce_scatter_ring.c   \
-	reduce_scatter/reduce_scatter_linear.c \
-	reduce_scatter/reduce_scatter_nvls.c
+	reduce_scatter/reduce_scatter_linear.c
+
+if TL_CUDA_NVLS_ENABLED
+reduce_scatter += reduce_scatter/reduce_scatter_nvls.c
+endif
 
 reduce_scatterv =                            \
 	reduce_scatterv/reduce_scatterv.h        \
@@ -57,8 +60,6 @@ sources =               \
 	tl_cuda_cache.c     \
 	tl_cuda_topo.c      \
 	tl_cuda_team_topo.c \
-	tl_cuda_nvls.h 		\
-	tl_cuda_nvls.c 		\
 	$(allgather)        \
 	$(allgatherv)       \
 	$(alltoall)         \
@@ -66,6 +67,10 @@ sources =               \
 	$(bcast)            \
 	$(reduce_scatter)   \
 	$(reduce_scatterv)
+
+if TL_CUDA_NVLS_ENABLED
+sources += tl_cuda_nvls.h tl_cuda_nvls.c
+endif
 
 module_LTLIBRARIES = libucc_tl_cuda.la
 libucc_tl_cuda_la_SOURCES  = $(sources)
