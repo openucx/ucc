@@ -5,7 +5,7 @@
 
 if TL_CUDA_ENABLED
 
-SUBDIRS = kernel
+SUBDIRS = kernels
 
 allgather =                      \
 	allgather/allgather.h        \
