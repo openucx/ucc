@@ -4,8 +4,6 @@
  * See file LICENSE for terms.
  */
 
-#ifdef HAVE_TL_CUDA_NVLS
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -75,5 +73,3 @@ ucc_status_t post_reduce_scatter_kernel(cudaStream_t stream,
 #ifdef __cplusplus
 }
 #endif
-
-#endif // HAVE_TL_CUDA_NVLS
