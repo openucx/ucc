@@ -233,6 +233,9 @@ ucc_status_t ucc_config_names_array_dup(ucc_config_names_array_t *dst,
 ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
                                           const ucc_config_names_array_t *src);
 
+ucc_status_t ucc_config_names_array_to_string(const ucc_config_names_array_t *array,
+                                              char *str, size_t max);
+
 void ucc_config_names_array_free(ucc_config_names_array_t *array);
 
 int ucc_config_names_search(const ucc_config_names_array_t *config_names,
