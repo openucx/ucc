@@ -58,8 +58,8 @@ void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
     int64_t            polls     = 0;
     int64_t            npolls    = task->alltoall_onesided.npolls;
     int                use_op    = task->alltoall_onesided.op;
-    ucp_mem_map_mem_h  src_memh  = TASK_ARGS(task).src_memh.local_memh;
-    ucp_mem_map_mem_h *dst_memh  = TASK_ARGS(task).dst_memh.global_memh;
+    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).src_memh.local_memh;
+    ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).dst_memh.global_memh;
     uint32_t          *posted;
     uint32_t          *completed;
     size_t             nelems;
@@ -68,6 +68,9 @@ void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
     nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
 
     if (use_op == GET_OP) {
+        /* these are not typos */
+        src_memh  = TASK_ARGS(task).dst_memh.local_memh;
+        dst_memh  = TASK_ARGS(task).src_memh.global_memh;
         posted    = &task->onesided.get_posted;
         completed = &task->onesided.get_completed;
     } else {
@@ -135,14 +138,17 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
     int                iteration = 0;
     int64_t            polls     = 0;
     int                use_op    = task->alltoall_onesided.op;
-    ucp_mem_map_mem_h  src_memh  = TASK_ARGS(task).src_memh.local_memh;
-    ucp_mem_map_mem_h *dst_memh  = TASK_ARGS(task).dst_memh.global_memh;
+    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).src_memh.local_memh;
+    ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).dst_memh.global_memh;
     uint32_t          *posted;
     uint32_t          *completed;
     ucc_rank_t         peer;
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
     if (use_op == GET_OP) {
+        /* these are not typos */
+        src_memh  = TASK_ARGS(task).dst_memh.local_memh;
+        dst_memh  = TASK_ARGS(task).src_memh.global_memh;
         posted    = &task->onesided.get_posted;
         completed = &task->onesided.get_completed;
     } else {
