@@ -7,6 +7,8 @@
 #include "allreduce/allreduce.h"
 #include "ucc/api/ucc.h"
 #include "utils/arch/cuda_def.h"
+#include "tl_cuda_nvls.h"
+#include "../kernels/allreduce_kernel.h"
 
 #include <cuda_runtime.h>
 #include <cuda.h>
@@ -24,11 +26,6 @@ enum {
     STAGE_COPY_POST_BAR_START,
     STAGE_COPY_POST_BAR_TEST
 };
-
-// Kernel is defined in src/components/tl/cuda/kernels/allreduce_kernel.cu
-ucc_status_t post_allreduce_kernel(cudaStream_t stream, CUdeviceptr src_addr,
-                                   size_t src_size_bytes, uint32_t rank,
-                                   uint32_t tsize);
 
 ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
 {
@@ -91,7 +88,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
     case STAGE_COPY_BAR_START:
         status = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
         if (status != UCC_OK) {
-            ucc_error("reduce scatter barrier start failed");
+            ucc_error("allreduce barrier start failed");
             task->super.status = UCC_ERR_NO_RESOURCE;
             return;
         }
@@ -140,7 +137,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
     case STAGE_BARRIER_START:
         status = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
         if (status != UCC_OK) {
-            ucc_error("reduce scatter barrier start failed");
+            ucc_error("allreduce barrier start failed");
             task->super.status = UCC_ERR_NO_RESOURCE;
             return;
         }
@@ -156,11 +153,16 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
         task->allreduce_nvls.stage = STAGE_COPY_POST;
         // fallthrough        
     case STAGE_COPY_POST:
-        cudaMemcpyAsync((void *)task->allreduce_nvls.rbuf,
+        cuda_status = cudaMemcpyAsync((void *)task->allreduce_nvls.rbuf,
                         (void *)nvls->uc_va,
                         task->allreduce_nvls.dst_size_bytes,
                         cudaMemcpyDeviceToDevice,
                         stream);
+        if (cuda_status != cudaSuccess) {
+            ucc_error("cudaMemcpyAsync failed: %s", cudaGetErrorString(cuda_status));
+            task->super.status = UCC_ERR_NO_RESOURCE;
+            return;
+        }
         cuda_status = cudaEventRecord(evt, stream);
         if (cuda_status != cudaSuccess) {
             ucc_error("cudaEventRecord failed: %s", cudaGetErrorString(cuda_status));
@@ -175,12 +177,12 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             task->super.status = UCC_INPROGRESS;
             return;
         }
-        task->allreduce_nvls.stage = STAGE_COPY_BAR_START;
+        task->allreduce_nvls.stage = STAGE_COPY_POST_BAR_START;
         // fallthrough
     case STAGE_COPY_POST_BAR_START:
         status = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
         if (status != UCC_OK) {
-            ucc_error("reduce scatter barrier start failed");
+            ucc_error("allreduce barrier start failed");
             task->super.status = UCC_ERR_NO_RESOURCE;
             return;
         }
