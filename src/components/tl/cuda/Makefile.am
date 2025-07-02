@@ -48,7 +48,12 @@ reduce_scatterv =                            \
 	reduce_scatterv/reduce_scatterv.h        \
 	reduce_scatterv/reduce_scatterv.c        \
 	reduce_scatterv/reduce_scatterv_ring.c   \
-	reduce_scatterv/reduce_scatterv_linear.c	
+	reduce_scatterv/reduce_scatterv_linear.c
+
+allreduce =                    \
+	allreduce/allreduce.h      \
+	allreduce/allreduce.c      \
+	allreduce/allreduce_nvls.c
 
 sources =               \
 	tl_cuda.h           \
@@ -65,6 +70,7 @@ sources =               \
 	$(alltoall)         \
 	$(alltoallv)        \
 	$(bcast)            \
+	$(allreduce)        \
 	$(reduce_scatter)   \
 	$(reduce_scatterv)
 

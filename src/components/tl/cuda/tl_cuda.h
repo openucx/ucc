@@ -32,7 +32,7 @@
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
     (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
      UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
-     UCC_COLL_TYPE_BCAST |                                                     \
+     UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_ALLREDUCE |                           \
      UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV)
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
@@ -294,6 +294,15 @@ struct ucc_tl_cuda_task {
             cudaEvent_t             evtCopy;
             cudaEvent_t             evtCompletion;
         } reduce_scatterv_nvls;
+        struct {
+            int            stage;
+            ucc_datatype_t dt;
+            void          *sbuf;
+            void          *rbuf;
+            size_t         src_size_bytes;
+            size_t         dst_size_bytes;
+            cudaEvent_t    evtCompletion;
+        } allreduce_nvls;
     };
 };
 
