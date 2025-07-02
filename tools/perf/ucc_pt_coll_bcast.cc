@@ -12,8 +12,9 @@
 
 ucc_pt_coll_bcast::ucc_pt_coll_bcast(ucc_datatype_t dt, ucc_memory_type mt,
                                      int root_shift, bool is_persistent,
-                                     ucc_pt_comm *communicator)
-                   : ucc_pt_coll(communicator)
+                                     ucc_pt_comm *communicator,
+                                     ucc_pt_generator_base *generator)
+                   : ucc_pt_coll(communicator, generator)
 {
     has_inplace_   = false;
     has_reduction_ = false;
@@ -33,19 +34,19 @@ ucc_pt_coll_bcast::ucc_pt_coll_bcast(ucc_datatype_t dt, ucc_memory_type mt,
     }
 }
 
-ucc_status_t ucc_pt_coll_bcast::init_args(size_t count,
-                                          ucc_pt_test_args_t &test_args)
+ucc_status_t ucc_pt_coll_bcast::init_args(ucc_pt_test_args_t &test_args)
 {
     ucc_coll_args_t &args     = test_args.coll_args;
     size_t           dt_size  = ucc_dt_size(coll_args.src.info.datatype);
-    size_t           size     = count * dt_size;
     ucc_status_t     st;
 
     coll_args.root      = test_args.coll_args.root;
     args                = coll_args;
-    args.src.info.count = count;
-    UCCCHECK_GOTO(ucc_pt_alloc(&src_header, size, args.src.info.mem_type), exit,
-                  st);
+    args.src.info.count = generator->get_src_count();
+    UCCCHECK_GOTO(ucc_pt_alloc(&src_header,
+                               generator->get_src_count() * dt_size,
+                               args.src.info.mem_type),
+                  exit, st);
     args.src.info.buffer = src_header->addr;
 exit:
     return st;

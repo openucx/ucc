@@ -7,6 +7,7 @@
 #include "ucc_pt_config.h"
 BEGIN_C_DECLS
 #include "utils/ucc_string.h"
+#include <getopt.h>
 END_C_DECLS
 
 ucc_pt_config::ucc_pt_config() {
@@ -90,8 +91,102 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
 {
     int c;
     ucc_status_t st;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"gen", required_argument, 0, 0},
+        {0, 0, 0, 0}
+    };
 
-    while ((c = getopt(argc, argv, "c:b:e:d:f:m:n:w:o:N:r:S:iphFT")) != -1) {
+    // Reset getopt state
+    optind = 1;
+
+    while (1) {
+        c = getopt_long(argc, argv, "c:b:e:d:f:m:n:w:o:N:r:S:iphFT", long_options, &option_index);
+        if (c == -1)
+            break;
+        if (c == 0) { // long option
+            if (strcmp(long_options[option_index].name, "gen") == 0) {
+                std::string gen_arg(optarg);
+                if (gen_arg.rfind("exp:", 0) == 0) {
+                    bench.gen.type = UCC_PT_GEN_TYPE_EXP;
+                    auto min_pos = gen_arg.find("min=", 4);
+                    if (min_pos == std::string::npos) {
+                        std::cerr << "Invalid format for --gen exp:min=N[@max=M]" << std::endl;
+                        return UCC_ERR_INVALID_PARAM;
+                    }
+                    auto at_pos = gen_arg.find("@", min_pos);
+                    if (at_pos != std::string::npos) {
+                        auto max_pos = gen_arg.find("max=", at_pos);
+                        if (max_pos == std::string::npos) {
+                            std::cerr << "Invalid format for --gen exp:min=N@max=M" << std::endl;
+                            return UCC_ERR_INVALID_PARAM;
+                        }
+                        try {
+                            ucc_status_t st = ucc_str_to_memunits(gen_arg.substr(min_pos + 4, at_pos - (min_pos + 4)).c_str(),
+                                                                (void*)&bench.gen.exp_min);
+                            if (st != UCC_OK) {
+                                std::cerr << "Failed to parse min value" << std::endl;
+                                return st;
+                            }
+                            st = ucc_str_to_memunits(gen_arg.substr(max_pos + 4).c_str(),
+                                                   (void*)&bench.gen.exp_max);
+                            if (st != UCC_OK) {
+                                std::cerr << "Failed to parse max value" << std::endl;
+                                return st;
+                            }
+                        } catch (const std::exception& e) {
+                            std::cerr << "Invalid values in --gen exp:min=N@max=M" << std::endl;
+                            return UCC_ERR_INVALID_PARAM;
+                        }
+                    } else {
+                        try {
+                            ucc_status_t st = ucc_str_to_memunits(gen_arg.substr(min_pos + 4).c_str(),
+                                                                (void*)&bench.gen.exp_min);
+                            if (st != UCC_OK) {
+                                std::cerr << "Failed to parse min value" << std::endl;
+                                return st;
+                            }
+                            bench.gen.exp_max = bench.gen.exp_min;
+                        } catch (const std::exception& e) {
+                            std::cerr << "Invalid value in --gen exp:min=N" << std::endl;
+                            return UCC_ERR_INVALID_PARAM;
+                        }
+                    }
+                    bench.min_count = bench.gen.exp_min;
+                    bench.max_count = bench.gen.exp_max;
+                } else if (gen_arg.rfind("file:", 0) == 0) {
+                    bench.gen.type = UCC_PT_GEN_TYPE_FILE;
+                    auto name_pos = gen_arg.find("name=", 5);
+                    if (name_pos == std::string::npos) {
+                        std::cerr << "Invalid format for --gen file:name=filename[@nrep=N]" << std::endl;
+                        return UCC_ERR_INVALID_PARAM;
+                    }
+                    auto at_pos = gen_arg.find("@", name_pos);
+                    if (at_pos != std::string::npos) {
+                        bench.gen.file_name = gen_arg.substr(name_pos + 5, at_pos - (name_pos + 5));
+                        auto nrep_str = gen_arg.substr(at_pos + 1);
+                        if (nrep_str.rfind("nrep=", 0) == 0) {
+                            try {
+                                bench.gen.nrep = std::stoull(nrep_str.substr(5));
+                            } catch (const std::exception& e) {
+                                std::cerr << "Invalid nrep value in --gen file:name=filename@nrep=N" << std::endl;
+                                return UCC_ERR_INVALID_PARAM;
+                            }
+                        } else {
+                            std::cerr << "Invalid format for --gen file:name=filename@nrep=N" << std::endl;
+                            return UCC_ERR_INVALID_PARAM;
+                        }
+                    } else {
+                        bench.gen.file_name = gen_arg.substr(name_pos + 5);
+                        bench.gen.nrep = 1; // Default value if nrep is not specified
+                    }
+                } else {
+                    std::cerr << "Invalid value for --gen. Use exp:min=N[@max=M] or file:name=filename[@nrep=N]" << std::endl;
+                    return UCC_ERR_INVALID_PARAM;
+                }
+            }
+            continue;
+        }
         switch (c) {
             case 'c':
                 if (ucc_pt_op_map.count(optarg) == 0) {
@@ -200,6 +295,7 @@ void ucc_pt_config::print_help()
     std::cout << "  -T: triggered collective"<<std::endl;
     std::cout << "  -F: enable full print"<<std::endl;
     std::cout << "  -S: <number>: root shift for rooted collectives"<<std::endl;
+    std::cout << "  --gen <exp:min=N[@max=M]|file:name=filename[@nrep=N]>: Pattern generator (exponential or file-based)" << std::endl;
     std::cout << "  -h: show this help message"<<std::endl;
     std::cout << std::endl;
 }

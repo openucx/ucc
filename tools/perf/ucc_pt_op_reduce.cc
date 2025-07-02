@@ -12,8 +12,9 @@
 
 ucc_pt_op_reduce::ucc_pt_op_reduce(ucc_datatype_t dt, ucc_memory_type mt,
                                    ucc_reduction_op_t op, int nbufs,
-                                   ucc_pt_comm *communicator) :
-                                   ucc_pt_coll(communicator)
+                                   ucc_pt_comm *communicator,
+                                   ucc_pt_generator_base *generator) :
+                                   ucc_pt_coll(communicator, generator)
 {
     has_inplace_   = false;
     has_reduction_ = true;
@@ -40,11 +41,11 @@ ucc_pt_op_reduce::ucc_pt_op_reduce(ucc_datatype_t dt, ucc_memory_type mt,
     num_bufs  = nbufs;
 }
 
-ucc_status_t ucc_pt_op_reduce::init_args(size_t count,
-                                         ucc_pt_test_args_t &test_args)
+ucc_status_t ucc_pt_op_reduce::init_args(ucc_pt_test_args_t &test_args)
 {
     ucc_ee_executor_task_args_t &args   = test_args.executor_args;
-    size_t                       size   = count * ucc_dt_size(data_type);
+    size_t                       dt_size = ucc_dt_size(data_type);
+    size_t                       size    = generator->get_src_count() * dt_size;
     ucc_status_t st;
     int i;
 
@@ -55,7 +56,7 @@ ucc_status_t ucc_pt_op_reduce::init_args(size_t count,
     args.task_type     = UCC_EE_EXECUTOR_TASK_REDUCE;
     args.reduce.dst    = dst_header->addr;
     args.reduce.n_srcs = num_bufs;
-    args.reduce.count  = count;
+    args.reduce.count  = generator->get_src_count();
     args.reduce.dt     = data_type;
     args.reduce.op     = reduce_op;
     args.flags         = 0;

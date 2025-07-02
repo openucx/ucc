@@ -1,0 +1,27 @@
+[format]
+version = 1.0
+description = UCC Collective Pattern File
+
+[collective]
+type = ALLTOALLV
+team_size = 4
+datatype = INT32
+flags = COUNT_32BIT
+counts = {
+    4902912,2774016,1523,34623
+    6607872,1327104,523,12356
+    52134,63422,1777,22356
+    1234,1234,1234,1234
+}
+
+[collective]
+type = ALLTOALLV
+team_size = 4
+datatype = INT32
+flags = COUNT_32BIT
+counts = {
+    1,1,1,1
+    2,2,2,2
+    3,3,3,3
+    4,4,4,4
+}

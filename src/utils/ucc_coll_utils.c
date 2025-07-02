@@ -8,6 +8,7 @@
 #include "components/base/ucc_base_iface.h"
 #include "core/ucc_team.h"
 #include "schedule/ucc_schedule_pipelined.h"
+#include <time.h>
 
 #define STR_TYPE_CHECK(_str, _p, _prefix)                                      \
     do {                                                                       \
