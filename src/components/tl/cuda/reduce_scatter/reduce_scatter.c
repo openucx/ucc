@@ -21,6 +21,10 @@ ucc_tl_cuda_reduce_scatter_algs[UCC_TL_CUDA_REDUCE_SCATTER_ALG_LAST + 1] = {
             {.id   = UCC_TL_CUDA_REDUCE_SCATTER_ALG_LINEAR,
              .name = "linear",
              .desc = "linear reduce scatter algorithm"},
+        [UCC_TL_CUDA_REDUCE_SCATTER_ALG_NVLS] =
+            {.id   = UCC_TL_CUDA_REDUCE_SCATTER_ALG_NVLS,
+             .name = "nvls",
+             .desc = "nvls reduce scatter algorithm"},
         [UCC_TL_CUDA_REDUCE_SCATTER_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 

@@ -16,6 +16,10 @@
 #include "tl_cuda_ep_hash.h"
 #include "tl_cuda_topo.h"
 #include "tl_cuda_team_topo.h"
+#ifdef HAVE_TL_CUDA_NVLS
+#include "tl_cuda_nvls.h"
+#endif
+
 #include <cuda_runtime.h>
 
 #ifndef UCC_TL_CUDA_DEFAULT_SCORE
@@ -169,8 +173,12 @@ typedef struct ucc_tl_cuda_team {
     ucc_tl_cuda_scratch_t      scratch;
     cudaStream_t               stream;
     ucc_tl_cuda_rank_id_t     *ids;
+    int                       *shared_handles;
     ucc_team_oob_coll_t        oob;
     void                      *oob_req;
+#ifdef HAVE_TL_CUDA_NVLS
+    ucc_tl_cuda_nvls_t         nvls;
+#endif
 } ucc_tl_cuda_team_t;
 
 UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
@@ -269,6 +277,21 @@ struct ucc_tl_cuda_task {
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
                                  ucc_rank_t                block);
         } reduce_scatterv_linear;
+        struct {
+            int                     stage;
+            int                     num_frags;
+            ucc_datatype_t          dt;
+            void *                  sbuf;
+            void *                  rbuf;
+            size_t                  src_size_bytes;
+            size_t                  dst_size_bytes;
+            size_t (*get_count)(const ucc_tl_cuda_task_t *task,
+                                ucc_rank_t                block);
+            size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
+                                 ucc_rank_t                block);
+            cudaEvent_t             evtCopy;
+            cudaEvent_t             evtCompletion;
+        } reduce_scatterv_nvls;
     };
 };
 

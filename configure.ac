@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2001-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2001-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # This software product is a proprietary product of Mellanox Technologies Ltd.
 # (the "Company") and all right, title, and interest and to the software product,
 # including all associated intellectual property rights, are and shall
@@ -171,6 +171,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/sysdep.m4])
      m4_include([config/m4/ucx.m4])
      m4_include([config/m4/cuda.m4])
+     m4_include([config/m4/nvls.m4])
      m4_include([config/m4/nccl.m4])
      m4_include([config/m4/rocm.m4])
      m4_include([config/m4/doca_urom.m4])
@@ -199,6 +200,9 @@ AS_IF([test "x$with_docs_only" = xyes],
      if test $cuda_happy = "yes"; then
          mc_modules="${mc_modules}:cuda"
      fi
+
+     CHECK_NVLS
+     AC_MSG_RESULT([NVLS support: $nvls_happy])
 
      CHECK_ROCM
      AC_MSG_RESULT([ROCM support: $rocm_happy; $ROCM_CPPFLAGS $ROCM_LDFLAGS])
@@ -245,6 +249,7 @@ AC_CONFIG_FILES([
                  src/components/mc/rocm/Makefile
                  src/components/ec/rocm/Makefile
                  src/components/ec/rocm/kernel/Makefile
+                 src/components/tl/cuda/kernels/Makefile
                  test/mpi/Makefile
                  test/gtest/Makefile
                  tools/info/Makefile
@@ -275,6 +280,9 @@ AS_IF([test "x$cuda_happy" = "xyes"],[
 AC_MSG_NOTICE([     NVCC gencodes:   ${NVCC_ARCH}])
 ])
 AC_MSG_NOTICE([ DOCA UROM enabled:   ${doca_urom_happy}])
+AS_IF([test "x$nvls_happy" = "xyes"],[
+AC_MSG_NOTICE([ NVLS (NVLINK SHARP):   enabled])
+])
 AS_IF([test "x$rocm_happy" = xyes],[
 AC_MSG_NOTICE([ROCM architectures:   ${ROCM_ARCH}])
 ])
