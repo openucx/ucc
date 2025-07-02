@@ -125,6 +125,7 @@ typedef struct ucc_tl_ucp_task {
             int                     phase;
             ucc_knomial_pattern_t   p;
             void                   *scratch;
+            void                   *reduce_bufs[UCC_EE_EXECUTOR_NUM_BUFS];
             ucc_mc_buffer_header_t *scratch_mc_header;
             ucc_ee_executor_task_t *etask;
             ucc_ee_executor_t      *executor;
