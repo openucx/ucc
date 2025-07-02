@@ -40,20 +40,21 @@ reduce_scatter =                           \
 	reduce_scatter/reduce_scatter_ring.c   \
 	reduce_scatter/reduce_scatter_linear.c
 
-if TL_CUDA_NVLS_ENABLED
-reduce_scatter += reduce_scatter/reduce_scatter_nvls.c
-endif
-
 reduce_scatterv =                            \
 	reduce_scatterv/reduce_scatterv.h        \
 	reduce_scatterv/reduce_scatterv.c        \
 	reduce_scatterv/reduce_scatterv_ring.c   \
 	reduce_scatterv/reduce_scatterv_linear.c
 
+if TL_CUDA_NVLS_ENABLED
+reduce_scatter += reduce_scatter/reduce_scatter_nvls.c
+
 allreduce =                    \
 	allreduce/allreduce.h      \
 	allreduce/allreduce.c      \
 	allreduce/allreduce_nvls.c
+
+endif
 
 sources =               \
 	tl_cuda.h           \
