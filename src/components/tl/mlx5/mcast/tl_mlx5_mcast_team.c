@@ -328,6 +328,12 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_process_comm_event(ucc_base_team_t 
             goto failed;
         }
 
+        if (!comm->event) {
+            tl_error(comm->lib, "received NULL event after successful get_event call");
+            status = UCC_ERR_NO_MESSAGE;
+            goto failed;
+        }
+
         group = (struct mcast_group *)comm->event->param.ud.private_data;
 
         ucc_assert(group != NULL);
@@ -433,6 +439,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                 if (UCC_OK != status) {
                     tl_error(comm->lib, "unable to post bcast for group setup info");
                     ucc_free(comm->group_setup_info);
+                    comm->group_setup_info = NULL;
                     return status;
                 }
 
@@ -449,18 +456,23 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     /* bcast is not completed yet */
                     if (status < 0) {
                         ucc_free(comm->group_setup_info);
+                        comm->group_setup_info = NULL;
                     }
                     return status;
                 }
 
-                if (comm->group_setup_info->status != UCC_OK) {
+                if (comm->group_setup_info && comm->group_setup_info->status != UCC_OK) {
                     /* rank 0 was not able to join a mcast group so all
                      * the ranks should return */
                     ucc_free(comm->group_setup_info);
+                    comm->group_setup_info = NULL;
                     return UCC_ERR_NO_RESOURCE;
                 }
 
-                ucc_free(comm->group_setup_info);
+                if (comm->group_setup_info) {
+                    ucc_free(comm->group_setup_info);
+                    comm->group_setup_info = NULL;
+                }
 
                 /* setup of the rest of the mcast resources */
                 status = ucc_tl_mlx5_mcast_coll_setup_comm_resources(comm);
@@ -533,16 +545,23 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     /* bcast is not completed yet */
                     if (status < 0) {
                         ucc_free(comm->group_setup_info);
+                        comm->group_setup_info = NULL;
                     }
                     return status;
                 }
 
                 data   = comm->group_setup_info;
+                if (!data) {
+                    tl_error(comm->lib, "group_setup_info is NULL after successful coll_test");
+                    return UCC_ERR_NO_RESOURCE;
+                }
+                
                 status = data->status;
                 if (UCC_OK != status) {
                     /* rank 0 was not able to join a mcast group so all
                      * the ranks should return */
                     ucc_free(data);
+                    comm->group_setup_info = NULL;
                     return status;
                 }
 
@@ -556,6 +575,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                         tl_error(comm->lib, "none-root rank is unable to join mcast group error %d",
                                  status);
                         ucc_free(data);
+                        comm->group_setup_info = NULL;
                         return status;
                     }
                     comm->mcast.groups[i].mcast_addr = net_addr;
