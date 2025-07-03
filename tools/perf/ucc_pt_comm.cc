@@ -169,6 +169,9 @@ ucc_status_t ucc_pt_comm::init()
                   free_ctx, st);
     do {
         st = ucc_team_create_test(team);
+        if (st == UCC_INPROGRESS) {
+            ucc_context_progress(context);
+        }
     } while(st == UCC_INPROGRESS);
     UCCCHECK_GOTO(st, free_ctx, st);
     ucc_context_config_release(ctx_config);
@@ -215,6 +218,9 @@ ucc_status_t ucc_pt_comm::finalize()
 
     do {
         status = ucc_team_destroy(team);
+        if (status == UCC_INPROGRESS) {
+            ucc_context_progress(context);
+        }
     } while (status == UCC_INPROGRESS);
     if (status != UCC_OK) {
         std::cerr << "ucc team destroy error: " << ucc_status_string(status);
