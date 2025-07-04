@@ -193,7 +193,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
     ucc_rank_t          rank        = UCC_TL_TEAM_RANK(team);
     ucc_tl_cuda_sync_t *sync        = TASK_SYNC(task, rank);
     int                 stream_idx  = 0;
-    int                 num_streams = UCC_TL_CUDA_TEAM_NUM_STREAMS(team);
     ucc_ee_h            ee          = task->super.ee;
     ucc_tl_cuda_sync_t *peer_sync;
     ucc_ee_executor_t  *exec;
@@ -202,6 +201,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
     ucc_rank_t          i, peer, psrc, pdst;
     ucc_status_t        status = UCC_OK;
     cudaStream_t        stream = 0;
+    int                 num_streams = UCC_TL_CUDA_TEAM_NUM_STREAMS(team);
 
     if (lib->cfg.alltoall_use_copy_engine) {
         // If triggered post, use the stream from the executor
@@ -211,21 +211,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
             stream_idx = 0;
         }
         // copy engine is used, so no executor is needed
-        exec   = NULL;
-        // First clean up any existing completion events
-        for (i = 0; i < num_streams; i++) {
-            if (task->alltoallv_ce.evtCompletions[i]) {
-                CUDA_CHECK_GOTO(cudaEventDestroy(task->alltoallv_ce.evtCompletions[i]),
-                                exit, status);
-                task->alltoallv_ce.evtCompletions[i] = NULL;
-            }
-        }
-        // Create new events for each stream
-        for (i = 0; i < num_streams; i++) {
-            CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&task->alltoallv_ce.evtCompletions[i],
-                                                   cudaEventDisableTiming),
-                           exit, status);
-        }
+        exec = NULL;
     } else {
         stream = 0;
         status = ucc_coll_task_get_executor(&task->super, &exec);
@@ -266,8 +252,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
             // Get the current stream
             stream = UCC_TL_CUDA_TEAM_STREAM_IDX(team, stream_idx);
             // Round-robin across available streams
-            ucc_assume(team->num_streams > 0);
-            stream_idx = (stream_idx + 1) % team->num_streams;
+            ucc_assume(num_streams > 0);
+            stream_idx = (stream_idx + 1) % num_streams;
         }
         
         status = task->alltoallv_ce.copy_post(
@@ -307,8 +293,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
             // Get the current stream
             stream = team->streams[stream_idx];
             // Round-robin across available streams
-            ucc_assume(team->num_streams > 0);
-            stream_idx = (stream_idx + 1) % team->num_streams;
+            ucc_assume(num_streams > 0);
+            stream_idx = (stream_idx + 1) % num_streams;
         }
 
         status = task->alltoallv_ce.copy_post(
@@ -329,10 +315,10 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
                 exit, status);
         } else {
             // Record completion events for each stream
-            for (i = 0; i < team->num_streams; i++) {
+            for (i = 0; i < num_streams; i++) {
                 CUDA_CHECK_GOTO(
                     cudaEventRecord(task->alltoallv_ce.evtCompletions[i],
-                                    team->streams[i]),
+                                    UCC_TL_CUDA_TEAM_STREAM_IDX(team, i)),
                     exit, status);
             }
         }
@@ -645,9 +631,9 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
         task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
 
-    task->super.post           = ucc_tl_cuda_alltoallv_ce_start;
+    task->super.post = ucc_tl_cuda_alltoallv_ce_start;
     task->super.triggered_post_setup =
-    ucc_tl_cuda_alltoallv_ce_triggered_post_setup;
+        ucc_tl_cuda_alltoallv_ce_triggered_post_setup;
 
     task->super.progress = ucc_tl_cuda_alltoallv_ce_progress;
     task->super.finalize = ucc_tl_cuda_alltoallv_ce_finalize;
