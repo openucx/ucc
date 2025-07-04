@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -32,11 +32,11 @@ size_t ucc_tl_cuda_alltoall_get_offset(const ucc_tl_cuda_task_t *task,
 ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_tl_cuda_lib_t  *lib  = UCC_TL_CUDA_TEAM_LIB(team);
     ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucc_status_t        status;
     size_t              data_len;
-
-    task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+    int                 i;
 
     task->alltoallv_ce.get_size   = ucc_tl_cuda_alltoall_get_size;
     task->alltoallv_ce.get_offset = ucc_tl_cuda_alltoall_get_offset;
@@ -64,6 +64,21 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
         if (ucc_unlikely(status != UCC_OK)) {
             goto exit_err;
         }
+    }
+
+    if (lib->cfg.alltoall_use_copy_engine) {
+        ucc_debug("ucc_tl_cuda_alltoallv_ce_init: copy engine");
+        task->super.triggered_post = ucc_tl_cuda_alltoallv_ce_triggered_post;
+
+        task->alltoallv_ce.copy_post = cuda_copy_post;
+        task->alltoallv_ce.evtCompletions = (cudaEvent_t*)ucc_malloc(team->num_streams * sizeof(cudaEvent_t), "alltoallv_ce.evtCompletions");
+        for (i = 0; i < team->num_streams; i++) {
+            CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&task->alltoallv_ce.evtCompletions[i], cudaEventDisableTiming), exit_err, status);
+        }
+    } else {
+        ucc_debug("ucc_tl_cuda_alltoallv_ce_init: executor");
+        task->alltoallv_ce.copy_post = ee_copy_post;
+        task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
 
     task->super.post           = ucc_tl_cuda_alltoallv_ce_start;
