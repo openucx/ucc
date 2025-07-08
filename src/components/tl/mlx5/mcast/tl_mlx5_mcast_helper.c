@@ -327,7 +327,7 @@ static ucc_status_t ucc_tl_mlx5_mcast_create_ah(ucc_tl_mlx5_mcast_coll_comm_t *c
     };
 
     for (i = 0; i < comm->mcast_group_count; i ++) {
-        ah_attr.dlid  = comm->mcast.groups[i].lid;
+        ah_attr.dlid = comm->mcast.groups[i].lid;
         memcpy(ah_attr.grh.dgid.raw, &comm->mcast.groups[i].mgid, sizeof(ah_attr.grh.dgid.raw));
 
         comm->mcast.groups[i].ah = ibv_create_ah(comm->ctx->pd, &ah_attr);
@@ -360,6 +360,11 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
     struct ibv_qp_attr   attr;
     uint16_t             pkey;
     int                  i;
+    int                  retry_count;
+    const int            max_retries   = 5;  // More attempts for large scale
+    const int            base_delay_us = 5000;  // Longer base delay (5ms)
+    int                  attach_result;
+    int                  attached_groups = 0; // Track successfully attached groups
 
     ibv_query_port(ctx->ctx, ctx->ib_port, &port_attr);
     for (ctx->pkey_index = 0; ctx->pkey_index < port_attr.pkey_tbl_len;
@@ -394,12 +399,42 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
             goto error;
         }
 
-        if (ibv_attach_mcast(comm->mcast.groups[i].qp, &comm->mcast.groups[i].mgid,
-                             comm->mcast.groups[i].lid)) {
+        // Add retry logic for multicast attach - enhanced for large scale
+        retry_count   = 0;
+        attach_result = -1;
+
+        while (retry_count < max_retries) {
+            attach_result = ibv_attach_mcast(comm->mcast.groups[i].qp, &comm->mcast.groups[i].mgid,
+                                           comm->mcast.groups[i].lid);
+            if (attach_result == 0) {
+                break; // Success
+            }
+
+            retry_count++;
+            if (retry_count < max_retries) {
+                // Add randomization to prevent thundering herd
+                int random_jitter = rand() % 1000;  // 0-1ms random jitter
+                int delay         = base_delay_us * retry_count + random_jitter;
+                usleep(delay);
+                tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_DEBUG,
+                                  "retrying ibv_attach_mcast for group %d, attempt %d/%d, errno %d, delay %dus",
+                                  i, retry_count + 1, max_retries, errno, delay);
+            }
+        }
+
+        if (attach_result != 0) {
             tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
-                              "failed to attach QP to the mcast group with mcast_lid %d , errno %d",
-                              comm->mcast.groups[i].lid, errno);
+                              "failed to attach QP to the mcast group with mcast_lid %d after %d attempts, errno %d",
+                              comm->mcast.groups[i].lid, max_retries, errno);
             goto error;
+        }
+
+        attached_groups++; // Track successful attachment
+
+        if (retry_count > 0) {
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_DEBUG,
+                              "successfully attached QP to mcast group %d after %d retries",
+                              i, retry_count);
         }
 
         attr.qp_state = IBV_QPS_RTR;
@@ -429,7 +464,15 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
     return UCC_OK;
 
 error:
-    for (i=0; i < comm->mcast_group_count; i++) {
+    /* Detach any successfully attached groups to prevent ghost attachments */
+    for (i = 0; i < attached_groups; i++) {
+        if (ibv_detach_mcast(comm->mcast.groups[i].qp, &comm->mcast.groups[i].mgid,
+                            comm->mcast.groups[i].lid)) {
+            tl_warn(ctx->lib, "failed to detach QP from mcast group %d during cleanup", i);
+        }
+    }
+
+    for (i = 0; i < comm->mcast_group_count; i++) {
         ibv_destroy_qp(comm->mcast.groups[i].qp);
         comm->mcast.groups[i].qp = NULL;
     }
@@ -539,7 +582,7 @@ ucc_status_t ucc_tl_mlx5_mcast_modify_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *c
         attr.path_mtu              = IBV_MTU_4096;
         attr.dest_qp_num           = comm->one_sided.info[i].rc_qp_num[my_rank];
         attr.rq_psn                = DEF_PSN;
-        attr.max_dest_rd_atomic	   = 16;
+        attr.max_dest_rd_atomic    = 16;
         attr.min_rnr_timer         = 12;
         attr.ah_attr.is_global     = 0;
         attr.ah_attr.dlid          = comm->one_sided.info[i].port_lid;
@@ -613,9 +656,11 @@ ucc_status_t ucc_tl_mlx5_leave_mcast_groups(ucc_tl_mlx5_mcast_coll_context_t *ct
 
 ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
 {
-    ucc_tl_mlx5_mcast_context_t *mcast_ctx = ucc_container_of(comm->ctx, ucc_tl_mlx5_mcast_context_t, mcast_context);
-    ucc_tl_mlx5_context_t       *mlx5_ctx  = ucc_container_of(mcast_ctx, ucc_tl_mlx5_context_t, mcast);
-    ucc_context_h                context   = mlx5_ctx->super.super.ucc_context;
+    ucc_tl_mlx5_mcast_context_t *mcast_ctx  = ucc_container_of(comm->ctx,
+                                                               ucc_tl_mlx5_mcast_context_t, mcast_context);
+    ucc_tl_mlx5_context_t       *mlx5_ctx   = ucc_container_of(mcast_ctx,
+                                                               ucc_tl_mlx5_context_t, mcast);
+    ucc_context_h                context    = mlx5_ctx->super.super.ucc_context;
     int                          ret, i;
     ucc_status_t                 status;
 
@@ -737,6 +782,23 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
 
     if (comm->p2p_ctx != NULL) {
         ucc_free(comm->p2p_ctx);
+    }
+
+    /* Cleanup HCA copy resources */
+    if (comm->hca_copy_qp) {
+        ret = ibv_destroy_qp(comm->hca_copy_qp);
+        if (ret) {
+            tl_error(comm->lib, "couldn't destroy HCA copy QP");
+            return UCC_ERR_NO_RESOURCE;
+        }
+    }
+
+    if (comm->hca_copy_cq) {
+        ret = ibv_destroy_cq(comm->hca_copy_cq);
+        if (ret) {
+            tl_error(comm->lib, "couldn't destroy HCA copy CQ");
+            return UCC_ERR_NO_RESOURCE;
+        }
     }
 
     ucc_free(comm);

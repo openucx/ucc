@@ -9,6 +9,8 @@
 #include "tl_mlx5_mcast_rcache.h"
 #include "tl_mlx5_mcast_progress.h"
 #include "tl_mlx5_mcast_allgather.h"
+#include "tl_mlx5_mcast_one_sided_progress.h"
+#include "tl_mlx5_mcast_hca_copy.h"
 #include <inttypes.h>
 
 /* 32 here is the bit count of ib mcast packet's immediate data */
@@ -138,7 +140,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_allgather_reliability_ready(ucc_tl_
     return UCC_OK;
 }
 
-static inline void ucc_tl_mlx5_mcast_init_async_reliability_slots(ucc_tl_mlx5_mcast_coll_req_t *req)
+static inline ucc_status_t ucc_tl_mlx5_mcast_init_async_reliability_slots(ucc_tl_mlx5_mcast_coll_req_t *req)
 {
     ucc_tl_mlx5_mcast_coll_comm_t *comm = req->comm;
     char                          *dest;
@@ -153,13 +155,25 @@ static inline void ucc_tl_mlx5_mcast_init_async_reliability_slots(ucc_tl_mlx5_mc
         dest = PTR_OFFSET(comm->one_sided.slots_buffer,
                           (req->ag_counter % ONE_SIDED_SLOTS_COUNT)
                           * comm->one_sided.slot_size);
-    
-        /* both user buffer and reliability slots are on host */
-        memcpy(PTR_OFFSET(dest, ONE_SIDED_SLOTS_INFO_SIZE), req->ptr, req->length);
+
+        /* Copy from user buffer to reliability slots - handle CUDA memory safely */
+        if (comm->cuda_mem_enabled) {
+            /* Use HCA copy if enabled, otherwise use CUDA-aware memory copy */
+            ucc_status_t status = ucc_tl_mlx5_mcast_memcpy(PTR_OFFSET(dest, ONE_SIDED_SLOTS_INFO_SIZE),
+                                                          UCC_MEMORY_TYPE_HOST,
+                                                          req->ptr, UCC_MEMORY_TYPE_CUDA, req->length, comm);
+            if (status != UCC_OK) {
+                tl_error(comm->lib, "memory copy failed in reliability slots");
+                return status;
+            }
+        } else {
+            memcpy(PTR_OFFSET(dest, ONE_SIDED_SLOTS_INFO_SIZE), req->ptr, req->length);
+        }
         memcpy(dest, &req->ag_counter, ONE_SIDED_SLOTS_INFO_SIZE);
 
         comm->one_sided.slots_state = ONE_SIDED_VALID;
     }
+    return UCC_OK;
 }
 
 static inline ucc_status_t ucc_tl_mlx5_mcast_do_staging_based_allgather(void *req_handle)
@@ -191,10 +205,15 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_staging_based_allgather(void *re
             }
         }
 
-        ucc_tl_mlx5_mcast_init_async_reliability_slots(req);
+        status = ucc_tl_mlx5_mcast_init_async_reliability_slots(req);
+        if (status != UCC_OK) {
+            tl_error(comm->lib, "failed to initialize async reliability slots");
+            return status;
+        }
 
         if (req->to_recv) {
-            num_recvd = ucc_tl_mlx5_mcast_recv_collective(comm, req, req->to_recv, UCC_COLL_TYPE_ALLGATHER);
+            num_recvd = ucc_tl_mlx5_mcast_recv_collective(comm, req, req->to_recv,
+                                                          UCC_COLL_TYPE_ALLGATHER);
             if (num_recvd < 0) {
                 tl_error(comm->lib, "a failure happend during cq polling");
                 status = UCC_ERR_NO_MESSAGE;
@@ -222,7 +241,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_staging_based_allgather(void *re
     }
 
     if (ONE_SIDED_SYNCHRONOUS_PROTO == req->one_sided_reliability_scheme) {
-        /* mcast operations are all done, now wait until all the processes 
+        /* mcast operations are all done, now wait until all the processes
          * are done with their mcast operations */
         if (!req->barrier_req) {
             // mcast operations are done and now go to barrier
@@ -275,7 +294,7 @@ void ucc_tl_mlx5_mcast_allgather_progress(ucc_coll_task_t *coll_task)
 
 static inline ucc_status_t
 ucc_tl_mlx5_mcast_validate_zero_copy_allgather_params(ucc_tl_mlx5_mcast_coll_comm_t *comm,
-                                                      ucc_tl_mlx5_mcast_coll_req_t  *req)
+                                                      ucc_tl_mlx5_mcast_coll_req_t *req)
 {
 
     if (req->concurrency_level % 2 == 0 && req->num_packets % req->mcast_prepost_bucket_size != 0) {
@@ -293,9 +312,12 @@ ucc_tl_mlx5_mcast_validate_zero_copy_allgather_params(ucc_tl_mlx5_mcast_coll_com
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (req->length % comm->max_per_packet != 0) {
+    /* Allow small messages (< max_per_packet) to use truly zero-copy
+     * For small messages, we have num_packets = 1 and the message fits in one packet */
+    if (req->length >= comm->max_per_packet && req->length % comm->max_per_packet != 0) {
         tl_debug(comm->lib, "Pipelined mcast allgather not supported: "
-                "length (%ld) must be a multiple of max_per_packet (%d).",
+                "length (%ld) must be a multiple of max_per_packet (%d) "
+                "for messages >= max_per_packet.",
                 req->length, comm->max_per_packet);
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -338,6 +360,11 @@ ucc_tl_mlx5_mcast_prepare_zero_copy_allgather(ucc_tl_mlx5_mcast_coll_comm_t *com
 
     if (req->concurrency_level == 0) {
         tl_warn(comm->lib, "not enough concurreny level to enable zcopy pipeline allgather");
+        tl_debug(comm->lib, "truly zero-copy allgather requires at least 2 multicast groups. "
+                            "Current mcast_group_count=%d, concurrency_level=%d. "
+                            "Set UCC_TL_MLX5_MCAST_GROUP_COUNT=2 or higher "
+                            "to enable truly zero-copy.",
+                            comm->mcast_group_count, req->concurrency_level);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -513,7 +540,7 @@ ucc_tl_mlx5_mcast_do_zero_copy_pipelined_allgather(void *req_handle)
         req->barrier_req = NULL;
         req->step++;
         if (comm->one_sided.reliability_enabled) {
-            memset(comm->one_sided.recvd_pkts_tracker, 0, sizeof(int) * comm->commsize);
+            memset(comm->one_sided.recvd_pkts_tracker, 0, comm->commsize * sizeof(uint32_t));
         }
     }
 
@@ -638,20 +665,20 @@ ucc_tl_mlx5_mcast_do_zero_copy_pipelined_allgather(void *req_handle)
 
 ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
 {
-    ucc_coll_task_t               *coll_task =  &(task->super);
-    ucc_tl_mlx5_team_t            *mlx5_team = TASK_TEAM(task);
-    ucc_tl_mlx5_mcast_team_t      *team      = mlx5_team->mcast;
-    ucc_coll_args_t               *args      = &TASK_ARGS(task);
-    ucc_datatype_t                 dt        = args->src.info.datatype;
-    size_t                         count     = args->src.info.count;
-    ucc_status_t                   status    = UCC_OK;
-    size_t                         data_size = ucc_dt_size(dt) * count;
-    void                          *sbuf      = args->src.info.buffer;
-    void                          *rbuf      = args->dst.info.buffer;
-    ucc_tl_mlx5_mcast_coll_comm_t *comm      = team->mcast_comm;
-    ucc_tl_mlx5_mcast_reg_t       *reg       = NULL;
-    ucc_rank_t                     max_team  = ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE;
-    int                            max_ctr   = ONE_SIDED_MAX_ZCOPY_COLL_COUNTER;
+    ucc_coll_task_t               *coll_task  = &(task->super);
+    ucc_tl_mlx5_team_t            *mlx5_team  = TASK_TEAM(task);
+    ucc_tl_mlx5_mcast_team_t      *team       = mlx5_team->mcast;
+    ucc_coll_args_t               *args       = &TASK_ARGS(task);
+    ucc_datatype_t                 dt         = args->src.info.datatype;
+    size_t                         count      = args->src.info.count;
+    ucc_status_t                   status     = UCC_OK;
+    size_t                         data_size  = ucc_dt_size(dt) * count;
+    void                          *sbuf       = args->src.info.buffer;
+    void                          *rbuf       = args->dst.info.buffer;
+    ucc_tl_mlx5_mcast_coll_comm_t *comm       = team->mcast_comm;
+    ucc_tl_mlx5_mcast_reg_t       *reg        = NULL;
+    ucc_rank_t                     max_team   = ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE;
+    int                            max_ctr    = ONE_SIDED_MAX_ZCOPY_COLL_COUNTER;
     ucc_tl_mlx5_mcast_coll_req_t  *req;
 
 
@@ -669,20 +696,40 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
     }
     memset(req, 0, sizeof(ucc_tl_mlx5_mcast_coll_req_t));
 
-    req->comm   = comm;
-    req->ptr    = sbuf;
-    req->rptr   = rbuf;
-    req->length = data_size;
-    req->mr     = comm->pp_mr;
-    req->rreg   = NULL;
+    req->comm                     = comm;
+    req->ptr                      = sbuf;
+    req->rptr                     = rbuf;
+    req->length                   = data_size;
+    req->mr                       = comm->pp_mr;
+    req->rreg                     = NULL;
+    req->scratch_buf              = NULL;
+    req->scratch_buf_header       = NULL;
+    req->scratch_packets_received = 0;
     /* - zero copy protocol only provides zero copy design at sender side
      * - truly zero copy protocol provides zero copy design at receiver side as well
      * here we select the sender side protocol
-     * - cost of cuda memcpy is high so we always choose zcopy when cuda is enabled
+     * - For CUDA staging with scratch buffer optimization, we use EAGER protocol
+     * - For non-CUDA or small messages, we use EAGER protocol
+     * - For large non-CUDA messages, we use ZCOPY protocol
      */
-    req->proto  = (req->length < comm->max_eager && !comm->cuda_mem_enabled) ?
-                   MCAST_PROTO_EAGER :
-                   MCAST_PROTO_ZCOPY;
+    if (comm->cuda_mem_enabled) {
+        /* For CUDA memory: Use truly zero-copy if enabled, otherwise use staging with scratch buffer */
+        if (comm->allgather_comm.truly_zero_copy_allgather_enabled) {
+            req->proto = MCAST_PROTO_ZCOPY;
+            tl_trace(comm->lib,
+                     "CUDA message size %zu: using truly zero-copy (including small messages)",
+                     req->length);
+        } else {
+            req->proto = MCAST_PROTO_EAGER;
+            tl_trace(comm->lib,
+                     "CUDA message size %zu: using staging with scratch buffer", req->length);
+        }
+    } else {
+        /* Use eager for small messages, zcopy for large messages */
+        req->proto = (req->length < comm->max_eager) ?
+                     MCAST_PROTO_EAGER :
+                     MCAST_PROTO_ZCOPY;
+    }
 
     assert(comm->commsize <= ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE);
 
@@ -699,16 +746,27 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
         goto failed;
     }
 
-    if (req->proto == MCAST_PROTO_ZCOPY) {
-        /* register the send buffer */
-       status = ucc_tl_mlx5_mcast_mem_register(comm->ctx, req->ptr, req->length, &reg);
-       if (UCC_OK != status) {
-           tl_error(comm->lib, "sendbuf registration failed");
-           goto failed;
-       }
-       req->rreg = reg;
-       req->mr   = reg->mr;
+    if (req->proto == MCAST_PROTO_EAGER && comm->cuda_mem_enabled) {
+        /* For CUDA staging protocol, allocate scratch buffer for message assembly */
+        size_t scratch_size = req->length * comm->commsize;
+        status = ucc_mc_alloc(&req->scratch_buf_header, scratch_size, UCC_MEMORY_TYPE_HOST);
+        if (UCC_OK != status) {
+            tl_error(comm->lib, "failed to allocate scratch buffer of size %zu", scratch_size);
+            goto failed;
+        }
+        req->scratch_buf = req->scratch_buf_header->addr;
+        tl_trace(comm->lib,
+                 "allocated scratch buffer of size %zu for CUDA staging", scratch_size);
     }
+
+    /* Register the send buffer for both zero-copy and CUDA staging protocols */
+    status = ucc_tl_mlx5_mcast_mem_register(comm->ctx, req->ptr, req->length, &reg);
+    if (UCC_OK != status) {
+        tl_error(comm->lib, "sendbuf registration failed");
+        goto failed;
+    }
+    req->rreg = reg;
+    req->mr   = reg->mr;
 
     if (comm->one_sided.reliability_enabled) {
         req->one_sided_reliability_scheme = (req->length <
@@ -729,9 +787,20 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
     if (comm->allgather_comm.truly_zero_copy_allgather_enabled) {
         status = ucc_tl_mlx5_mcast_prepare_zero_copy_allgather(comm, req);
         if (UCC_OK != status) {
-            goto failed;
+            tl_trace(comm->lib,
+                     "truly zero-copy allgather failed to prepare, falling back to staging: %s",
+                     ucc_status_string(status));
+            tl_trace(comm->lib,
+                     "using staging protocol as fallback for message size %zu", req->length);
+        } else {
+            req->progress = ucc_tl_mlx5_mcast_do_zero_copy_pipelined_allgather;
+            tl_trace(comm->lib,
+                     "successfully enabled truly zero-copy allgather for message size %zu", req->length);
         }
-        req->progress = ucc_tl_mlx5_mcast_do_zero_copy_pipelined_allgather;
+    } else {
+        tl_trace(comm->lib,
+                 "truly zero-copy allgather not enabled, using staging protocol for message size %zu",
+                 req->length);
     }
 
     comm->allgather_comm.coll_counter++;
@@ -747,6 +816,9 @@ failed:
     if (req) {
         if (req->rreg) {
             ucc_tl_mlx5_mcast_mem_deregister(comm->ctx, req->rreg);
+        }
+        if (req->scratch_buf_header) {
+            ucc_mc_free(req->scratch_buf_header);
         }
         ucc_mpool_put(req);
     }

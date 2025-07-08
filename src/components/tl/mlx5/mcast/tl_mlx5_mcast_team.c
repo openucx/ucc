@@ -88,6 +88,10 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
         return UCC_ERR_NO_MEMORY;
     }
 
+    /* Initialize HCA copy resources to NULL */
+    comm->hca_copy_cq = NULL;
+    comm->hca_copy_qp = NULL;
+
     ucc_list_head_init(&comm->bpool);
     ucc_list_head_init(&comm->pending_q);
 
@@ -107,6 +111,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     comm->one_sided.reliability_enabled = conf_params->one_sided_reliability_enable;
     comm->one_sided.reliability_scheme_msg_threshold
                                         = conf_params->reliability_scheme_msg_threshold;
+    comm->one_sided.hca_copy_enabled    = conf_params->hca_copy_enabled;
     comm->bcast_comm.wsize              = conf_params->wsize;
     comm->allgather_comm.max_push_send  = conf_params->max_push_send;
     comm->bcast_comm.max_push_send      = conf_params->max_push_send;
@@ -220,8 +225,10 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
     comm->pending_recv = 0;
     comm->buf_n        = comm->params.rx_depth * 2;
 
-    supported_mem_type = comm->cuda_mem_enabled ? UCC_MEMORY_TYPE_CUDA
-                                                : UCC_MEMORY_TYPE_HOST;
+    /* check the impact of creating recv posted buffers on GPU vs CPU */
+    /* Note: For staging-based operations, we always use HOST memory for staging buffers
+     * to use fast memcpy operations, then do one final cudaMemcpy to user buffer. */
+    supported_mem_type = UCC_MEMORY_TYPE_HOST;
 
     comm->grh_buf = ucc_malloc(GRH_LENGTH * sizeof(char), "grh");
     if (ucc_unlikely(!comm->grh_buf)) {
