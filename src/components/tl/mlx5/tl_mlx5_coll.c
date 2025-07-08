@@ -16,7 +16,7 @@ ucc_status_t ucc_tl_mlx5_coll_mcast_init(ucc_base_coll_args_t *coll_args,
 {
     ucc_status_t        status  = UCC_OK;
     ucc_tl_mlx5_task_t *task    = NULL;
-    
+
     status = ucc_tl_mlx5_mcast_check_support(coll_args, team);
     if (UCC_OK != status) {
         return status;
@@ -91,6 +91,11 @@ ucc_status_t ucc_tl_mlx5_task_finalize(ucc_coll_task_t *coll_task)
         if (req->ag_schedule) {
             ucc_free(req->ag_schedule);
             req->ag_schedule = NULL;
+        }
+        if (req->scratch_buf_header) {
+            ucc_mc_free(req->scratch_buf_header);
+            req->scratch_buf_header = NULL;
+            req->scratch_buf = NULL;
         }
         ucc_mpool_put(req);
         tl_trace(UCC_TASK_LIB(task), "finalizing an mcast task %p", task);

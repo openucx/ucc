@@ -33,6 +33,8 @@ mcast =                                         \
 	mcast/tl_mlx5_mcast_one_sided_progress.c    \
 	mcast/tl_mlx5_mcast_allgather.h             \
 	mcast/tl_mlx5_mcast_allgather.c             \
+	mcast/tl_mlx5_mcast_hca_copy.h              \
+	mcast/tl_mlx5_mcast_hca_copy.c              \
 	mcast/tl_mlx5_mcast_team.c
 
 sources =             \

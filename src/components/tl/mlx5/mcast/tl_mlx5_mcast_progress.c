@@ -54,7 +54,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_resend_packet_reliable(ucc_tl_mlx5_
     ucc_assert(comm->bcast_comm.p2p_pkt[p2p_pkt_id].type == MCAST_P2P_NEED_NACK_SEND);
 
     comm->bcast_comm.p2p_pkt[p2p_pkt_id].type = MCAST_P2P_NACK_SEND_PENDING;
-    
+
     tl_trace(comm->lib, "[comm %d, rank %d] Send data NACK: to %d, psn %d, context %ld nack_requests %d \n",
                          comm->comm_id, comm->rank,
                          comm->bcast_comm.p2p_pkt[p2p_pkt_id].from, psn, pp->context, comm->bcast_comm.nack_requests);
@@ -128,7 +128,7 @@ static inline int ucc_tl_mlx5_mcast_find_nack_psn(ucc_tl_mlx5_mcast_coll_comm_t*
     }
 
     ucc_assert(psn < max_search_psn);
-    
+
     return psn;
 }
 
@@ -145,20 +145,16 @@ static ucc_status_t ucc_tl_mlx5_mcast_recv_data_completion(ucc_tl_mlx5_mcast_p2p
     struct pp_packet               *pp    = (struct pp_packet *)obj->data[1];
     ucc_tl_mlx5_mcast_coll_req_t   *req   = (ucc_tl_mlx5_mcast_coll_req_t *)obj->data[2];
     void                           *dest;
-    ucc_memory_type_t               mem_type;
 
     tl_trace(comm->lib, "[comm %d, rank %d] Recved data psn %d", comm->comm_id, comm->rank, pp->psn);
 
     dest = req->ptr + PSN_TO_RECV_OFFSET(pp->psn, req, comm);
 
-    if (comm->cuda_mem_enabled) {
-        mem_type = UCC_MEMORY_TYPE_CUDA;
-    } else {
-        mem_type = UCC_MEMORY_TYPE_HOST;
-    }
+    ucc_memory_type_t dst_mem_type = comm->cuda_mem_enabled ? UCC_MEMORY_TYPE_CUDA : UCC_MEMORY_TYPE_HOST;
+    ucc_memory_type_t src_mem_type = UCC_MEMORY_TYPE_HOST; // staging buffer is always HOST
 
     status = ucc_mc_memcpy(dest, (void*) pp->buf, pp->length,
-                           mem_type, mem_type);
+                           dst_mem_type, src_mem_type);
     if (ucc_unlikely(status != UCC_OK)) {
         tl_error(comm->lib, "failed to copy buffer");
         return status;
@@ -166,7 +162,7 @@ static ucc_status_t ucc_tl_mlx5_mcast_recv_data_completion(ucc_tl_mlx5_mcast_p2p
 
     req->to_recv--;
     comm->r_window[pp->psn % comm->bcast_comm.wsize] = pp;
-    
+
     status = ucc_tl_mlx5_mcast_check_nack_requests(comm, pp->psn);
     if (status < 0) {
         return status;
@@ -186,7 +182,6 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable_send_NACK(ucc_tl_mlx5_mcas
     struct pp_packet *pp;
     ucc_rank_t        parent;
     struct packet    *p;
-    ucc_memory_type_t mem_type;
 
     p          = ucc_calloc(1, sizeof(struct packet));
     p->type    = MCAST_P2P_NACK;
@@ -204,7 +199,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable_send_NACK(ucc_tl_mlx5_mcas
     if (status <  0) {
         return status;
     }
-   
+
     tl_trace(comm->lib, "[comm %d, rank %d] Sent NAK : parent %d, psn %d",
              comm->comm_id, comm->rank, parent, psn);
 
@@ -215,11 +210,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable_send_NACK(ucc_tl_mlx5_mcas
 
     comm->bcast_comm.recv_drop_packet_in_progress = true;
 
-    if (comm->cuda_mem_enabled) {
-        mem_type = UCC_MEMORY_TYPE_CUDA;
-    } else {
-        mem_type = UCC_MEMORY_TYPE_HOST;
-    }
+    ucc_memory_type_t mem_type = comm->cuda_mem_enabled ? UCC_MEMORY_TYPE_CUDA : UCC_MEMORY_TYPE_HOST;
 
     status = comm->params.p2p_iface.recv_nb((void*) pp->buf,
                                             pp->length, parent, mem_type,
@@ -248,7 +239,7 @@ ucc_status_t ucc_tl_mlx5_mcast_reliable_send(ucc_tl_mlx5_mcast_coll_comm_t *comm
         comm->bcast_comm.p2p_spkt[i].type    = MCAST_P2P_ACK;
         comm->bcast_comm.p2p_spkt[i].psn     = comm->bcast_comm.last_acked + comm->bcast_comm.wsize;
         comm->bcast_comm.p2p_spkt[i].comm_id = comm->comm_id;
-        
+
         tl_trace(comm->lib, "rank %d, Posting SEND to parent %d, n_parent %d,  psn %d",
                  comm->rank, parent, comm->bcast_comm.parent_n, comm->psn);
 
@@ -278,7 +269,7 @@ static ucc_status_t ucc_tl_mlx5_mcast_recv_completion(ucc_tl_mlx5_mcast_p2p_comp
         ucc_assert(comm->bcast_comm.p2p_pkt[pkt_id].type == MCAST_P2P_NACK);
         psn = comm->bcast_comm.p2p_pkt[pkt_id].psn;
         pp  = comm->r_window[psn % comm->bcast_comm.wsize];
-        
+
         tl_trace(comm->lib, "[comm %d, rank %d] Got NACK: from %d, psn %d, avail %d pkt_id %d",
                              comm->comm_id, comm->rank,
                              comm->bcast_comm.p2p_pkt[pkt_id].from, psn, pp->psn == psn, pkt_id);
@@ -307,7 +298,7 @@ static ucc_status_t ucc_tl_mlx5_mcast_recv_completion(ucc_tl_mlx5_mcast_p2p_comp
 static ucc_status_t ucc_tl_mlx5_mcast_send_completion(ucc_tl_mlx5_mcast_p2p_completion_obj_t *obj)
 {
     ucc_tl_mlx5_mcast_coll_comm_t *comm = (ucc_tl_mlx5_mcast_coll_comm_t*)obj->data[0];
- 
+
     comm->bcast_comm.sacks_n++;
     ucc_mpool_put(obj);
     return UCC_OK;
@@ -316,13 +307,13 @@ static ucc_status_t ucc_tl_mlx5_mcast_send_completion(ucc_tl_mlx5_mcast_p2p_comp
 static inline int add_uniq(ucc_rank_t *arr, uint32_t *len, ucc_rank_t value)
 {
     int i;
-    
+
     for (i=0; i<(*len); i++) {
         if (arr[i] == value) {
             return 0;
         }
     }
-    
+
     arr[*len] = value;
     (*len)++;
     return 1;
