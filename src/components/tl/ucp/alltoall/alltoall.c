@@ -78,8 +78,8 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_team_t  *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_mem_map_memh_t *src_memh = NULL;
     ucc_mem_map_memh_t *dst_memh = NULL;
+    ucc_status_t        status   = UCC_OK;
     ucc_tl_ucp_task_t  *task;
-    ucc_status_t        status;
 
     ALLTOALL_TASK_CHECK(coll_args->args, tl_team);
 
