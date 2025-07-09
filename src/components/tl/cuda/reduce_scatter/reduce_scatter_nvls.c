@@ -4,8 +4,6 @@
  * See file LICENSE for terms.
  */
 
-#ifdef HAVE_TL_CUDA_NVLS
-
 #include "reduce_scatter/reduce_scatter.h"
 #include <ucc/api/ucc.h>
 
@@ -224,5 +222,3 @@ ucc_tl_cuda_reduce_scatter_nvls_init(ucc_base_coll_args_t *coll_args,
     *task_p = &task->super;
     return UCC_OK;
 }
-
-#endif // HAVE_TL_CUDA_NVLS
