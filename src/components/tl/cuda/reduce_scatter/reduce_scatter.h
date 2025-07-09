@@ -42,9 +42,11 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_linear_init(ucc_base_coll_args_t *coll_a
                                                     ucc_base_team_t *     tl_team,
                                                     ucc_coll_task_t **    task_p);
 
+#ifdef HAVE_TL_CUDA_NVLS
 ucc_status_t ucc_tl_cuda_reduce_scatter_nvls_init(ucc_base_coll_args_t *coll_args,
                                                   ucc_base_team_t *     tl_team,
                                                   ucc_coll_task_t **    task_p);
+#endif // HAVE_TL_CUDA_NVLS
 
 static inline int ucc_tl_cuda_reduce_scatter_alg_from_str(const char *str)
 {

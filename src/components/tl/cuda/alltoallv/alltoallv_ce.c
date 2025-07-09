@@ -13,6 +13,10 @@
 #include "utils/arch/cuda_def.h"
 #include "utils/ucc_compiler_def.h"
 
+#include <cuda_runtime.h>
+#include <driver_types.h>
+
+
 enum {
     ALLTOALL_CE_STAGE_SYNC,  /*< Wait for free SYNC segment */
     ALLTOALL_CE_STAGE_SETUP, /*< Wait for memhandle setup to finish */
@@ -328,6 +332,129 @@ exit:
     return status;
 }
 
+ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task)
+{
+    ucc_tl_cuda_team_t *team        = TASK_TEAM(task);
+    ucc_rank_t          rank        = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_sync_t *sync        = TASK_SYNC(task, rank);
+    ucc_ee_h            ee          = task->super.ee;
+    ucc_rank_t          i, peer;
+    void               *src, *dst;
+    size_t              data_size, data_displ;
+    ucc_status_t        status = UCC_OK;
+    cudaStream_t        stream = 0;
+    int                 stream_idx = 0;
+    size_t              op_count = 0;
+    size_t              fail_idx;
+
+    // Count total operations
+    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
+        peer = (rank + i) % UCC_TL_TEAM_SIZE(team);
+        ucc_tl_cuda_sync_t *peer_sync = TASK_SYNC(task, peer);
+        data_size = task->alltoallv_ce.get_size(task, peer_sync->alltoallv_ce.sbytes, rank);
+        if (data_size > 0) {
+            op_count++;
+        }
+    }
+
+    // Allocate arrays
+    void **srcs      = ucc_malloc(op_count * sizeof(void *), "srcs");
+    void **dsts      = ucc_malloc(op_count * sizeof(void *), "dsts");
+    size_t *sizes    = ucc_malloc(op_count * sizeof(size_t), "sizes");
+    
+    struct cudaMemcpyAttributes attrs[8];
+    size_t attrsIdxs[8];
+
+    if (!srcs || !dsts || !sizes) {
+        status = UCC_ERR_NO_MEMORY;
+        goto exit;
+    }
+
+    if (ee) {
+        stream = (cudaStream_t)ee->ee_context;
+    } else {
+        stream = UCC_TL_CUDA_TEAM_STREAM_IDX(team, stream_idx);
+    }
+    op_count = 0;
+
+    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
+        peer = (rank + i) % UCC_TL_TEAM_SIZE(team);
+        
+        ucc_tl_cuda_sync_t *peer_sync = TASK_SYNC(task, peer);
+
+        data_size = task->alltoallv_ce.get_size(task, peer_sync->alltoallv_ce.sbytes, rank);
+        if (data_size == 0) {
+            continue;
+        }
+
+        // Source buffer
+        if (peer == rank) {
+            src = task->alltoallv_ce.sbuf;
+        } else {
+            src = PTR_OFFSET(task->alltoallv_ce.peer_map_addr_src[peer],
+                             peer_sync->mem_info_src.offset);
+        }
+
+        data_displ = task->alltoallv_ce.get_offset(
+            task, peer_sync->alltoallv_ce.sdispl_bytes, rank);
+        src = PTR_OFFSET(src, data_displ);
+
+        // Destination buffer
+        data_displ = task->alltoallv_ce.get_offset(
+            task, sync->alltoallv_ce.rdispl_bytes, peer);
+        dst = PTR_OFFSET(task->alltoallv_ce.rbuf, data_displ);
+
+        srcs[op_count] = src;
+        dsts[op_count] = dst;
+        sizes[op_count] = data_size;
+
+        // Setup attributes
+        memset(&attrs[op_count], 0, sizeof(struct cudaMemcpyAttributes));
+        attrs[op_count].srcAccessOrder = cudaMemcpySrcAccessOrderAny;
+        attrs[op_count].srcLocHint.id = (int) rank; 
+        attrs[op_count].srcLocHint.type = cudaMemLocationTypeDevice;
+        attrs[op_count].dstLocHint.id = (int) peer;
+        attrs[op_count].dstLocHint.type = cudaMemLocationTypeDevice;
+
+        attrsIdxs[op_count] = op_count;
+
+        op_count++;
+    }
+
+    // Launch batch copy
+    cudaError_t cerr = cudaMemcpyBatchAsync(
+        dsts, srcs, sizes, op_count,
+        attrs, attrsIdxs, op_count,
+        &fail_idx, stream);
+
+    if (cerr != cudaSuccess) {
+        ucc_error("cudaMemcpyBatchAsync failed: %s (failIdx=%zu)",
+                  cudaGetErrorString(cerr), fail_idx);
+        status = UCC_ERR_NO_MESSAGE;
+        goto exit;
+    }
+
+    task->alltoallv_ce.num_posted = op_count;
+
+    // Record completion events
+    if (ee) {
+        CUDA_CHECK_GOTO(
+            cudaEventRecord(task->alltoallv_ce.evtCompletions[0], stream),
+            exit, status);
+    } else {
+        CUDA_CHECK_GOTO(
+            cudaEventRecord(task->alltoallv_ce.evtCompletions[stream_idx], stream),
+            exit, status);
+    }
+
+exit:
+    ucc_free(srcs);
+    ucc_free(dsts);
+    ucc_free(sizes);
+    return status;
+}
+
+
 ucc_status_t ucc_tl_cuda_alltoallv_unmap(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
@@ -455,6 +582,7 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
                 task->alltoallv_ce.exec_task[i] = NULL;
             }
         }
+
         status =
             ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
         if (ucc_unlikely(status != UCC_OK)) {
@@ -494,8 +622,6 @@ ucc_status_t
 ucc_tl_cuda_alltoallv_ce_triggered_post_setup(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    ucc_tl_cuda_lib_t  *lib  = UCC_TL_CUDA_TEAM_LIB(team);
     ucc_status_t        status;
 
     do {
@@ -519,15 +645,6 @@ ucc_tl_cuda_alltoallv_ce_triggered_post_setup(ucc_coll_task_t *coll_task)
         return status;
     }
     task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_POST_COPIES;
-
-    if (lib->cfg.alltoall_use_copy_engine) {
-        status = ucc_tl_cuda_alltoallv_ce_post_copies(task);
-        if (ucc_unlikely(status != UCC_OK)) {
-            ucc_error("failed to post copies\n");
-            return status;
-        }
-        task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_COPY;
-    }   
 
     return UCC_OK;
 }
@@ -557,6 +674,15 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
     coll_task->ee = ee;
     tl_debug(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
+    coll_task->triggered_post_setup(coll_task);
+
+    status = ucc_tl_cuda_alltoallv_ce_post_batch_copies(task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        ucc_error("failed to post copies\n");
+        return status;
+    }
+    task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_COPY;
+
     status = coll_task->post(coll_task);
     if (ucc_likely(status == UCC_OK)) {
         post_event.ev_type         = UCC_EVENT_COLLECTIVE_POST;
