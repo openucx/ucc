@@ -38,21 +38,21 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
 
     size_t buf_size_bytes = args->src.info.count * ucc_dt_size(dt);
 
-    ucc_debug("allreduce_nvls_start symmetric uc addr: %lld mc addr: "
-              "%lld buf_size_bytes: %zu",
-              nvls->uc_va, nvls->mc_va, buf_size_bytes);
+    ucc_debug("allreduce_nvls_start symmetric uc addr: %p mc addr: %p "
+              "buf_size_bytes: %zu",
+              (void *)nvls->uc_va, (void *)nvls->mc_va, buf_size_bytes);
 
     task->allreduce_nvls.rbuf           = args->dst.info.buffer;
     task->allreduce_nvls.sbuf           = args->src.info.buffer;
     task->allreduce_nvls.buf_size_bytes = buf_size_bytes;
-
-    task->allreduce_nvls.stage = STAGE_COPY;
 
     // copy src buffer to symmetric memory first
     CUDA_CHECK(cudaMemcpyAsync((void *)nvls->uc_va, args->src.info.buffer,
                                buf_size_bytes, cudaMemcpyDeviceToDevice,
                                stream));
     CUDA_CHECK(cudaEventRecord(task->allreduce_nvls.evtCompletion, stream));
+
+    task->allreduce_nvls.stage = STAGE_COPY;
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
