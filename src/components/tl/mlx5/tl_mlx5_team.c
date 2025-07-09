@@ -128,6 +128,7 @@ static inline ucc_status_t ucc_tl_mlx5_alltoall_team_test(ucc_base_team_t *team)
         tl_team->a2a_status.local =
             ucc_tl_mlx5_team_test_alltoall_start(tl_team);
         tl_team->a2a_state = TL_MLX5_TEAM_STATE_ALLTOALL_POSTED;
+        // coverity[missing_break:FALSE]
     case TL_MLX5_TEAM_STATE_ALLTOALL_POSTED:
         // coverity[deref_arg:FALSE]
         tl_team->a2a_status.local =

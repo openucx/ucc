@@ -555,7 +555,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     tl_error(comm->lib, "group_setup_info is NULL after successful coll_test");
                     return UCC_ERR_NO_RESOURCE;
                 }
-                
+
                 status = data->status;
                 if (UCC_OK != status) {
                     /* rank 0 was not able to join a mcast group so all

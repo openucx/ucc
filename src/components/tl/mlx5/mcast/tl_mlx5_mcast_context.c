@@ -299,8 +299,6 @@ ucc_status_t ucc_tl_mlx5_mcast_clean_ctx(ucc_tl_mlx5_mcast_coll_context_t *ctx)
 {
     tl_debug(ctx->lib, "cleaning mcast ctx: %p", ctx);
 
-    if (ctx == NULL) return UCC_OK;
-
     if (ctx->rcache) {
         ucc_rcache_destroy(ctx->rcache);
         ctx->rcache = NULL;

@@ -51,7 +51,7 @@ static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
     ucc_rank_t         *node_leaders = NULL;
     ucc_status_t        status;
 
-    ucc_assert(team_rank >= 0 && team_rank < UCC_CL_TEAM_SIZE(cl_team));
+    ucc_assert(team_rank < UCC_CL_TEAM_SIZE(cl_team));
     ucc_assert(SBGP_EXISTS(cl_team, NODE_LEADERS));
 
     status = ucc_topo_get_node_leaders(core_team->topo, &node_leaders);
@@ -64,7 +64,7 @@ static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
     return UCC_OK;
 }
 
-/* Check if the ranks are block ordered. If they aren't, we'll need to 
+/* Check if the ranks are block ordered. If they aren't, we'll need to
    unpack the data after the allgatherv into the right position, even if the
    dst buffer is contiguous */
 static inline ucc_status_t is_block_ordered(ucc_cl_hier_team_t *cl_team, int *ordered)
@@ -183,7 +183,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
 
     /* handle the case where this rank may be the only one on this node */
     ldr_sbgp_only = !SBGP_ENABLED(cl_team, NODE) && SBGP_ENABLED(cl_team, NODE_LEADERS);
-    
+
     UCC_CHECK_GOTO(ucc_schedule_init(schedule, &args, team), free_sched, status);
 
     node_counts_size   = node_sbgp_size * sizeof(ucc_count_t);
@@ -286,7 +286,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
                                             &args.args,
                                             args.args.dst.info_v.displacements,
                                             rank));
-                args.args.src.info.count    = 
+                args.args.src.info.count    =
                     ucc_coll_args_get_count(&args.args,
                                             args.args.dst.info_v.counts,
                                             rank);
@@ -370,7 +370,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
             args.args.src.info_v.datatype = args.args.dst.info_v.datatype;
             args.args.src.info_v.mem_type = args.args.dst.info_v.mem_type;
             args.args.src.info_v.buffer   = buffer;
-            
+
             // Pass leader_disps and leader_counts through src.info_v for unpack
             args.args.src.info_v.displacements = leader_disps;
             args.args.src.info_v.counts        = leader_counts;

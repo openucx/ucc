@@ -212,6 +212,7 @@ ucc_coll_args_free_asymmetric_buffer(ucc_coll_task_t *task)
 
     if (save->scratch == NULL) {
         ucc_error("failure trying to free NULL asymmetric buffer");
+        return UCC_ERR_INVALID_PARAM;
     }
 
     status = ucc_mc_free(save->scratch);
@@ -466,6 +467,7 @@ ucc_ep_map_from_array_generic(void **array, ucc_rank_t size,
     if (is_const_stride) {
         if ((stride == 1) && (size == full_size)) {
             map.type = UCC_EP_MAP_FULL;
+            /* coverity[uninit_use] - union fields not used for UCC_EP_MAP_FULL */
         }
         else {
             map.type           = UCC_EP_MAP_STRIDED;

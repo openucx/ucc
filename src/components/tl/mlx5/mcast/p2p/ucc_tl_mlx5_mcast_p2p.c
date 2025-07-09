@@ -34,7 +34,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_p2p_bcast_nb(void *buf, size_t
 {
     ucc_status_t    status = UCC_OK;
     ucc_coll_req_h  req    = NULL;
-    ucc_coll_args_t args;
+    ucc_coll_args_t args   = {0};
 
     args.mask              = UCC_COLL_ARGS_FIELD_ACTIVE_SET |
                              UCC_COLL_ARGS_FIELD_CB;
