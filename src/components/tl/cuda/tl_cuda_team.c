@@ -363,8 +363,6 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
     int                 i;
     ucc_coll_score_team_info_t team_info;
 
-    ucc_print("ucc_tl_cuda_team_get_scores");
-
     team_info.alg_fn              = ucc_tl_cuda_alg_id_to_init;
     team_info.default_score       = UCC_TL_CUDA_DEFAULT_SCORE;
     team_info.init                = ucc_tl_cuda_coll_init;
@@ -381,7 +379,6 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
     if (UCC_OK != status) {
         return status;
     }
-
 
     for (i = 0; i < UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR; i++) {
         status = ucc_coll_score_update_from_str(

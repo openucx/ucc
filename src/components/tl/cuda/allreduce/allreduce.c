@@ -42,6 +42,8 @@ ucc_status_t ucc_tl_cuda_allreduce_init(ucc_base_coll_args_t *coll_args,
     if (ucc_unlikely(status != UCC_OK)) {
         ucc_tl_cuda_task_put(task);
     }
+#else
+    (void) task;
 #endif /* ENABLE_NVLS */
 
     return status;
