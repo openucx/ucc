@@ -83,7 +83,7 @@ typedef struct ucc_tl_cuda_lib_config {
     unsigned long       allgather_ring_max_rings;
     uint32_t            allgather_ring_num_chunks;
     unsigned long       reduce_scatter_ring_max_rings;
-    uint32_t            use_topo_cache;
+    uint32_t            topo_cache_enable;
 } ucc_tl_cuda_lib_config_t;
 
 typedef struct ucc_tl_cuda_context_config {

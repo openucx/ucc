@@ -43,9 +43,9 @@ static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
      ucc_offsetof(ucc_tl_cuda_lib_config_t, reduce_scatter_ring_max_rings),
      UCC_CONFIG_TYPE_ULUNITS},
     
-    {"USE_TOPO_CACHE", "y",
-     "Use the NVLINK topology cache",
-     ucc_offsetof(ucc_tl_cuda_lib_config_t, use_topo_cache),
+    {"TOPO_CACHE_ENABLE", "y",
+     "Enable NVLINK topology cache",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, topo_cache_enable),
      UCC_CONFIG_TYPE_BOOL},
 
     {NULL}};

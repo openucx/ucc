@@ -71,7 +71,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
     CUDA_CHECK_GOTO(cudaGetDevice(&self->device), free_mpool, status);
 
     /* Handle CUDA topology initialization based on caching configuration */
-    if (lib->cfg.use_topo_cache && lib->topo != NULL) {
+    if (lib->cfg.topo_cache_enable && lib->topo != NULL) {
         /* If topology caching is enabled and a cached topology exists,
            reuse the existing topology from the library */
         self->topo = lib->topo;
@@ -80,7 +80,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
            - If caching is enabled: store in lib->topo for reuse
            - If caching is disabled: store in self->topo (context-specific) */
         ucc_tl_cuda_topo_t **topo_ptr =
-            lib->cfg.use_topo_cache ? &lib->topo : &self->topo;
+            lib->cfg.topo_cache_enable ? &lib->topo : &self->topo;
 
         /* Create new topology instance and store it in the appropriate location */
         status = ucc_tl_cuda_topo_create((const ucc_base_lib_t *)&lib->super,
@@ -156,7 +156,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_context_t)
 
     // Only destroy topology if it's context-specific (not cached)
     // For cached topology, it will be destroyed when the library is cleaned up
-    if (self->topo != NULL && !lib->cfg.use_topo_cache) {
+    if (self->topo != NULL && !lib->cfg.topo_cache_enable) {
         ucc_tl_cuda_topo_destroy(self->topo);
         self->topo = NULL;
     }
