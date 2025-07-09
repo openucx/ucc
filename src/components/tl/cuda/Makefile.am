@@ -46,14 +46,14 @@ reduce_scatterv =                            \
 	reduce_scatterv/reduce_scatterv_ring.c   \
 	reduce_scatterv/reduce_scatterv_linear.c
 
+allreduce =                    \
+	allreduce/allreduce.h      \
+	allreduce/allreduce.c
+
 if TL_CUDA_NVLS_ENABLED
 reduce_scatter += reduce_scatter/reduce_scatter_nvls.c
 
-allreduce =                    \
-	allreduce/allreduce.h      \
-	allreduce/allreduce.c      \
-	allreduce/allreduce_nvls.c
-
+allreduce += llreduce/allreduce_nvls.c
 endif
 
 sources =               \
