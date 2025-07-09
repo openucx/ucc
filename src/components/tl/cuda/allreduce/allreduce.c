@@ -44,5 +44,3 @@ ucc_status_t ucc_tl_cuda_allreduce_init(ucc_base_coll_args_t *coll_args,
 
     return status;
 }
-
-

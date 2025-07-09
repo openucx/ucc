@@ -14,17 +14,17 @@
 #include <cuda.h>
 
 enum {
-    STAGE_COPY, /*< Copy src buffer to symmetric memory */
-    STAGE_COPY_BAR_START,
-    STAGE_COPY_BAR_TEST,
-    STAGE_KERNEL_START,
-    STAGE_KERNEL,        /*< Kernel is running */
-    STAGE_BARRIER_START, /*< Kernel is done, waiting for other ranks to finish */
-    STAGE_BARRIER_TEST,  /*< Kernel is done, waiting for other ranks to finish */
-    STAGE_COPY_POST,
-    STAGE_COPY_POST_WAIT,
-    STAGE_COPY_POST_BAR_START,
-    STAGE_COPY_POST_BAR_TEST
+    STAGE_COPY,                /*< Copy src buffer to symmetric memory */
+    STAGE_COPY_BAR_START,      /*< Start barrier after copy */
+    STAGE_COPY_BAR_TEST,       /*< Test barrier after copy */
+    STAGE_KERNEL_START,        /*< Start kernel */
+    STAGE_KERNEL,              /*< Kernel is running */
+    STAGE_BARRIER_START,       /*< Start barrier after kernel */
+    STAGE_BARRIER_TEST,        /*< Test barrier after kernel */
+    STAGE_COPY_POST,           /*< Copy result buffer from symmetric memory to dst buffer */
+    STAGE_COPY_POST_WAIT,      /*< Wait for the copy to complete */
+    STAGE_COPY_POST_BAR_START, /*< Start barrier after copy */
+    STAGE_COPY_POST_BAR_TEST   /*< Test barrier after copy */
 };
 
 ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
@@ -36,23 +36,21 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
     cudaStream_t        stream = team->stream;
     ucc_datatype_t      dt     = task->allreduce_nvls.dt;
 
-    size_t src_size_bytes = args->src.info.count * ucc_dt_size(dt);
-    size_t dst_size_bytes = args->dst.info.count * ucc_dt_size(dt);
+    size_t buf_size_bytes = args->src.info.count * ucc_dt_size(dt);
 
     ucc_debug("allreduce_nvls_start symmetric uc addr: %lld mc addr: "
-              "%lld src_size_bytes: %zu dst_size_bytes: %zu",
-              nvls->uc_va, nvls->mc_va, src_size_bytes, dst_size_bytes);
+              "%lld buf_size_bytes: %zu",
+              nvls->uc_va, nvls->mc_va, buf_size_bytes);
 
     task->allreduce_nvls.rbuf           = args->dst.info.buffer;
     task->allreduce_nvls.sbuf           = args->src.info.buffer;
-    task->allreduce_nvls.src_size_bytes = src_size_bytes;
-    task->allreduce_nvls.dst_size_bytes = dst_size_bytes;
+    task->allreduce_nvls.buf_size_bytes = buf_size_bytes;
 
     task->allreduce_nvls.stage = STAGE_COPY;
 
     // copy src buffer to symmetric memory first
     CUDA_CHECK(cudaMemcpyAsync((void *)nvls->uc_va, args->src.info.buffer,
-                               src_size_bytes, cudaMemcpyDeviceToDevice,
+                               buf_size_bytes, cudaMemcpyDeviceToDevice,
                                stream));
     CUDA_CHECK(cudaEventRecord(task->allreduce_nvls.evtCompletion, stream));
 
@@ -76,7 +74,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
         if (cuda_status == cudaErrorNotReady) {
             task->super.status = UCC_INPROGRESS;
             return;
-        }   
+        }
         if (cuda_status != cudaSuccess) {
             ucc_error("cudaEventQuery failed %s",
                       cudaGetErrorString(cuda_status));
@@ -104,7 +102,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
         // fallthrough
     case STAGE_KERNEL_START:
         status = post_allreduce_kernel(stream, nvls->mc_va,
-                                       task->allreduce_nvls.src_size_bytes,
+                                       task->allreduce_nvls.buf_size_bytes,
                                        trank, UCC_TL_TEAM_SIZE(team));
         if (status != UCC_OK) {
             ucc_error("failed to post allreduce kernel");
@@ -151,11 +149,11 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
         }
         ucc_debug("allreduce kernel is completed");
         task->allreduce_nvls.stage = STAGE_COPY_POST;
-        // fallthrough        
+        // fallthrough
     case STAGE_COPY_POST:
         cuda_status = cudaMemcpyAsync((void *)task->allreduce_nvls.rbuf,
                         (void *)nvls->uc_va,
-                        task->allreduce_nvls.dst_size_bytes,
+                        task->allreduce_nvls.buf_size_bytes,
                         cudaMemcpyDeviceToDevice,
                         stream);
         if (cuda_status != cudaSuccess) {
