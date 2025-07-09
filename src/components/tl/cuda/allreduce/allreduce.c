@@ -43,7 +43,7 @@ ucc_status_t ucc_tl_cuda_allreduce_init(ucc_base_coll_args_t *coll_args,
         ucc_tl_cuda_task_put(task);
     }
 #else
-    (void) task;
+    (void) task_h;
 #endif /* ENABLE_NVLS */
 
     return status;
