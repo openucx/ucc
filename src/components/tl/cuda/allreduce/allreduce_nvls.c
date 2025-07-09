@@ -10,8 +10,6 @@
 #include "tl_cuda_nvls.h"
 #include "../kernels/allreduce_kernel.h"
 
-#include <cuda_runtime.h>
-#include <cuda.h>
 
 enum {
     STAGE_COPY,                /*< Copy src buffer to symmetric memory */
