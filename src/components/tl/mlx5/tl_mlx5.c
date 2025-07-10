@@ -28,6 +28,8 @@ static const char *alltoall_block_shape_modes[] = {
     [UCC_TL_MLX5_ALLTOALL_BLOCK_SHAPE_SQUARE] = "square",
     [UCC_TL_MLX5_ALLTOALL_BLOCK_SHAPE_LAST]   = NULL};
 
+
+
 static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_mlx5_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
@@ -203,7 +205,7 @@ static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.timeout),
      UCC_CONFIG_TYPE_INT},
 
-    {"MCAST_BCAST_ENABLE", "1", "Enable Mcast-based Bcast",
+    {"MCAST_BCAST_ENABLE", "0", "Enable Mcast-based Bcast",
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.mcast_bcast_enabled),
      UCC_CONFIG_TYPE_BOOL},
 
@@ -211,9 +213,13 @@ static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.mcast_allgather_enabled),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"MCAST_ENABLE", "0", "Enable Mcast",
+    {"MCAST_ENABLE", "n",
+     "Enable Mcast\n"
+     "n - disable mcast entirely\n"
+     "try - try to enable, continue without mcast if resources unavailable (silent except debug/trace)\n"
+     "y - force enable and warn if resources unavailable, continue without mcast",
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.mcast_enabled),
-     UCC_CONFIG_TYPE_INT},
+     UCC_CONFIG_TYPE_TERNARY},
 
     {"MCAST_NET_DEVICE", "", "Specifies which network device to use for Mcast",
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.ib_dev_name),
