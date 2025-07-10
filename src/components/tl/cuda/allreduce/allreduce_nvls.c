@@ -6,6 +6,7 @@
 
 #include "allreduce/allreduce.h"
 #include "ucc/api/ucc.h"
+#include "core/ucc_ee.h"
 #include "utils/arch/cuda_def.h"
 #include "tl_cuda_nvls.h"
 #include "../kernels/allreduce_kernel.h"
@@ -31,7 +32,8 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_team_t *team   = TASK_TEAM(task);
     ucc_coll_args_t    *args   = &TASK_ARGS(task);
     ucc_tl_cuda_nvls_t *nvls   = &team->nvls;
-    cudaStream_t        stream = team->stream;
+    ucc_ee_h            ee     = task->super.ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
     ucc_datatype_t      dt     = task->allreduce_nvls.dt;
 
     size_t buf_size_bytes = args->src.info.count * ucc_dt_size(dt);
@@ -66,7 +68,8 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t          trank  = UCC_TL_TEAM_RANK(team);
     cudaEvent_t         evt    = task->allreduce_nvls.evtCompletion;
     ucc_tl_cuda_nvls_t *nvls   = &team->nvls;
-    cudaStream_t        stream = team->stream;
+    ucc_ee_h            ee     = task->super.ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
 
     ucc_status_t        status;
     cudaError_t         cuda_status;
