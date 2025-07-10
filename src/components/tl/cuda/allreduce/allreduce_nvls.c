@@ -40,12 +40,16 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
               "buf_size_bytes: %zu",
               (void *)nvls->uc_va, (void *)nvls->mc_va, buf_size_bytes);
 
-    task->allreduce_nvls.rbuf           = args->dst.info.buffer;
-    task->allreduce_nvls.sbuf           = args->src.info.buffer;
+    task->allreduce_nvls.rbuf = args->dst.info.buffer;
+    if (UCC_IS_INPLACE(*args)) {
+        task->allreduce_nvls.sbuf = args->dst.info.buffer;
+    } else {
+        task->allreduce_nvls.sbuf = args->src.info.buffer;
+    }
     task->allreduce_nvls.buf_size_bytes = buf_size_bytes;
 
     // copy src buffer to symmetric memory first
-    CUDA_CHECK(cudaMemcpyAsync((void *)nvls->uc_va, args->src.info.buffer,
+    CUDA_CHECK(cudaMemcpyAsync((void *)nvls->uc_va, task->allreduce_nvls.sbuf,
                                buf_size_bytes, cudaMemcpyDeviceToDevice,
                                stream));
     CUDA_CHECK(cudaEventRecord(task->allreduce_nvls.evtCompletion, stream));
