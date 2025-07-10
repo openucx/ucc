@@ -91,7 +91,7 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
         status = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
         if (status != UCC_OK) {
             ucc_error("reduce scatter barrier start failed");
-            task->super.status = UCC_ERR_NO_RESOURCE;
+            task->super.status = status;
             return;
         }
         task->reduce_scatterv_nvls.stage = STAGE_COPY_BAR_TEST;
@@ -141,7 +141,7 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
         status = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
         if (status != UCC_OK) {
             ucc_error("reduce scatter barrier start failed");
-            task->super.status = UCC_ERR_NO_RESOURCE;
+            task->super.status = status;
             return;
         }
         task->reduce_scatterv_nvls.stage = STAGE_BARRIER_TEST;

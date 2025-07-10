@@ -36,7 +36,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
 
     size_t buf_size_bytes = args->src.info.count * ucc_dt_size(dt);
 
-    ucc_debug("allreduce_nvls_start symmetric uc addr: %p mc addr: %p "
+    ucc_trace("allreduce_nvls_start symmetric uc addr: %p mc addr: %p "
               "buf_size_bytes: %zu",
               (void *)nvls->uc_va, (void *)nvls->mc_va, buf_size_bytes);
 
@@ -85,7 +85,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
         status = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
         if (status != UCC_OK) {
             ucc_error("allreduce barrier start failed");
-            task->super.status = UCC_ERR_NO_RESOURCE;
+            task->super.status = status;
             return;
         }
         task->allreduce_nvls.stage = STAGE_COPY_BAR_TEST;
@@ -107,7 +107,6 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             task->super.status = status;
             return;
         }
-        ucc_debug("allreduce kernel posted");
         cuda_status = cudaEventRecord(evt, stream);
         if (cuda_status != cudaSuccess) {
             ucc_error("cudaEventRecord failed: %s", cudaGetErrorString(cuda_status));
@@ -134,7 +133,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
         status = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
         if (status != UCC_OK) {
             ucc_error("allreduce barrier start failed");
-            task->super.status = UCC_ERR_NO_RESOURCE;
+            task->super.status = status;
             return;
         }
         task->allreduce_nvls.stage = STAGE_BARRIER_TEST;
@@ -145,7 +144,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             task->super.status = status;
             return;
         }
-        ucc_debug("allreduce kernel is completed");
+        ucc_trace("allreduce kernel is completed");
         task->allreduce_nvls.stage = STAGE_COPY_POST;
         // fallthrough
     case STAGE_COPY_POST:
@@ -179,7 +178,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
         status = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
         if (status != UCC_OK) {
             ucc_error("allreduce barrier start failed");
-            task->super.status = UCC_ERR_NO_RESOURCE;
+            task->super.status = status;
             return;
         }
         task->allreduce_nvls.stage = STAGE_COPY_POST_BAR_TEST;
@@ -191,7 +190,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->super.status = UCC_OK;
-        ucc_debug("allreduce kernel is completed");
+        ucc_trace("allreduce kernel is completed");
         break;
     }
     return;
@@ -217,13 +216,13 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
 
     if (coll_args->args.op != UCC_OP_SUM ||
         coll_args->args.dst.info.datatype != UCC_DT_FLOAT32) {
-        ucc_error("NVLS allreduce is supported only with SUM operation "
+        ucc_debug("NVLS allreduce is supported only with SUM operation "
                   "and float32 datatype");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_connected(team->topo))) {
-        ucc_error("NVLS allreduce is supported only on fully connected "
+        ucc_debug("NVLS allreduce is supported only on fully connected "
                   "NVLINK systems");
         return UCC_ERR_NOT_SUPPORTED;
     }

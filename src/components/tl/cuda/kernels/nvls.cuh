@@ -9,7 +9,6 @@
 
 #include <cuda.h>
 
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 900
 #define MULTIMEM_ST(val, ptr)                                                  \
     asm volatile("multimem.st.global.v4.f32 [%0], {%1,%2,%3,%4};" ::"l"(ptr),  \
                  "r"(val.x), "r"(val.y), "r"(val.z), "r"(val.w)                \
@@ -20,8 +19,5 @@
         : "=r"(val.x), "=r"(val.y), "=r"(val.z), "=r"(val.w)                   \
         : "l"(ptr)                                                             \
         : "memory");
-#else
-    #error "NVLS is supported only on CUDA ARCH 9.0 and higher"
-#endif // __CUDA_ARCH__
 
 #endif // UCC_TL_CUDA_NVLS_CUH_
