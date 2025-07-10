@@ -10,6 +10,8 @@
 #include "utils/arch/cuda_def.h"
 #include "tl_cuda_nvls.h"
 #include "../kernels/allreduce_kernel.h"
+#include "components/ec/ucc_ec.h"
+#include "components/ec/cuda/ec_cuda_resources.h"
 
 
 enum {
@@ -54,7 +56,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
     CUDA_CHECK(cudaMemcpyAsync((void *)nvls->uc_va, task->allreduce_nvls.sbuf,
                                buf_size_bytes, cudaMemcpyDeviceToDevice,
                                stream));
-    CUDA_CHECK(cudaEventRecord(task->allreduce_nvls.evtCompletion, stream));
+    CUDA_CHECK(cudaEventRecord(((ucc_ec_cuda_event_t *)task->allreduce_nvls.evtCompletion)->event, stream));
 
     task->allreduce_nvls.stage = STAGE_COPY;
 
@@ -63,13 +65,14 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
 
 void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t *task   = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t *team   = TASK_TEAM(task);
-    ucc_rank_t          trank  = UCC_TL_TEAM_RANK(team);
-    cudaEvent_t         evt    = task->allreduce_nvls.evtCompletion;
-    ucc_tl_cuda_nvls_t *nvls   = &team->nvls;
-    ucc_ee_h            ee     = task->super.ee;
-    cudaStream_t        stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
+    ucc_tl_cuda_task_t *task      = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_team_t *team      = TASK_TEAM(task);
+    ucc_rank_t          trank     = UCC_TL_TEAM_RANK(team);
+    ucc_ec_cuda_event_t *ec_event = (ucc_ec_cuda_event_t *)task->allreduce_nvls.evtCompletion;
+    cudaEvent_t         evt       = ec_event->event;
+    ucc_tl_cuda_nvls_t *nvls      = &team->nvls;
+    ucc_ee_h            ee        = task->super.ee;
+    cudaStream_t        stream    = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
 
     ucc_status_t        status;
     cudaError_t         cuda_status;
@@ -207,7 +210,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_finalize(ucc_coll_task_t *task)
 {
     ucc_tl_cuda_task_t *tl_task = ucc_derived_of(task, ucc_tl_cuda_task_t);
 
-    CUDA_CHECK(cudaEventDestroy(tl_task->allreduce_nvls.evtCompletion));
+    ucc_ec_destroy_event(tl_task->allreduce_nvls.evtCompletion, UCC_EE_CUDA_STREAM);
 
     ucc_tl_cuda_task_put(tl_task);
     return UCC_OK;
@@ -239,8 +242,11 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
         return status;
     }
 
-    CUDA_CHECK(cudaEventCreateWithFlags(&task->allreduce_nvls.evtCompletion,
-                                        cudaEventDisableTiming));
+    status = ucc_ec_create_event(&task->allreduce_nvls.evtCompletion, UCC_EE_CUDA_STREAM);
+    if (ucc_unlikely(status != UCC_OK)) {
+        ucc_tl_cuda_task_put(task);
+        return status;
+    }
 
     task->allreduce_nvls.dt = coll_args->args.dst.info.datatype;
 

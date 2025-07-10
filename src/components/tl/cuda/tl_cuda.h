@@ -300,7 +300,7 @@ struct ucc_tl_cuda_task {
             void          *sbuf;
             void          *rbuf;
             size_t         buf_size_bytes;
-            cudaEvent_t    evtCompletion;
+            void          *evtCompletion;
         } allreduce_nvls;
     };
 };
