@@ -267,8 +267,8 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     if (tl_team->mcast_state != TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE) {
         mcast_status = ucc_tl_mlx5_mcast_team_test(team);
         if (mcast_status < 0) {
-            tl_warn(team->context->lib, "MCAST tl team: %p creation failed %d",
-                    team, mcast_status);
+            tl_mlx5_mcast_log(ctx->mcast.mcast_enabled, team->context->lib, UCC_LOG_LEVEL_WARN,
+                              "MCAST tl team: %p creation failed %d", team, mcast_status);
             tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE;
         }
     }
@@ -320,13 +320,15 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *tl_team,
     team_info.supported_mem_types = mt;
     team_info.supported_colls =
         (UCC_COLL_TYPE_ALLTOALL * (team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_READY)) |
-        (UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_ALLGATHER) *
-        (team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_READY);
+        (UCC_COLL_TYPE_BCAST * (team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_READY &&
+         tl_ctx->mcast.mcast_bcast_enabled)) |
+        (UCC_COLL_TYPE_ALLGATHER * (team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_READY &&
+         tl_ctx->mcast.mcast_allgather_enabled));
     team_info.size                = UCC_TL_TEAM_SIZE(team);
 
     status = ucc_coll_score_build_default(
         tl_team, UCC_TL_MLX5_DEFAULT_SCORE, ucc_tl_mlx5_coll_init,
-        UCC_TL_MLX5_SUPPORTED_COLLS, mt, 2, &score);
+        team_info.supported_colls, mt, 2, &score);
     if (UCC_OK != status) {
         tl_debug(lib, "failed to build score map");
         return status;

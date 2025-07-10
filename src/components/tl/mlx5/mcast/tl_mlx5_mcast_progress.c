@@ -29,7 +29,9 @@ static ucc_status_t ucc_tl_mlx5_mcast_reliability_send_completion(ucc_tl_mlx5_mc
         comm->bcast_comm.p2p_pkt[pkt_id].type = MCAST_P2P_ACK;
         comm->bcast_comm.nack_requests--;
         status = comm->params.p2p_iface.recv_nb(&comm->bcast_comm.p2p_pkt[pkt_id],
-                                                sizeof(struct packet), comm->bcast_comm.p2p_pkt[pkt_id].from, UCC_MEMORY_TYPE_HOST,
+                                                sizeof(struct packet),
+                                                comm->bcast_comm.p2p_pkt[pkt_id].from,
+                                                UCC_MEMORY_TYPE_HOST,
                                                 comm->p2p_ctx, GET_COMPL_OBJ(comm,
                                                 ucc_tl_mlx5_mcast_recv_completion, pkt_id, NULL));
         if (status <  0) {
@@ -357,9 +359,11 @@ ucc_status_t ucc_tl_mlx5_mcast_prepare_reliable(ucc_tl_mlx5_mcast_coll_comm_t *c
                              comm->rank, child, comm->bcast_comm.child_n, comm->psn);
 
                     status = comm->params.p2p_iface.recv_nb(&comm->bcast_comm.p2p_pkt[comm->bcast_comm.child_n - 1],
-                                                            sizeof(struct packet), child, UCC_MEMORY_TYPE_HOST,
+                                                            sizeof(struct packet), child,
+                                                            UCC_MEMORY_TYPE_HOST,
                                                             comm->p2p_ctx, GET_COMPL_OBJ(comm,
-                                                            ucc_tl_mlx5_mcast_recv_completion, comm->bcast_comm.child_n - 1, req));
+                                                            ucc_tl_mlx5_mcast_recv_completion,
+                                                            comm->bcast_comm.child_n - 1, req));
                     if (status <  0) {
                         return status;
                     }

@@ -232,11 +232,11 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
             }
             if (comm->one_sided.recvd_pkts_tracker[source_rank] > req->num_packets) {
                 tl_error(comm->lib, "reliability failed: comm->one_sided.recvd_pkts_tracker[%d] %d"
-                        " req->num_packets %d offset %d"
-                        " comm->allgather_comm.under_progress_counter %d req->ag_counter"
-                        " %d \n", source_rank, comm->one_sided.recvd_pkts_tracker[source_rank],
-                        req->num_packets, offset,
-                        comm->allgather_comm.under_progress_counter, req->ag_counter);
+                         " req->num_packets %d offset %d"
+                         " comm->allgather_comm.under_progress_counter %d req->ag_counter"
+                         " %d \n", source_rank, comm->one_sided.recvd_pkts_tracker[source_rank],
+                         req->num_packets, offset,
+                         comm->allgather_comm.under_progress_counter, req->ag_counter);
                 return UCC_ERR_NO_MESSAGE;
             }
             if (comm->allgather_comm.truly_zero_copy_allgather_enabled ||
@@ -280,40 +280,40 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_drain_recv_wr(ucc_tl_mlx5_mcast_col
 
     /* set the qp state to ERR to flush the posted recv buffers */
     if (ibv_modify_qp(comm->mcast.groups[qp_id].qp, &attr, IBV_QP_STATE)) {
-        tl_error(ctx->lib, "failed to move mcast qp to ERR, errno %d", errno);
+        tl_error(comm->lib, "failed to move mcast qp to ERR, errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
     attr.qp_state = IBV_QPS_RESET;
     if (ibv_modify_qp(comm->mcast.groups[qp_id].qp, &attr, IBV_QP_STATE)) {
-        tl_error(ctx->lib, "failed to move mcast qp to RESET, errno %d", errno);
+        tl_error(comm->lib, "failed to move mcast qp to RESET, errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
     attr.qp_state = IBV_QPS_INIT;
     if (ibv_modify_qp(comm->mcast.groups[qp_id].qp, &attr,
                       IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_QKEY)) {
-        tl_error(ctx->lib, "failed to move mcast qp to INIT, errno %d", errno);
+        tl_error(comm->lib, "failed to move mcast qp to INIT, errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
     attr.qp_state = IBV_QPS_RTR;
     if (ibv_modify_qp(comm->mcast.groups[qp_id].qp, &attr, IBV_QP_STATE)) {
-        tl_error(ctx->lib, "failed to modify QP to RTR, errno %d", errno);
+        tl_error(comm->lib, "failed to modify QP to RTR, errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
     attr.qp_state = IBV_QPS_RTS;
     attr.sq_psn   = DEF_PSN;
     if (ibv_modify_qp(comm->mcast.groups[qp_id].qp, &attr, IBV_QP_STATE | IBV_QP_SQ_PSN)) {
-        tl_error(ctx->lib, "failed to modify QP to RTS, errno %d", errno);
+        tl_error(comm->lib, "failed to modify QP to RTS, errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
     if (ibv_attach_mcast(comm->mcast.groups[qp_id].qp, &comm->mcast.groups[qp_id].mgid,
                          comm->mcast.groups[qp_id].lid)) {
-        tl_error(ctx->lib, "failed to attach QP %d to the mcast group with mcast_lid %d, errno %d",
-                 qp_id, errno, comm->mcast.groups[qp_id].lid);
+        tl_error(comm->lib, "failed to attach QP %d to the mcast group with mcast_lid %d, errno %d",
+                 qp_id, comm->mcast.groups[qp_id].lid, errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
