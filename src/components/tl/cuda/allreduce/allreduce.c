@@ -10,10 +10,12 @@
 
 ucc_base_coll_alg_info_t
     ucc_tl_cuda_allreduce_algs[UCC_TL_CUDA_ALLREDUCE_ALG_LAST + 1] = {
+#ifdef ENABLE_NVLS
         [UCC_TL_CUDA_ALLREDUCE_ALG_NVLS] = {.id =
                                                 UCC_TL_CUDA_ALLREDUCE_ALG_NVLS,
                                             .name = "nvls",
                                             .desc = "NVLINK SHARP allreduce"},
+#endif /* ENABLE_NVLS */
         [UCC_TL_CUDA_ALLREDUCE_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 

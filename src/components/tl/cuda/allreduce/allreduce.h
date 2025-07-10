@@ -11,7 +11,9 @@
 #include "tl_cuda_coll.h"
 
 enum {
+#ifdef ENABLE_NVLS
     UCC_TL_CUDA_ALLREDUCE_ALG_NVLS,
+#endif /* ENABLE_NVLS */
     UCC_TL_CUDA_ALLREDUCE_ALG_LAST
 };
 
