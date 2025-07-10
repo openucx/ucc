@@ -11,23 +11,14 @@ extern "C" {
 #include "utils/arch/cuda_def.h"
 #include "../tl_cuda.h"
 
+#include "nvls.cuh"
+
 #ifdef __cplusplus
 }
 #endif
 
 #define MAX_THREADS 1024
 #define MAX_BLOCKS 10
-
-#define MULTIMEM_ST(val, ptr)                                                  \
-    asm volatile("multimem.st.global.v4.f32 [%0], {%1,%2,%3,%4};" ::"l"(ptr),  \
-                 "r"(val.x), "r"(val.y), "r"(val.z), "r"(val.w)                \
-                 : "memory");
-
-#define MULTIMEM_LD(val, ptr)                                                  \
-    asm("multimem.ld_reduce.global.add.v4.f32 {%0,%1,%2,%3}, [%4];"            \
-        : "=r"(val.x), "=r"(val.y), "=r"(val.z), "=r"(val.w)                   \
-        : "l"(ptr)                                                             \
-        : "memory");
 
 __global__ void __launch_bounds__(MAX_THREADS)
     reduce_scatter_kernel(float *src_addr, float *dst_addr, size_t src_count,

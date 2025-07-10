@@ -7,7 +7,6 @@
 #ifndef UCC_TL_CUDA_ALLREDUCE_KERNEL_H_
 #define UCC_TL_CUDA_ALLREDUCE_KERNEL_H_
 
-#include <cuda_runtime.h>
 #include <cuda.h>
 #include "ucc/api/ucc.h"
 
@@ -24,4 +23,4 @@ ucc_status_t post_allreduce_kernel(cudaStream_t stream, CUdeviceptr src_addr,
 }
 #endif
 
-#endif // UCC_TL_CUDA_ALLREDUCE_KERNEL_H_ 
+#endif // UCC_TL_CUDA_ALLREDUCE_KERNEL_H_

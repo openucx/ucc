@@ -8,6 +8,7 @@
 #include <ucc/api/ucc.h>
 
 #include "utils/arch/cuda_def.h"
+#include "kernels/reduce_scatter_kernel.h"
 
 #include <cuda_runtime.h>
 #include <cuda.h>
@@ -21,14 +22,6 @@ enum {
     STAGE_BARRIER_START, /*< Kernel is done, waiting for other ranks to finish */
     STAGE_BARRIER_TEST, /*< Kernel is done, waiting for other ranks to finish */
 };
-
-// Kernel is defined in src/components/tl/cuda/kernels/reduce_scatter_kernel.cu
-ucc_status_t post_reduce_scatter_kernel(cudaStream_t stream,
-                                        CUdeviceptr  src_addr,
-                                        CUdeviceptr  dst_addr,
-                                        size_t       src_size_bytes,
-                                        uint32_t     rank,
-                                        uint32_t     tsize);
 
 ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_start(ucc_coll_task_t *coll_task)
 {
@@ -57,7 +50,7 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_start(ucc_coll_task_t *coll_task)
     task->reduce_scatterv_nvls.dst_size_bytes = dst_size_bytes;
 
     task->reduce_scatterv_nvls.stage = STAGE_COPY;
-   
+
     // copy src buffer to symmetric memory first
     CUDA_CHECK(cudaMemcpyAsync((void *)nvls->uc_va, args->src.info.buffer,
                                src_size_bytes, cudaMemcpyDeviceToDevice,
@@ -85,7 +78,7 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
         if (cuda_status == cudaErrorNotReady) {
             task->super.status = UCC_INPROGRESS;
             return;
-        }   
+        }
         if (cuda_status != cudaSuccess) {
             ucc_error("cudaEventQuery failed %s",
                       cudaGetErrorString(cuda_status));
@@ -169,7 +162,7 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
 ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_finalize(ucc_coll_task_t *task)
 {
     ucc_tl_cuda_task_t *tl_task = ucc_derived_of(task, ucc_tl_cuda_task_t);
-    
+
     CUDA_CHECK(cudaEventDestroy(tl_task->reduce_scatterv_nvls.evtCompletion));
     CUDA_CHECK(cudaEventDestroy(tl_task->reduce_scatterv_nvls.evtCopy));
 
