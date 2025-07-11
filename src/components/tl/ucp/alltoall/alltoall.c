@@ -72,28 +72,23 @@ out:
 }
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
-                                               ucc_base_team_t *team,
-                                               ucc_coll_task_t **task_h)
+                                               ucc_base_team_t      *team,
+                                               ucc_coll_task_t     **task_h)
 {
-    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_task_t *task;
-    ucc_status_t       status;
+    ucc_tl_ucp_team_t  *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_mem_map_memh_t *src_memh = NULL;
+    ucc_mem_map_memh_t *dst_memh = NULL;
+    ucc_status_t        status   = UCC_OK;
+    ucc_tl_ucp_task_t  *task;
 
     ALLTOALL_TASK_CHECK(coll_args->args, tl_team);
 
+    /* memory handles do not support work buffers, so check here */
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER)) {
         tl_error(UCC_TL_TEAM_LIB(tl_team),
                  "global work buffer not provided nor associated with team");
         status = UCC_ERR_NOT_SUPPORTED;
         goto out;
-    }
-    if (coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) {
-        if (!(coll_args->args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS)) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
-                     "non memory mapped buffers are not supported");
-            status = UCC_ERR_NOT_SUPPORTED;
-            goto out;
-        }
     }
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH)) {
         coll_args->args.src_memh.global_memh = NULL;
@@ -103,7 +98,8 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     } else {
         if (!(coll_args->args.flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)) {
             tl_error(UCC_TL_TEAM_LIB(tl_team),
-                "onesided alltoall requires global memory handles for dst buffers");
+                     "onesided alltoall requires global memory handles for dst "
+                     "buffers");
             status = UCC_ERR_INVALID_PARAM;
             goto out;
         }
@@ -113,7 +109,30 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     *task_h              = &task->super;
     task->super.post     = ucc_tl_ucp_alltoall_onesided_start;
     task->super.progress = ucc_tl_ucp_alltoall_onesided_progress;
-    status               = UCC_OK;
+
+    if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS)) {
+        if (!(coll_args->args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS)) {
+            if (!(coll_args->args.mask &
+                  UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH) ||
+                !(coll_args->args.mask &
+                  UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH)) {
+                status = ucc_tl_ucp_coll_dynamic_segment_init(
+                    &coll_args->args, &src_memh, &dst_memh, task);
+                if (UCC_OK != status) {
+                    tl_error(UCC_TL_TEAM_LIB(tl_team),
+                             "failed to initialize dynamic segments");
+                    goto out;
+                }
+
+                TASK_ARGS(task).src_memh.local_memh = src_memh;
+                TASK_ARGS(task).dst_memh.local_memh = dst_memh;
+                TASK_ARGS(task).mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH |
+                                        UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH;
+                TASK_ARGS(task).flags |= UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL |
+                                         UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL;
+            }
+        }
+    }
 out:
     return status;
 }

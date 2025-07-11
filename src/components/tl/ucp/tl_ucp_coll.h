@@ -545,4 +545,18 @@ static inline unsigned ucc_tl_ucp_get_knomial_radix(ucc_tl_ucp_team_t *team,
     return radix;
 }
 
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t *coll_args,
+                                                  ucc_mem_map_memh_t **src_map,
+                                                  ucc_mem_map_memh_t **dst_map,
+                                                  ucc_tl_ucp_task_t   *task);
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_exchange(
+    ucc_tl_ucp_task_t *task, ucc_mem_map_memh_t *src_map,
+    ucc_mem_map_memh_t *dst_map, ucc_mem_map_memh_t **global_src_map,
+    ucc_mem_map_memh_t **global_dst_map);
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(
+    ucc_tl_ucp_task_t *task, ucc_mem_map_memh_t **global_src_map,
+    ucc_mem_map_memh_t **global_dst_map, int team_size);
+
 #endif
