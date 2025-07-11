@@ -688,7 +688,7 @@ static ucc_status_t ucc_coll_score_parse_str(const char *str,
         }
         /* if we get there then we could not match token to any field */
         status = UCC_ERR_INVALID_PARAM;
-
+        ucc_error("failed to parse token \'%s\' in \'%s\'", tokens[i], str);
         //TODO add parsing of msg ranges and team size ranges
         goto out;
     }

@@ -226,24 +226,26 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
 
     if (coll_args->args.op != UCC_OP_SUM ||
         coll_args->args.dst.info.datatype != UCC_DT_FLOAT32) {
-        ucc_debug("NVLS allreduce is supported only with SUM operation "
+        ucc_error("NVLS allreduce is supported only with SUM operation "
                   "and float32 datatype");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_connected(team->topo))) {
-        ucc_debug("NVLS allreduce is supported only on fully connected "
+        ucc_error("NVLS allreduce is supported only on fully connected "
                   "NVLINK systems");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     status = ucc_tl_cuda_task_init(coll_args, team, &task);
     if (ucc_unlikely(status != UCC_OK)) {
+        ucc_error("failed to initialize CUDA task");
         return status;
     }
 
     status = ucc_ec_create_event(&task->allreduce_nvls.evtCompletion, UCC_EE_CUDA_STREAM);
     if (ucc_unlikely(status != UCC_OK)) {
+        ucc_error("failed to create CUDA event");
         ucc_tl_cuda_task_put(task);
         return status;
     }

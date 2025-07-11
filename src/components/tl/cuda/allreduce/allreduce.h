@@ -21,7 +21,7 @@ extern ucc_base_coll_alg_info_t
     ucc_tl_cuda_allreduce_algs[UCC_TL_CUDA_ALLREDUCE_ALG_LAST + 1];
 
 #ifdef HAVE_NVLS
-#define UCC_TL_CUDA_ALLREDUCE_DEFAULT_ALG_SELECT_STR "allreduce:nvls:@0"
+#define UCC_TL_CUDA_ALLREDUCE_DEFAULT_ALG_SELECT_STR "allreduce:cuda:@0"
 #else
 #define UCC_TL_CUDA_ALLREDUCE_DEFAULT_ALG_SELECT_STR ""
 #endif /* HAVE_NVLS */
