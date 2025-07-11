@@ -28,16 +28,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
 {
     ucc_tl_cuda_context_config_t *tl_cuda_config =
         ucc_derived_of(config, ucc_tl_cuda_context_config_t);
-    ucc_tl_cuda_lib_t *lib =
-        ucc_derived_of(params->context->lib, ucc_tl_cuda_lib_t);
-    ucc_status_t status;
-    int num_devices;
-    cudaError_t cuda_st;
-    CUcontext cu_ctx;
-    CUresult cu_st;
+    ucc_status_t       status;
+    ucc_tl_cuda_lib_t *lib;
+    int                num_devices;
+    cudaError_t        cuda_st;
+    CUcontext          cu_ctx;
+    CUresult           cu_st;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_cuda_config->super,
                               params->context);
+    lib = ucc_derived_of(self->super.super.lib, ucc_tl_cuda_lib_t);
     memcpy(&self->cfg, tl_cuda_config, sizeof(*tl_cuda_config));
 
     cuda_st = cudaGetDeviceCount(&num_devices);
@@ -130,14 +130,14 @@ ucc_status_t ucc_tl_cuda_memh_pack(const ucc_base_context_t *context, /* NOLINT 
 
 /**
  * @brief Cleanup function for CUDA TL context
- * 
+ *
  * This function is responsible for cleaning up resources associated with a CUDA TL context.
  * It performs the following operations:
  * 1. Logs the context finalization with debug information
  * 2. Destroys the IPC cache hash table if it exists
  * 3. Cleans up topology if it's context-specific (not cached)
  * 4. Cleans up the request memory pool
- * 
+ *
  * @param self Pointer to the CUDA TL context structure to be cleaned up
  */
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_context_t)
