@@ -54,7 +54,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_resend_packet_reliable(ucc_tl_mlx5_
     ucc_assert(comm->bcast_comm.p2p_pkt[p2p_pkt_id].type == MCAST_P2P_NEED_NACK_SEND);
 
     comm->bcast_comm.p2p_pkt[p2p_pkt_id].type = MCAST_P2P_NACK_SEND_PENDING;
-    
+
     tl_trace(comm->lib, "[comm %d, rank %d] Send data NACK: to %d, psn %d, context %ld nack_requests %d \n",
                          comm->comm_id, comm->rank,
                          comm->bcast_comm.p2p_pkt[p2p_pkt_id].from, psn, pp->context, comm->bcast_comm.nack_requests);
@@ -128,7 +128,7 @@ static inline int ucc_tl_mlx5_mcast_find_nack_psn(ucc_tl_mlx5_mcast_coll_comm_t*
     }
 
     ucc_assert(psn < max_search_psn);
-    
+
     return psn;
 }
 
@@ -166,7 +166,7 @@ static ucc_status_t ucc_tl_mlx5_mcast_recv_data_completion(ucc_tl_mlx5_mcast_p2p
 
     req->to_recv--;
     comm->r_window[pp->psn % comm->bcast_comm.wsize] = pp;
-    
+
     status = ucc_tl_mlx5_mcast_check_nack_requests(comm, pp->psn);
     if (status < 0) {
         return status;
@@ -204,12 +204,16 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable_send_NACK(ucc_tl_mlx5_mcas
     if (status <  0) {
         return status;
     }
-   
+
     tl_trace(comm->lib, "[comm %d, rank %d] Sent NAK : parent %d, psn %d",
              comm->comm_id, comm->rank, parent, psn);
 
     // Prepare to obtain the data.
-    pp         = ucc_tl_mlx5_mcast_buf_get_free(comm);
+    pp = ucc_tl_mlx5_mcast_buf_get_free(comm);
+    if (ucc_unlikely(pp == NULL)) {
+        tl_error(comm->lib, "failed to get free buffer for NACK");
+        return UCC_ERR_NO_MEMORY;
+    }
     pp->psn    = psn;
     pp->length = PSN_TO_RECV_LEN(pp->psn, req, comm);
 
@@ -248,7 +252,7 @@ ucc_status_t ucc_tl_mlx5_mcast_reliable_send(ucc_tl_mlx5_mcast_coll_comm_t *comm
         comm->bcast_comm.p2p_spkt[i].type    = MCAST_P2P_ACK;
         comm->bcast_comm.p2p_spkt[i].psn     = comm->bcast_comm.last_acked + comm->bcast_comm.wsize;
         comm->bcast_comm.p2p_spkt[i].comm_id = comm->comm_id;
-        
+
         tl_trace(comm->lib, "rank %d, Posting SEND to parent %d, n_parent %d,  psn %d",
                  comm->rank, parent, comm->bcast_comm.parent_n, comm->psn);
 
@@ -278,7 +282,7 @@ static ucc_status_t ucc_tl_mlx5_mcast_recv_completion(ucc_tl_mlx5_mcast_p2p_comp
         ucc_assert(comm->bcast_comm.p2p_pkt[pkt_id].type == MCAST_P2P_NACK);
         psn = comm->bcast_comm.p2p_pkt[pkt_id].psn;
         pp  = comm->r_window[psn % comm->bcast_comm.wsize];
-        
+
         tl_trace(comm->lib, "[comm %d, rank %d] Got NACK: from %d, psn %d, avail %d pkt_id %d",
                              comm->comm_id, comm->rank,
                              comm->bcast_comm.p2p_pkt[pkt_id].from, psn, pp->psn == psn, pkt_id);
@@ -307,7 +311,7 @@ static ucc_status_t ucc_tl_mlx5_mcast_recv_completion(ucc_tl_mlx5_mcast_p2p_comp
 static ucc_status_t ucc_tl_mlx5_mcast_send_completion(ucc_tl_mlx5_mcast_p2p_completion_obj_t *obj)
 {
     ucc_tl_mlx5_mcast_coll_comm_t *comm = (ucc_tl_mlx5_mcast_coll_comm_t*)obj->data[0];
- 
+
     comm->bcast_comm.sacks_n++;
     ucc_mpool_put(obj);
     return UCC_OK;
@@ -316,13 +320,13 @@ static ucc_status_t ucc_tl_mlx5_mcast_send_completion(ucc_tl_mlx5_mcast_p2p_comp
 static inline int add_uniq(ucc_rank_t *arr, uint32_t *len, ucc_rank_t value)
 {
     int i;
-    
+
     for (i=0; i<(*len); i++) {
         if (arr[i] == value) {
             return 0;
         }
     }
-    
+
     arr[*len] = value;
     (*len)++;
     return 1;

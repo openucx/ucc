@@ -86,6 +86,7 @@ static int cmp_files(char *f1, char *f2)
     }
 
     if (fclose(fp2) != 0) {
+        fclose(fp1);
         return 0;
     }
 close:
@@ -478,14 +479,14 @@ failed:
             return UCC_ERR_NO_RESOURCE;
         }
     }
-    
+
     if (ibv_destroy_srq(comm->mcast.srq)) {
         tl_error(comm->lib, "ibv_destroy_srq failed");
         return UCC_ERR_NO_RESOURCE;
     }
 
     ucc_free(comm->mcast.rc_qp);
-    
+
     return UCC_ERR_NO_RESOURCE;
 }
 
@@ -498,7 +499,7 @@ ucc_status_t ucc_tl_mlx5_mcast_modify_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *c
 
     for (i = 0; i < comm->commsize; i++) {
         memset(&attr, 0, sizeof(attr));
-         
+
         attr.qp_state        = IBV_QPS_INIT;
         attr.pkey_index      = 0;
         attr.port_num        = ctx->ib_port;

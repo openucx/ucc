@@ -38,7 +38,7 @@ void ucc_tl_ucp_gather_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t             tsize     = UCC_TL_TEAM_SIZE(team);
     ucc_rank_t             rank      = UCC_TL_TEAM_RANK(team);
     ucc_rank_t             root      = (ucc_rank_t)args->root;
-    uint32_t               radix     = task->gather_kn.radix;
+    ucc_kn_radix_t         radix     = task->gather_kn.radix;
     ucc_rank_t             vrank     = VRANK(rank, root, tsize);
     ucc_memory_type_t      mtype     = args->src.info.mem_type;
     ucc_status_t           status    = UCC_OK;

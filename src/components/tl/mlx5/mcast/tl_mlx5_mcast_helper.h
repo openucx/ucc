@@ -413,18 +413,19 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
 
     wc = ucc_malloc(sizeof(struct ibv_wc) * POLL_PACKED, "WC");
     if (!wc) {
-        return -1;
+        recv_progressed = -1;
+        goto exit;
     }
 
     while (num_left >  recv_progressed)
     {
-        memset(wc, 0, sizeof(sizeof(struct ibv_wc) * POLL_PACKED));
+        memset(wc, 0, sizeof(struct ibv_wc) * POLL_PACKED);
         num_comp = ibv_poll_cq(comm->mcast.rcq, POLL_PACKED, &wc[0]);
 
         if (num_comp < 0) {
             tl_error(comm->lib, "recv queue poll completion failed %d", num_comp);
-            ucc_free(wc);
-            return -1;
+            recv_progressed = -1;
+            goto exit;
         } else if (num_comp == 0) {
             break;
         }
@@ -432,7 +433,8 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
         if (IBV_WC_SUCCESS != wc[0].status) {
             tl_error(comm->lib, "mcast_recv: %s err pending_recv %d wr_id %ld num_comp %d byte_len %d\n",
                      ibv_wc_status_str(wc[0].status), comm->pending_recv, wc[0].wr_id, num_comp, wc[0].byte_len);
-            return -1;
+            recv_progressed = -1;
+            goto exit;
         }
 
         real_num_comp = num_comp;
@@ -453,8 +455,8 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
             if (UCC_OK != status) {
                 tl_error(comm->lib, "process mcast packet failed, status %d",
                          status);
-                ucc_free(wc);
-                return -1;
+                recv_progressed = -1;
+                goto exit;
             }
 
             recv_progressed++;
@@ -462,9 +464,14 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
         }
 
         comm->pending_recv -= num_comp;
-        ucc_tl_mlx5_mcast_post_recv_buffers(comm);
+        status = ucc_tl_mlx5_mcast_post_recv_buffers(comm);
+        if (UCC_OK != status) {
+            recv_progressed = -1;
+            goto exit;
+        }
     }
 
+exit:
     ucc_free(wc);
     return recv_progressed;
 }
@@ -535,14 +542,14 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable(ucc_tl_mlx5_mcast_coll_com
                 return status;
             }
         }
-        
+
         if (comm->bcast_comm.parent_n) {
             status = ucc_tl_mlx5_mcast_poll_recv(comm);
             if (UCC_OK != status) {
                 return status;
             }
         }
-        
+
         status = ucc_tl_mlx5_mcast_check_nack_requests(comm, UINT32_MAX);
         if (UCC_OK != status) {
             return status;
