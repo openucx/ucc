@@ -213,6 +213,17 @@ ucc_knomial_pattern_get_base_rank(ucc_knomial_pattern_t *p, ucc_rank_t rank)
     }
 }
 
+/* return the index of rank in the loop assuming smallest rank has index 0 */
+static inline ucc_kn_radix_t
+ucc_knomial_pattern_get_loop_index(ucc_knomial_pattern_t *p, ucc_rank_t rank)
+{
+    ucc_rank_t base_rank = ucc_knomial_pattern_get_base_rank(p, rank);
+    ucc_rank_t rank0 = ucc_knomial_pattern_loop_rank(p, base_rank);
+    ucc_rank_t cur_rank = ucc_knomial_pattern_loop_rank(p, rank);
+
+    return (cur_rank - rank0) / p->radix_pow;
+}
+
 static inline void
 ucc_knomial_pattern_next_iteration(ucc_knomial_pattern_t *p)
 {
