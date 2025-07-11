@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -11,9 +11,6 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 #include "tl_ucp_sendrecv.h"
-
-/* TODO: add as parameters */
-#define NP_THRESH 32
 
 static inline ucc_rank_t get_recv_peer(ucc_rank_t rank, ucc_rank_t size,
                                        ucc_rank_t step)
@@ -27,40 +24,21 @@ static inline ucc_rank_t get_send_peer(ucc_rank_t rank, ucc_rank_t size,
     return (rank - step + size) % size;
 }
 
-static ucc_rank_t get_num_posts(const ucc_tl_ucp_team_t *team)
-{
-    unsigned long posts = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoallv_pairwise_num_posts;
-    ucc_rank_t    tsize = UCC_TL_TEAM_SIZE(team);
-
-    if (posts == UCC_ULUNITS_AUTO) {
-        if (UCC_TL_TEAM_SIZE(team) <= NP_THRESH) {
-            /* use linear algorithm */
-            posts = 0;
-        } else {
-            /* use pairwise algorithm */
-            posts = 1;
-        }
-    }
-
-    posts = (posts > tsize || posts == 0) ? tsize: posts;
-    return posts;
-}
-
 static void ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
-    ptrdiff_t          sbuf  = (ptrdiff_t)TASK_ARGS(task).src.info_v.buffer;
-    ptrdiff_t          rbuf  = (ptrdiff_t)TASK_ARGS(task).dst.info_v.buffer;
+    void              *sbuf  = TASK_ARGS(task).src.info_v.buffer;
+    void              *rbuf  = TASK_ARGS(task).dst.info_v.buffer;
     ucc_memory_type_t  smem  = TASK_ARGS(task).src.info_v.mem_type;
     ucc_memory_type_t  rmem  = TASK_ARGS(task).dst.info_v.mem_type;
     ucc_rank_t         grank = UCC_TL_TEAM_RANK(team);
     ucc_rank_t         gsize = UCC_TL_TEAM_SIZE(team);
     int                polls = 0;
-    ucc_rank_t         peer, nreqs;
+    ucc_rank_t         nreqs = task->alltoallv_pairwise.num_posts;
+    ucc_rank_t         peer;
     size_t             rdt_size, sdt_size, data_size, data_displ;
 
-    nreqs    = get_num_posts(team);
     rdt_size = ucc_dt_size(TASK_ARGS(task).dst.info_v.datatype);
     sdt_size = ucc_dt_size(TASK_ARGS(task).src.info_v.datatype);
     while ((task->tagged.send_posted < gsize ||
@@ -79,7 +57,7 @@ static void ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
                              &TASK_ARGS(task),
                              TASK_ARGS(task).dst.info_v.displacements, peer) *
                          rdt_size;
-            UCPCHECK_GOTO(ucc_tl_ucp_recv_nz((void *)(rbuf + data_displ),
+            UCPCHECK_GOTO(ucc_tl_ucp_recv_nz(PTR_OFFSET(rbuf, data_displ),
                                              data_size, rmem, peer, team, task),
                           task, out);
             polls = 0;
@@ -96,7 +74,7 @@ static void ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
                              &TASK_ARGS(task),
                              TASK_ARGS(task).src.info_v.displacements, peer) *
                          sdt_size;
-            UCPCHECK_GOTO(ucc_tl_ucp_send_nz((void *)(sbuf + data_displ),
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nz(PTR_OFFSET(sbuf, data_displ),
                                              data_size, smem, peer, team, task),
                           task, out);
             polls = 0;
