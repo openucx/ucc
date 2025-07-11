@@ -144,6 +144,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([DOCS_ONLY], [true])
      AM_CONDITIONAL([HAVE_GTEST], [false])
      AM_CONDITIONAL([HAVE_CXX11], [false])
+     AM_CONDITIONAL([HAVE_CXX17], [false])
      AM_CONDITIONAL([HAVE_GNUXX11], [false])
      AM_CONDITIONAL([HAVE_GLIBCXX_NOTHROW], [false])
      AM_CONDITIONAL([HAVE_AARCH64_THUNDERX2], [false])

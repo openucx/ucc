@@ -1,24 +1,32 @@
 #
-# Copyright (c) 2001-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2001-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # See file LICENSE for terms.
 #
 
 CUDA_MIN_REQUIRED_MAJOR=11
 CUDA_MIN_REQUIRED_MINOR=0
 
-ARCH7="-gencode=arch=compute_52,code=sm_52"
-ARCH8="-gencode=arch=compute_60,code=sm_60 \
--gencode=arch=compute_61,code=sm_61 \
--gencode=arch=compute_61,code=compute_61"
-ARCH9="-gencode=arch=compute_70,code=sm_70 \
--gencode=arch=compute_70,code=compute_70"
-ARCH10="-gencode=arch=compute_75,code=sm_75"
-ARCH110="-gencode=arch=compute_80,code=sm_80 \
--gencode=arch=compute_80,code=compute_80"
-ARCH111="-gencode=arch=compute_86,code=sm_86 \
--gencode=arch=compute_86,code=compute_86"
-ARCH120="-gencode=arch=compute_90,code=sm_90 \
--gencode=arch=compute_90,code=compute_90"
+ARCH7_CODE="-gencode=arch=compute_52,code=sm_52"
+ARCH8_CODE="-gencode=arch=compute_60,code=sm_60 -gencode=arch=compute_61,code=sm_61"
+ARCH9_CODE="-gencode=arch=compute_70,code=sm_70"
+ARCH10_CODE="-gencode=arch=compute_75,code=sm_75"
+ARCH110_CODE="-gencode=arch=compute_80,code=sm_80"
+ARCH111_CODE="-gencode=arch=compute_86,code=sm_86"
+ARCH120_CODE="-gencode=arch=compute_90,code=sm_90"
+ARCH124_CODE="-gencode=arch=compute_89,code=sm_89"
+ARCH128_CODE="-gencode=arch=compute_100,code=sm_100 -gencode=arch=compute_120,code=sm_120"
+ARCH130_CODE="-gencode=arch=compute_110,code=sm_110"
+
+
+ARCH8_PTX="-gencode=arch=compute_61,code=compute_61"
+ARCH9_PTX="-gencode=arch=compute_70,code=compute_70"
+ARCH10_PTX=""
+ARCH110_PTX="-gencode=arch=compute_80,code=compute_80"
+ARCH111_PTX="-gencode=arch=compute_86,code=compute_86"
+ARCH120_PTX="-gencode=arch=compute_90,code=compute_90"
+ARCH124_PTX="-gencode=arch=compute_90,code=compute_90"
+ARCH128_PTX="-gencode=arch=compute_120,code=compute_120"
+ARCH130_PTX="-gencode=arch=compute_120,code=compute_120"
 
 AC_DEFUN([CHECK_CUDA],[
 AS_IF([test "x$cuda_checked" != "xyes"],
@@ -103,19 +111,36 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                 AS_IF([test $CUDA_MAJOR_VERSION -lt $CUDA_MIN_REQUIRED_MAJOR],
                       [AC_MSG_WARN([Minimum required CUDA version: $CUDA_MIN_REQUIRED_MAJOR.$CUDA_MIN_REQUIRED_MINOR])
                        cuda_happy=no])])
-         AS_IF([test "x$enable_debug" = xyes],
-               [NVCC_CFLAGS="$NVCC_CFLAGS -O0 -g"],
-               [NVCC_CFLAGS="$NVCC_CFLAGS -O3 -g -DNDEBUG"])
+
+# Check if CUDA version is 13 or higher, which requires C++17 support.
+# If the compiler supports C++17, add the flag to NVCC_CFLAGS. If not, warn the user but still add the flag (build may fail).
+
+         AS_IF([test "x$cuda_happy" = "xyes"],
+               [AS_IF([test $CUDA_MAJOR_VERSION -ge 13],
+                      [AS_IF([test "x$cxx17_happy" = "xyes"],
+                             [NVCC_CFLAGS="$NVCC_CFLAGS -std=c++17"],
+                             [AC_MSG_WARN([CUDA $CUDA_MAJOR_VERSION.$CUDA_MINOR_VERSION requires C++17 but compiler does not support it. Build may fail.])
+                              NVCC_CFLAGS="$NVCC_CFLAGS -std=c++17"])])])
+
          AS_IF([test "x$cuda_happy" = "xyes"],
                [AS_IF([test "x$with_nvcc_gencode" = "xdefault"],
+                      [AS_IF([test $CUDA_MAJOR_VERSION -eq 13],
+                             # offline compilation support for architectures before '<compute/sm/lto>_75' is discontinued
+                             [NVCC_ARCH="${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH124_CODE} ${ARCH128_CODE} ${ARCH130_CODE} ${ARCH130_PTX}"],
                       [AS_IF([test $CUDA_MAJOR_VERSION -eq 12],
-                             [NVCC_ARCH="${ARCH7} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH110} ${ARCH111} ${ARCH120}"],
-                             [AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
-                                   [AS_IF([test $CUDA_MINOR_VERSION -lt 1],
-                                           [NVCC_ARCH="${ARCH7} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH110}"],
-                                           [NVCC_ARCH="${ARCH7} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH110} ${ARCH111}"])])])],
+                              [AS_IF([test $CUDA_MINOR_VERSION -ge 8],
+                                    [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH124_CODE} ${ARCH128_CODE} ${ARCH128_PTX}"],
+                              [AS_IF([test $CUDA_MINOR_VERSION -ge 4],
+                                    [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH124_CODE} ${ARCH124_PTX}"],
+                                    [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH120_PTX}"])])],
+                      [AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
+                              [AS_IF([test $CUDA_MINOR_VERSION -lt 1],
+                                    [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH110_PTX}"],
+                                    [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH111_PTX}"])])])])],
                       [NVCC_ARCH="$with_nvcc_gencode"])
                 AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])])
+
+
          LDFLAGS="$save_LDFLAGS"
          CPPFLAGS="$save_CPPFLAGS"
          LDFLAGS="$save_LDFLAGS"
