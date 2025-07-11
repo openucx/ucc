@@ -24,8 +24,6 @@ enum {
     STAGE_BARRIER_TEST,        /*< Test barrier after kernel */
     STAGE_COPY_POST,           /*< Copy result buffer from symmetric memory to dst buffer */
     STAGE_COPY_POST_WAIT,      /*< Wait for the copy to complete */
-    STAGE_COPY_POST_BAR_START, /*< Start barrier after copy */
-    STAGE_COPY_POST_BAR_TEST   /*< Test barrier after copy */
 };
 
 ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
@@ -182,25 +180,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             task->super.status = UCC_INPROGRESS;
             return;
         }
-        task->allreduce_nvls.stage = STAGE_COPY_POST_BAR_START;
-        // fallthrough
-    case STAGE_COPY_POST_BAR_START:
-        status = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
-        if (status != UCC_OK) {
-            ucc_error("allreduce barrier start failed");
-            task->super.status = status;
-            return;
-        }
-        task->allreduce_nvls.stage = STAGE_COPY_POST_BAR_TEST;
-        // fallthrough
-    case STAGE_COPY_POST_BAR_TEST:
-        status = ucc_tl_cuda_shm_barrier_test(trank, task->bar);
-        if (status != UCC_OK) {
-            task->super.status = status;
-            return;
-        }
         task->super.status = UCC_OK;
-        ucc_trace("allreduce kernel is completed");
         break;
     }
     return;
