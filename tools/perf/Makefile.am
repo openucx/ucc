@@ -34,7 +34,9 @@ ucc_perftest_SOURCES =             \
 	ucc_pt_coll_scatterv.cc        \
 	ucc_pt_op_memcpy.cc            \
 	ucc_pt_op_reduce.cc            \
-	ucc_pt_op_reduce_strided.cc
+	ucc_pt_op_reduce_strided.cc    \
+	generator/ucc_pt_generator_exp.cc        \
+	generator/ucc_pt_generator_file.cc
 
 CXX=$(MPICXX)
 LD=$(MPICXX)

@@ -12,8 +12,9 @@
 
 ucc_pt_op_memcpy::ucc_pt_op_memcpy(ucc_datatype_t dt, ucc_memory_type mt,
                                    int nbufs,
-                                   ucc_pt_comm *communicator) :
-                                   ucc_pt_coll(communicator)
+                                   ucc_pt_comm *communicator,
+                                   ucc_pt_generator_base *generator) :
+                                   ucc_pt_coll(communicator, generator)
 {
     has_inplace_   = false;
     has_reduction_ = false;
@@ -34,17 +35,21 @@ ucc_pt_op_memcpy::ucc_pt_op_memcpy(ucc_datatype_t dt, ucc_memory_type mt,
     num_bufs  = nbufs;
 }
 
-ucc_status_t ucc_pt_op_memcpy::init_args(size_t count,
-                                         ucc_pt_test_args_t &test_args)
+ucc_status_t ucc_pt_op_memcpy::init_args(ucc_pt_test_args_t &test_args)
 {
-    ucc_ee_executor_task_args_t &args = test_args.executor_args;
-    size_t                       size = count * ucc_dt_size(data_type);
+    ucc_ee_executor_task_args_t &args    = test_args.executor_args;
+    size_t                       dt_size = ucc_dt_size(data_type);
+    size_t                       size    = generator->get_src_count() * dt_size;
     ucc_status_t st;
     int i;
 
-    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header, num_bufs * size, mem_type),
+    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header,
+                               num_bufs * size,
+                               mem_type),
                   exit, st);
-    UCCCHECK_GOTO(ucc_pt_alloc(&src_header, num_bufs * size, mem_type),
+    UCCCHECK_GOTO(ucc_pt_alloc(&src_header,
+                               num_bufs * size,
+                               mem_type),
                   free_dst, st);
 
     if (num_bufs == 1) {
@@ -56,9 +61,11 @@ ucc_status_t ucc_pt_op_memcpy::init_args(size_t count,
         args.task_type              = UCC_EE_EXECUTOR_TASK_COPY_MULTI;
         args.copy_multi.num_vectors = num_bufs;
         for (i = 0; i < num_bufs; i++) {
-            args.copy_multi.src[i]    = PTR_OFFSET(src_header->addr, size * i);
-            args.copy_multi.dst[i]    = PTR_OFFSET(dst_header->addr, size * i);
-            args.copy_multi.counts[i] = size;
+            args.copy_multi.src[i]    = PTR_OFFSET(src_header->addr,
+                                                   size * i);
+            args.copy_multi.dst[i]    = PTR_OFFSET(dst_header->addr,
+                                                   size * i);
+            args.copy_multi.counts[i] = generator->get_src_count();
         }
     }
 

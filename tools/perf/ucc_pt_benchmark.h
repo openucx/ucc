@@ -9,16 +9,20 @@
 
 #include "ucc_pt_config.h"
 #include "ucc_pt_coll.h"
+#include "generator/ucc_pt_generator.h"
 #include "ucc_pt_comm.h"
+#include "utils/ucc_coll_utils.h"
 #include <ucc/api/ucc.h>
 
 class ucc_pt_benchmark {
     ucc_pt_benchmark_config config;
     ucc_pt_comm *comm;
     ucc_pt_coll *coll;
+    ucc_pt_generator_base *generator;
 
     void print_header();
-    void print_time(size_t count, ucc_pt_test_args_t args, double time);
+    void print_time(size_t count, ucc_pt_test_args_t args, double time_avg,
+                    double time_min, double time_max);
 public:
     ucc_pt_benchmark(ucc_pt_benchmark_config cfg, ucc_pt_comm *communicator);
     ucc_status_t run_bench() noexcept;

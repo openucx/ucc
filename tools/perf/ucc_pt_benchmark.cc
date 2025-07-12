@@ -10,79 +10,100 @@
 #include "ucc_perftest.h"
 #include "utils/ucc_coll_utils.h"
 #include "core/ucc_ee.h"
+#include "ucc_pt_coll.h"
+#include "generator/ucc_pt_generator.h"
 
 ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
                                    ucc_pt_comm *communicator):
     config(cfg),
     comm(communicator)
 {
+    if (cfg.gen.type == UCC_PT_GEN_TYPE_EXP) {
+        generator = new ucc_pt_generator_exponential(cfg.min_count, cfg.max_count, 2,
+                                                     communicator->get_size(),
+                                                     cfg.op_type);
+    } else if (cfg.gen.type == UCC_PT_GEN_TYPE_FILE) {
+        generator = new ucc_pt_generator_file(cfg.gen.file_name,
+                                              communicator->get_size(),
+                                              communicator->get_rank(),
+                                              cfg.op_type, cfg.gen.nrep);
+        if (cfg.op_type != UCC_PT_OP_TYPE_ALLTOALLV) {
+            throw std::runtime_error("Only ALLTOALLV is supported for file generator");
+        }
+    } else {
+        /* assuming that the generator type is UCC_PT_GEN_TYPE_EXP */
+        generator = new ucc_pt_generator_exponential(cfg.min_count, cfg.max_count, 2,
+                                                     communicator->get_size(),
+                                                     cfg.op_type);
+    }
+
     switch (cfg.op_type) {
     case UCC_PT_OP_TYPE_ALLGATHER:
         coll = new ucc_pt_coll_allgather(cfg.dt, cfg.mt, cfg.inplace,
-                                         cfg.persistent, comm);
+                                         cfg.persistent, comm, generator);
         break;
     case UCC_PT_OP_TYPE_ALLGATHERV:
         coll = new ucc_pt_coll_allgatherv(cfg.dt, cfg.mt, cfg.inplace,
-                                          cfg.persistent, comm);
+                                          cfg.persistent, comm, generator);
         break;
     case UCC_PT_OP_TYPE_ALLREDUCE:
         coll = new ucc_pt_coll_allreduce(cfg.dt, cfg.mt, cfg.op, cfg.inplace,
-                                         cfg.persistent, comm);
+                                         cfg.persistent, comm, generator);
         break;
     case UCC_PT_OP_TYPE_ALLTOALL:
         coll = new ucc_pt_coll_alltoall(cfg.dt, cfg.mt, cfg.inplace,
-                                        cfg.persistent, comm);
+                                        cfg.persistent, comm, generator);
         break;
     case UCC_PT_OP_TYPE_ALLTOALLV:
         coll = new ucc_pt_coll_alltoallv(cfg.dt, cfg.mt, cfg.inplace,
-                                         cfg.persistent, comm);
+                                         cfg.persistent, comm, generator);
         break;
     case UCC_PT_OP_TYPE_BARRIER:
-        coll = new ucc_pt_coll_barrier(comm);
+        coll = new ucc_pt_coll_barrier(comm, generator);
         break;
     case UCC_PT_OP_TYPE_BCAST:
         coll = new ucc_pt_coll_bcast(cfg.dt, cfg.mt, cfg.root_shift,
-                                     cfg.persistent, comm);
+                                     cfg.persistent, comm, generator);
         break;
     case UCC_PT_OP_TYPE_GATHER:
         coll = new ucc_pt_coll_gather(cfg.dt, cfg.mt, cfg.inplace,
-                                      cfg.persistent, cfg.root_shift, comm);
+                                      cfg.persistent, cfg.root_shift, comm, generator);
         break;
     case UCC_PT_OP_TYPE_GATHERV:
         coll = new ucc_pt_coll_gatherv(cfg.dt, cfg.mt, cfg.inplace,
-                                       cfg.persistent, cfg.root_shift, comm);
+                                       cfg.persistent, cfg.root_shift, comm, generator);
         break;
     case UCC_PT_OP_TYPE_REDUCE:
         coll = new ucc_pt_coll_reduce(cfg.dt, cfg.mt, cfg.op, cfg.inplace,
-                                      cfg.persistent, cfg.root_shift, comm);
+                                      cfg.persistent, cfg.root_shift, comm, generator);
         break;
     case UCC_PT_OP_TYPE_REDUCE_SCATTER:
         coll = new ucc_pt_coll_reduce_scatter(cfg.dt, cfg.mt, cfg.op,
                                               cfg.inplace,
-                                              cfg.persistent, comm);
+                                              cfg.persistent, comm, generator);
         break;
     case UCC_PT_OP_TYPE_REDUCE_SCATTERV:
         coll = new ucc_pt_coll_reduce_scatterv(cfg.dt, cfg.mt, cfg.op,
                                                cfg.inplace, cfg.persistent,
-                                               comm);
+                                               comm, generator);
         break;
     case UCC_PT_OP_TYPE_SCATTER:
         coll = new ucc_pt_coll_scatter(cfg.dt, cfg.mt, cfg.inplace,
-                                       cfg.persistent, cfg.root_shift, comm);
+                                       cfg.persistent, cfg.root_shift, comm, generator);
         break;
     case UCC_PT_OP_TYPE_SCATTERV:
         coll = new ucc_pt_coll_scatterv(cfg.dt, cfg.mt, cfg.inplace,
-                                        cfg.persistent, cfg.root_shift, comm);
+                                        cfg.persistent, cfg.root_shift, comm, generator);
         break;
     case UCC_PT_OP_TYPE_MEMCPY:
-        coll = new ucc_pt_op_memcpy(cfg.dt, cfg.mt, cfg.n_bufs, comm);
+        coll = new ucc_pt_op_memcpy(cfg.dt, cfg.mt, cfg.n_bufs, comm, generator);
         break;
     case UCC_PT_OP_TYPE_REDUCEDT:
-        coll = new ucc_pt_op_reduce(cfg.dt, cfg.mt, cfg.op, cfg.n_bufs, comm);
+        coll = new ucc_pt_op_reduce(cfg.dt, cfg.mt, cfg.op, cfg.n_bufs, comm, generator);
         break;
     case UCC_PT_OP_TYPE_REDUCEDT_STRIDED:
         coll = new ucc_pt_op_reduce_strided(cfg.dt, cfg.mt, cfg.op, cfg.n_bufs,
-                                            comm);
+                                            comm, generator);
         break;
     default:
         throw std::runtime_error("not supported collective");
@@ -91,23 +112,26 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
 
 ucc_status_t ucc_pt_benchmark::run_bench() noexcept
 {
-    size_t min_count = coll->has_range() ? config.min_count : 1;
-    size_t max_count = coll->has_range() ? config.max_count : 1;
     ucc_status_t       st;
     ucc_pt_test_args_t args;
     double             time;
+    double             time_min, time_max, time_avg;
+    double             total_time = 0;
 
+    generator->reset();
     print_header();
-    for (size_t cnt = min_count; cnt <= max_count; cnt *= config.mult_factor) {
-        size_t coll_size = cnt * ucc_dt_size(config.dt);
+
+
+    for (generator->reset(); generator->has_next(); generator->next()) {
         int iter = config.n_iter_small;
         int warmup = config.n_warmup_small;
-        if (coll_size >= config.large_thresh) {
+
+        if (generator->get_count_max() >= config.large_thresh) {
             iter = config.n_iter_large;
             warmup = config.n_warmup_large;
         }
         args.coll_args.root = config.root;
-        UCCCHECK_GOTO(coll->init_args(cnt, args), exit_err, st);
+        UCCCHECK_GOTO(coll->init_args(args), exit_err, st);
         if ((uint64_t)config.op_type < (uint64_t)UCC_COLL_TYPE_LAST) {
             UCCCHECK_GOTO(run_single_coll_test(args.coll_args, warmup, iter, time),
                           free_coll, st);
@@ -116,12 +140,23 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
                                                    warmup, iter, time),
                           free_coll, st);
         }
-        print_time(cnt, args, time);
+
+        comm->allreduce(&time, &time_min, 1, UCC_OP_MIN);
+        comm->allreduce(&time, &time_max, 1, UCC_OP_MAX);
+        comm->allreduce(&time, &time_avg, 1, UCC_OP_SUM);
+        time_avg /= comm->get_size();
+        total_time += time_max;
+
+        print_time(generator->get_src_count(), args, time_avg, time_min, time_max);
         coll->free_args(args);
-        if (max_count == 0) {
-            /* exit from loop when min_count == max_count == 0 */
+        if (!coll->has_range()) {
+            /* exit here since collective doesn't have count argument */
             break;
         }
+    }
+
+    if (comm->get_rank() == 0) {
+        std::cout << "Total time: " << total_time / 1000 << " ms" << std::endl;
     }
 
     return UCC_OK;
@@ -342,17 +377,12 @@ void ucc_pt_benchmark::print_header()
 }
 
 void ucc_pt_benchmark::print_time(size_t count, ucc_pt_test_args_t args,
-                                  double time)
+                                  double time_avg,
+                                  double time_min,
+                                  double time_max)
 {
-    double time_us = time;
     size_t size    = count * ucc_dt_size(config.dt);
     int    gsize   = comm->get_size();
-    double time_avg, time_min, time_max;
-
-    comm->allreduce(&time_us, &time_min, 1, UCC_OP_MIN);
-    comm->allreduce(&time_us, &time_max, 1, UCC_OP_MAX);
-    comm->allreduce(&time_us, &time_avg, 1, UCC_OP_SUM);
-    time_avg /= gsize;
 
     if (comm->get_rank() == 0) {
         std::ios iostate(nullptr);
@@ -398,4 +428,5 @@ void ucc_pt_benchmark::print_time(size_t count, ucc_pt_test_args_t args,
 ucc_pt_benchmark::~ucc_pt_benchmark()
 {
     delete coll;
+    delete generator;
 }

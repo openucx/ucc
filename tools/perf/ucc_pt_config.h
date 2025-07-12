@@ -71,6 +71,19 @@ static inline const char* ucc_pt_op_type_str(ucc_pt_op_type_t op)
     return NULL;
 }
 
+typedef enum {
+    UCC_PT_GEN_TYPE_EXP,
+    UCC_PT_GEN_TYPE_FILE
+} ucc_pt_gen_type_t;
+
+struct ucc_pt_gen_config {
+    ucc_pt_gen_type_t type;
+    size_t exp_min;
+    size_t exp_max;
+    std::string file_name;
+    size_t nrep;  // Number of repetitions for file-based generation
+};
+
 struct ucc_pt_benchmark_config {
     ucc_pt_op_type_t   op_type;
     size_t             min_count;
@@ -91,6 +104,7 @@ struct ucc_pt_benchmark_config {
     int                root;
     int                root_shift;
     int                mult_factor;
+    ucc_pt_gen_config  gen;
 };
 
 struct ucc_pt_config {

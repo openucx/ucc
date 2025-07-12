@@ -14,8 +14,9 @@ ucc_pt_op_reduce_strided::ucc_pt_op_reduce_strided(ucc_datatype_t dt,
                                                    ucc_memory_type mt,
                                                    ucc_reduction_op_t op,
                                                    int nbufs,
-                                                   ucc_pt_comm *communicator) :
-                                                   ucc_pt_coll(communicator)
+                                                   ucc_pt_comm *communicator,
+                                                   ucc_pt_generator_base *generator) :
+                                                   ucc_pt_coll(communicator, generator)
 {
     has_inplace_   = false;
     has_reduction_ = true;
@@ -36,12 +37,12 @@ ucc_pt_op_reduce_strided::ucc_pt_op_reduce_strided(ucc_datatype_t dt,
     num_bufs  = nbufs;
 }
 
-ucc_status_t ucc_pt_op_reduce_strided::init_args(size_t count,
-                                                 ucc_pt_test_args_t &test_args)
+ucc_status_t ucc_pt_op_reduce_strided::init_args(ucc_pt_test_args_t &test_args)
 {
-    ucc_ee_executor_task_args_t &args   = test_args.executor_args;
-    size_t                       size   = count * ucc_dt_size(data_type);
-    size_t                       stride = count * ucc_dt_size(data_type);
+    ucc_ee_executor_task_args_t &args    = test_args.executor_args;
+    size_t                       dt_size = ucc_dt_size(data_type);
+    size_t                       size    = generator->get_src_count() * dt_size;
+    size_t                       stride  = generator->get_src_count() * dt_size;
     ucc_status_t st;
 
     UCCCHECK_GOTO(ucc_pt_alloc(&dst_header, size, mem_type), exit, st);
@@ -54,7 +55,7 @@ ucc_status_t ucc_pt_op_reduce_strided::init_args(size_t count,
     args.reduce_strided.src2   = PTR_OFFSET(src_header->addr, size);
     args.reduce_strided.n_src2 = num_bufs - 1;
     args.reduce_strided.stride = stride;
-    args.reduce_strided.count  = count;
+    args.reduce_strided.count  = generator->get_src_count();
     args.reduce_strided.dt     = data_type;
     args.reduce_strided.op     = reduce_op;
     args.flags         = 0;
