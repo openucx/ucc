@@ -170,6 +170,11 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.truly_zero_copy_coll_min_msg),
      UCC_CONFIG_TYPE_UINT},
 
+    {"MCAST_HCA_COPY_ENABLE", "0",
+     "Enable HCA-assisted copy for systems without CUDA API support",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.hca_copy_enabled),
+     UCC_CONFIG_TYPE_BOOL},
+
     {"ALLTOALL_SEND_BATCH_SIZE", "2",
      "Number of blocks that are transposed "
      "on the NIC before being sent as a batch to a remote peer",

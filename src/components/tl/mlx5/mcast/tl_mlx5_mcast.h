@@ -125,6 +125,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm_init_spec {
     int                               truly_zero_copy_bcast_enabled;
     int                               truly_zero_copy_coll_min_msg;
     int                               mcast_prepost_bucket_size;
+    int                               hca_copy_enabled;
     void                             *oob;
 } ucc_tl_mlx5_mcast_coll_comm_init_spec_t;
 
@@ -279,6 +280,7 @@ typedef struct ucc_tl_mlx5_mcast_one_sided_reliability_comm {
     int                                          reliability_enabled;
     int                                          reliability_ready;
     int                                          pending_reads;
+    int                                          hca_copy_enabled;
     enum ucc_tl_mlx5_mcast_one_sided_slot_states slots_state;
     ucc_tl_mlx5_mcast_per_qp_posted_recv_info_t  posted_recv[MAX_GROUP_COUNT];
 } ucc_tl_mlx5_mcast_one_sided_reliability_comm_t;
@@ -365,6 +367,9 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     ucc_tl_mlx5_mcast_bcast_comm_t                  bcast_comm;
     uint32_t                                        truly_zero_copy_coll_min_msg;
     ucc_tl_mlx5_mcast_context_t                    *context;
+    /* Dedicated HCA copy resources - separate from mcast operations */
+    struct ibv_cq                                  *hca_copy_cq;  /* Dedicated CQ for HCA copy */
+    struct ibv_qp                                  *hca_copy_qp;  /* Dedicated QP for HCA copy */
     struct pp_packet                               *r_window[1]; // note: do not add any new variable after here
 } ucc_tl_mlx5_mcast_coll_comm_t;
 
@@ -467,6 +472,10 @@ typedef struct ucc_tl_mlx5_mcast_coll_req {
     ucc_ee_executor_task_t                             *exec_task;
     ucc_coll_task_t                                    *coll_task;
     ucc_status_t (*progress)                           (void *req);
+    /* Scratch buffer for efficient CUDA memory assembly */
+    char                                               *scratch_buf;
+    ucc_mc_buffer_header_t                             *scratch_buf_header;
+    int                                                 scratch_packets_received;
 } ucc_tl_mlx5_mcast_coll_req_t;
 
 typedef struct ucc_tl_mlx5_mcast_oob_p2p_context {
@@ -482,7 +491,7 @@ typedef struct ucc_tl_mlx5_mcast_oob_p2p_context {
 static inline struct pp_packet* ucc_tl_mlx5_mcast_buf_get_free(ucc_tl_mlx5_mcast_coll_comm_t* comm)
 {
     struct pp_packet* pp;
-    
+
     pp = ucc_list_extract_head(&comm->bpool, struct pp_packet, super);
 
     ucc_assert(pp == NULL || pp->context == 0);

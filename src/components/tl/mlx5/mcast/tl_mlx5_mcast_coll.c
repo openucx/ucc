@@ -110,7 +110,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_bcast(void *req_handle)
                 num_free_win = wsize - (comm->psn - comm->bcast_comm.last_acked);
             }
         }
-        
+
         status = ucc_tl_mlx5_mcast_prepare_reliable(comm, req, req->root);
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
@@ -458,7 +458,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_zero_copy_pipelined_bcast(void *
         req->barrier_req = NULL;
         req->step++;
         if (comm->one_sided.reliability_enabled) {
-            memset(comm->one_sided.recvd_pkts_tracker, 0, sizeof(int) * comm->commsize);
+            memset(comm->one_sided.recvd_pkts_tracker, 0, comm->commsize * sizeof(uint32_t));
         }
     }
 
@@ -768,16 +768,28 @@ ucc_tl_mlx5_mcast_check_comm_level_cap(ucc_base_coll_args_t *coll_args,
         zero_copy_supported = true;
     }
 
-    if (zero_copy_supported &&
-        (buf_size < comm->truly_zero_copy_coll_min_msg ||
-         buf_size % comm->max_per_packet != 0)) {
-        tl_trace(comm->lib,
-                 "zero-copy requirements not met for collective %s "
-                 "(buf_size: %zu, min_msg: %d, max_packet: %d)",
-                 ucc_coll_type_str(coll_type), buf_size,
-                 comm->truly_zero_copy_coll_min_msg,
-                 comm->max_per_packet);
-        return UCC_ERR_NO_RESOURCE;
+    if (zero_copy_supported) {
+        if (coll_type == UCC_COLL_TYPE_BCAST &&
+            (buf_size < comm->truly_zero_copy_coll_min_msg ||
+             buf_size % comm->max_per_packet != 0)) {
+            tl_trace(comm->lib,
+                     "zero-copy bcast requirements not met "
+                     "(buf_size: %zu, min_msg: %d, max_packet: %d)",
+                     buf_size,
+                     comm->truly_zero_copy_coll_min_msg,
+                     comm->max_per_packet);
+            return UCC_ERR_NO_RESOURCE;
+        } else if (coll_type == UCC_COLL_TYPE_ALLGATHER &&
+                   buf_size >= comm->max_per_packet &&
+                   buf_size % comm->max_per_packet != 0) {
+            /* For allgather, allow small messages (< max_per_packet) and
+             * only enforce packet size multiple for large messages */
+            tl_trace(comm->lib,
+                     "zero-copy allgather requirements not met: "
+                     "large message (>= %d bytes) must be multiple of max_per_packet (%d)",
+                     comm->max_per_packet, comm->max_per_packet);
+            return UCC_ERR_NO_RESOURCE;
+        }
     }
 
     /* Specific checks for CUDA BCAST without zero-copy */
@@ -789,16 +801,6 @@ ucc_tl_mlx5_mcast_check_comm_level_cap(ucc_base_coll_args_t *coll_args,
                  "mcast cuda bcast with size %zu not supported without "
                  "zero copy enabled (max size: %d)",
                  buf_size, CUDA_MEM_MCAST_BCAST_MAX_MSG);
-        return UCC_ERR_NO_RESOURCE;
-    }
-
-    /* Specific checks for CUDA ALLGATHER without zero-copy */
-    if (mem_type == UCC_MEMORY_TYPE_CUDA &&
-        coll_type == UCC_COLL_TYPE_ALLGATHER &&
-        !comm->allgather_comm.truly_zero_copy_allgather_enabled) {
-        tl_trace(comm->lib,
-                 "mcast cuda allgather not supported without zero copy "
-                 "enabled");
         return UCC_ERR_NO_RESOURCE;
     }
 
