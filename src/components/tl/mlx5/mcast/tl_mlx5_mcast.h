@@ -57,6 +57,13 @@ enum ucc_tl_mlx5_mcast_one_sided_reliability_scheme {
 
 #define CUDA_MEM_MCAST_BCAST_MAX_MSG 4096
 
+typedef enum ucc_tl_mlx5_mcast_enable_mode {
+    UCC_TL_MLX5_MCAST_DISABLE = 0,
+    UCC_TL_MLX5_MCAST_FORCE   = 1,
+    UCC_TL_MLX5_MCAST_TRY     = 2,
+    UCC_TL_MLX5_MCAST_MODE_LAST
+} ucc_tl_mlx5_mcast_enable_mode_t;
+
 enum {
     MCAST_PROTO_EAGER,     /* Internal staging buffers */
     MCAST_PROTO_ZCOPY
@@ -156,12 +163,12 @@ typedef struct ucc_tl_mlx5_mcast_rcache_region {
 } ucc_tl_mlx5_mcast_rcache_region_t;
 
 typedef struct ucc_tl_mlx5_mcast_ctx_params {
-    int      mcast_enabled;
-    char    *ib_dev_name;
-    int      print_nack_stats;
-    int      timeout;
-    uint8_t  mcast_bcast_enabled;
-    uint8_t  mcast_allgather_enabled;
+    ucc_tl_mlx5_mcast_enable_mode_t mcast_enabled;
+    char                           *ib_dev_name;
+    int                             print_nack_stats;
+    int                             timeout;
+    int                             mcast_bcast_enabled;
+    int                             mcast_allgather_enabled;
 } ucc_tl_mlx5_mcast_ctx_params_t;
 
 typedef struct ucc_tl_mlx5_mcast_coll_context {
@@ -191,14 +198,14 @@ typedef struct ucc_tl_mlx5_mcast_join_info_t {
 } ucc_tl_mlx5_mcast_join_info_t;
 
 typedef struct ucc_tl_mlx5_mcast_context {
-    ucc_thread_mode_t                  tm;
-    ucc_tl_mlx5_mcast_coll_context_t   mcast_context;
-    ucc_tl_mlx5_mcast_context_config_t cfg;
-    int                                mcast_enabled;
-    int                                mcast_ctx_ready;
-    ucc_tl_mlx5_mcast_oob_ctx_t        oob_ctx;
-    uint8_t                            mcast_bcast_enabled;
-    uint8_t                            mcast_allgather_enabled;
+    ucc_thread_mode_t                   tm;
+    ucc_tl_mlx5_mcast_coll_context_t    mcast_context;
+    ucc_tl_mlx5_mcast_context_config_t  cfg;
+    ucc_tl_mlx5_mcast_enable_mode_t     mcast_enabled;
+    int                                 mcast_ctx_ready;
+    ucc_tl_mlx5_mcast_oob_ctx_t         oob_ctx;
+    int                                 mcast_bcast_enabled;
+    int                                 mcast_allgather_enabled;
 } ucc_tl_mlx5_mcast_context_t;
 
 struct pp_packet {
@@ -633,4 +640,15 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t *mcast_c
 
 
 ucc_status_t ucc_tl_mlx5_mcast_clean_ctx(ucc_tl_mlx5_mcast_coll_context_t *ctx);
+
+/* Conditional logging macro for mcast operations */
+#define tl_mlx5_mcast_log(_mcast_enabled, _lib, _intended_level, _fmt, ...) \
+    do { \
+        if ((_mcast_enabled) == UCC_TL_MLX5_MCAST_FORCE) { \
+            ucc_log_component((_intended_level), (_lib)->log_component, (_fmt), ##__VA_ARGS__); \
+        } else if ((_mcast_enabled) == UCC_TL_MLX5_MCAST_TRY) { \
+            ucc_log_component(UCC_LOG_LEVEL_DEBUG, (_lib)->log_component, (_fmt), ##__VA_ARGS__); \
+        } \
+    } while(0)
+
 #endif
