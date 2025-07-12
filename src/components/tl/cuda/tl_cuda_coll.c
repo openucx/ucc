@@ -12,6 +12,7 @@
 #include "bcast/bcast.h"
 #include "reduce_scatter/reduce_scatter.h"
 #include "reduce_scatterv/reduce_scatterv.h"
+#include "allreduce/allreduce.h"
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 
@@ -37,6 +38,7 @@ const char *
         UCC_TL_CUDA_ALLGATHER_DEFAULT_ALG_SELECT_STR,
         UCC_TL_CUDA_ALLGATHERV_DEFAULT_ALG_SELECT_STR,
         UCC_TL_CUDA_BCAST_DEFAULT_ALG_SELECT_STR,
+        UCC_TL_CUDA_ALLREDUCE_DEFAULT_ALG_SELECT_STR,
         UCC_TL_CUDA_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR,
         UCC_TL_CUDA_REDUCE_SCATTERV_DEFAULT_ALG_SELECT_STR};
 
@@ -86,6 +88,8 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
         return ucc_tl_cuda_reduce_scatter_init(coll_args, team, task_h);
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
         return ucc_tl_cuda_reduce_scatterv_init(coll_args, team, task_h);
+    case UCC_COLL_TYPE_ALLREDUCE:
+        return ucc_tl_cuda_allreduce_init(coll_args, team, task_h);
     case UCC_COLL_TYPE_ALLTOALLV:
         return ucc_tl_cuda_alltoallv_init(coll_args, team, task_h);
     default:
@@ -153,6 +157,8 @@ static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
         return ucc_tl_cuda_allgatherv_alg_from_str(str);
     case UCC_COLL_TYPE_BCAST:
         return ucc_tl_cuda_bcast_alg_from_str(str);
+    case UCC_COLL_TYPE_ALLREDUCE:
+        return ucc_tl_cuda_allreduce_alg_from_str(str);
     default:
         break;
     }
@@ -216,6 +222,22 @@ ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
             break;
         };
         break;
+    case UCC_COLL_TYPE_ALLREDUCE:
+        switch (alg_id) {
+#ifdef HAVE_NVLS
+        case UCC_TL_CUDA_ALLREDUCE_ALG_NVLS:
+            *init = ucc_tl_cuda_allreduce_nvls_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+#else
+        default:
+            status = UCC_ERR_NOT_SUPPORTED;
+            break;
+#endif /* HAVE_NVLS */
+        };
+        break;
     case UCC_COLL_TYPE_REDUCE_SCATTER:
         switch (alg_id) {
         case UCC_TL_CUDA_REDUCE_SCATTER_ALG_AUTO:
@@ -227,9 +249,11 @@ ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
         case UCC_TL_CUDA_REDUCE_SCATTER_ALG_LINEAR:
             *init = ucc_tl_cuda_reduce_scatter_linear_init;
             break;
+#ifdef HAVE_NVLS
         case UCC_TL_CUDA_REDUCE_SCATTER_ALG_NVLS:
             *init = ucc_tl_cuda_reduce_scatter_nvls_init;
             break;
+#endif /* HAVE_NVLS */
         default:
             status = UCC_ERR_INVALID_PARAM;
             break;

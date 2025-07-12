@@ -18,11 +18,11 @@ extern "C" {
 #endif
 
 #define MAX_THREADS 1024
-#define MAX_BLOCKS 10
+#define MAX_BLOCKS 4
 
 __global__ void __launch_bounds__(MAX_THREADS)
-    reduce_scatter_kernel(float *src_addr, float *dst_addr, size_t src_count,
-                          uint32_t rank, uint32_t tsize)
+    allreduce_kernel(float *src_addr, size_t src_count, uint32_t rank,
+                     uint32_t tsize)
 {
     size_t chunk_start = ((int64_t)src_count * (int64_t)rank) / (int64_t)tsize;
     size_t chunk_end =
@@ -35,8 +35,7 @@ __global__ void __launch_bounds__(MAX_THREADS)
          idx += stride) {
         uint4 val;
         MULTIMEM_LD(val, src_addr + idx);
-        float *dst                         = dst_addr + (idx - chunk_start);
-        reinterpret_cast<float4 *>(dst)[0] = *reinterpret_cast<float4 *>(&val);
+        MULTIMEM_ST(val, src_addr + idx);
     }
 
     return;
@@ -46,15 +45,12 @@ __global__ void __launch_bounds__(MAX_THREADS)
 extern "C" {
 #endif
 
-ucc_status_t post_reduce_scatter_kernel(cudaStream_t stream,
-                                        CUdeviceptr  src_addr,
-                                        CUdeviceptr  dst_addr,
-                                        size_t       src_size_bytes,
-                                        uint32_t     rank,
-                                        uint32_t     tsize)
+ucc_status_t post_allreduce_kernel(cudaStream_t stream, CUdeviceptr src_addr,
+                                   size_t src_size_bytes, uint32_t rank,
+                                   uint32_t tsize)
 {
-    reduce_scatter_kernel<<<MAX_BLOCKS, MAX_THREADS, 0, stream>>>(
-        (float *)src_addr, (float *)dst_addr, src_size_bytes / sizeof(float),
+    allreduce_kernel<<<MAX_BLOCKS, MAX_THREADS, 0, stream>>>(
+        (float *)src_addr, src_size_bytes / sizeof(float),
         rank, tsize);
     CUDA_CHECK(cudaGetLastError());
 

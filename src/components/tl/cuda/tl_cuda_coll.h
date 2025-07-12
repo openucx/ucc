@@ -10,7 +10,7 @@
 #include "tl_cuda.h"
 #include "components/mc/ucc_mc.h"
 
-#define UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR 5
+#define UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR 6
 extern const char
     *ucc_tl_cuda_default_alg_select_str[UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR];
 

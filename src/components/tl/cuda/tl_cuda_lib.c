@@ -10,7 +10,7 @@
 UCC_CLASS_INIT_FUNC(ucc_tl_cuda_lib_t, const ucc_base_lib_params_t *params,
                     const ucc_base_config_t *config)
 {
-    const ucc_tl_cuda_lib_config_t *tl_config     =
+    const ucc_tl_cuda_lib_config_t *tl_config =
         ucc_derived_of(config, ucc_tl_cuda_lib_config_t);
     size_t min_scratch_size;
 

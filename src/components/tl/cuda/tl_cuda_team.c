@@ -147,7 +147,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
     if (self->topo) {
         ucc_tl_cuda_team_topo_destroy(self->topo);
     }
-    
+
 #ifdef HAVE_TL_CUDA_NVLS
     // destroy the nvls context
     ucc_tl_cuda_nvls_destroy(self, self->super.super.context);
