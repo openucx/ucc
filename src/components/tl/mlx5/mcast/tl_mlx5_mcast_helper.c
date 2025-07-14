@@ -208,14 +208,15 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_post(ucc_tl_mlx5_mcast_coll_context_t 
 
     dst = inet_ntop(AF_INET6, net_addr, buf, INET6_ADDRSTRLEN);
     if (NULL == dst) {
-        tl_warn(ctx->lib, "inet_ntop failed");
+        tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_WARN, "inet_ntop failed");
         return UCC_ERR_NO_RESOURCE;
     }
 
     tl_debug(ctx->lib, "joining addr: %s is_root %d group %p", buf, is_root, group);
 
     if (rdma_join_multicast(ctx->id, (struct sockaddr*)net_addr, (void *)group)) {
-        tl_warn(ctx->lib, "rdma_join_multicast failed errno %d", errno);
+        tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_WARN,
+                          "rdma_join_multicast failed errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
@@ -230,8 +231,9 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_get_event(ucc_tl_mlx5_mcast_coll_conte
 
     if (rdma_get_cm_event(ctx->channel, event) < 0) {
         if (EINTR != errno) {
-            tl_warn(ctx->lib, "rdma_get_cm_event failed, errno %d %s",
-                    errno, strerror(errno));
+            tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_WARN,
+                              "rdma_get_cm_event failed, errno %d %s",
+                              errno, strerror(errno));
             return UCC_ERR_NO_RESOURCE;
         } else {
             /* need to retry again */
@@ -240,19 +242,21 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_get_event(ucc_tl_mlx5_mcast_coll_conte
     }
 
     if (RDMA_CM_EVENT_MULTICAST_JOIN != (*event)->event) {
-        tl_warn(ctx->lib, "failed to join multicast, unexpected event was"
-                " received: event=%d, str=%s, status=%d",
-                 (*event)->event, rdma_event_str((*event)->event),
-                 (*event)->status);
+        tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_WARN,
+                          "failed to join multicast, unexpected event was"
+                          " received: event=%d, str=%s, status=%d",
+                          (*event)->event, rdma_event_str((*event)->event),
+                          (*event)->status);
         if (rdma_ack_cm_event(*event) < 0) {
-            tl_warn(ctx->lib, "rdma_ack_cm_event failed");
+            tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_WARN,
+                              "rdma_ack_cm_event failed");
         }
         return UCC_ERR_NO_RESOURCE;
     }
 
     dst = inet_ntop(AF_INET6, (*event)->param.ud.ah_attr.grh.dgid.raw, buf, INET6_ADDRSTRLEN);
     if (NULL == dst) {
-        tl_warn(ctx->lib, "inet_ntop failed");
+        tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_WARN, "inet_ntop failed");
         return UCC_ERR_NO_RESOURCE;
     }
 
@@ -285,7 +289,8 @@ ucc_status_t ucc_tl_mlx5_mcast_init_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
         ucc_list_head_init(&comm->one_sided.posted_recv[i].posted_recv_bufs);
         comm->mcast.groups[i].qp = ibv_create_qp(ctx->pd, &qp_init_attr);
         if (!comm->mcast.groups[i].qp) {
-            tl_error(ctx->lib, "Failed to create mcast UD qp index %d, errno %d", i, errno);
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "Failed to create mcast UD qp index %d, errno %d", i, errno);
             goto error;
         }
         if (qp_init_attr.cap.max_inline_data < max_inline) {
@@ -327,7 +332,8 @@ static ucc_status_t ucc_tl_mlx5_mcast_create_ah(ucc_tl_mlx5_mcast_coll_comm_t *c
 
         comm->mcast.groups[i].ah = ibv_create_ah(comm->ctx->pd, &ah_attr);
         if (!comm->mcast.groups[i].ah) {
-            tl_error(comm->lib, "failed to create AH index %d", i);
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "failed to create AH index %d", i);
             goto error;
         }
     }
@@ -338,7 +344,8 @@ error:
     for (j = 0; j < i; j++) {
         ret = ibv_destroy_ah(comm->mcast.groups[j].ah);
         if (ret) {
-            tl_error(comm->lib, "couldn't destroy ah");
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "couldn't destroy ah");
             return UCC_ERR_NO_RESOURCE;
         }
         comm->mcast.groups[j].ah = NULL;
@@ -365,7 +372,8 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
         ctx->pkey_index = 0;
         ibv_query_pkey(ctx->ctx, ctx->ib_port, ctx->pkey_index, &pkey);
         if (!pkey) {
-            tl_warn(ctx->lib, "cannot find valid PKEY");
+            tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_WARN,
+                              "cannot find valid PKEY");
             return UCC_ERR_NO_RESOURCE;
         }
 
@@ -381,27 +389,31 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
 
         if (ibv_modify_qp(comm->mcast.groups[i].qp, &attr,
                           IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_QKEY)) {
-            tl_error(ctx->lib, "failed to move mcast qp to INIT, errno %d", errno);
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "failed to move mcast qp to INIT, errno %d", errno);
             goto error;
         }
 
         if (ibv_attach_mcast(comm->mcast.groups[i].qp, &comm->mcast.groups[i].mgid,
                              comm->mcast.groups[i].lid)) {
-            tl_error(ctx->lib, "failed to attach QP to the mcast group with mcast_lid %d , errno %d",
-                     errno, comm->mcast.groups[i].lid);
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "failed to attach QP to the mcast group with mcast_lid %d , errno %d",
+                              comm->mcast.groups[i].lid, errno);
             goto error;
         }
 
         attr.qp_state = IBV_QPS_RTR;
         if (ibv_modify_qp(comm->mcast.groups[i].qp, &attr, IBV_QP_STATE)) {
-            tl_error(ctx->lib, "failed to modify QP to RTR, errno %d", errno);
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "failed to modify QP to RTR, errno %d", errno);
             goto error;
         }
 
         attr.qp_state = IBV_QPS_RTS;
         attr.sq_psn   = DEF_PSN;
         if (ibv_modify_qp(comm->mcast.groups[i].qp, &attr, IBV_QP_STATE | IBV_QP_SQ_PSN)) {
-            tl_error(ctx->lib, "failed to modify QP to RTS, errno %d", errno);
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "failed to modify QP to RTS, errno %d", errno);
             goto error;
         }
 
@@ -438,13 +450,15 @@ ucc_status_t ucc_tl_mlx5_mcast_create_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *c
 
     comm->mcast.srq = ibv_create_srq(ctx->pd, &srq_init_attr);
     if (!comm->mcast.srq) {
-        tl_error(ctx->lib, "ibv_create_srq() failed");
+        tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_ERROR,
+                          "ibv_create_srq() failed");
         return UCC_ERR_NO_RESOURCE;
     }
 
     comm->mcast.rc_qp = ucc_calloc(1, comm->commsize * sizeof(struct ibv_qp *), "ibv_qp* list");
     if (!comm->mcast.rc_qp) {
-        tl_error(ctx->lib, "failed to allocate memory for ibv_qp*");
+        tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_ERROR,
+                          "failed to allocate memory for ibv_qp*");
         goto failed;
     }
 
@@ -465,7 +479,9 @@ ucc_status_t ucc_tl_mlx5_mcast_create_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *c
 
         comm->mcast.rc_qp[i] = ibv_create_qp(ctx->pd, &qp_init_attr);
         if (!comm->mcast.rc_qp[i]) {
-            tl_error(ctx->lib, "Failed to create mcast RC qp index %d, errno %d", i, errno);
+            tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_ERROR,
+                              "Failed to create mcast RC qp index %d, errno %d",
+                              i, errno);
             goto failed;
         }
     }
@@ -475,13 +491,15 @@ ucc_status_t ucc_tl_mlx5_mcast_create_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *c
 failed:
     for (j=0; j<i; j++) {
         if (ibv_destroy_qp(comm->mcast.rc_qp[j])) {
-            tl_error(comm->lib, "ibv_destroy_qp failed");
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "ibv_destroy_qp failed");
             return UCC_ERR_NO_RESOURCE;
         }
     }
 
     if (ibv_destroy_srq(comm->mcast.srq)) {
-        tl_error(comm->lib, "ibv_destroy_srq failed");
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                          "ibv_destroy_srq failed");
         return UCC_ERR_NO_RESOURCE;
     }
 
@@ -510,7 +528,8 @@ ucc_status_t ucc_tl_mlx5_mcast_modify_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *c
         if (ibv_modify_qp(comm->mcast.rc_qp[i], &attr,
                           IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT |
                           IBV_QP_ACCESS_FLAGS)) {
-            tl_error(ctx->lib, "Failed to move rc qp to INIT, errno %d", errno);
+            tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_ERROR,
+                                         "Failed to move rc qp to INIT, errno %d", errno);
             return UCC_ERR_NO_RESOURCE;
         }
 
@@ -534,7 +553,9 @@ ucc_status_t ucc_tl_mlx5_mcast_modify_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *c
         if (ibv_modify_qp(comm->mcast.rc_qp[i], &attr,
                           IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN
                           | IBV_QP_RQ_PSN | IBV_QP_MAX_DEST_RD_ATOMIC | IBV_QP_MIN_RNR_TIMER)) {
-            tl_error(ctx->lib, "Failed to modify rc QP index %d to RTR, errno %d", i, errno);
+            tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_ERROR,
+                              "Failed to modify rc QP index %d to RTR, errno %d",
+                              i, errno);
             return UCC_ERR_NO_RESOURCE;
         }
 
@@ -549,7 +570,9 @@ ucc_status_t ucc_tl_mlx5_mcast_modify_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *c
         if (ibv_modify_qp(comm->mcast.rc_qp[i], &attr,
                           IBV_QP_STATE | IBV_QP_SQ_PSN | IBV_QP_TIMEOUT |
                           IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY | IBV_QP_MAX_QP_RD_ATOMIC)) {
-            tl_error(ctx->lib, "Failed to modify rc QP index %i to RTS, errno %d", i, errno);
+            tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_ERROR,
+                              "Failed to modify rc QP index %i to RTS, errno %d",
+                              i, errno);
             return UCC_ERR_NO_RESOURCE;
         }
     }
@@ -569,7 +592,8 @@ ucc_status_t ucc_tl_mlx5_leave_mcast_groups(ucc_tl_mlx5_mcast_coll_context_t *ct
         if (comm->mcast.groups[i].mcast_addr.sin6_flowinfo != 0) {
             dst = inet_ntop(AF_INET6, &comm->mcast.groups[i].mcast_addr, buf, INET6_ADDRSTRLEN);
             if (NULL == dst) {
-                tl_error(comm->lib, "inet_ntop failed for group %d during mcast leave group", i);
+                tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                                  "inet_ntop failed for group %d during mcast leave group", i);
                 status = UCC_ERR_NO_RESOURCE;
                 continue;
             }
@@ -577,7 +601,8 @@ ucc_status_t ucc_tl_mlx5_leave_mcast_groups(ucc_tl_mlx5_mcast_coll_context_t *ct
             tl_debug(ctx->lib, "mcast leave: ctx %p, comm %p, dgid: %s group %d", ctx, comm, buf, i);
 
             if (rdma_leave_multicast(ctx->id, (struct sockaddr*)&comm->mcast.groups[i].mcast_addr)) {
-                tl_error(comm->lib, "mcast rmda_leave_multicast failed for group %d", i);
+                tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                                  "mcast rmda_leave_multicast failed for group %d", i);
                 status = UCC_ERR_NO_RESOURCE;
             }
         }
@@ -601,8 +626,9 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
     }
 
     if (UCC_OK != status) {
-        tl_error(comm->lib, "failed to clean mcast team: relibality progress status %d",
-                 status);
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                          "failed to clean mcast team: relibality progress status %d",
+                          status);
         return status;
     }
 
@@ -610,13 +636,15 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
         if (comm->mcast.groups[i].qp) {
             ret = ibv_detach_mcast(comm->mcast.groups[i].qp, &(comm->mcast.groups[i].mgid), comm->mcast.groups[i].lid);
             if (ret) {
-                tl_error(comm->lib, "couldn't detach QP, ret %d, errno %d", ret, errno);
+                tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                                  "couldn't detach QP, ret %d, errno %d", ret, errno);
                 return UCC_ERR_NO_RESOURCE;
             }
 
             ret = ibv_destroy_qp(comm->mcast.groups[i].qp);
             if (ret) {
-                tl_error(comm->lib, "failed to destroy QP %d", ret);
+                tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                                  "failed to destroy QP %d", ret);
                 return UCC_ERR_NO_RESOURCE;
             }
 
@@ -625,7 +653,8 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
         if (comm->mcast.groups[i].ah) {
             ret = ibv_destroy_ah(comm->mcast.groups[i].ah);
             if (ret) {
-                tl_error(comm->lib, "couldn't destroy ah");
+                tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                                  "couldn't destroy ah");
                 return UCC_ERR_NO_RESOURCE;
             }
             comm->mcast.groups[i].ah = NULL;
@@ -634,7 +663,8 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
 
     status = ucc_tl_mlx5_leave_mcast_groups(comm->ctx, comm);
     if (status) {
-        tl_error(comm->lib, "couldn't leave mcast group");
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                          "couldn't leave mcast group");
         return status;
     }
 
@@ -645,7 +675,8 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
     if (comm->mcast.rcq) {
         ret = ibv_destroy_cq(comm->mcast.rcq);
         if (ret) {
-            tl_error(comm->lib, "couldn't destroy rcq");
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "couldn't destroy rcq");
             return UCC_ERR_NO_RESOURCE;
         }
     }
@@ -653,7 +684,8 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
     if (comm->mcast.scq) {
         ret = ibv_destroy_cq(comm->mcast.scq);
         if (ret) {
-            tl_error(comm->lib, "couldn't destroy scq");
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "couldn't destroy scq");
             return UCC_ERR_NO_RESOURCE;
         }
     }
@@ -661,7 +693,8 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
     if (comm->grh_mr) {
         ret = ibv_dereg_mr(comm->grh_mr);
         if (ret) {
-            tl_error(comm->lib, "couldn't destroy grh mr");
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "couldn't destroy grh mr");
             return UCC_ERR_NO_RESOURCE;
         }
     }
@@ -677,7 +710,8 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
     if (comm->pp_mr) {
         ret = ibv_dereg_mr(comm->pp_mr);
         if (ret) {
-            tl_error(comm->lib, "couldn't destroy pp mr");
+            tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                              "couldn't destroy pp mr");
             return UCC_ERR_NO_RESOURCE;
         }
     }

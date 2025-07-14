@@ -40,6 +40,13 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
         return UCC_ERR_NO_RESOURCE;
     }
 
+    /* Check if actual mcast resources are available (they might be NULL in FORCE mode) */
+    if (!mcast_context->ctx || !mcast_context->pd) {
+        tl_mlx5_mcast_log(ctx->mcast_enabled, base_context->lib, UCC_LOG_LEVEL_WARN,
+                              "mcast context resources not available, cannot create mcast team");
+        return UCC_ERR_NO_RESOURCE;
+    }
+
     new_mcast_team = ucc_calloc(1, sizeof(ucc_tl_mlx5_mcast_team_t), "new_mcast_team");
 
     if (!new_mcast_team) {
@@ -121,8 +128,9 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     comm->mcast.rcq = ibv_create_cq(mcast_context->ctx, comm->params.rx_depth, NULL, NULL, 0);
     if (!comm->mcast.rcq) {
-        tl_error(mcast_context->lib, "could not create recv cq, rx_depth %d, errno %d",
-                  comm->params.rx_depth, errno);
+        tl_mlx5_mcast_log(mcast_context->params.mcast_enabled, mcast_context->lib, UCC_LOG_LEVEL_ERROR,
+                          "could not create recv cq, rx_depth %d, errno %d",
+                          comm->params.rx_depth, errno);
         status = UCC_ERR_NO_RESOURCE;
         goto cleanup;
     }
@@ -130,8 +138,9 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     comm->mcast.scq = ibv_create_cq(mcast_context->ctx, comm->params.sx_depth, NULL, NULL, 0);
     if (!comm->mcast.scq) {
         ibv_destroy_cq(comm->mcast.rcq);
-        tl_error(mcast_context->lib, "could not create send cq, sx_depth %d, errno %d",
-                  comm->params.sx_depth, errno);
+        tl_mlx5_mcast_log(mcast_context->params.mcast_enabled, mcast_context->lib, UCC_LOG_LEVEL_ERROR,
+                          "could not create send cq, sx_depth %d, errno %d",
+                          comm->params.sx_depth, errno);
         status = UCC_ERR_NO_RESOURCE;
         goto cleanup;
     }
@@ -197,14 +206,14 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
     ret = posix_memalign((void**)&comm->call_rwr, page_size, sizeof(struct ibv_recv_wr) *
                          comm->params.rx_depth);
     if (ret) {
-        tl_error(comm->ctx->lib, "posix_memalign failed");
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR, "posix_memalign failed");
         return UCC_ERR_NO_MEMORY;
     }
 
     ret = posix_memalign((void**)&comm->call_rsgs, page_size, sizeof(struct ibv_sge) *
                          comm->params.rx_depth * 2);
     if (ret) {
-        tl_error(comm->ctx->lib, "posix_memalign failed");
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR, "posix_memalign failed");
         return UCC_ERR_NO_MEMORY;
     }
 
@@ -216,20 +225,24 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
 
     comm->grh_buf = ucc_malloc(GRH_LENGTH * sizeof(char), "grh");
     if (ucc_unlikely(!comm->grh_buf)) {
-        tl_error(comm->ctx->lib, "failed to allocate grh memory");
-        return status;
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                          "failed to allocate grh memory");
+        status = UCC_ERR_NO_RESOURCE;
+        goto error;
     }
 
     status = ucc_mc_memset(comm->grh_buf, 0, GRH_LENGTH, UCC_MEMORY_TYPE_HOST);
     if (status != UCC_OK) {
-        tl_error(comm->ctx->lib, "could not cuda memset");
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                          "could not cuda memset");
         goto error;
     }
 
     comm->grh_mr = ibv_reg_mr(comm->ctx->pd, comm->grh_buf, GRH_LENGTH,
                               IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
     if (!comm->grh_mr) {
-        tl_error(comm->ctx->lib, "could not register device memory for GRH, errno %d", errno);
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                          "could not register device memory for GRH, errno %d", errno);
         status = UCC_ERR_NO_RESOURCE;
         goto error;
     }
@@ -237,20 +250,23 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
     status = ucc_mc_alloc(&comm->pp_buf_header, buf_size * comm->buf_n, supported_mem_type);
     comm->pp_buf = comm->pp_buf_header->addr;
     if (ucc_unlikely(status != UCC_OK)) {
-        tl_error(comm->ctx->lib, "failed to allocate cuda memory");
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                          "failed to allocate cuda memory");
         goto error;
     }
 
     status = ucc_mc_memset(comm->pp_buf, 0, buf_size * comm->buf_n, supported_mem_type);
     if (status != UCC_OK) {
-        tl_error(comm->ctx->lib, "could not memset");
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                          "could not memset");
         goto error;
     }
 
     comm->pp_mr = ibv_reg_mr(comm->ctx->pd, comm->pp_buf, buf_size * comm->buf_n,
                              IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
     if (!comm->pp_mr) {
-        tl_error(comm->ctx->lib, "could not register pp_buf device mr, errno %d", errno);
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                          "could not register pp_buf device mr, errno %d", errno);
         status = UCC_ERR_NO_RESOURCE;
         goto error;
     }
@@ -258,7 +274,8 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
     ret = posix_memalign((void**) &comm->pp, page_size, sizeof(struct
                          pp_packet) * comm->buf_n);
     if (ret) {
-        tl_error(comm->ctx->lib, "posix_memalign failed");
+        tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
+                          "posix_memalign failed");
         return UCC_ERR_NO_MEMORY;
     }
 
