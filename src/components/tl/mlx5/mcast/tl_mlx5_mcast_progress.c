@@ -147,20 +147,18 @@ static ucc_status_t ucc_tl_mlx5_mcast_recv_data_completion(ucc_tl_mlx5_mcast_p2p
     struct pp_packet               *pp    = (struct pp_packet *)obj->data[1];
     ucc_tl_mlx5_mcast_coll_req_t   *req   = (ucc_tl_mlx5_mcast_coll_req_t *)obj->data[2];
     void                           *dest;
-    ucc_memory_type_t               mem_type;
+    ucc_memory_type_t               dst_mem_type;
+    ucc_memory_type_t               src_mem_type;
 
     tl_trace(comm->lib, "[comm %d, rank %d] Recved data psn %d", comm->comm_id, comm->rank, pp->psn);
 
     dest = req->ptr + PSN_TO_RECV_OFFSET(pp->psn, req, comm);
 
-    if (comm->cuda_mem_enabled) {
-        mem_type = UCC_MEMORY_TYPE_CUDA;
-    } else {
-        mem_type = UCC_MEMORY_TYPE_HOST;
-    }
+    dst_mem_type = comm->cuda_mem_enabled ? UCC_MEMORY_TYPE_CUDA : UCC_MEMORY_TYPE_HOST;
+    src_mem_type = UCC_MEMORY_TYPE_HOST; // staging buffer is always HOST
 
     status = ucc_mc_memcpy(dest, (void*) pp->buf, pp->length,
-                           mem_type, mem_type);
+                           dst_mem_type, src_mem_type);
     if (ucc_unlikely(status != UCC_OK)) {
         tl_error(comm->lib, "failed to copy buffer");
         return status;
@@ -188,7 +186,6 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable_send_NACK(ucc_tl_mlx5_mcas
     struct pp_packet *pp;
     ucc_rank_t        parent;
     struct packet    *p;
-    ucc_memory_type_t mem_type;
 
     p          = ucc_calloc(1, sizeof(struct packet));
     p->type    = MCAST_P2P_NACK;
@@ -221,11 +218,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable_send_NACK(ucc_tl_mlx5_mcas
 
     comm->bcast_comm.recv_drop_packet_in_progress = true;
 
-    if (comm->cuda_mem_enabled) {
-        mem_type = UCC_MEMORY_TYPE_CUDA;
-    } else {
-        mem_type = UCC_MEMORY_TYPE_HOST;
-    }
+    ucc_memory_type_t mem_type = comm->cuda_mem_enabled ? UCC_MEMORY_TYPE_CUDA : UCC_MEMORY_TYPE_HOST;
 
     status = comm->params.p2p_iface.recv_nb((void*) pp->buf,
                                             pp->length, parent, mem_type,
