@@ -71,6 +71,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_nvls_t *nvls      = &team->nvls;
     ucc_ee_h            ee        = task->super.ee;
     cudaStream_t        stream    = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
+    ucc_datatype_t      dt        = task->allreduce_nvls.dt;
 
     ucc_status_t        status;
     cudaError_t         cuda_status;
@@ -109,7 +110,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
     case STAGE_KERNEL_START:
         status = post_allreduce_kernel(stream, nvls->mc_va,
                                        task->allreduce_nvls.buf_size_bytes,
-                                       trank, UCC_TL_TEAM_SIZE(team));
+                                       trank, UCC_TL_TEAM_SIZE(team), dt);
         if (status != UCC_OK) {
             ucc_error("failed to post allreduce kernel");
             task->super.status = status;
@@ -205,9 +206,10 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
     ucc_status_t        status;
 
     if (coll_args->args.op != UCC_OP_SUM ||
-        coll_args->args.dst.info.datatype != UCC_DT_FLOAT32) {
+        (coll_args->args.dst.info.datatype != UCC_DT_FLOAT32 &&
+         coll_args->args.dst.info.datatype != UCC_DT_BFLOAT16)) {
         ucc_error("NVLS allreduce is supported only with SUM operation "
-                  "and float32 datatype");
+                  "and float32 or bfloat16 datatype");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -231,6 +233,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
     }
 
     task->allreduce_nvls.dt = coll_args->args.dst.info.datatype;
+    ucc_debug("NVLS allreduce datatype: %ld", (long)task->allreduce_nvls.dt);
 
     task->super.post     = ucc_tl_cuda_allreduce_nvls_start;
     task->super.progress = ucc_tl_cuda_allreduce_nvls_progress;

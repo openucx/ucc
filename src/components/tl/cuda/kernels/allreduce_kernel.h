@@ -17,7 +17,7 @@ extern "C" {
 // Kernel function declaration
 ucc_status_t post_allreduce_kernel(cudaStream_t stream, CUdeviceptr src_addr,
                                    size_t src_size_bytes, uint32_t rank,
-                                   uint32_t tsize);
+                                   uint32_t tsize, ucc_datatype_t datatype);
 
 #ifdef __cplusplus
 }
