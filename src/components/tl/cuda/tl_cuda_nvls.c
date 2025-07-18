@@ -112,11 +112,13 @@ ucc_tl_cuda_nvls_share_handles(struct ucc_tl_cuda_team *self, int export_handle,
                                  sizeof(export_handle), self->oob.coll_info,
                                  &self->oob_req);
     if (UCC_OK != status) {
+        ucc_error("failed to allgather export handle");
         return status;
     }
 
     while (UCC_OK != (status = self->oob.req_test(self->oob_req))) {
         if (status < 0) {
+            ucc_error("failed to test allgather export handle");
             return status;
         }
     }
@@ -142,7 +144,7 @@ ucc_tl_cuda_nvls_import_handle(struct ucc_tl_cuda_team *self, int export_handle,
 
     peerFd = syscall(SYS_pidfd_getfd, pidFd, export_handle, 0);
     if (peerFd < 0) {
-        ucc_error("failed to get peer fd");
+        ucc_error("failed to get peer fd: %s (errno=%d)", strerror(errno), errno);
         close(pidFd);
         return UCC_ERR_NO_RESOURCE;
     }
@@ -259,6 +261,7 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
         status = ucc_tl_cuda_nvls_create_multicast_object(&mcProp, &mcHandle,
                                                           &export_handle);
         if (status != UCC_OK) {
+            ucc_error("failed to create multicast object");
             goto cleanup;
         }
     }
