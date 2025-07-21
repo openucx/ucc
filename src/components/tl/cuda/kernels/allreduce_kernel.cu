@@ -46,8 +46,8 @@ __global__ void __launch_bounds__(MAX_THREADS)
 }
 
 __global__ void __launch_bounds__(MAX_THREADS)
-    allreduce_kernel_bfloat16(nv_bfloat16 *src_addr, size_t src_count, uint32_t rank,
-                     uint32_t tsize)
+    allreduce_kernel_bfloat16(float *src_addr, size_t src_count, uint32_t rank,
+                              uint32_t tsize)
 {
     size_t chunk_start = ((int64_t)src_count * (int64_t)rank) / (int64_t)tsize;
     size_t chunk_end =
@@ -81,8 +81,9 @@ ucc_status_t post_allreduce_kernel(cudaStream_t stream, CUdeviceptr src_addr,
             rank, tsize);
         break;
     case UCC_DT_BFLOAT16:
+        assert(((uintptr_t)(src_addr) % 8) == 0);
         allreduce_kernel_bfloat16<<<MAX_BLOCKS, MAX_THREADS, 0, stream>>>(
-            (nv_bfloat16 *)src_addr, src_size_bytes / sizeof(nv_bfloat16),
+            (float *)src_addr, src_size_bytes / sizeof(float),
             rank, tsize);
         break;
     default:
