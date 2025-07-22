@@ -35,26 +35,29 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
     ucc_ee_h            ee     = task->super.ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
     ucc_datatype_t      dt     = task->allreduce_nvls.dt;
-
-    size_t buf_size_bytes = args->src.info.count * ucc_dt_size(dt);
-
-    ucc_trace("allreduce_nvls_start symmetric uc addr: %p mc addr: %p "
-              "buf_size_bytes: %zu",
-              (void *)nvls->uc_va, (void *)nvls->mc_va, buf_size_bytes);
+    size_t buf_size_bytes;
 
     task->allreduce_nvls.rbuf = args->dst.info.buffer;
     if (UCC_IS_INPLACE(*args)) {
         task->allreduce_nvls.sbuf = args->dst.info.buffer;
+        buf_size_bytes = args->dst.info.count * ucc_dt_size(dt);
     } else {
         task->allreduce_nvls.sbuf = args->src.info.buffer;
+        buf_size_bytes = args->src.info.count * ucc_dt_size(dt);
     }
     task->allreduce_nvls.buf_size_bytes = buf_size_bytes;
+
+    tl_trace(UCC_TASK_LIB(task),"task: %p stream: %p allreduce_nvls_start symmetric uc addr: %p mc addr: %p "
+              "buf_size_bytes: %zu, is inplace: %d", task, stream, (void *)nvls->uc_va, (void *)nvls->mc_va, buf_size_bytes, UCC_IS_INPLACE(*args));
 
     // copy src buffer to symmetric memory first
     CUDA_CHECK(cudaMemcpyAsync((void *)nvls->uc_va, task->allreduce_nvls.sbuf,
                                buf_size_bytes, cudaMemcpyDeviceToDevice,
                                stream));
     CUDA_CHECK(cudaEventRecord(((ucc_ec_cuda_event_t *)task->allreduce_nvls.evtCompletion)->event, stream));
+
+    // TODO: delete this and move memcpy to progress
+    CUDA_CHECK(cudaStreamSynchronize(stream));
 
     task->allreduce_nvls.stage = STAGE_COPY;
 
@@ -153,7 +156,9 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             task->super.status = status;
             return;
         }
-        ucc_trace("allreduce kernel is completed");
+        ucc_trace("task: %p allreduce kernel is completed", task);
+        tl_trace(UCC_TASK_LIB(task), "task: %p allreduce kernel is completed", task);
+
         task->allreduce_nvls.stage = STAGE_COPY_POST;
         // fallthrough
     case STAGE_COPY_POST:
@@ -163,7 +168,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
                         cudaMemcpyDeviceToDevice,
                         stream);
         if (cuda_status != cudaSuccess) {
-            ucc_error("cudaMemcpyAsync failed: %s", cudaGetErrorString(cuda_status));
+            ucc_error("task: %p, cudaMemcpyAsync failed: %s, stream: %p, sbuf: %p, rbuf: %p, uc_va: %p, buf_size_bytes: %zu", task, cudaGetErrorString(cuda_status), stream, task->allreduce_nvls.sbuf, task->allreduce_nvls.rbuf, (void*) nvls->uc_va, task->allreduce_nvls.buf_size_bytes);
             task->super.status = UCC_ERR_NO_RESOURCE;
             return;
         }
@@ -191,10 +196,38 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_finalize(ucc_coll_task_t *task)
 {
     ucc_tl_cuda_task_t *tl_task = ucc_derived_of(task, ucc_tl_cuda_task_t);
 
+    tl_debug(UCC_TASK_LIB(tl_task), "task: %p allreduce_nvls_finalize", task);
+
     ucc_ec_destroy_event(tl_task->allreduce_nvls.evtCompletion, UCC_EE_CUDA_STREAM);
 
     ucc_tl_cuda_task_put(tl_task);
     return UCC_OK;
+}
+
+//NOLINTNEXTLINE(misc-unused-parameters): ev parameter unused as it's not needed for this implementation
+ucc_status_t ucc_tl_cuda_allreduce_nvls_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
+                                                     ucc_coll_task_t *coll_task)
+{
+    ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_status_t        status;
+    ucc_ev_t            post_event;
+
+    ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
+    coll_task->ee = ee;
+    tl_debug(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
+
+    task->allreduce_nvls.stage = STAGE_COPY;
+
+    status = coll_task->post(coll_task);
+    if (ucc_likely(status == UCC_OK)) {
+        post_event.ev_type         = UCC_EVENT_COLLECTIVE_POST;
+        post_event.ev_context_size = 0;
+        post_event.ev_context      = NULL;
+        post_event.req             = &coll_task->super;
+        ucc_ee_set_event_internal(coll_task->ee, &post_event,
+                                  &coll_task->ee->event_out_queue);
+    }
+    return status;
 }
 
 ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
@@ -236,6 +269,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
     ucc_debug("NVLS allreduce datatype: %ld", (long)task->allreduce_nvls.dt);
 
     task->super.post     = ucc_tl_cuda_allreduce_nvls_start;
+    task->super.triggered_post = ucc_tl_cuda_allreduce_nvls_triggered_post;
     task->super.progress = ucc_tl_cuda_allreduce_nvls_progress;
     task->super.finalize = ucc_tl_cuda_allreduce_nvls_finalize;
 
