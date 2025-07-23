@@ -20,7 +20,7 @@ volumes:
     }
 
 env:
-  CUDA_VER: '12.1.1'
+  CUDA_VER: '12.9'
   UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}"
   UCC_DOCKER_IMAGE_NAME: "${registry_host}${registry_path}/${UCC_URI_SUFFIX}"
   NVIDIA_ROOT_DIR: "/opt/nvidia"

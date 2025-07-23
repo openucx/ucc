@@ -1,11 +1,11 @@
-ARG CUDA_VER='12.1.1'
+ARG CUDA_VER='12.9'
 FROM harbor.mellanox.com/torch-ucc/ucc/1.0.0/x86_64/centos8/cuda${CUDA_VER}:base
 RUN rm -rf  ${SRC_DIR}/ucc
 COPY . ${SRC_DIR}/ucc
 
 RUN apt update && apt install -y sudo && \
     echo "swx-jenkins ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-RUN pip install 'protobuf<=3.19.0'
+RUN pip install 'protobuf'
 #==============================================================================
 # Build UCC
 RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucc.sh

@@ -82,7 +82,7 @@ for HOST in $(cat "$HOSTFILE"); do
         sudo /usr/sbin/sshd -D -p ${DOCKER_SSH_PORT}"
     echo "INFO: start docker container on $HOST ... DONE"
 
-    sleep 5
+    sleep 15
 
     echo "INFO: verify docker container on $HOST ..."
     ssh -p "${DOCKER_SSH_PORT}" "$HOST" hostname
