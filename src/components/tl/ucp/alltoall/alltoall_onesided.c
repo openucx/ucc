@@ -12,10 +12,57 @@
 #include "tl_ucp_sendrecv.h"
 
 #define CONGESTION_THRESHOLD    8
-#define GET_OP                  0
-#define PUT_OP                  1
 
-void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask);
+void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask);
+void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask);
+ucc_status_t ucc_tl_ucp_alltoall_onesided_get_start(ucc_coll_task_t *ctask);
+ucc_status_t ucc_tl_ucp_alltoall_onesided_put_start(ucc_coll_task_t *ctask);
+
+/* Common helper function to check completion and handle polling */
+static inline int alltoall_onesided_handle_completion(ucc_tl_ucp_task_t *task,
+                                                      uint32_t *posted,
+                                                      uint32_t *completed,
+                                                      size_t nreqs,
+                                                      int64_t npolls,
+                                                      int *iteration,
+                                                      int64_t *cumulative_polls)
+{
+    if ((*posted - *completed) >= nreqs) {
+        while (*cumulative_polls < npolls) {
+            ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
+            (*cumulative_polls)++;
+            if ((*posted - *completed) < nreqs) {
+                break;
+            }
+        }
+        if (*cumulative_polls >= npolls) {
+            task->alltoall_onesided.iteration = *iteration;
+            return 0; /* Return 0 to indicate should return */
+        }
+    }
+    return 1; /* Return 1 to indicate should continue */
+}
+
+/* Common helper function to wait for all operations to complete */
+static inline void alltoall_onesided_wait_completion(ucc_tl_ucp_task_t *task,
+                                                     int64_t npolls)
+{
+    int64_t polls = 0;
+
+    if (!UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
+        while (polls++ < npolls) {
+            ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
+            if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
+                return;
+            }
+        }
+        ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
+        if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
+            return;
+        }
+        return;
+    }
+}
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_sched_start(ucc_coll_task_t *ctask)
 {
@@ -43,7 +90,8 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_finalize(ucc_coll_task_t *coll_task)
     return status;
 }
 
-void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
+/* GET operation progress function */
+void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
 {
     ucc_tl_ucp_task_t *task      = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
@@ -55,75 +103,81 @@ void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
     ucc_rank_t         peer      = (start + task->alltoall_onesided.iteration) % gsize;
     int                iteration = task->alltoall_onesided.iteration;
     size_t             nreqs     = task->alltoall_onesided.tokens;
-    int64_t            polls     = 0;
     int64_t            npolls    = task->alltoall_onesided.npolls;
-    int                use_op    = task->alltoall_onesided.op;
-    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).src_memh.local_memh;
-    ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).dst_memh.global_memh;
-    uint32_t          *posted;
-    uint32_t          *completed;
+    int64_t            cumulative_polls = 0;
+    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).dst_memh.local_memh;
+    ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).src_memh.global_memh;
+    uint32_t          *posted    = &task->onesided.get_posted;
+    uint32_t          *completed = &task->onesided.get_completed;
     size_t             nelems;
 
     nelems = TASK_ARGS(task).src.info.count;
     nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
 
-    if (use_op == GET_OP) {
-        /* these are not typos */
-        src_memh  = TASK_ARGS(task).dst_memh.local_memh;
-        dst_memh  = TASK_ARGS(task).src_memh.global_memh;
-        posted    = &task->onesided.get_posted;
-        completed = &task->onesided.get_completed;
-    } else {
-        posted    = &task->onesided.put_posted;
-        completed = &task->onesided.put_completed;
-    }
     for (; *posted < gsize; peer = (peer + 1) % gsize) {
-        if (use_op == PUT_OP) {
-            UCPCHECK_GOTO(ucc_tl_ucp_put_nb((void *)(src + peer * nelems),
-                          (void *)PTR_OFFSET(dest, grank * nelems), nelems, peer, src_memh, dst_memh, team, task),
-                          task, out);
-        } else {
-            UCPCHECK_GOTO(ucc_tl_ucp_get_nb(PTR_OFFSET(dest, peer * nelems),
-                          (void *)PTR_OFFSET(src, grank * nelems), nelems, peer, src_memh, dst_memh, team, task),
-                          task, out);
-        }
+        UCPCHECK_GOTO(ucc_tl_ucp_get_nb(PTR_OFFSET(dest, peer * nelems),
+                      (void *)PTR_OFFSET(src, grank * nelems), nelems, peer, src_memh, dst_memh, team, task),
+                      task, out);
         ++iteration;
 
-        if ((*posted - *completed) >= nreqs) {
-            while (polls++ < npolls) {
-                ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
-                if ((*posted - *completed) < nreqs) {
-                    break;
-                }
-            }
-            if (polls >= npolls) {
-                task->alltoall_onesided.iteration = iteration;
-                return;
-            }
+        if (!alltoall_onesided_handle_completion(task, posted, completed, nreqs, npolls, &iteration, &cumulative_polls)) {
+            return;
         }
     }
 
-    if (!UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
-        while (polls++ < npolls) {
-            ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
-            if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
-                goto complete;
-            }
-        }
-        ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
-        if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
-            goto complete;
-        }
-        return;
+    alltoall_onesided_wait_completion(task, npolls);
+    if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
+        task->super.status = UCC_OK;
     }
-
-complete:
-    task->super.status = UCC_OK;
 out:
     return;
 }
 
-ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
+/* PUT operation progress function */
+void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
+{
+    ucc_tl_ucp_task_t *task      = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
+    ptrdiff_t          src       = (ptrdiff_t)TASK_ARGS(task).src.info.buffer;
+    ptrdiff_t          dest      = (ptrdiff_t)TASK_ARGS(task).dst.info.buffer;
+    ucc_rank_t         grank     = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         gsize     = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t         start     = (grank + 1) % gsize;
+    ucc_rank_t         peer      = (start + task->alltoall_onesided.iteration) % gsize;
+    int                iteration = task->alltoall_onesided.iteration;
+    size_t             nreqs     = task->alltoall_onesided.tokens;
+    int64_t            npolls    = task->alltoall_onesided.npolls;
+    int64_t            cumulative_polls = 0;
+    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).src_memh.local_memh;
+    ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).dst_memh.global_memh;
+    uint32_t          *posted    = &task->onesided.put_posted;
+    uint32_t          *completed = &task->onesided.put_completed;
+    size_t             nelems;
+
+    nelems = TASK_ARGS(task).src.info.count;
+    nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
+
+    for (; *posted < gsize; peer = (peer + 1) % gsize) {
+        UCPCHECK_GOTO(ucc_tl_ucp_put_nb((void *)(src + peer * nelems),
+                      (void *)PTR_OFFSET(dest, grank * nelems), nelems, peer, src_memh, dst_memh, team, task),
+                      task, out);
+        ++iteration;
+
+        if (!alltoall_onesided_handle_completion(task, posted, completed, nreqs, npolls, &iteration, &cumulative_polls)) {
+            return;
+        }
+    }
+
+    alltoall_onesided_wait_completion(task, npolls);
+    if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
+        task->super.status = UCC_OK;
+    }
+out:
+    return;
+}
+
+/* GET operation start function */
+ucc_status_t ucc_tl_ucp_alltoall_onesided_get_start(ucc_coll_task_t *ctask)
 {
     ucc_tl_ucp_task_t *task      = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
@@ -136,48 +190,64 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
     size_t             nreqs     = task->alltoall_onesided.tokens;
     size_t             npolls    = task->alltoall_onesided.npolls;
     int                iteration = 0;
-    int64_t            polls     = 0;
-    int                use_op    = task->alltoall_onesided.op;
-    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).src_memh.local_memh;
-    ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).dst_memh.global_memh;
-    uint32_t          *posted;
-    uint32_t          *completed;
+    int64_t            cumulative_polls = 0;
+    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).dst_memh.local_memh;
+    ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).src_memh.global_memh;
+    uint32_t          *posted    = &task->onesided.get_posted;
+    uint32_t          *completed = &task->onesided.get_completed;
     ucc_rank_t         peer;
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-    if (use_op == GET_OP) {
-        /* these are not typos */
-        src_memh  = TASK_ARGS(task).dst_memh.local_memh;
-        dst_memh  = TASK_ARGS(task).src_memh.global_memh;
-        posted    = &task->onesided.get_posted;
-        completed = &task->onesided.get_completed;
-    } else {
-        posted    = &task->onesided.put_posted;
-        completed = &task->onesided.put_completed;
-    }
+
     nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
     for (peer = start; *posted < gsize; peer = (peer + 1) % gsize) {
-        if (use_op == PUT_OP) {
-            UCPCHECK_GOTO(ucc_tl_ucp_put_nb((void *)(src + peer * nelems),
-                          (void *)PTR_OFFSET(dest, grank * nelems), nelems, peer, src_memh, dst_memh, team, task),
-                          task, out);
-        } else {
-            UCPCHECK_GOTO(ucc_tl_ucp_get_nb(PTR_OFFSET(dest, peer * nelems),
-                          (void *)PTR_OFFSET(src, grank * nelems), nelems, peer, src_memh, dst_memh, team, task),
-                          task, out);
-        }
+        UCPCHECK_GOTO(ucc_tl_ucp_get_nb(PTR_OFFSET(dest, peer * nelems),
+                      (void *)PTR_OFFSET(src, grank * nelems), nelems, peer, src_memh, dst_memh, team, task),
+                      task, out);
         ++iteration;
 
-        if ((*posted - *completed) >= nreqs) {
-            while (polls++ < npolls) {
-                ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
-                if ((*posted - *completed) < nreqs) {
-                    break;
-                }
-            }
-            if (polls >= npolls) {
-                break;
-            }
+        if (!alltoall_onesided_handle_completion(task, posted, completed, nreqs, npolls, &iteration, &cumulative_polls)) {
+            break;
+        }
+    }
+    task->alltoall_onesided.iteration = iteration;
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+out:
+    return task->super.status;
+}
+
+/* PUT operation start function */
+ucc_status_t ucc_tl_ucp_alltoall_onesided_put_start(ucc_coll_task_t *ctask)
+{
+    ucc_tl_ucp_task_t *task      = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
+    ptrdiff_t          src       = (ptrdiff_t)TASK_ARGS(task).src.info.buffer;
+    ptrdiff_t          dest      = (ptrdiff_t)TASK_ARGS(task).dst.info.buffer;
+    ucc_rank_t         grank     = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         gsize     = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t         start     = (grank + 1) % gsize;
+    size_t             nelems    = TASK_ARGS(task).src.info.count;
+    size_t             nreqs     = task->alltoall_onesided.tokens;
+    size_t             npolls    = task->alltoall_onesided.npolls;
+    int                iteration = 0;
+    int64_t            cumulative_polls = 0;
+    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).src_memh.local_memh;
+    ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).dst_memh.global_memh;
+    uint32_t          *posted    = &task->onesided.put_posted;
+    uint32_t          *completed = &task->onesided.put_completed;
+    ucc_rank_t         peer;
+
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
+
+    nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
+    for (peer = start; *posted < gsize; peer = (peer + 1) % gsize) {
+        UCPCHECK_GOTO(ucc_tl_ucp_put_nb((void *)(src + peer * nelems),
+                      (void *)PTR_OFFSET(dest, grank * nelems), nelems, peer, src_memh, dst_memh, team, task),
+                      task, out);
+        ++iteration;
+
+        if (!alltoall_onesided_handle_completion(task, posted, completed, nreqs, npolls, &iteration, &cumulative_polls)) {
+            break;
         }
     }
     task->alltoall_onesided.iteration = iteration;
@@ -243,8 +313,6 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
 
     sbgp                 = ucc_topo_get_sbgp(tl_team->topo, UCC_SBGP_NODE);
     task                 = ucc_tl_ucp_init_task(coll_args, team);
-    task->super.post     = ucc_tl_ucp_alltoall_onesided_start;
-    task->super.progress = ucc_tl_ucp_alltoall_onesided_progress;
     task->super.finalize = ucc_tl_ucp_alltoall_onesided_finalize;
     a2a_task             = &task->super;
 
@@ -282,9 +350,11 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
         if (polls > task->n_polls) {
             npolls = polls;
         }
-        task->alltoall_onesided.op = GET_OP;
+        task->super.post     = ucc_tl_ucp_alltoall_onesided_get_start;
+        task->super.progress = ucc_tl_ucp_alltoall_onesided_get_progress;
     } else {
-        task->alltoall_onesided.op = PUT_OP;
+        task->super.post     = ucc_tl_ucp_alltoall_onesided_put_start;
+        task->super.progress = ucc_tl_ucp_alltoall_onesided_put_progress;
     }
     task->alltoall_onesided.npolls    = npolls;
     task->alltoall_onesided.iteration = 0;
