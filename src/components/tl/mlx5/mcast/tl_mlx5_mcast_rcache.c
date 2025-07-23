@@ -32,7 +32,7 @@ static ucc_status_t ucc_tl_mlx5_mcast_coll_dereg_mr(ucc_tl_mlx5_mcast_coll_conte
         return UCC_OK;
     }
 
-    tl_debug(ctx->lib, "external memory deregister: mr %p", mr);
+    tl_trace(ctx->lib, "external memory deregister: mr %p", mr);
 
     if (ibv_dereg_mr(mr)) {
         tl_error(ctx->lib, "couldn't destroy mr %p", mr);

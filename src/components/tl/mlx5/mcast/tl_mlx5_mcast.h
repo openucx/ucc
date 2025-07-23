@@ -286,10 +286,11 @@ typedef struct ucc_tl_mlx5_mcast_one_sided_reliability_comm {
 } ucc_tl_mlx5_mcast_one_sided_reliability_comm_t;
 
 typedef struct ucc_tl_mlx5_mcast_service_coll {
-    ucc_status_t (*bcast_post) (void*, void*, size_t, ucc_rank_t, ucc_service_coll_req_t**);
-    ucc_status_t (*allgather_post) (void*, void*, void*, size_t, ucc_service_coll_req_t**);
-    ucc_status_t (*barrier_post) (void*, ucc_service_coll_req_t**);
-    ucc_status_t (*coll_test) (ucc_service_coll_req_t*);
+    ucc_status_t (*bcast_post)      (void*, void*, size_t, ucc_rank_t, ucc_service_coll_req_t**);
+    ucc_status_t (*allgather_post)  (void*, void*, void*, size_t, ucc_service_coll_req_t**);
+    ucc_status_t (*allreduce_post)  (void*, void*, void*, size_t, ucc_datatype_t, ucc_reduction_op_t, ucc_service_coll_req_t**);
+    ucc_status_t (*barrier_post)    (void*, ucc_service_coll_req_t**);
+    ucc_status_t (*coll_test)       (ucc_service_coll_req_t*);
 } ucc_tl_mlx5_mcast_service_coll_t;
 
 typedef struct ucc_tl_mlx5_mcast_allgather_comm {
@@ -359,6 +360,9 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                             cuda_mem_enabled;
     ucc_tl_mlx5_mcast_join_info_t                  *group_setup_info;
     ucc_service_coll_req_t                         *group_setup_info_req;
+    int                                             mcast_transport_ready;
+    int                                             transport_ready_global;
+    ucc_service_coll_req_t                         *transport_ready_req;
     ucc_tl_mlx5_mcast_service_coll_t                service_coll;
     struct rdma_cm_event                           *event;
     ucc_tl_mlx5_mcast_one_sided_reliability_comm_t  one_sided;

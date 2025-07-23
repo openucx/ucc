@@ -5,6 +5,7 @@
  */
 
 #include "mcast/tl_mlx5_mcast_service_coll.h"
+#include "core/ucc_service_coll.h"
  
 ucc_status_t ucc_tl_mlx5_mcast_service_bcast_post(void *arg, void *buf, size_t size, ucc_rank_t root,
                                                   ucc_service_coll_req_t **bcast_req)
@@ -65,6 +66,26 @@ ucc_status_t ucc_tl_mlx5_mcast_service_barrier_post(void *arg, ucc_service_coll_
 
     *barrier_req = req;
 
+    return status;
+}
+
+ucc_status_t ucc_tl_mlx5_mcast_service_allreduce_post(void *arg, void *sendbuf, void *recvbuf,
+                                                       size_t count, ucc_datatype_t dt,
+                                                       ucc_reduction_op_t op,
+                                                       ucc_service_coll_req_t **allred_req)
+{
+    ucc_tl_mlx5_mcast_oob_p2p_context_t *ctx    = (ucc_tl_mlx5_mcast_oob_p2p_context_t *)arg;
+    ucc_status_t                         status = UCC_OK;
+    ucc_team_t                          *team   = ctx->base_team;
+    ucc_subset_t                         subset = ctx->subset;
+    ucc_service_coll_req_t              *req    = NULL;
+
+    status = ucc_service_allreduce(team, sendbuf, recvbuf, dt, count, op, subset, &req);
+    if (UCC_OK != status) {
+        tl_error(ctx->base_ctx->lib, "tl service mcast allreduce failed");
+        return status;
+    }
+    *allred_req = req;
     return status;
 }
 
