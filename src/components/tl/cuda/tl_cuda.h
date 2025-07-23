@@ -87,11 +87,14 @@ extern ucc_tl_cuda_iface_t ucc_tl_cuda;
 typedef struct ucc_tl_cuda_lib_config {
     ucc_tl_lib_config_t super;
     uint32_t            max_concurrent; // Maximum number of tasks that can be progressed simultaneously.
-    size_t              scratch_size;
+    size_t              scratch_size;   // Size of the scratch buffer for each task
     unsigned long       allgather_ring_max_rings;
     uint32_t            allgather_ring_num_chunks;
     unsigned long       reduce_scatter_ring_max_rings;
     int                 topo_cache_enable;
+#ifdef HAVE_TL_CUDA_NVLS
+    size_t              nvls_symmetric_size; // Size of the symmetric memory for NVLS, for each task
+#endif
 } ucc_tl_cuda_lib_config_t;
 
 typedef struct ucc_tl_cuda_context_config {
