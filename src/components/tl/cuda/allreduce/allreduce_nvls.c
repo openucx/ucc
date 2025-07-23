@@ -16,6 +16,7 @@
 
 enum {
     STAGE_COPY,                /*< Copy src buffer to symmetric memory */
+    STAGE_COPY_WAIT,           /*< Wait for the copy to complete */
     STAGE_COPY_BAR_START,      /*< Start barrier after copy */
     STAGE_COPY_BAR_TEST,       /*< Test barrier after copy */
     STAGE_KERNEL_START,        /*< Start kernel */
@@ -50,15 +51,6 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
     tl_trace(UCC_TASK_LIB(task),"task: %p stream: %p allreduce_nvls_start symmetric uc addr: %p mc addr: %p "
               "buf_size_bytes: %zu, is inplace: %d", task, stream, (void *)nvls->uc_va, (void *)nvls->mc_va, buf_size_bytes, UCC_IS_INPLACE(*args));
 
-    // copy src buffer to symmetric memory first
-    CUDA_CHECK(cudaMemcpyAsync((void *)nvls->uc_va, task->allreduce_nvls.sbuf,
-                               buf_size_bytes, cudaMemcpyDeviceToDevice,
-                               stream));
-    CUDA_CHECK(cudaEventRecord(((ucc_ec_cuda_event_t *)task->allreduce_nvls.evtCompletion)->event, stream));
-
-    // TODO: delete this and move memcpy to progress
-    CUDA_CHECK(cudaStreamSynchronize(stream));
-
     task->allreduce_nvls.stage = STAGE_COPY;
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -78,8 +70,32 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
 
     ucc_status_t        status;
     cudaError_t         cuda_status;
+
     switch (task->allreduce_nvls.stage) {
     case STAGE_COPY:
+        // copy src buffer to symmetric memory first
+        cuda_status =
+            cudaMemcpyAsync((void *)nvls->uc_va, task->allreduce_nvls.sbuf,
+                            task->allreduce_nvls.buf_size_bytes,
+                            cudaMemcpyDeviceToDevice, stream);
+        if (cuda_status != cudaSuccess) {
+            ucc_error("cudaMemcpyAsync failed: %s",
+                      cudaGetErrorString(cuda_status));
+            task->super.status = UCC_ERR_NO_MEMORY; // TODO: better error code?
+            return;
+        }
+        cuda_status = cudaEventRecord(
+            ((ucc_ec_cuda_event_t *)task->allreduce_nvls.evtCompletion)->event,
+            stream);
+        if (cuda_status != cudaSuccess) {
+            ucc_error("cudaEventRecord failed: %s",
+                      cudaGetErrorString(cuda_status));
+            task->super.status = UCC_ERR_NO_RESOURCE;
+            return;
+        }
+        task->allreduce_nvls.stage = STAGE_COPY_WAIT;
+        // fallthrough
+    case STAGE_COPY_WAIT:
         cuda_status = cudaEventQuery(evt);
         if (cuda_status == cudaErrorNotReady) {
             task->super.status = UCC_INPROGRESS;
