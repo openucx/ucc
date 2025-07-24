@@ -98,6 +98,23 @@ typedef struct ucc_tl_ucp_allreduce_sw_host_allgather
 typedef struct ucc_tl_ucp_dpu_offload_buf_info
     ucc_tl_ucp_dpu_offload_buf_info_t;
 
+/* Structure to hold dynamic segment exchange parameters and buffers */
+typedef struct {
+    ucc_tl_ucp_task_t  *task;
+    void               *src_pack_buffer;
+    void               *dst_pack_buffer;
+    size_t              src_pack_size;
+    size_t              dst_pack_size;
+    size_t              max_individual_pack_size;
+    size_t              exchange_size;
+    ucc_mem_map_memh_t *src_memh_pack;
+    ucc_mem_map_memh_t *dst_memh_pack;
+    void               *exchange_buffer;
+    void               *global_buffer;
+    ucc_mem_map_memh_t *src_memh_local;
+    ucc_mem_map_memh_t *dst_memh_local;
+} ucc_tl_ucp_dynamic_segment_args_t;
+
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
     uint32_t        flags;

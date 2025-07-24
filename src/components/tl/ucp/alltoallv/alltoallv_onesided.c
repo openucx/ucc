@@ -26,23 +26,24 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_start(ucc_coll_task_t *ctask)
     size_t              rdt_size   = ucc_dt_size(TASK_ARGS(task).dst.info_v.datatype);
     ucc_mem_map_mem_h   src_memh   = TASK_ARGS(task).src_memh.local_memh;
     ucc_mem_map_mem_h  *dst_memh   = TASK_ARGS(task).dst_memh.global_memh;
-    //ucc_mem_map_memh_t *src_memh_g = NULL;
-    //ucc_mem_map_memh_t *dst_memh_g = NULL;
     ucc_rank_t          peer;
     ucc_status_t        status;
     size_t              sd_disp, dd_disp, data_size;
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-    status = ucc_tl_ucp_coll_dynamic_segment_exchange(task);
-    if (UCC_OK != status) {
-        task->super.status = status;
-        goto out;
+    if (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG) {
+        status = ucc_tl_ucp_coll_dynamic_segment_exchange(task);
+        if (UCC_OK != status) {
+            task->super.status = status;
+            goto out;
+        }
+        src_memh   = task->dynamic_segments.src_global[grank];
+        dst_memh   = (ucc_mem_map_mem_h *)task->dynamic_segments.dst_global;
+    } else {
+        if (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL) {
+            src_memh = TASK_ARGS(task).src_memh.global_memh[grank];
+        }
     }
-
-    if (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL) {
-        src_memh = TASK_ARGS(task).src_memh.global_memh[grank];
-    }
-
     /* perform a put to each member peer using the peer's index in the
      * destination displacement. */
     for (peer = (grank + 1) % gsize; task->onesided.put_posted < gsize;
@@ -82,8 +83,7 @@ void ucc_tl_ucp_alltoallv_onesided_progress(ucc_coll_task_t *ctask)
     }
 
     pSync[0]           = 0;
-    task->super.status = UCC_OK;
-    ucc_tl_ucp_coll_dynamic_segment_finalize(task);
+    task->super.status = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
 }
 
 ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
