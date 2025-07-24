@@ -141,7 +141,7 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
     return UCC_OK;
 }
 
-// check if segment for current task is available and barrier is available (completed from prev iteration) 
+// check if segment for current task is available and barrier is available (completed from prev iteration)
 // and possibly mark the segment as occupied by updating the state counter to the current seq_num
 static inline ucc_status_t ucc_tl_cuda_get_sync_root(ucc_tl_cuda_task_t *task, ucc_rank_t root)
 {
