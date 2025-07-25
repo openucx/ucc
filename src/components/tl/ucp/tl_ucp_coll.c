@@ -377,6 +377,7 @@ static ucc_status_t dynamic_segment_calculate_sizes(ucc_tl_ucp_dynamic_segment_a
         tl_error(UCC_TASK_LIB(args->task),
                  "failed to start service allgather for sizes");
         ucc_free(global_sizes);
+        global_sizes = NULL;
         return status;
     }
 
@@ -392,6 +393,7 @@ static ucc_status_t dynamic_segment_calculate_sizes(ucc_tl_ucp_dynamic_segment_a
                  "failed during service allgather for sizes");
         ucc_service_coll_finalize(scoll_req);
         ucc_free(global_sizes);
+        global_sizes = NULL;
         return status;
     }
     ucc_service_coll_finalize(scoll_req);
@@ -407,10 +409,12 @@ static ucc_status_t dynamic_segment_calculate_sizes(ucc_tl_ucp_dynamic_segment_a
     args->exchange_size = 2 * (sizeof(ucc_mem_map_memh_t) + args->max_individual_pack_size + sizeof(size_t) * 2);
     if (args->exchange_size == 0) {
         ucc_free(global_sizes);
+        global_sizes = NULL;
         return UCC_ERR_NO_MESSAGE;
     }
 
     ucc_free(global_sizes);
+    global_sizes = NULL;
     return UCC_OK;
 }
 
@@ -430,6 +434,7 @@ static ucc_status_t dynamic_segment_allocate_buffers(ucc_tl_ucp_dynamic_segment_
     if (UCC_OK != status) {
        tl_error(UCC_TASK_LIB(args->task), "failed to allocate dst_memh_pack");
        ucc_free(args->src_memh_pack);
+       args->src_memh_pack = NULL;
        return status;
     }
 
@@ -438,7 +443,9 @@ static ucc_status_t dynamic_segment_allocate_buffers(ucc_tl_ucp_dynamic_segment_
     if (!args->exchange_buffer) {
         tl_error(UCC_TASK_LIB(args->task), "failed to allocate exchange buffer");
         ucc_free(args->src_memh_pack);
+        args->src_memh_pack = NULL;
         ucc_free(args->dst_memh_pack);
+        args->dst_memh_pack = NULL;
         return UCC_ERR_NO_MEMORY;
     }
 
@@ -447,8 +454,11 @@ static ucc_status_t dynamic_segment_allocate_buffers(ucc_tl_ucp_dynamic_segment_
     if (!args->global_buffer) {
         tl_error(UCC_TASK_LIB(args->task), "failed to allocate global buffer");
         ucc_free(args->exchange_buffer);
+        args->exchange_buffer = NULL;
         ucc_free(args->src_memh_pack);
+        args->src_memh_pack = NULL;
         ucc_free(args->dst_memh_pack);
+        args->dst_memh_pack = NULL;
         return UCC_ERR_NO_MEMORY;
     }
 
@@ -653,6 +663,7 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_exchange, 
 err_cleanup_global:
     if (args.global_buffer) {
         ucc_free(args.global_buffer);
+        args.global_buffer = NULL;
     }
 err_cleanup:
     dynamic_segment_cleanup_buffers(&args);
