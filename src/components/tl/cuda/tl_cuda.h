@@ -20,6 +20,7 @@
 #include "tl_cuda_nvls.h"
 #endif
 
+#include <cuda.h>
 #include <cuda_runtime.h>
 
 #ifndef UCC_TL_CUDA_DEFAULT_SCORE
@@ -290,6 +291,7 @@ struct ucc_tl_cuda_task {
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
                                  ucc_rank_t                block);
         } reduce_scatterv_linear;
+#ifdef HAVE_TL_CUDA_NVLS
         struct {
             int                     stage;
             int                     num_frags;
@@ -316,6 +318,7 @@ struct ucc_tl_cuda_task {
             void          *evtCompletion;
         } allreduce_nvls;
     };
+#endif
 };
 
 #endif
