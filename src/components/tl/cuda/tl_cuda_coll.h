@@ -45,6 +45,20 @@ extern const char
         (PTR_OFFSET(_scratch, (_task)->coll_id * _scratch_size));              \
     })
 
+#define TASK_SYMMETRIC_MC(_task)                                                   \
+    ({                                                                             \
+        ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                              \
+        size_t _symm_size = UCC_TL_CUDA_TEAM_LIB(_team)->cfg.nvls_symmetric_size;  \
+        (PTR_OFFSET(_team->nvls.mc_va, (_task)->coll_id * _symm_size));            \
+    })
+
+#define TASK_SYMMETRIC_UC(_task)                                                   \
+    ({                                                                             \
+        ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                              \
+        size_t _symm_size = UCC_TL_CUDA_TEAM_LIB(_team)->cfg.nvls_symmetric_size;  \
+        (PTR_OFFSET(_team->nvls.uc_va, (_task)->coll_id * _symm_size));            \
+    })
+
 static inline void ucc_tl_cuda_task_reset(ucc_tl_cuda_task_t *task)
 {
     task->super.status = UCC_INPROGRESS;
