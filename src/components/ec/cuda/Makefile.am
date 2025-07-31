@@ -20,7 +20,7 @@ module_LTLIBRARIES         = libucc_ec_cuda.la
 libucc_ec_cuda_la_SOURCES  = $(sources)
 libucc_ec_cuda_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS) $(CUDA_CPPFLAGS)
 libucc_ec_cuda_la_CFLAGS   = $(BASE_CFLAGS)
-libucc_ec_cuda_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(CUDA_LDFLAGS)
+libucc_ec_cuda_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(CUDA_LDFLAGS) -lstdc++
 libucc_ec_cuda_la_LIBADD   = $(CUDA_LIBS)                      \
                              $(UCC_TOP_BUILDDIR)/src/libucc.la \
                              kernel/libucc_ec_cuda_kernels.la
