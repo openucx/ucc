@@ -288,7 +288,7 @@ ucc_status_t ucc_ec_cuda_executor_kernel_calc_max_threads(int *max)
     low = 0;
     high = *max / WARP_SIZE;
 
-    while (low < high) {
+    while (low < high - 1) {
         int mid = low + (high - low) / 2;
         useCoopLaunch ?
             GET_BLOCKS(mid * WARP_SIZE, true) :
@@ -302,13 +302,13 @@ ucc_status_t ucc_ec_cuda_executor_kernel_calc_max_threads(int *max)
         }
     }
 
-    if (low == 0) {
+    if (high == 0) {
         ec_error(&ucc_ec_cuda.super,
 	         "no amount of threads per block can fit the kernel");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    *max = low * WARP_SIZE;
+    *max = high * WARP_SIZE;
     ec_trace(&ucc_ec_cuda.super,
 	     "max threads per block that can fit the kernel found to be %d",
 	     *max);
