@@ -75,7 +75,9 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
 
 };
 
-static inline void ucc_ec_cuda_set_threads_nbr(int *nt, int maxThreadsPerBlock)
+static inline void ucc_ec_cuda_set_threads_nbr(int *nt,
+                                               int maxThreadsPerBlock,
+                                               int is_reduce)
 {
     if (*nt != UCC_ULUNITS_AUTO) {
         if (maxThreadsPerBlock < *nt) {
@@ -92,9 +94,11 @@ static inline void ucc_ec_cuda_set_threads_nbr(int *nt, int maxThreadsPerBlock)
     } else {
         *nt = (maxThreadsPerBlock / WARP_SIZE) * WARP_SIZE;
 
-        // Pass max threads per block, lowering it if necessary
-        // based on kernel occupancy requirements
-        ucc_ec_cuda_calculate_max_threads(nt);
+        if (!is_reduce) {
+            // Pass max threads per block, lowering it if necessary
+            // based on kernel occupancy requirements
+            ucc_ec_cuda_executor_kernel_calc_max_threads(nt);
+        }
     }
 }
 
@@ -122,14 +126,9 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
 
     ucc_ec_cuda_set_threads_nbr((int *)&cfg->exec_num_threads,
-                                prop.maxThreadsPerBlock);
-    if (cfg->reduce_num_threads == UCC_ULUNITS_AUTO) {
-        // If auto, reuse exec threads
-        cfg->reduce_num_threads = cfg->exec_num_threads;
-    } else {
-        ucc_ec_cuda_set_threads_nbr(&cfg->reduce_num_threads,
-                                    prop.maxThreadsPerBlock);
-    }
+                                prop.maxThreadsPerBlock, 0/*is_reduce*/);
+    ucc_ec_cuda_set_threads_nbr(&cfg->reduce_num_threads,
+                                prop.maxThreadsPerBlock, 1/*is_reduce*/);
 
     if (cfg->reduce_num_blocks != UCC_ULUNITS_AUTO) {
         if (prop.maxGridSize[0] < cfg->reduce_num_blocks) {
