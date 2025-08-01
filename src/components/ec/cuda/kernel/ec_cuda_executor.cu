@@ -278,7 +278,7 @@ extern "C" {
 // according to executor_kernel resource requirements while maintaining
 // num threads is divisible by WARP_SIZE
 //     max: IN/OUT parameter
-ucc_status_t ucc_ec_cuda_calculate_max_threads(int *max)
+ucc_status_t ucc_ec_cuda_executor_kernel_calc_max_threads(int *max)
 {
     int useCoopLaunch = EC_CUDA_CONFIG->use_cooperative_launch;
     int low, high, nblocks;
