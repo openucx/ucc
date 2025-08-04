@@ -11,7 +11,7 @@ NVCCFLAGS =                                      \
     -I${UCC_TOP_BUILDDIR}/src                    \
     --compiler-options -fno-rtti,-fno-exceptions
 
-LINK = $(LIBTOOL) --mode=link $(CC) -o $@
+LINK = $(LIBTOOL) --tag=CXX --mode=link $(NVCC) -o $@
 
 .cu.o:
 	$(NVCC) -c $< -o $@  $(NVCCFLAGS) $(NVCC_ARCH)
