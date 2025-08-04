@@ -800,17 +800,25 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
             ucp_rkey_buffer_release(data->rinfo.packed_key);
             data->rinfo.packed_key = NULL;
         }
+        // Free the data structure itself for export mode too
+        ucc_free(data);
+        memh->tl_data = NULL;
     } else if (mode == UCC_MEM_MAP_MODE_IMPORT || mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
         // need to free rkeys (data->rkey) , packed memh (data->packed_memh)
         if (data->packed_memh) {
             ucp_memh_buffer_release(data->packed_memh, NULL);
+            data->packed_memh = NULL;
         }
         if (data->rinfo.packed_key) {
             ucp_rkey_buffer_release(data->rinfo.packed_key);
+            data->rinfo.packed_key = NULL;
         }
         if (data->rkey) {
             ucp_rkey_destroy(data->rkey);
         }
+        // Free the data structure itself
+        ucc_free(data);
+        memh->tl_data = NULL;
     } else {
         ucc_error("Unknown mem map mode entered: %d", mode);
         return UCC_ERR_INVALID_PARAM;
