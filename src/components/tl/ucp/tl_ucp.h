@@ -43,12 +43,12 @@ typedef struct ucc_tl_ucp_iface {
 /* Extern iface should follow the pattern: ucc_tl_<tl_name> */
 extern ucc_tl_ucp_iface_t ucc_tl_ucp;
 
-typedef enum ucc_tl_ucp_alltoall_onesided_alg_type {
+typedef enum ucc_tl_ucp_onesided_alg_type {
     UCC_TL_UCP_ALLTOALL_ONESIDED_PUT,
     UCC_TL_UCP_ALLTOALL_ONESIDED_GET,
     UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO,
     UCC_TL_UCP_ALLTOALL_ONESIDED_LAST
-} ucc_tl_ucp_alltoall_onesided_alg_t;
+} ucc_tl_ucp_onesided_alg_type;
 
 typedef struct ucc_tl_ucp_lib_config {
     ucc_tl_lib_config_t                super;
@@ -89,7 +89,7 @@ typedef struct ucc_tl_ucp_lib_config {
     ucc_ternary_auto_value_t           use_topo;
     int                                use_reordering;
     uint32_t                           alltoall_onesided_percent_bw;
-    ucc_tl_ucp_alltoall_onesided_alg_t alltoall_onesided_alg;
+    ucc_tl_ucp_onesided_alg_type       alltoall_onesided_alg;
 } ucc_tl_ucp_lib_config_t;
 
 typedef enum ucc_tl_ucp_local_copy_type {
@@ -235,6 +235,13 @@ typedef struct ucc_tl_ucp_context {
         ucc_tl_ucp_copy_test_fn_t     test;
         ucc_tl_ucp_copy_finalize_fn_t finalize;
     } copy;
+    /* Only one dynamic-segment service-collective exchange may be in
+     * flight per context: service collectives share UCC_TL_UCP_SERVICE_TAG
+     * and an identical match key, so concurrent exchanges could consume
+     * each other's receives. Tasks check-and-claim this flag at exchange
+     * start and release it in dynamic_segment_finalize and every abandon
+     * path. */
+    int dyn_seg_exchange_active;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                     const ucc_base_config_t *);
