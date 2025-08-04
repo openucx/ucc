@@ -79,6 +79,8 @@ static inline void ucc_ec_cuda_set_threads_nbr(int *nt,
                                                int maxThreadsPerBlock,
                                                int is_reduce)
 {
+    ucc_status_t status;
+
     if (*nt != UCC_ULUNITS_AUTO) {
         if (maxThreadsPerBlock < *nt) {
             ec_warn(
@@ -97,7 +99,11 @@ static inline void ucc_ec_cuda_set_threads_nbr(int *nt,
         if (!is_reduce) {
             // Pass max threads per block, lowering it if necessary
             // based on kernel occupancy requirements
-            ucc_ec_cuda_executor_kernel_calc_max_threads(nt);
+            status = ucc_ec_cuda_executor_kernel_calc_max_threads(nt);
+            if (status != UCC_OK) {
+                ec_error(&ucc_ec_cuda.super, "Could not calculate max threads: %s",
+                         ucc_status_string(status));
+            }
         }
     }
 }
