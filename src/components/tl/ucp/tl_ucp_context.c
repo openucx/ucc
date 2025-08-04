@@ -532,8 +532,6 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
                                             ucc_mem_map_params_t   map,
                                             ucc_context_oob_coll_t oob)
 {
-    ucc_tl_ucp_lib_t *lib =
-        ucc_derived_of(ctx->super.super.lib, ucc_tl_ucp_lib_t);
     uint32_t             size  = oob.n_oob_eps;
     uint64_t             nsegs = map.n_segments;
     ucp_mem_map_params_t mmap_params;
@@ -544,26 +542,27 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
 
     if (size < 2) {
         tl_error(
-            lib,
+            ctx->super.super.lib,
             "oob.n_oob_eps set to incorrect value for remote exchange (%d)",
             size);
         return UCC_ERR_INVALID_PARAM;
     }
     if (nsegs > MAX_NR_SEGMENTS) {
-        tl_error(lib, "cannot map more than %d segments", MAX_NR_SEGMENTS);
+        tl_error(ctx->super.super.lib, "cannot map more than %d segments",
+                 MAX_NR_SEGMENTS);
         return UCC_ERR_INVALID_PARAM;
     }
     ctx->rkeys = (ucp_rkey_h *)ucc_calloc(sizeof(ucp_rkey_h), nsegs * size,
                                           "ucp_ctx_rkeys");
     if (NULL == ctx->rkeys) {
-        tl_error(lib, "failed to allocated %zu bytes",
+        tl_error(ctx->super.super.lib, "failed to allocated %zu bytes",
                  sizeof(ucp_rkey_h) * nsegs * size);
         return UCC_ERR_NO_MEMORY;
     }
     ctx->remote_info = (ucc_tl_ucp_remote_info_t *)ucc_calloc(
         nsegs, sizeof(ucc_tl_ucp_remote_info_t), "ucp_remote_info");
     if (NULL == ctx->remote_info) {
-        tl_error(lib, "failed to allocated %zu bytes",
+        tl_error(ctx->super.super.lib, "failed to allocated %zu bytes",
                  sizeof(ucc_tl_ucp_remote_info_t) * nsegs);
         ucc_status = UCC_ERR_NO_MEMORY;
         goto fail_alloc_remote_segs;
@@ -577,7 +576,8 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
 
         status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
         if (UCS_OK != status) {
-            tl_error(lib, "ucp_mem_map failed with error code: %d", status);
+            tl_error(ctx->super.super.lib,
+                     "ucp_mem_map failed with error code: %d", status);
             ucc_status = ucs_status_to_ucc_status(status);
             goto fail_mem_map;
         }
@@ -587,7 +587,8 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
                                                   &ctx->remote_info[i].packed_key,
                                                   &ctx->remote_info[i].packed_key_len);
         if (UCS_OK != status) {
-            tl_error(lib, "failed to pack UCP key with error code: %d", status);
+            tl_error(ctx->super.super.lib,
+                     "failed to pack UCP key with error code: %d", status);
             ucc_status = ucs_status_to_ucc_status(status);
             goto fail_mem_map;
         }
@@ -816,20 +817,12 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
         if (data->rkey) {
             ucp_rkey_destroy(data->rkey);
         }
-        // Free the data structure itself
         ucc_free(data);
         memh->tl_data = NULL;
     } else {
         ucc_error("Unknown mem map mode entered: %d", mode);
         return UCC_ERR_INVALID_PARAM;
     }
-
-    /* Free the TL data structure */
-    if (data) {
-        ucc_free(data);
-        memh->tl_data = NULL;
-    }
-
     return UCC_OK;
 }
 

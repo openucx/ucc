@@ -42,12 +42,12 @@ typedef struct ucc_tl_ucp_iface {
 /* Extern iface should follow the pattern: ucc_tl_<tl_name> */
 extern ucc_tl_ucp_iface_t ucc_tl_ucp;
 
-typedef enum ucc_tl_ucp_alltoall_onesided_alg_type {
+typedef enum ucc_tl_ucp_onesided_alg_type {
     UCC_TL_UCP_ALLTOALL_ONESIDED_PUT,
     UCC_TL_UCP_ALLTOALL_ONESIDED_GET,
     UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO,
     UCC_TL_UCP_ALLTOALL_ONESIDED_LAST
-} ucc_tl_ucp_alltoall_onesided_alg_t;
+} ucc_tl_ucp_onesided_alg_type;
 
 typedef struct ucc_tl_ucp_lib_config {
     ucc_tl_lib_config_t                super;
@@ -88,7 +88,7 @@ typedef struct ucc_tl_ucp_lib_config {
     ucc_ternary_auto_value_t           use_topo;
     int                                use_reordering;
     uint32_t                           alltoall_onesided_percent_bw;
-    ucc_tl_ucp_alltoall_onesided_alg_t alltoall_onesided_alg;
+    ucc_tl_ucp_onesided_alg_type       alltoall_onesided_alg;
 } ucc_tl_ucp_lib_config_t;
 
 typedef enum ucc_tl_ucp_local_copy_type {

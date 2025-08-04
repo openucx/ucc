@@ -408,6 +408,7 @@ static inline ucc_status_t ucc_tl_ucp_check_memh(ucp_ep_h *ep, ucc_rank_t me,
     ucs_status_t            ucs_status;
     int                     i;
     size_t                  offset;
+    size_t                  addr_offset;
 
     base = (uint64_t)dst_memh[me]->address;
     end  = base + dst_memh[me]->len;
@@ -415,8 +416,9 @@ static inline ucc_status_t ucc_tl_ucp_check_memh(ucp_ep_h *ep, ucc_rank_t me,
     if (!((uint64_t)va >= base && (uint64_t)va < end)) {
         return UCC_ERR_NOT_FOUND;
     }
-    *rva = (uint64_t)PTR_OFFSET(dst_memh[peer]->address,
-                                ((uint64_t)va - (uint64_t)dst_memh[me]->address));
+    addr_offset = (uint64_t)va - (uint64_t)dst_memh[me]->address;
+    *rva        = (uint64_t)PTR_OFFSET(dst_memh[peer]->address, addr_offset);
+
     dst_tl_data = (ucc_tl_ucp_memh_data_t *)dst_memh[peer]->tl_h[tl_index].tl_data;
     if (NULL == dst_tl_data->rkey) {
         offset = 0;
@@ -480,12 +482,13 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     void                 *offset;
     ptrdiff_t             base_offset;
     ucc_status_t          status;
+    ucc_rank_t            ctx_peer; /* for onesided reg. through context */
 
     *segment  = -1;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
     ucc_assert(UCC_TL_CORE_TEAM(team) != NULL);
-    peer = ucc_get_ctx_rank(UCC_TL_CORE_TEAM(team), core_rank);
-
+    /* ctx_peer (context rank) is used for segment-based addressing */
+    ctx_peer = ucc_get_ctx_rank(UCC_TL_CORE_TEAM(team), core_rank);
     offset = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),
                                   core_rank, ucc_tl_ucp.super.super.id);
 
@@ -498,50 +501,33 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     if (*segment >= 0) {
         *rva = rvas[*segment] +
                ((uint64_t)va - (uint64_t)ctx->remote_info[*segment].va_base);
-        if (ucc_unlikely(NULL == UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment))) {
+        if (ucc_unlikely(NULL == UCC_TL_UCP_REMOTE_RKEY(ctx, ctx_peer, *segment))) {
             ucs_status_t ucs_status = ucp_ep_rkey_unpack(
                 *ep, PTR_OFFSET(keys, key_offset),
-                &UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment));
+                &UCC_TL_UCP_REMOTE_RKEY(ctx, ctx_peer, *segment));
             if (UCS_OK != ucs_status) {
                 return ucs_status_to_ucc_status(ucs_status);
             }
         }
-        *rkey = UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment);
+        *rkey = UCC_TL_UCP_REMOTE_RKEY(ctx, ctx_peer, *segment);
         return UCC_OK;
     }
-    if (ucc_unlikely(0 > *segment)) {
-        if (dst_memh) {
-            /* check if segment is in src/dst memh */
-            status = find_tl_index(dst_memh[grank], &tl_index);
-            if (status == UCC_ERR_NOT_FOUND) {
-               tl_error(UCC_TL_TEAM_LIB(team),
-                 "attempt to perform one-sided operation with malformed mem map handle");
-               return status;
-            }
-
-            status = ucc_tl_ucp_check_memh(ep, grank, peer, va, rva, rkey, tl_index, dst_memh);
-            if (status == UCC_OK) {
-                return UCC_OK;
-            }
+    if (dst_memh) {
+        /* check if segment is in dst memh */
+        status = find_tl_index(dst_memh[grank], &tl_index);
+        if (status == UCC_ERR_NOT_FOUND) {
+           tl_error(UCC_TL_TEAM_LIB(team),
+             "attempt to perform one-sided operation with malformed mem map handle");
+           return status;
         }
-        /* general error if nothing was found */
-        tl_error(UCC_TL_TEAM_LIB(team),
-            "attempt to perform one-sided operation on non-registered memory %p", va);
-        return UCC_ERR_NOT_FOUND;
-    }
-    if (ucc_unlikely(NULL == UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment))) {
-        ucs_status_t ucs_status =
-            ucp_ep_rkey_unpack(*ep, PTR_OFFSET(keys, key_offset),
-                               &UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment));
-        if (UCS_OK != ucs_status) {
-            return ucs_status_to_ucc_status(ucs_status);
+        status = ucc_tl_ucp_check_memh(ep, grank, peer, va, rva, rkey, tl_index, dst_memh);
+        if (status == UCC_OK) {
+            return UCC_OK;
         }
     }
-
-    tl_error(
-        UCC_TL_TEAM_LIB(team),
-        "attempt to perform one-sided operation on non-registered memory %p",
-        va);
+    /* general error if nothing was found */
+    tl_error(UCC_TL_TEAM_LIB(team),
+        "attempt to perform one-sided operation on non-registered memory %p", va);
     return UCC_ERR_NOT_FOUND;
 }
 
@@ -639,6 +625,7 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
     }
 
     ucp_status = ucp_put_nbx(ep, buffer, msglen, rva, rkey, &req_param);
+
     task->onesided.put_posted++;
     if (UCS_OK != ucp_status) {
         if (UCS_PTR_IS_ERR(ucp_status)) {
@@ -698,6 +685,7 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
     }
 
     ucp_status = ucp_get_nbx(ep, buffer, msglen, rva, rkey, &req_param);
+
     task->onesided.get_posted++;
     if (UCS_OK != ucp_status) {
         if (UCS_PTR_IS_ERR(ucp_status)) {
@@ -715,11 +703,11 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
                                                  ucc_mem_map_mem_h *dest_memh,
                                                  ucc_tl_ucp_team_t *team)
 {
-    ucp_request_param_t req_param   = {0};
-    int                 segment     = 0;
-    uint64_t            one         = 1;
-    ucp_rkey_h          rkey        = NULL;
-    uint64_t            rva         = 0;
+    ucp_request_param_t req_param = {0};
+    int                 segment   = 0;
+    uint64_t            one       = 1;
+    ucp_rkey_h          rkey      = NULL;
+    uint64_t            rva       = 0;
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
