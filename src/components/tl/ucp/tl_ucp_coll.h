@@ -89,6 +89,8 @@ enum ucc_tl_ucp_task_flags {
     UCC_TL_UCP_TASK_FLAG_SUBSET      = UCC_BIT(0),
     /* indicates usage of dynamic segments */
     UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG = UCC_BIT(1),
+    /* indicates onesided operations have been started */
+    UCC_TL_UCP_TASK_FLAG_OPS_STARTED = UCC_BIT(2),
 };
 
 typedef struct ucc_tl_ucp_allreduce_sw_pipeline
@@ -110,10 +112,10 @@ typedef struct {
     ucc_mem_map_memh_t *src_memh_pack;
     ucc_mem_map_memh_t *dst_memh_pack;
     void               *exchange_buffer;
-    void               *global_buffer;
     ucc_mem_map_memh_t *src_memh_local;
     ucc_mem_map_memh_t *dst_memh_local;
-} ucc_tl_ucp_dynamic_segment_args_t;
+    size_t             *global_sizes;
+} ucc_tl_ucp_dyn_seg_args_t;
 
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
@@ -295,12 +297,16 @@ typedef struct ucc_tl_ucp_task {
         char                        plugin_data[UCC_TL_UCP_TASK_PLUGIN_MAX_DATA];
     };
     struct {
-        ucc_mem_map_memh_t     *src_local;
-        ucc_mem_map_memh_t     *dst_local;
-        ucc_mem_map_memh_t    **src_global;
-        ucc_mem_map_memh_t    **dst_global;
-        ucc_mem_map_memh_t     *gwb_local;
-        ucc_mem_map_memh_t     *gwb_global;
+        ucc_mem_map_memh_t        *src_local;
+        ucc_mem_map_memh_t        *dst_local;
+        ucc_mem_map_memh_t       **src_global;
+        ucc_mem_map_memh_t       **dst_global;
+        ucc_tl_ucp_dyn_seg_args_t *exchange_args;
+        void                      *global_buffer;
+        ucc_service_coll_req_t    *scoll_req_sizes; /* For sizes allgather */
+        ucc_service_coll_req_t    *scoll_req_data; /* For data ex allgather */
+        int                        exchange_step;
+        ucc_status_t               exchange_status;
     } dynamic_segments;
 } ucc_tl_ucp_task_t;
 
@@ -576,7 +582,21 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t *coll_args,
                                                   ucc_tl_ucp_task_t   *task);
 
 ucc_status_t ucc_tl_ucp_coll_dynamic_segment_exchange(ucc_tl_ucp_task_t *task);
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_exchange_nb(ucc_tl_ucp_task_t *task);
 
 ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task);
+
+static inline ucc_status_t ucc_tl_ucp_test_dynamic_segment(ucc_tl_ucp_task_t *task)
+{
+    if (!(task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
+        return UCC_OK;
+    }
+
+    if (task->dynamic_segments.exchange_step < 5) {
+        return ucc_tl_ucp_coll_dynamic_segment_exchange_nb(task);
+    }
+
+    return UCC_OK;
+}
 
 #endif
