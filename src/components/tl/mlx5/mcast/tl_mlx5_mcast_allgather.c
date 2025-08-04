@@ -140,38 +140,33 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_allgather_reliability_ready(ucc_tl_
     return UCC_OK;
 }
 
-static inline ucc_status_t ucc_tl_mlx5_mcast_init_async_reliability_slots(ucc_tl_mlx5_mcast_coll_req_t *req)
+static inline ucc_status_t 
+ucc_tl_mlx5_mcast_init_async_reliability_slots(ucc_tl_mlx5_mcast_coll_req_t *req)
 {
     ucc_tl_mlx5_mcast_coll_comm_t *comm = req->comm;
     char                          *dest;
+    ucc_status_t                   status;
 
     ucc_assert(req->ag_counter == comm->allgather_comm.under_progress_counter);
 
     if (ONE_SIDED_ASYNCHRONOUS_PROTO == req->one_sided_reliability_scheme &&
         ONE_SIDED_INVALID == comm->one_sided.slots_state) {
-        /* copy the sendbuf and seqnum to the internal temp buf in case other processes need
-         * to read from it */
+        
         ucc_assert(req->length <= comm->one_sided.reliability_scheme_msg_threshold);
         dest = PTR_OFFSET(comm->one_sided.slots_buffer,
-                          (req->ag_counter % ONE_SIDED_SLOTS_COUNT)
-                          * comm->one_sided.slot_size);
+                         (req->ag_counter % ONE_SIDED_SLOTS_COUNT)
+                         * comm->one_sided.slot_size);
 
-        /* Copy from user buffer to reliability slots - handle CUDA memory safely */
-        if (comm->cuda_mem_enabled) {
-            /* Use HCA copy if enabled, otherwise use CUDA-aware memory copy */
-            ucc_status_t status = ucc_tl_mlx5_mcast_memcpy(PTR_OFFSET(dest, ONE_SIDED_SLOTS_INFO_SIZE),
-                                                          UCC_MEMORY_TYPE_HOST,
-                                                          req->ptr, UCC_MEMORY_TYPE_CUDA, req->length, comm);
-            if (status != UCC_OK) {
-                tl_error(comm->lib, "memory copy failed in reliability slots");
-                return status;
-            }
-        } else {
-            memcpy(PTR_OFFSET(dest, ONE_SIDED_SLOTS_INFO_SIZE), req->ptr, req->length);
+        status = ucc_tl_mlx5_mcast_memcpy_nb(PTR_OFFSET(dest, ONE_SIDED_SLOTS_INFO_SIZE),
+                                            UCC_MEMORY_TYPE_HOST,
+                                            req->ptr, req->src_mem_type,
+                                            req->length, comm,
+                                            &comm->one_sided.pending_copy_task);
+        if (status != UCC_OK) {
+            tl_error(comm->lib, "failed to start copy to reliability slots");
+            return status;
         }
-        memcpy(dest, &req->ag_counter, ONE_SIDED_SLOTS_INFO_SIZE);
-
-        comm->one_sided.slots_state = ONE_SIDED_VALID;
+        comm->one_sided.slots_state = ONE_SIDED_PENDING_DATA;
     }
     return UCC_OK;
 }
@@ -184,8 +179,24 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_staging_based_allgather(void *re
     ucc_tl_mlx5_mcast_coll_comm_t *comm   = req->comm;
     const int                      zcopy  = req->proto != MCAST_PROTO_EAGER;
     int                            num_recvd;
+    char                          *dest;
 
     ucc_assert(req->to_recv >= 0 && req->to_send >= 0);
+
+    /* Check reliability slots copy completion */
+    if (comm->one_sided.slots_state == ONE_SIDED_PENDING_DATA) {
+        status = ucc_tl_mlx5_mcast_memcpy_test(comm->one_sided.pending_copy_task);
+        if (status == UCC_OK) {
+            /* Calculate dest same way as in init */
+            dest = PTR_OFFSET(comm->one_sided.slots_buffer,
+                            (req->ag_counter % ONE_SIDED_SLOTS_COUNT)
+                            * comm->one_sided.slot_size);
+            memcpy(dest, &req->ag_counter, ONE_SIDED_SLOTS_INFO_SIZE);
+            comm->one_sided.slots_state = ONE_SIDED_VALID;
+        } else if (status != UCC_INPROGRESS) {
+            return status;
+        }
+    }
 
     status = ucc_tl_mlx5_mcast_allgather_reliability_ready(req);
     if (UCC_OK != status) {
@@ -705,15 +716,20 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
     req->scratch_buf              = NULL;
     req->scratch_buf_header       = NULL;
     req->scratch_packets_received = 0;
-    /* - zero copy protocol only provides zero copy design at sender side
-     * - truly zero copy protocol provides zero copy design at receiver side as well
-     * here we select the sender side protocol
-     * - For CUDA staging with scratch buffer optimization, we use EAGER protocol
-     * - For non-CUDA or small messages, we use EAGER protocol
-     * - For large non-CUDA messages, we use ZCOPY protocol
+    /* Protocol selection for sender/receiver behavior:
+     * When truly zero-copy enabled:
+     * - Both sender and receiver use zero-copy (CUDA and non-CUDA)
+     *
+     * When truly zero-copy disabled:
+     * For CUDA memory:
+     * - Sender always uses zero-copy
+     * - Receiver uses staging with scratch buffer
+     *
+     * For non-CUDA memory:
+     * - Small messages use EAGER protocol
+     * - Large messages use ZCOPY protocol (zero-copy at sender only, receiver same as EAGER)
      */
     if (comm->cuda_mem_enabled) {
-        /* For CUDA memory: Use truly zero-copy if enabled, otherwise use staging with scratch buffer */
         if (comm->allgather_comm.truly_zero_copy_allgather_enabled) {
             req->proto = MCAST_PROTO_ZCOPY;
             tl_trace(comm->lib,

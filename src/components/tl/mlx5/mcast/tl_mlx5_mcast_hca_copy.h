@@ -44,4 +44,12 @@ ucc_status_t ucc_tl_mlx5_mcast_memcpy(void *dst, ucc_memory_type_t dst_mtype,
                                       size_t size,
                                       ucc_tl_mlx5_mcast_coll_comm_t *comm);
 
+ucc_status_t ucc_tl_mlx5_mcast_memcpy_nb(void *dst, ucc_memory_type_t dst_mtype,
+                                         void *src, ucc_memory_type_t src_mtype,
+                                         size_t size,
+                                         ucc_tl_mlx5_mcast_coll_comm_t *comm,
+                                         ucc_tl_mlx5_mcast_hca_copy_task_t **copy_task);
+
+ucc_status_t ucc_tl_mlx5_mcast_memcpy_test(ucc_tl_mlx5_mcast_hca_copy_task_t *copy_task);
+
 #endif /* UCC_TL_MLX5_MCAST_HCA_COPY_H_ */

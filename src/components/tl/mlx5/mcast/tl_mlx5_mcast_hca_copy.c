@@ -332,3 +332,41 @@ ucc_status_t ucc_tl_mlx5_mcast_memcpy(void *dst, ucc_memory_type_t dst_mtype,
         return ucc_mc_memcpy(dst, src, size, dst_mtype, src_mtype);
     }
 }
+
+ucc_status_t ucc_tl_mlx5_mcast_memcpy_nb(void *dst, ucc_memory_type_t dst_mtype,
+                                         void *src, ucc_memory_type_t src_mtype,
+                                         size_t size,
+                                         ucc_tl_mlx5_mcast_coll_comm_t *comm,
+                                         ucc_tl_mlx5_mcast_hca_copy_task_t **copy_task)
+{
+    /* If HCA copy enabled and CUDA memory involved */
+    if (comm->one_sided.hca_copy_enabled &&
+        (src_mtype == UCC_MEMORY_TYPE_CUDA || dst_mtype == UCC_MEMORY_TYPE_CUDA)) {
+
+        return ucc_tl_mlx5_mcast_hca_copy_post(dst, dst_mtype, src, src_mtype,
+                                              size, comm, copy_task);
+    }
+
+    /* For non-HCA path: regular mc_memcpy */
+    ucc_status_t status = ucc_mc_memcpy(dst, src, size, dst_mtype, src_mtype);
+    *copy_task = NULL;
+    return status;
+}
+
+ucc_status_t ucc_tl_mlx5_mcast_memcpy_test(ucc_tl_mlx5_mcast_hca_copy_task_t *copy_task)
+{
+    ucc_status_t status;
+
+    if (copy_task == NULL) {
+        /* Non-HCA path completed synchronously */
+        return UCC_OK;
+    }
+
+    /* Test HCA copy completion */
+    status = ucc_tl_mlx5_mcast_hca_copy_test(copy_task);
+    if (status != UCC_INPROGRESS) {
+        /* Copy either completed or failed - clean up */
+        ucc_tl_mlx5_mcast_hca_copy_finalize(copy_task);
+    }
+    return status;
+}
