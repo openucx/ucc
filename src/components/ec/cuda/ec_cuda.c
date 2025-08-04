@@ -101,7 +101,8 @@ static inline void ucc_ec_cuda_set_threads_nbr(int *nt,
             // based on kernel occupancy requirements
             status = ucc_ec_cuda_executor_kernel_calc_max_threads(nt);
             if (status != UCC_OK) {
-                ec_error(&ucc_ec_cuda.super, "Could not calculate max threads: %s",
+                ec_error(&ucc_ec_cuda.super,
+                         "Error while calculating max threads: %s",
                          ucc_status_string(status));
             }
         }
