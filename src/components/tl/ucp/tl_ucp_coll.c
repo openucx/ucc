@@ -499,8 +499,8 @@ static ucc_status_t dynamic_segment_allocate_buffers(ucc_tl_ucp_dyn_seg_args_t *
         return UCC_ERR_NO_MEMORY;
     }
 
-    args->global_buffer = ucc_malloc(args->exchange_size * core_team->size, "global buffer");
-    if (!args->global_buffer) {
+    args->task->dynamic_segments.global_buffer = ucc_malloc(args->exchange_size * core_team->size, "global buffer");
+    if (!args->task->dynamic_segments.global_buffer) {
         tl_error(UCC_TASK_LIB(args->task), "failed to allocate global buffer");
         ucc_free(args->exchange_buffer);
         args->exchange_buffer = NULL;
@@ -530,7 +530,7 @@ static ucc_status_t dynamic_segment_pack_and_exchange_data_start(ucc_tl_ucp_dyn_
     memcpy(PTR_OFFSET(args->exchange_buffer, sizeof(ucc_mem_map_memh_t) + args->max_individual_pack_size + sizeof(size_t) * 2), args->dst_memh_pack,
            args->dst_pack_size + 2 * sizeof(size_t) + sizeof(ucc_mem_map_memh_t));
     /* Allgather the packed memory handles */
-    status = ucc_service_allgather(core_team, args->exchange_buffer, args->global_buffer,
+    status = ucc_service_allgather(core_team, args->exchange_buffer, args->task->dynamic_segments.global_buffer,
                                    args->exchange_size, subset, scoll_req);
     if (status != UCC_OK) {
         tl_error(UCC_TASK_LIB(args->task),
@@ -599,8 +599,8 @@ static ucc_status_t dynamic_segment_import_memory_handles(ucc_tl_ucp_dyn_seg_arg
         src_offset = i * args->exchange_size;
         dst_offset = i * args->exchange_size + args->exchange_size / 2;
 
-        args->task->dynamic_segments.src_global[i] = (ucc_mem_map_memh_t *)PTR_OFFSET(args->global_buffer, src_offset);
-        args->task->dynamic_segments.dst_global[i] = (ucc_mem_map_memh_t *)PTR_OFFSET(args->global_buffer, dst_offset);
+        args->task->dynamic_segments.src_global[i] = (ucc_mem_map_memh_t *)PTR_OFFSET(args->task->dynamic_segments.global_buffer, src_offset);
+        args->task->dynamic_segments.dst_global[i] = (ucc_mem_map_memh_t *)PTR_OFFSET(args->task->dynamic_segments.global_buffer, dst_offset);
 
         args->task->dynamic_segments.src_global[i]->tl_h = ucc_calloc(1, sizeof(ucc_mem_map_tl_t), "global tl_h");
         args->task->dynamic_segments.dst_global[i]->tl_h = ucc_calloc(1, sizeof(ucc_mem_map_tl_t), "global tl_h");
@@ -664,6 +664,7 @@ static void dynamic_segment_cleanup_buffers(ucc_tl_ucp_dyn_seg_args_t *args)
         ucc_free(args->global_sizes);
         args->global_sizes = NULL;
     }
+
 }
 
 UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_exchange_nb, (task),
@@ -758,8 +759,6 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_exchange_n
                 tl_error(UCC_TASK_LIB(task), "failed to test data exchange");
                 goto err_cleanup_global;
             }
-            task->dynamic_segments.exchange_step = 4;
-            return UCC_INPROGRESS;
         }
     }
     status = dynamic_segment_import_memory_handles(task->dynamic_segments.exchange_args);
@@ -776,9 +775,9 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_exchange_n
     return UCC_OK;
 
 err_cleanup_global:
-    if (task->dynamic_segments.exchange_args && task->dynamic_segments.exchange_args->global_buffer) {
-        ucc_free(task->dynamic_segments.exchange_args->global_buffer);
-        task->dynamic_segments.exchange_args->global_buffer = NULL;
+    if (task->dynamic_segments.global_buffer) {
+        ucc_free(task->dynamic_segments.global_buffer);
+        task->dynamic_segments.global_buffer = NULL;
     }
 err_cleanup:
     if (task->dynamic_segments.exchange_args) {
@@ -801,28 +800,6 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_finalize, 
     if (!(task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
         return UCC_OK;
     }
-
-    /* Don't finalize if exchange is still in progress */
-    if (task->dynamic_segments.exchange_step < DYN_SEG_EXCHANGE_STEP_COMPLETE) {
-        return UCC_INPROGRESS;
-    }
-
-    /* Cleanup nonblocking exchange state if it exists */
-    if (task->dynamic_segments.exchange_args) {
-        if (task->dynamic_segments.scoll_req_sizes) {
-            ucc_service_coll_finalize(task->dynamic_segments.scoll_req_sizes);
-            task->dynamic_segments.scoll_req_sizes = NULL;
-        }
-        if (task->dynamic_segments.scoll_req_data) {
-            ucc_service_coll_finalize(task->dynamic_segments.scoll_req_data);
-            task->dynamic_segments.scoll_req_data = NULL;
-        }
-        dynamic_segment_cleanup_buffers(task->dynamic_segments.exchange_args);
-        ucc_free(task->dynamic_segments.exchange_args);
-        task->dynamic_segments.exchange_args = NULL;
-    }
-
-    /* Free global memory handle arrays - don't unmap imported handles as UCX rcache manages them */
     if (task->dynamic_segments.src_global) {
         for (i = 0; i < team_size; i++) {
             if (task->dynamic_segments.src_global[i] &&
@@ -831,9 +808,13 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_finalize, 
                 if (status != UCC_OK) {
                     tl_error(UCC_TASK_LIB(task), "failed to unmap src global memory handle for rank %d", i);
                 }
+                ucc_free(task->dynamic_segments.src_global[i]->tl_h);
+                task->dynamic_segments.src_global[i]->tl_h = NULL;
                 task->dynamic_segments.src_global[i] = NULL;
             }
         }
+        ucc_free(task->dynamic_segments.src_global);
+        task->dynamic_segments.src_global = NULL;
     }
     if (task->dynamic_segments.dst_global) {
         for (i = 0; i < team_size; i++) {
@@ -843,9 +824,42 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_finalize, 
                 if (status != UCC_OK) {
                     tl_error(UCC_TASK_LIB(task), "failed to unmap dst global memory handle for rank %d", i);
                 }
+                ucc_free(task->dynamic_segments.dst_global[i]->tl_h);
+                task->dynamic_segments.dst_global[i]->tl_h = NULL;
                 task->dynamic_segments.dst_global[i] = NULL;
             }
         }
+        ucc_free(task->dynamic_segments.dst_global);
+        task->dynamic_segments.dst_global = NULL;
+    }
+    /* Free global buffer */
+    if (task->dynamic_segments.global_buffer) {
+        ucc_free(task->dynamic_segments.global_buffer);
+        task->dynamic_segments.global_buffer = NULL;
+    }
+    if (task->dynamic_segments.src_local) {
+        if (task->dynamic_segments.src_local->tl_h) {
+            status = ucc_tl_ucp_mem_unmap(&ctx->super.super, UCC_MEM_MAP_MODE_EXPORT, task->dynamic_segments.src_local->tl_h);
+            if (status != UCC_OK) {
+                tl_error(UCC_TASK_LIB(task), "failed to unmap src local memory handle");
+            }
+            ucc_free(task->dynamic_segments.src_local->tl_h);
+            task->dynamic_segments.src_local->tl_h = NULL;
+        }
+        ucc_free(task->dynamic_segments.src_local);
+        task->dynamic_segments.src_local = NULL;
+    }
+    if (task->dynamic_segments.dst_local) {
+        if (task->dynamic_segments.dst_local->tl_h) {
+            status = ucc_tl_ucp_mem_unmap(&ctx->super.super, UCC_MEM_MAP_MODE_EXPORT, task->dynamic_segments.dst_local->tl_h);
+            if (status != UCC_OK) {
+                tl_error(UCC_TASK_LIB(task), "failed to unmap dst local memory handle");
+            }
+            ucc_free(task->dynamic_segments.dst_local->tl_h);
+            task->dynamic_segments.dst_local->tl_h = NULL;
+        }
+        ucc_free(task->dynamic_segments.dst_local);
+        task->dynamic_segments.dst_local = NULL;
     }
     return status;
 }
