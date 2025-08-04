@@ -50,10 +50,10 @@ typedef struct {
     ucc_mem_map_memh_t *src_memh_pack;
     ucc_mem_map_memh_t *dst_memh_pack;
     void               *exchange_buffer;
-    void               *global_buffer;
     ucc_mem_map_memh_t *src_memh_local;
     ucc_mem_map_memh_t *dst_memh_local;
-} ucc_tl_ucp_dynamic_segment_args_t;
+    size_t             *global_sizes;
+} ucc_tl_ucp_dyn_seg_args_t;
 
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
@@ -243,12 +243,16 @@ typedef struct ucc_tl_ucp_task {
     uint32_t flush_posted;
     uint32_t flush_completed;
     struct {
-        ucc_mem_map_memh_t     *src_local;
-        ucc_mem_map_memh_t     *dst_local;
-        ucc_mem_map_memh_t    **src_global;
-        ucc_mem_map_memh_t    **dst_global;
-        ucc_mem_map_memh_t     *gwb_local;
-        ucc_mem_map_memh_t     *gwb_global;
+        ucc_mem_map_memh_t        *src_local;
+        ucc_mem_map_memh_t        *dst_local;
+        ucc_mem_map_memh_t       **src_global;
+        ucc_mem_map_memh_t       **dst_global;
+        ucc_tl_ucp_dyn_seg_args_t *exchange_args;
+        void                      *global_buffer;
+        ucc_service_coll_req_t    *scoll_req_sizes; /* For sizes allgather */
+        ucc_service_coll_req_t    *scoll_req_data; /* For data ex allgather */
+        int                        exchange_step;
+        ucc_status_t               exchange_status;
     } dynamic_segments;
 } ucc_tl_ucp_task_t;
 
