@@ -7715,6 +7715,7 @@ ScopedTrace::~ScopedTrace()
 #  include <crt_externs.h>
 # endif  // GTEST_OS_MAC
 
+# include <cstdint>
 # include <errno.h>
 # include <fcntl.h>
 # include <limits.h>
@@ -9820,6 +9821,7 @@ Matcher<absl::string_view>::Matcher(absl::string_view s) {
 
 
 
+#include <cstdint>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
