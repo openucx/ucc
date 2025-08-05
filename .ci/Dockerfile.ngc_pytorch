@@ -14,7 +14,7 @@ RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucc.sh
 RUN chown -R 6213:11429 /opt/nvidia
 #==============================================================================
 RUN groupadd -g 11429 swx-jenkins
-RUN adduser --no-create-home --uid 6213 --gid 11429 --home /labhome/swx-jenkins swx-jenkins
+RUN useradd --no-create-home --uid 6213 --gid 11429 --home /labhome/swx-jenkins swx-jenkins
 #==============================================================================
 USER swx-jenkins
 
