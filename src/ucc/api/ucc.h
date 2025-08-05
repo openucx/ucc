@@ -1150,7 +1150,7 @@ ucc_status_t ucc_context_progress(ucc_context_h context);
  *  @b Description
  *
  *  @ref ucc_context_destroy routine releases the resources associated
- *  with the handle @e context. All teams associated with the team should be
+ *  with the handle @e context. All teams associated with the context should be
  *  released before this. It is invalid to associate any team with this handle
  *  after the routine is called.
  *
