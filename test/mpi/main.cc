@@ -54,6 +54,7 @@ static size_t msgrange[3] = {
 static std::vector<bool>   inplace      = {false};
 static std::vector<bool>   persistent   = {false};
 static std::vector<bool>   triggered    = {false};
+static std::vector<bool>   local_reg    = {false};
 static ucc_test_mpi_root_t root_type    = ROOT_RANDOM;
 static int                 root_value   = 10;
 static ucc_thread_mode_t   thread_mode  = UCC_THREAD_SINGLE;
@@ -108,6 +109,7 @@ void print_help()
        "-T, --thread-multiple\n\tenable multi-threaded testing\n\n"
        "-v, --verbose\n\tlog all test cases\n\n"
        "--triggered            <value>\n\t0 - use post, 1 - use triggered post, 2 - both\n\n"
+       "--local_reg            <value>\n\t0 - no local registration, 1 - local registration, 2 - both\n\n"
        "-h, --help\n\tShow help\n";
 }
 
@@ -363,6 +365,25 @@ static void process_triggered(const char *arg)
     throw std::string("incorrect triggered: ") + arg;
 }
 
+static void process_local_reg(const char *arg)
+{
+    int value = std::stoi(arg);
+    switch(value) {
+    case 0:
+        local_reg = {false};
+        return;
+    case 1:
+        local_reg = {true};
+        return;
+    case 2:
+        local_reg = {false, true};
+        return;
+    default:
+        break;
+    }
+    throw std::string("incorrect local_reg: ") + arg;
+}
+
 static void process_root(const char *arg)
 {
     auto tokens = str_split(arg, ":");
@@ -527,6 +548,9 @@ void ProcessArgs(int argc, char** argv)
         case 'G':
             process_triggered(optarg);
             break;
+        case 'L':
+            process_local_reg(optarg);
+            break;
         case 'r':
             process_root(optarg);
             break;
@@ -650,10 +674,13 @@ int main(int argc, char *argv[])
     for (auto inpl : inplace) {
         for (auto pers : persistent) {
             for (auto trig: triggered) {
-                test->set_triggered(trig);
-                test->set_inplace(inpl);
-                test->set_persistent(pers);
-                test->run_all();
+                for (auto lr : local_reg) {
+                    test->set_triggered(trig);
+                    test->set_inplace(inpl);
+                    test->set_persistent(pers);
+                    test->set_local_registration(lr);
+                    test->run_all();
+                }
             }
         }
     }

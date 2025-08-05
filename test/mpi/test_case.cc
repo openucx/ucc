@@ -184,6 +184,10 @@ TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
     check_buf      = NULL;
     sbuf_mc_header = NULL;
     rbuf_mc_header = NULL;
+    src_memh       = NULL;
+    dst_memh       = NULL;
+    src_memh_size  = 0;
+    dst_memh_size  = 0;
     test_skip      = TEST_SKIP_NONE;
     args.flags     = 0;
     args.mask      = 0;
@@ -213,13 +217,24 @@ TestCase::~TestCase()
     if (TEST_SKIP_NONE == test_skip) {
         UCC_CHECK(ucc_collective_finalize(req));
     }
+
     if (sbuf_mc_header) {
         UCC_CHECK(ucc_mc_free(sbuf_mc_header));
     }
+
     if (rbuf_mc_header) {
         UCC_CHECK(ucc_mc_free(rbuf_mc_header));
     }
+
     if (check_buf) {
         ucc_free(check_buf);
     }
+
+    if (src_memh) {
+        UCC_CHECK(ucc_mem_unmap(&src_memh));
+    }
+    if (dst_memh) {
+        UCC_CHECK(ucc_mem_unmap(&dst_memh));
+    }
+
 }
