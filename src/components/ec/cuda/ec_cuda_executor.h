@@ -32,6 +32,8 @@ ucc_status_t ucc_cuda_executor_task_finalize(ucc_ee_executor_task_t *task);
 /* implemented in ec_cuda_executor.cu */
 ucc_status_t ucc_ec_cuda_persistent_kernel_start(ucc_ec_cuda_executor_t *eee);
 
+ucc_status_t ucc_ec_cuda_executor_kernel_calc_max_threads(int *max);
+
 ucc_status_t ucc_ec_cuda_reduce(ucc_ee_executor_task_args_t *task,
                                 cudaStream_t                 stream);
 #endif
