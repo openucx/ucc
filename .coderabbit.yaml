@@ -1,0 +1,102 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "en-US"
+early_access: true
+tone_instructions: "Adopt a concise, matter-of-fact style that gets straight to the point without unnecessary pleasantries"
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: '@coderabbitai summary'
+  review_status: true
+  commit_status: true
+  poem: false
+  collapse_walkthrough: true
+  path_filters:
+    - '!test/gtest/common/gtest-all.cc'
+    - '!test/gtest/common/gtest.h'
+  path_instructions:
+    - path: '**/*.hpp'
+      instructions: >-
+        Review the C++ header files, point out issues relative to principles of clean
+        code, expressiveness, and performance. Pay special attention to:
+        - Memory management and resource handling
+        - Thread safety and concurrency issues
+        - Performance implications for HPC workloads
+        - API design consistency with UCC patterns
+        - Error handling and status codes
+        - Proper include guards and forward declarations
+        - Template design and instantiation considerations
+    - path: '**/*.cpp'
+      instructions: >-
+        Review the C++ source files, focusing on:
+        - Memory management and resource cleanup
+        - Thread safety and concurrency patterns
+        - Performance optimizations for HPC workloads
+        - Error handling and exception safety
+        - API implementation consistency
+        - RAII principles and smart pointer usage
+        - Template implementations and specialization
+    - path: '**/*.cc'
+      instructions: >-
+        Review the C++ source files (alternative extension), focusing on:
+        - Memory management and resource cleanup
+        - Thread safety and concurrency patterns
+        - Performance optimizations for HPC workloads
+        - Error handling and exception safety
+        - API implementation consistency
+        - RAII principles and smart pointer usage
+        - Template implementations and specialization
+    - path: '**/*.c'
+      instructions: >-
+        Review the C code focusing on:
+        - Memory management and resource cleanup
+        - Error handling and status propagation
+        - Performance optimizations for HPC
+        - API consistency with UCC patterns
+        - Thread safety considerations
+    - path: '**/*.h'
+      instructions: >-
+        Review C header files for:
+        - API design consistency
+        - Proper include guards
+        - Documentation completeness
+        - Type safety and interface design
+    - path: '**/*.md'
+      instructions: >-
+        Review documentation for:
+        - Technical accuracy
+        - Clarity and completeness
+        - Proper formatting
+        - Link validity
+    - path: '**/Makefile.am'
+      instructions: >-
+        Review autotools build files for:
+        - Correct dependency management
+        - Proper conditional compilation
+        - Build system best practices
+    - path: '**/*.ac'
+      instructions: >-
+        Review autoconf files for:
+        - Proper feature detection
+        - Configuration consistency
+        - Build system integrity
+chat:
+  auto_reply: false
+tools:
+  shellcheck:
+    enabled: true
+  ruff:
+    enabled: true
+  markdownlint:
+    enabled: true
+  languagetool:
+    enabled: true
+    disabled_rules:
+      - EN_UNPAIRED_BRACKETS
+    disabled_categories:
+      - TYPOS
+      - TYPOGRAPHY
+      - CASING
+    enabled_only: false
+    level: default
