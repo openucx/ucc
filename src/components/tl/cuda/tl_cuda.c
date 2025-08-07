@@ -56,6 +56,16 @@ static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
      "Size of the symmetric memory for NVLS, for each task",
      ucc_offsetof(ucc_tl_cuda_lib_config_t, nvls_symmetric_size),
      UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"NVLS_SM_COUNT", "4",
+     "Number of SMs to use for NVLS",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, nvls_sm_count),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"NVLS_THREADS", "1024",
+     "Number of threads per block to use for NVLS",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, nvls_threads),
+     UCC_CONFIG_TYPE_UINT},
 #endif
 
     {NULL}};

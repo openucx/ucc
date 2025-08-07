@@ -31,6 +31,9 @@
 #define UCC_TL_CUDA_MAX_RING_CHUNKS 8
 
 #ifdef HAVE_NVLS
+#define UCC_TL_CUDA_MAX_NVLS_SM_COUNT 32
+#define UCC_TL_CUDA_MAX_NVLS_THREADS 1024
+
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
     (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
      UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
@@ -95,6 +98,8 @@ typedef struct ucc_tl_cuda_lib_config {
     int                 topo_cache_enable;
 #ifdef HAVE_TL_CUDA_NVLS
     size_t              nvls_symmetric_size; // Size of the symmetric memory for NVLS, for each task
+    uint32_t            nvls_sm_count;       // Number of blocks (SMs) to use for NVLS algorithms
+    uint32_t            nvls_threads;        // Number of threads per block to use for NVLS algorithms
 #endif
 } ucc_tl_cuda_lib_config_t;
 

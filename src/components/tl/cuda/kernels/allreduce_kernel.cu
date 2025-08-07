@@ -20,13 +20,9 @@ extern "C" {
 
 #include <cuda_bf16.h>
 
-
-#define MAX_THREADS 1024
-#define MAX_BLOCKS 4
-
-__global__ void __launch_bounds__(MAX_THREADS)
+__global__ void __launch_bounds__(UCC_TL_CUDA_MAX_NVLS_THREADS)
     allreduce_kernel_fp32(float *src_addr, size_t src_count, uint32_t rank,
-                     uint32_t tsize)
+                          uint32_t tsize)
 {
     size_t chunk_start = ((int64_t)src_count * (int64_t)rank) / (int64_t)tsize;
     size_t chunk_end =
@@ -45,7 +41,7 @@ __global__ void __launch_bounds__(MAX_THREADS)
     return;
 }
 
-__global__ void __launch_bounds__(MAX_THREADS)
+__global__ void __launch_bounds__(UCC_TL_CUDA_MAX_NVLS_THREADS)
     allreduce_kernel_bfloat16(float *src_addr, size_t src_count, uint32_t rank,
                               uint32_t tsize)
 {
@@ -70,21 +66,22 @@ __global__ void __launch_bounds__(MAX_THREADS)
 extern "C" {
 #endif
 
-ucc_status_t post_allreduce_kernel(cudaStream_t stream, CUdeviceptr src_addr,
+ucc_status_t post_allreduce_kernel(cudaStream_t stream, uint32_t sm_count,
+                                   uint32_t threads, CUdeviceptr src_addr,
                                    size_t src_size_bytes, uint32_t rank,
                                    uint32_t tsize, ucc_datatype_t datatype)
 {
+    assert(sm_count > 0 && sm_count <= UCC_TL_CUDA_MAX_NVLS_SM_COUNT);
+    assert(threads > 0 && threads <= UCC_TL_CUDA_MAX_NVLS_THREADS);
     switch (datatype) {
     case UCC_DT_FLOAT32:
-        allreduce_kernel_fp32<<<MAX_BLOCKS, MAX_THREADS, 0, stream>>>(
-            (float *)src_addr, src_size_bytes / sizeof(float),
-            rank, tsize);
+        allreduce_kernel_fp32<<<sm_count, threads, 0, stream>>>(
+            (float *)src_addr, src_size_bytes / sizeof(float), rank, tsize);
         break;
     case UCC_DT_BFLOAT16:
         assert(((uintptr_t)(src_addr) % 8) == 0);
-        allreduce_kernel_bfloat16<<<MAX_BLOCKS, MAX_THREADS, 0, stream>>>(
-            (float *)src_addr, src_size_bytes / sizeof(float),
-            rank, tsize);
+        allreduce_kernel_bfloat16<<<sm_count, threads, 0, stream>>>(
+            (float *)src_addr, src_size_bytes / sizeof(float), rank, tsize);
         break;
     default:
         return UCC_ERR_NOT_SUPPORTED;
