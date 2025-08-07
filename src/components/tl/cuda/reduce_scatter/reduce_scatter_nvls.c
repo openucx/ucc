@@ -158,7 +158,6 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
         ucc_debug("reduce scatter kernel is completed");
         break;
     }
-    return;
 }
 
 ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_finalize(ucc_coll_task_t *task)

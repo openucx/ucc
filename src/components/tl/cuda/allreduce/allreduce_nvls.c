@@ -35,6 +35,10 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_nvls_t *nvls   = &team->nvls;
     ucc_ee_h            ee     = task->super.ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
+
+    /* Variables are used in tl_trace below */
+    (void)nvls;
+    (void)stream;
     ucc_datatype_t      dt     = task->allreduce_nvls.dt;
     size_t buf_size_bytes;
 
@@ -208,7 +212,6 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
         task->super.status = UCC_OK;
         break;
     }
-    return;
 }
 
 ucc_status_t ucc_tl_cuda_allreduce_nvls_finalize(ucc_coll_task_t *task)

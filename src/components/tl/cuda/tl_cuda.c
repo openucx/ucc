@@ -9,7 +9,7 @@
 #include "components/mc/base/ucc_mc_base.h"
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
-#ifdef HAVE_TL_CUDA_NVLS
+#ifdef HAVE_NVLS
 #include "allreduce/allreduce.h"
 #endif
 #include "bcast/bcast.h"
@@ -51,7 +51,7 @@ static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
      ucc_offsetof(ucc_tl_cuda_lib_config_t, topo_cache_enable),
      UCC_CONFIG_TYPE_BOOL},
 
-#ifdef HAVE_TL_CUDA_NVLS
+#ifdef HAVE_NVLS
     {"NVLS_SYMMETRIC_SIZE", "512Mb",
      "Size of the symmetric memory for NVLS, for each task",
      ucc_offsetof(ucc_tl_cuda_lib_config_t, nvls_symmetric_size),
@@ -128,7 +128,7 @@ __attribute__((constructor)) static void tl_cuda_iface_init(void)
         ucc_tl_cuda_allgather_algs;
     ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
         ucc_tl_cuda_allgatherv_algs;
-#ifdef HAVE_TL_CUDA_NVLS
+#ifdef HAVE_NVLS
     ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLREDUCE)] =
         ucc_tl_cuda_allreduce_algs;
 #endif
