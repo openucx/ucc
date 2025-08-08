@@ -249,6 +249,7 @@ struct TestCaseParams {
     size_t msgsize;
     bool inplace;
     bool persistent;
+    bool local_registration;
     ucc_datatype_t dt;
     ucc_reduction_op_t op;
     ucc_memory_type_t mt;

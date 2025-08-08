@@ -63,9 +63,11 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
 exit:
     if (dst_header) {
         ucc_pt_free(dst_header);
+        dst_header = NULL;
     }
     if (src_header) {
         ucc_pt_free(src_header);
+        src_header = NULL;
     }
     throw std::runtime_error("failed to initialize alltoallv arguments");
 }
@@ -101,4 +103,14 @@ float ucc_pt_coll_alltoallv::get_bw(float time_ms, int grsize,
     S = src_size > dst_size ? src_size : dst_size;
 
     return (S / time_ms) * ((N - 1) / N) / 1000.0;
+}
+
+ucc_pt_coll_alltoallv::~ucc_pt_coll_alltoallv()
+{
+    if (src_header) {
+        ucc_pt_free(src_header);
+    }
+    if (dst_header) {
+        ucc_pt_free(dst_header);
+    }
 }

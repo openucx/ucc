@@ -160,6 +160,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_ucp_config->super,
                               params->context);
     memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
+    self->thread_mode = params->thread_mode;
     lib = ucc_derived_of(self->super.super.lib, ucc_tl_ucp_lib_t);
     prefix = strdup(params->prefix);
     if (!prefix) {
@@ -237,6 +238,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         self->sendrecv_cbs.ucc_tl_ucp_recv_nb = ucc_tl_ucp_recv_nb_st;
         self->sendrecv_cbs.ucc_tl_ucp_send_nz = ucc_tl_ucp_send_nz_st;
         self->sendrecv_cbs.ucc_tl_ucp_recv_nz = ucc_tl_ucp_recv_nz_st;
+        self->sendrecv_cbs.send_cb            = ucc_tl_ucp_send_completion_cb_st;
+        self->sendrecv_cbs.recv_cb            = ucc_tl_ucp_recv_completion_cb_st;
+        self->sendrecv_cbs.p2p_counter_inc    = ucc_tl_ucp_send_recv_counter_inc_st;
         break;
     case UCC_THREAD_MULTIPLE:
         worker_params.thread_mode = UCS_THREAD_MODE_MULTI;
@@ -244,6 +248,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         self->sendrecv_cbs.ucc_tl_ucp_recv_nb = ucc_tl_ucp_recv_nb_mt;
         self->sendrecv_cbs.ucc_tl_ucp_send_nz = ucc_tl_ucp_send_nz_mt;
         self->sendrecv_cbs.ucc_tl_ucp_recv_nz = ucc_tl_ucp_recv_nz_mt;
+        self->sendrecv_cbs.send_cb            = ucc_tl_ucp_send_completion_cb_mt;
+        self->sendrecv_cbs.recv_cb            = ucc_tl_ucp_recv_completion_cb_mt;
+        self->sendrecv_cbs.p2p_counter_inc    = ucc_tl_ucp_send_recv_counter_inc_mt;
         break;
     default:
         /* unreachable */
