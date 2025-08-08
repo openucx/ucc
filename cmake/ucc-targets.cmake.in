@@ -1,13 +1,16 @@
 #
-# Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 set(prefix ${CMAKE_CURRENT_LIST_DIR}/../../..)
 set(exec_prefix "@exec_prefix@")
 
-add_library(ucc::ucc SHARED IMPORTED)
+# Check if target already exists to avoid duplicate target errors
+if(NOT TARGET ucc::ucc)
+  add_library(ucc::ucc SHARED IMPORTED)
 
-set_target_properties(ucc::ucc PROPERTIES
-  IMPORTED_LOCATION "@libdir@/libucc.so"
-  INTERFACE_INCLUDE_DIRECTORIES "@includedir@"
-)
+  set_target_properties(ucc::ucc PROPERTIES
+    IMPORTED_LOCATION "@libdir@/libucc.so"
+    INTERFACE_INCLUDE_DIRECTORIES "@includedir@"
+  )
+endif()
