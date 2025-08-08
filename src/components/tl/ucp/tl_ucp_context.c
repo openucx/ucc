@@ -193,7 +193,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
             tl_error(self->super.super.lib, "failed to convert net devices to string");
             goto err_cfg;
         }
-        ucc_print("net_devices_str: %s", net_devices_str);
         UCP_CHECK(ucp_config_modify(ucp_config, "NET_DEVICES", net_devices_str),
                   "failed to set net devices", err_cfg, self);
     }
