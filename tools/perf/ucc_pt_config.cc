@@ -20,6 +20,7 @@ ucc_pt_config::ucc_pt_config() {
     bench.op             = UCC_OP_SUM;
     bench.inplace        = false;
     bench.persistent     = false;
+    bench.mapped         = false;
     bench.triggered      = false;
     bench.n_iter_small   = 1000;
     bench.n_warmup_small = 100;
@@ -101,7 +102,7 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
     optind = 1;
 
     while (1) {
-        c = getopt_long(argc, argv, "c:b:e:d:f:m:n:w:o:N:r:S:iphFT", long_options, &option_index);
+        c = getopt_long(argc, argv, "c:b:e:d:f:m:n:w:o:N:r:S:iphFTM", long_options, &option_index);
         if (c == -1)
             break;
         if (c == 0) { // long option
@@ -261,6 +262,9 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
             case 'p':
                 bench.persistent = true;
                 break;
+            case 'M':
+                bench.mapped = true;
+                break;
             case 'T':
                 bench.triggered = true;
                 break;
@@ -292,6 +296,7 @@ void ucc_pt_config::print_help()
     std::cout << "  -w <number>: number of warmup iterations"<<std::endl;
     std::cout << "  -f <number>: multiplication factor between sizes. Default : 2."<<std::endl;
     std::cout << "  -N <number>: number of buffers"<<std::endl;
+    std::cout << "  -M: use local memory registration for collectives"<<std::endl;
     std::cout << "  -T: triggered collective"<<std::endl;
     std::cout << "  -F: enable full print"<<std::endl;
     std::cout << "  -S: <number>: root shift for rooted collectives"<<std::endl;
