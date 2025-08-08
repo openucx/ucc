@@ -484,7 +484,7 @@ void print_info()
 
 void ProcessArgs(int argc, char** argv)
 {
-    const char *const short_opts  = "c:t:m:d:o:M:I:P:N:r:s:C:D:i:Z:G:ThvS:O:";
+    const char *const short_opts  = "c:t:m:d:o:M:I:P:N:r:s:C:D:i:Z:G:ThvS:O:L:";
     const option      long_opts[] = {
                                 {"colls", required_argument, nullptr, 'c'},
                                 {"teams", required_argument, nullptr, 't'},
@@ -508,6 +508,7 @@ void ProcessArgs(int argc, char** argv)
                                 {"set_device", required_argument, nullptr, 'S'},
 #endif
                                 {"onesided", required_argument, nullptr, 'O'},
+                                {"local_registration", required_argument, nullptr, 'L'},
                                 {"help", no_argument, nullptr, 'h'},
                                 {nullptr, no_argument, nullptr, 0}
     };
@@ -583,6 +584,7 @@ void ProcessArgs(int argc, char** argv)
         case 'O':
             has_onesided = std::stoi(optarg);
             break;
+
         case 'v':
             verbose = true;
             break;

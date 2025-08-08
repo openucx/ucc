@@ -38,6 +38,8 @@ protected:
     ucc_ee_executor_task_args_t executor_args;
     ucc_mc_buffer_header_t *dst_header;
     ucc_mc_buffer_header_t *src_header;
+    ucc_mem_map_mem_h src_memh;
+    ucc_mem_map_mem_h dst_memh;
 public:
     ucc_pt_coll(ucc_pt_comm *communicator, ucc_pt_generator_base *generator)
     {
@@ -45,6 +47,8 @@ public:
         this->generator = generator;
         src_header = nullptr;
         dst_header = nullptr;
+        src_memh = nullptr;
+        dst_memh = nullptr;
     }
     virtual ucc_status_t init_args(ucc_pt_test_args_t &args) = 0;
     virtual void free_args(ucc_pt_test_args_t &args) {}
@@ -63,11 +67,12 @@ class ucc_pt_coll_allgather: public ucc_pt_coll {
 public:
     ucc_pt_coll_allgather(ucc_datatype_t dt, ucc_memory_type mt,
                           bool is_inplace, bool is_persistent,
+                          bool is_mapped,
                           ucc_pt_comm *communicator,
                           ucc_pt_generator_base *generator);
     ucc_status_t init_args(ucc_pt_test_args_t &args) override;
-    void free_args(ucc_pt_test_args_t &args) override;
     float get_bw(float time_ms, int grsize, ucc_pt_test_args_t args) override;
+    ~ucc_pt_coll_allgather();
 };
 
 class ucc_pt_coll_allgatherv: public ucc_pt_coll {
@@ -110,6 +115,7 @@ public:
                           ucc_pt_generator_base *generator);
     ucc_status_t init_args(ucc_pt_test_args_t &args) override;
     float get_bw(float time_ms, int grsize, ucc_pt_test_args_t args) override;
+    ~ucc_pt_coll_alltoallv();
 };
 
 class ucc_pt_coll_barrier: public ucc_pt_coll {

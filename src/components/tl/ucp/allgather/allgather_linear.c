@@ -34,8 +34,8 @@ ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task)
 
     /* Copy local data to the receive buffer if not in-place */
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-        status = ctx->copy.post(PTR_OFFSET(rbuf, data_size * trank), rmem,
-                                sbuf, smem, data_size, task,
+        status = ctx->copy.post(PTR_OFFSET(rbuf, data_size * trank), rmem, NULL,
+                                sbuf, smem, NULL, data_size, task,
                                 &task->allgather_linear.copy_task);
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
@@ -45,7 +45,7 @@ ucc_status_t ucc_tl_ucp_allgather_linear_start(ucc_coll_task_t *coll_task)
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
-/* Get the number of requests in flight to be used for the allgather batched algorithm 
+/* Get the number of requests in flight to be used for the allgather batched algorithm
  * If the number of requests is not specified, use the number of team size - 1
  * If number of request is bigger than the team size - 1, use the team size - 1
  */
