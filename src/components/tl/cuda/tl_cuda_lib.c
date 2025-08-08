@@ -23,6 +23,38 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_lib_t, const ucc_base_lib_params_t *params,
     if (self->cfg.allgather_ring_num_chunks > UCC_TL_CUDA_MAX_RING_CHUNKS) {
         self->cfg.allgather_ring_num_chunks = UCC_TL_CUDA_MAX_RING_CHUNKS;
     }
+#ifdef HAVE_NVLS
+    if (self->cfg.nvls_sm_count < 1) {
+        tl_error(
+            &self->super,
+            "nvls_sm_count is too small, min is 1, please check NVLS_SM_COUNT "
+            "config parameter");
+        return UCC_ERR_INVALID_PARAM;
+    }
+    if (self->cfg.nvls_sm_count > UCC_TL_CUDA_MAX_NVLS_SM_COUNT) {
+        tl_error(
+            &self->super,
+            "nvls_sm_count is too large, max is %d, please check NVLS_SM_COUNT "
+            "config parameter",
+            UCC_TL_CUDA_MAX_NVLS_SM_COUNT);
+        return UCC_ERR_INVALID_PARAM;
+    }
+    if (self->cfg.nvls_threads < 1) {
+        tl_error(
+            &self->super,
+            "nvls_threads is too small, min is 1, please check NVLS_THREADS "
+            "config parameter");
+        return UCC_ERR_INVALID_PARAM;
+    }
+    if (self->cfg.nvls_threads > UCC_TL_CUDA_MAX_NVLS_THREADS) {
+        tl_error(
+            &self->super,
+            "nvls_threads is too large, max is %d, please check NVLS_THREADS "
+            "config parameter",
+            UCC_TL_CUDA_MAX_NVLS_THREADS);
+        return UCC_ERR_INVALID_PARAM;
+    }
+#endif
 
     /* min scratch size should be large enough so that
      * ucc_align_down_pow2(scratch_size / nrings / nchunks / dt_size / 2, 64) > 1

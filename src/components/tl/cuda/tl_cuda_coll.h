@@ -45,6 +45,20 @@ extern const char
         (PTR_OFFSET(_scratch, (_task)->coll_id * _scratch_size));              \
     })
 
+#define TASK_SYMMETRIC_MC(_task)                                                   \
+    ({                                                                             \
+        ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                              \
+        size_t _symm_size = UCC_TL_CUDA_TEAM_LIB(_team)->cfg.nvls_symmetric_size;  \
+        (PTR_OFFSET(_team->nvls.mc_va, (_task)->coll_id * _symm_size));            \
+    })
+
+#define TASK_SYMMETRIC_UC(_task)                                                   \
+    ({                                                                             \
+        ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                              \
+        size_t _symm_size = UCC_TL_CUDA_TEAM_LIB(_team)->cfg.nvls_symmetric_size;  \
+        (PTR_OFFSET(_team->nvls.uc_va, (_task)->coll_id * _symm_size));            \
+    })
+
 static inline void ucc_tl_cuda_task_reset(ucc_tl_cuda_task_t *task)
 {
     task->super.status = UCC_INPROGRESS;
@@ -141,7 +155,7 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
     return UCC_OK;
 }
 
-// check if segment for current task is available and barrier is available (completed from prev iteration) 
+// check if segment for current task is available and barrier is available (completed from prev iteration)
 // and possibly mark the segment as occupied by updating the state counter to the current seq_num
 static inline ucc_status_t ucc_tl_cuda_get_sync_root(ucc_tl_cuda_task_t *task, ucc_rank_t root)
 {

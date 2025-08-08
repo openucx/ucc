@@ -17,10 +17,7 @@ extern "C" {
 }
 #endif
 
-#define MAX_THREADS 1024
-#define MAX_BLOCKS 10
-
-__global__ void __launch_bounds__(MAX_THREADS)
+__global__ void __launch_bounds__(UCC_TL_CUDA_MAX_NVLS_THREADS)
     reduce_scatter_kernel(float *src_addr, float *dst_addr, size_t src_count,
                           uint32_t rank, uint32_t tsize)
 {
@@ -46,14 +43,15 @@ __global__ void __launch_bounds__(MAX_THREADS)
 extern "C" {
 #endif
 
-ucc_status_t post_reduce_scatter_kernel(cudaStream_t stream,
-                                        CUdeviceptr  src_addr,
-                                        CUdeviceptr  dst_addr,
-                                        size_t       src_size_bytes,
-                                        uint32_t     rank,
-                                        uint32_t     tsize)
+ucc_status_t post_reduce_scatter_kernel(cudaStream_t stream, uint32_t sm_count,
+                                        uint32_t threads, CUdeviceptr src_addr,
+                                        CUdeviceptr dst_addr,
+                                        size_t src_size_bytes, uint32_t rank,
+                                        uint32_t tsize)
 {
-    reduce_scatter_kernel<<<MAX_BLOCKS, MAX_THREADS, 0, stream>>>(
+    assert(sm_count > 0 && sm_count <= UCC_TL_CUDA_MAX_NVLS_SM_COUNT);
+    assert(threads > 0 && threads <= UCC_TL_CUDA_MAX_NVLS_THREADS);
+    reduce_scatter_kernel<<<sm_count, threads, 0, stream>>>(
         (float *)src_addr, (float *)dst_addr, src_size_bytes / sizeof(float),
         rank, tsize);
     CUDA_CHECK(cudaGetLastError());
