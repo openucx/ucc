@@ -112,13 +112,13 @@ ucc_tl_cuda_nvls_share_handles(struct ucc_tl_cuda_team *self, int export_handle,
                                  sizeof(export_handle), self->oob.coll_info,
                                  &self->oob_req);
     if (UCC_OK != status) {
-        ucc_error("failed to allgather export handle");
+        tl_error(UCC_TL_TEAM_LIB(self), "failed to allgather export handle");
         return status;
     }
 
     while (UCC_OK != (status = self->oob.req_test(self->oob_req))) {
         if (status < 0) {
-            ucc_error("failed to test allgather export handle");
+            tl_error(UCC_TL_TEAM_LIB(self), "failed to test allgather export handle");
             return status;
         }
     }
@@ -138,13 +138,13 @@ ucc_tl_cuda_nvls_import_handle(struct ucc_tl_cuda_team *self, int export_handle,
 
     pidFd = syscall(SYS_pidfd_open, targetPid, 0);
     if (pidFd < 0) {
-        ucc_error("failed to open pidfd for pid %d", targetPid);
+        tl_error(UCC_TL_TEAM_LIB(self), "failed to open pidfd for pid %d", targetPid);
         return UCC_ERR_NO_RESOURCE;
     }
 
     peerFd = syscall(SYS_pidfd_getfd, pidFd, export_handle, 0);
     if (peerFd < 0) {
-        ucc_error("failed to get peer fd: %s (errno=%d)", strerror(errno), errno);
+        tl_error(UCC_TL_TEAM_LIB(self), "failed to get peer fd: %s (errno=%d)", strerror(errno), errno);
         close(pidFd);
         return UCC_ERR_NO_RESOURCE;
     }
