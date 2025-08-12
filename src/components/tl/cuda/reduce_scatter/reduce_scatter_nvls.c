@@ -62,12 +62,14 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_start(ucc_coll_task_t *coll_task)
 
 void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t *task   = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t *team   = TASK_TEAM(task);
-    ucc_rank_t          trank  = UCC_TL_TEAM_RANK(team);
-    cudaEvent_t         evt    = task->reduce_scatterv_nvls.evtCompletion;
-    ucc_tl_cuda_nvls_t *nvls   = &team->nvls;
-    cudaStream_t        stream = team->stream;
+    ucc_tl_cuda_task_t *task     = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_team_t *team     = TASK_TEAM(task);
+    ucc_rank_t          trank    = UCC_TL_TEAM_RANK(team);
+    cudaEvent_t         evt      = task->reduce_scatterv_nvls.evtCompletion;
+    ucc_tl_cuda_nvls_t *nvls     = &team->nvls;
+    cudaStream_t        stream   = team->stream;
+    uint32_t            sm_count = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_sm_count;
+    uint32_t            threads  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_threads;
 
     ucc_status_t        status;
     cudaError_t cuda_status;
@@ -105,7 +107,7 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
         task->reduce_scatterv_nvls.stage = STAGE_KERNEL_START;
         // fallthrough
     case STAGE_KERNEL_START:
-        status = post_reduce_scatter_kernel(stream, nvls->mc_va,
+        status = post_reduce_scatter_kernel(stream, sm_count, threads, nvls->mc_va,
                                             (CUdeviceptr) task->reduce_scatterv_nvls.rbuf,
                                             task->reduce_scatterv_nvls.src_size_bytes, trank,
                                             UCC_TL_TEAM_SIZE(team));
@@ -156,7 +158,6 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
         ucc_debug("reduce scatter kernel is completed");
         break;
     }
-    return;
 }
 
 ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_finalize(ucc_coll_task_t *task)

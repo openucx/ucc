@@ -17,6 +17,9 @@ ucc_status_t ucc_cuda_executor_interruptible_get_stream(cudaStream_t *stream)
     uint32_t                 id;
 
     ucc_assert(num_streams > 0);
+    if (ucc_unlikely(num_streams <= 0)) {
+        return UCC_ERR_INVALID_PARAM;
+    }
     st = ucc_ec_cuda_get_resources(&resources);
     if (ucc_unlikely(st != UCC_OK)) {
         return st;
