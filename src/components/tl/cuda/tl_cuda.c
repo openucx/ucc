@@ -9,6 +9,9 @@
 #include "components/mc/base/ucc_mc_base.h"
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
+#ifdef HAVE_NVLS
+#include "allreduce/allreduce.h"
+#endif
 #include "bcast/bcast.h"
 #include "reduce_scatter/reduce_scatter.h"
 #include "reduce_scatterv/reduce_scatterv.h"
@@ -42,11 +45,28 @@ static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
      "reduce_scatterv ring algorithms",
      ucc_offsetof(ucc_tl_cuda_lib_config_t, reduce_scatter_ring_max_rings),
      UCC_CONFIG_TYPE_ULUNITS},
-    
+
     {"TOPO_CACHE_ENABLE", "y",
      "Enable NVLINK topology cache",
      ucc_offsetof(ucc_tl_cuda_lib_config_t, topo_cache_enable),
      UCC_CONFIG_TYPE_BOOL},
+
+#ifdef HAVE_NVLS
+    {"NVLS_SYMMETRIC_SIZE", "512Mb",
+     "Size of the symmetric memory for NVLS, for each task",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, nvls_symmetric_size),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"NVLS_SM_COUNT", "4",
+     "Number of SMs to use for NVLS",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, nvls_sm_count),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"NVLS_THREADS", "1024",
+     "Number of threads per block to use for NVLS",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, nvls_threads),
+     UCC_CONFIG_TYPE_UINT},
+#endif
 
     {NULL}};
 
@@ -108,7 +128,11 @@ __attribute__((constructor)) static void tl_cuda_iface_init(void)
         ucc_tl_cuda_allgather_algs;
     ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
         ucc_tl_cuda_allgatherv_algs;
-    ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_BCAST)] = 
+#ifdef HAVE_NVLS
+    ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLREDUCE)] =
+        ucc_tl_cuda_allreduce_algs;
+#endif
+    ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_BCAST)] =
         ucc_tl_cuda_bcast_algs;
     ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE_SCATTER)] =
         ucc_tl_cuda_reduce_scatter_algs;

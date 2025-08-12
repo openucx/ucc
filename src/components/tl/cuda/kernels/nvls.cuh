@@ -20,4 +20,15 @@
         : "l"(ptr)                                                             \
         : "memory");
 
+#define MULTIMEM_ST_BF16(val, ptr)                                             \
+    asm volatile("multimem.st.global.v4.bf16x2 [%0], {%1,%2,%3,%4};" ::"l"(ptr), \
+                 "r"(val.x), "r"(val.y), "r"(val.z), "r"(val.w)                \
+                 : "memory");
+
+#define MULTIMEM_LD_BF16(val, ptr)                                             \
+    asm("multimem.ld_reduce.global.add.v4.bf16x2 {%0,%1,%2,%3}, [%4];"            \
+        : "=r"(val.x), "=r"(val.y), "=r"(val.z), "=r"(val.w)                   \
+        : "l"(ptr)                                                             \
+        : "memory");
+
 #endif // UCC_TL_CUDA_NVLS_CUH_
