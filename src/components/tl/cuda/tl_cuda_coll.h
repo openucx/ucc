@@ -31,6 +31,12 @@ extern const char
         UCC_TL_CUDA_TEAM_BARRIER(_team, (_task)->coll_id);                     \
     })
 
+#define TASK_STREAM(_task)                                                     \
+    ({                                                                         \
+        ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                          \
+        UCC_TL_CUDA_TEAM_STREAM_IDX(_team, (_task)->coll_id % _team->num_streams); \
+    })
+
 #define TASK_SCRATCH(_task, _rank)                                             \
     ({                                                                         \
         ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                          \
