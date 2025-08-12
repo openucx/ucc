@@ -20,7 +20,7 @@ ucc_base_coll_alg_info_t
         [UCC_TL_CUDA_ALLREDUCE_ALG_AUTO] = {.id =
                                                 UCC_TL_CUDA_ALLREDUCE_ALG_AUTO,
                                             .name = "auto",
-                                            .desc = "allreduce algorithm not available without NVLS"},
+                                            .desc = "allreduce algorithm is not available without NVLS"},
 #endif /* HAVE_NVLS */
         [UCC_TL_CUDA_ALLREDUCE_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
