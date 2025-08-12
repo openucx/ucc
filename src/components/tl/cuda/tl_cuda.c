@@ -48,6 +48,16 @@ static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
      ucc_offsetof(ucc_tl_cuda_lib_config_t, topo_cache_enable),
      UCC_CONFIG_TYPE_BOOL},
 
+    {"ALLTOALL_USE_COPY_ENGINE", "y",
+     "Use copy engine for alltoallv",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, alltoall_use_copy_engine),
+     UCC_CONFIG_TYPE_BOOL},
+
+    {"NUM_STREAMS", "1",
+     "Number of CUDA streams to create per team",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, num_streams),
+     UCC_CONFIG_TYPE_UINT},
+
     {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_cuda_lib_t, ucc_base_lib_t,
