@@ -220,7 +220,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_finalize(ucc_coll_task_t *task)
 
 //NOLINTNEXTLINE(misc-unused-parameters): ev parameter unused as it's not needed for this implementation
 ucc_status_t ucc_tl_cuda_allreduce_nvls_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
-                                                     ucc_coll_task_t *coll_task)
+                                                       ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_status_t        status;
@@ -228,7 +228,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_triggered_post(ucc_ee_h ee, ucc_ev_t *ev
 
     ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
     coll_task->ee = ee;
-    tl_debug(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
+    tl_trace(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
 
     task->allreduce_nvls.stage = STAGE_COPY;
 
@@ -238,8 +238,12 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_triggered_post(ucc_ee_h ee, ucc_ev_t *ev
         post_event.ev_context_size = 0;
         post_event.ev_context      = NULL;
         post_event.req             = &coll_task->super;
-        ucc_ee_set_event_internal(coll_task->ee, &post_event,
-                                  &coll_task->ee->event_out_queue);
+        status = ucc_ee_set_event_internal(coll_task->ee, &post_event,
+                                           &coll_task->ee->event_out_queue);
+        if (ucc_unlikely(status != UCC_OK)) {
+            tl_error(UCC_TASK_LIB(task), "failed to set EE event: %s", ucc_status_string(status));
+            return status;
+        }
     }
     return status;
 }
@@ -255,7 +259,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
     if (coll_args->args.op != UCC_OP_SUM ||
         (coll_args->args.dst.info.datatype != UCC_DT_FLOAT32 &&
          coll_args->args.dst.info.datatype != UCC_DT_BFLOAT16)) {
-        ucc_error("NVLS allreduce is supported only with SUM operation "
+        ucc_warn("NVLS allreduce is supported only with SUM operation "
                   "and float32 or bfloat16 datatype");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -280,7 +284,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
     }
 
     task->allreduce_nvls.dt = coll_args->args.dst.info.datatype;
-    ucc_debug("NVLS allreduce datatype: %ld", (long)task->allreduce_nvls.dt);
+    tl_debug(UCC_TL_TEAM_LIB(team), "NVLS allreduce datatype: %ld", (long)task->allreduce_nvls.dt);
 
     task->super.post     = ucc_tl_cuda_allreduce_nvls_start;
     task->super.triggered_post = ucc_tl_cuda_allreduce_nvls_triggered_post;
