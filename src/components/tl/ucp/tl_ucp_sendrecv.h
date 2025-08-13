@@ -622,6 +622,7 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
     }
 
     ucp_status = ucp_put_nbx(ep, buffer, msglen, rva, rkey, &req_param);
+
     task->onesided.put_posted++;
     if (UCS_OK != ucp_status) {
         if (UCS_PTR_IS_ERR(ucp_status)) {
@@ -678,6 +679,7 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
     }
 
     ucp_status = ucp_get_nbx(ep, buffer, msglen, rva, rkey, &req_param);
+
     task->onesided.get_posted++;
     if (UCS_OK != ucp_status) {
         if (UCS_PTR_IS_ERR(ucp_status)) {
@@ -695,11 +697,11 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
                                                  ucc_mem_map_mem_h *dest_memh,
                                                  ucc_tl_ucp_team_t *team)
 {
-    ucp_request_param_t req_param   = {0};
-    int                 segment     = 0;
-    uint64_t            one         = 1;
-    ucp_rkey_h          rkey        = NULL;
-    uint64_t            rva         = 0;
+    ucp_request_param_t req_param = {0};
+    int                 segment   = 0;
+    uint64_t            one       = 1;
+    ucp_rkey_h          rkey      = NULL;
+    uint64_t            rva       = 0;
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
