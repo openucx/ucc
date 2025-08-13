@@ -124,6 +124,8 @@ std::string TestCase::str() {
     std::string _str = std::string("tc=");
     if (args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS) {
         _str += std::string("Onesided ");
+    } else if (args.mask & UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER) {
+        _str += std::string("DynSeg ");
     }
 
     _str += std::string(ucc_coll_type_str(args.coll_type)) +

@@ -629,10 +629,20 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
                                         params.count_bits = count_bits;
                                         params.displ_bits = displ_bits;
                                         params.buffers    = onesided_bufs;
+                                        params.use_dynamic_segments = false;
 
                                         auto tcs = TestCase::init(team, c, nt, params);
                                         auto res = exec_tests(tcs, triggered, persistent);
                                         rst.insert(rst.end(), res.begin(), res.end());
+
+                                        /* Test dynamic segments for onesided alltoallv */
+                                        if ((c == UCC_COLL_TYPE_ALLTOALLV) &&
+                                            (team.ctx != ctx) && (mt == UCC_MEMORY_TYPE_HOST)) {
+                                            params.use_dynamic_segments = true;
+                                            auto tcs_dynseg = TestCase::init(team, c, nt, params);
+                                            auto res_dynseg = exec_tests(tcs_dynseg, triggered, persistent);
+                                            rst.insert(rst.end(), res_dynseg.begin(), res_dynseg.end());
+                                        }
                                     }
                                 }
                             }
