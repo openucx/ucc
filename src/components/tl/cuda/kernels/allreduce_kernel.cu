@@ -10,7 +10,6 @@ extern "C" {
 
 #include "utils/arch/cuda_def.h"
 #include "../tl_cuda.h"
-#include "ucc/api/ucc.h"
 
 #ifdef __cplusplus
 }

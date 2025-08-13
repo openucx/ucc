@@ -38,9 +38,8 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
     (void)stream;
 
     task->allreduce_nvls.buf_size_bytes = args->dst.info.count * ucc_dt_size(task->allreduce_nvls.dt);
-    task->allreduce_nvls.rbuf = args->dst.info.buffer;
-    task->allreduce_nvls.sbuf =
-        UCC_IS_INPLACE(*args) ? args->dst.info.buffer : args->src.info.buffer;
+    task->allreduce_nvls.rbuf           = args->dst.info.buffer;
+    task->allreduce_nvls.sbuf           = UCC_IS_INPLACE(*args) ? args->dst.info.buffer : args->src.info.buffer;
 
     tl_trace(UCC_TASK_LIB(task),
              "task: %p stream: %p allreduce_nvls_start symmetric uc addr: %p "
@@ -183,7 +182,11 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
                         cudaMemcpyDeviceToDevice,
                         stream);
         if (cuda_status != cudaSuccess) {
-            ucc_error("task: %p, cudaMemcpyAsync failed: %s, stream: %p, sbuf: %p, rbuf: %p, uc_va: %p, buf_size_bytes: %zu", task, cudaGetErrorString(cuda_status), stream, task->allreduce_nvls.sbuf, task->allreduce_nvls.rbuf, (void*) uc_va, task->allreduce_nvls.buf_size_bytes);
+            ucc_error("task: %p, cudaMemcpyAsync failed: %s, stream: %p, sbuf: "
+                      "%p, rbuf: %p, uc_va: %p, buf_size_bytes: %zu",
+                      task, cudaGetErrorString(cuda_status), stream,
+                      task->allreduce_nvls.sbuf, task->allreduce_nvls.rbuf,
+                      (void *)uc_va, task->allreduce_nvls.buf_size_bytes);
             task->super.status = UCC_ERR_NO_RESOURCE;
             return;
         }
@@ -259,13 +262,13 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
     if (coll_args->args.op != UCC_OP_SUM ||
         (coll_args->args.dst.info.datatype != UCC_DT_FLOAT32 &&
          coll_args->args.dst.info.datatype != UCC_DT_BFLOAT16)) {
-        ucc_warn("NVLS allreduce is supported only with SUM operation "
+        tl_debug(UCC_TL_TEAM_LIB(team), "NVLS allreduce is supported only with SUM operation "
                   "and float32 or bfloat16 datatype");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_connected(team->topo))) {
-        ucc_error("NVLS allreduce is supported only on fully connected "
+        tl_debug(UCC_TL_TEAM_LIB(team), "NVLS allreduce is supported only on fully connected "
                   "NVLINK systems");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -284,12 +287,12 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
     }
 
     task->allreduce_nvls.dt = coll_args->args.dst.info.datatype;
-    tl_debug(UCC_TL_TEAM_LIB(team), "NVLS allreduce datatype: %ld", (long)task->allreduce_nvls.dt);
+    tl_debug(UCC_TL_TEAM_LIB(team), "NVLS allreduce datatype: %s", ucc_datatype_str(task->allreduce_nvls.dt));
 
-    task->super.post     = ucc_tl_cuda_allreduce_nvls_start;
+    task->super.post           = ucc_tl_cuda_allreduce_nvls_start;
     task->super.triggered_post = ucc_tl_cuda_allreduce_nvls_triggered_post;
-    task->super.progress = ucc_tl_cuda_allreduce_nvls_progress;
-    task->super.finalize = ucc_tl_cuda_allreduce_nvls_finalize;
+    task->super.progress       = ucc_tl_cuda_allreduce_nvls_progress;
+    task->super.finalize       = ucc_tl_cuda_allreduce_nvls_finalize;
 
     task->bar = TASK_BAR(task);
 
