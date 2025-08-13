@@ -73,8 +73,8 @@ void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
     ucc_rank_t          grank    = UCC_TL_TEAM_RANK(team);
     ucc_rank_t          gsize    = UCC_TL_TEAM_SIZE(team);
     long               *pSync    = TASK_ARGS(task).global_work_buffer;
-    ucc_mem_map_mem_h   src_memh = TASK_ARGS(task).src_memh.local_memh;
-    ucc_mem_map_mem_h  *dst_memh = TASK_ARGS(task).dst_memh.global_memh;
+    ucc_mem_map_mem_h   src_memh;
+    ucc_mem_map_mem_h  *dst_memh;
     ucc_rank_t          peer;
     ucc_status_t        status;
 
