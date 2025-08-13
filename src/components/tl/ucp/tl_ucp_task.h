@@ -33,7 +33,7 @@ typedef struct ucc_tl_ucp_dpu_offload_buf_info
 
 enum ucc_tl_ucp_task_flags {
     /*indicates whether subset field of tl_ucp_task is set*/
-    UCC_TL_UCP_TASK_FLAG_SUBSET = UCC_BIT(0),
+    UCC_TL_UCP_TASK_FLAG_SUBSET      = UCC_BIT(0),
     /* indicates usage of dynamic segments */
     UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG = UCC_BIT(1),
 };

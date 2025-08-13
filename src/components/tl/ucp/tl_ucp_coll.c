@@ -122,8 +122,8 @@ ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
 }
 
 static inline ucc_status_t dynamic_segment_map_memh(ucc_mem_map_memh_t **memh,
-                                                    ucc_coll_args_t *coll_args,
-                                                    int is_src,
+                                                    ucc_coll_args_t     *coll_args,
+                                                    int                  is_src,
                                                     ucc_tl_ucp_task_t   *task)
 {
     ucc_tl_ucp_team_t        *tl_team = UCC_TL_UCP_TASK_TEAM(task);
