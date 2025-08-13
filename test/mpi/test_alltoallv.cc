@@ -25,8 +25,9 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     std::default_random_engine eng;
     size_t                     dt_size, count;
     int                        rank, nprocs, rank_count;
-    bool                       is_onesided;
     void                      *work_buf;
+    bool                       is_onesided;
+    bool                       use_dynamic_segments;
 
     dt          = params.dt;
     dt_size     = ucc_dt_size(dt);
@@ -44,6 +45,9 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     count_bits  = params.count_bits;
     displ_bits  = params.displ_bits;
     is_onesided = (params.buffers != NULL);
+    /* Dynamic segments are enabled when buffers are provided but
+     * use_dynamic_segments is set */
+    use_dynamic_segments = is_onesided && params.use_dynamic_segments;
     work_buf    = NULL;
 
     std::uniform_int_distribution<int> urd(count / 2, count);
@@ -62,7 +66,10 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
                   UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
     if (is_onesided) {
         args.mask  |= UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
-        args.flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+        /* For dynamic segments, do not set MEM_MAPPED_BUFFERS flag */
+        if (!use_dynamic_segments) {
+            args.flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+        }
     }
     if (count_bits == TEST_FLAG_VSIZE_64BIT) {
         args.flags |= UCC_COLL_ARGS_FLAG_COUNT_64BIT;
@@ -103,23 +110,27 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     check_buf = ucc_malloc(rncounts * dt_size, "check buf");
     UCC_MALLOC_CHECK(check_buf);
 
-    if (!is_onesided) {
+    if (!is_onesided || (is_onesided && use_dynamic_segments)) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, sncounts * dt_size, mem_type));
         UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, rncounts * dt_size, mem_type));
         sbuf = sbuf_mc_header->addr;
         rbuf = rbuf_mc_header->addr;
     } else {
-        sbuf                    = params.buffers[MEM_SEND_SEGMENT];
-        rbuf                    = params.buffers[MEM_RECV_SEGMENT];
+        /* Traditional onesided: use pre-mapped buffers */
+        sbuf = params.buffers[MEM_SEND_SEGMENT];
+        rbuf = params.buffers[MEM_RECV_SEGMENT];
+    }
+
+    if (is_onesided) {
         work_buf                = params.buffers[MEM_WORK_SEGMENT];
         args.global_work_buffer = work_buf;
     }
 
-    args.src.info_v.buffer = sbuf;
+    args.src.info_v.buffer   = sbuf;
     args.src.info_v.datatype = dt;
     args.src.info_v.mem_type = mem_type;
 
-    args.dst.info_v.buffer = rbuf;
+    args.dst.info_v.buffer   = rbuf;
     args.dst.info_v.datatype = dt;
     args.dst.info_v.mem_type = mem_type;
 
