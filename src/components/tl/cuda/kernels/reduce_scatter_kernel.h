@@ -15,9 +15,9 @@ extern "C" {
 #endif
 
 // Kernel function declaration
-ucc_status_t post_reduce_scatter_kernel(cudaStream_t stream,
-                                        CUdeviceptr  src_addr,
-                                        CUdeviceptr  dst_addr,
+ucc_status_t post_reduce_scatter_kernel(cudaStream_t stream, uint32_t sm_count,
+                                        uint32_t threads, CUdeviceptr src_addr,
+                                        CUdeviceptr dst_addr,
                                         size_t src_size_bytes, uint32_t rank,
                                         uint32_t tsize);
 #ifdef __cplusplus

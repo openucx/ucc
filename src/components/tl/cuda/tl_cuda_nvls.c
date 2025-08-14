@@ -112,11 +112,13 @@ ucc_tl_cuda_nvls_share_handles(struct ucc_tl_cuda_team *self, int export_handle,
                                  sizeof(export_handle), self->oob.coll_info,
                                  &self->oob_req);
     if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(self), "failed to allgather export handle");
         return status;
     }
 
     while (UCC_OK != (status = self->oob.req_test(self->oob_req))) {
         if (status < 0) {
+            tl_error(UCC_TL_TEAM_LIB(self), "failed to test allgather export handle");
             return status;
         }
     }
@@ -136,13 +138,13 @@ ucc_tl_cuda_nvls_import_handle(struct ucc_tl_cuda_team *self, int export_handle,
 
     pidFd = syscall(SYS_pidfd_open, targetPid, 0);
     if (pidFd < 0) {
-        ucc_error("failed to open pidfd for pid %d", targetPid);
+        tl_error(UCC_TL_TEAM_LIB(self), "failed to open pidfd for pid %d", targetPid);
         return UCC_ERR_NO_RESOURCE;
     }
 
     peerFd = syscall(SYS_pidfd_getfd, pidFd, export_handle, 0);
     if (peerFd < 0) {
-        ucc_error("failed to get peer fd");
+        tl_error(UCC_TL_TEAM_LIB(self), "failed to get peer fd: %s (errno=%d)", strerror(errno), errno);
         close(pidFd);
         return UCC_ERR_NO_RESOURCE;
     }
@@ -189,10 +191,11 @@ static ucc_status_t ucc_tl_cuda_nvls_sync_barrier(struct ucc_tl_cuda_team *self)
 ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
                                    ucc_base_context_t      *tl_context)
 {
+    ucc_tl_cuda_lib_t *lib             = ucc_derived_of(tl_context->lib, ucc_tl_cuda_lib_t);
     ucc_tl_cuda_nvls_t *nvls           = &self->nvls;
-    const size_t        symmetric_size = 1024ULL * 1024ULL * 512ULL; // 512MB
-    size_t              minGran = 0, gran = 0, mcSize;
-    int                 export_handle = 0, device;
+    const size_t        symmetric_size = lib->cfg.max_concurrent * lib->cfg.nvls_symmetric_size;
+    size_t              minGran = 0, gran = 0, mcSize = 0;
+    int                 export_handle = 0, device = 0;
     pid_t              *shared_pids   = NULL;
     void               *uc_va = NULL, *mc_va = NULL;
     ucc_status_t        status = UCC_OK;
@@ -259,6 +262,7 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
         status = ucc_tl_cuda_nvls_create_multicast_object(&mcProp, &mcHandle,
                                                           &export_handle);
         if (status != UCC_OK) {
+            ucc_error("failed to create multicast object");
             goto cleanup;
         }
     }
