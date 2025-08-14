@@ -12,6 +12,7 @@
 #include "utils/ucc_log.h"
 #include "utils/ucc_list.h"
 #include "utils/ucc_string.h"
+#include "utils/ucc_debug.h"
 #include "ucc_progress_queue.h"
 
 static uint32_t ucc_context_seq_num = 0;
@@ -644,6 +645,9 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
     b_params.thread_mode       = lib->attr.thread_mode;
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         ctx->rank = params->oob.oob_ep;
+#ifdef ENABLE_DEBUG
+        ucc_check_wait_for_debugger(ctx->rank);
+#endif
     }
     status = ucc_create_tl_contexts(ctx, config, b_params);
     if (UCC_OK != status) {
