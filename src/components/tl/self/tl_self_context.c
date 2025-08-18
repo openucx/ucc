@@ -50,6 +50,7 @@ ucc_tl_self_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
     return UCC_OK;
 }
 
+/* NOLINTBEGIN */
 ucc_status_t ucc_tl_self_mem_map(const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
                                  ucc_mem_map_memh_t *memh, ucc_mem_map_tl_t *tl_h)
 {
@@ -68,4 +69,5 @@ ucc_status_t ucc_tl_self_memh_pack(const ucc_base_context_t *context,
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
+/* NOLINTEND */
 
