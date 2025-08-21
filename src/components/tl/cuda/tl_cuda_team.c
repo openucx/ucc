@@ -34,8 +34,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
     self->oob         = params->params.oob;
-    self->streams     = NULL;
-    self->num_streams = lib->cfg.num_streams;
+    self->stream      = NULL;
     self->topo        = NULL;
     self->scratch.loc = NULL;
 
@@ -183,15 +182,12 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
         }
         ucc_free(self->ids);
     }
-    if (self->streams) {
-        for (i = 0; i < self->num_streams; i++) {
-            st = cudaStreamDestroy(self->streams[i]);
-            if (st != cudaSuccess) {
-                tl_warn(UCC_TL_TEAM_LIB(self), "cudaStreamDestroy failed: %d (%s)",
-                        st, cudaGetErrorName(st));
-            }
+    if (self->stream) {
+        st = cudaStreamDestroy(self->stream);
+        if (st != cudaSuccess) {
+            tl_warn(UCC_TL_TEAM_LIB(self), "cudaStreamDestroy failed: %d (%s)",
+                    st, cudaGetErrorName(st));
         }
-        ucc_free(self->streams);
     }
     for (i = 0; i < UCC_TL_TEAM_SIZE(self); i++) {
         if (self->scratch.rem[i]) {
@@ -272,7 +268,7 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
         memcpy(&team->scratch.rem_info[i], &team->ids[i].scratch_info,
                sizeof(ucc_tl_cuda_mem_info_t));
     }
-    
+
     if (UCC_TL_TEAM_LIB(team)->log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
         ucc_tl_cuda_team_topo_print_proxies(&team->super, team->topo);
         ucc_tl_cuda_team_topo_print_rings(&team->super, team->topo);
@@ -298,27 +294,16 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     team->sync_state = (ucc_tl_cuda_sync_state_t*)PTR_OFFSET(team->bar,
                             sizeof(ucc_tl_cuda_shm_barrier_t) *
                             resource_num);
-    
-    /* Allocate memory for the array of CUDA streams */
-    team->streams = ucc_malloc(team->num_streams * sizeof(cudaStream_t), "cuda_streams");
-    if (!team->streams) {
-        tl_error(tl_team->context->lib, "failed to allocate memory for CUDA streams");
-        status = UCC_ERR_NO_MEMORY;
-        goto exit_err;
-    }
-    
-    /* Create all CUDA streams */
-    for (i = 0; i < team->num_streams; i++) {
-        CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->streams[i],
-                        cudaStreamNonBlocking), free_streams, status);
-    }
-    
+
+    CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
+        cudaStreamNonBlocking), exit_err, status);
+
     for (i = 0; i < resource_num; i++) {
         sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
         CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&sync->ipc_event_local,
                                                 cudaEventDisableTiming |
                                                 cudaEventInterprocess),
-                        free_streams, status);
+                        exit_err, status);
         CUDA_CHECK_GOTO(cudaIpcGetEventHandle(&sync->ev_handle,
                                              sync->ipc_event_local),
                         exit_err, status);
@@ -329,21 +314,8 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), bar);
     if (status != UCC_OK) {
         tl_error(tl_team->context->lib, "failed to start shm barrier");
-        goto free_streams;
+        goto exit_err;
     }
-    
-    goto barrier;
-
-free_streams:
-    /* Error handling for stream creation failure */
-    if (team->streams) {
-        for (j = 0; j < team->num_streams; j++) {
-            cudaStreamDestroy(team->streams[j]);
-        }
-        ucc_free(team->streams);
-        team->streams = NULL;
-    }
-    goto exit_err;
 
 barrier:
     bar = UCC_TL_CUDA_TEAM_BARRIER(team, 0);
@@ -351,7 +323,7 @@ barrier:
     if (status == UCC_INPROGRESS) {
         return status;
     } else if (status != UCC_OK) {
-        goto free_streams;
+        goto exit_err;
     }
 
     for (i = 0; i < resource_num; i++) {
@@ -363,7 +335,7 @@ barrier:
             peer_sync = UCC_TL_CUDA_TEAM_SYNC(team, j, i);
             CUDA_CHECK_GOTO(cudaIpcOpenEventHandle(&sync->data[j].ipc_event_remote,
                                                   peer_sync->ev_handle),
-                           free_streams, status);
+                           exit_err, status);
         }
     }
     team->oob_req = NULL;

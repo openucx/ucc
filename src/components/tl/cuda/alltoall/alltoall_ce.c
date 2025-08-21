@@ -36,7 +36,6 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucc_status_t        status;
     size_t              data_len;
-    int                 i;
 
     task->alltoallv_ce.get_size   = ucc_tl_cuda_alltoall_get_size;
     task->alltoallv_ce.get_offset = ucc_tl_cuda_alltoall_get_offset;
@@ -69,12 +68,8 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     if (lib->cfg.alltoall_use_copy_engine) {
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: copy engine");
         task->super.triggered_post = ucc_tl_cuda_alltoallv_ce_triggered_post;
-
         task->alltoallv_ce.copy_post = cuda_copy_post;
-        task->alltoallv_ce.evtCompletions = (cudaEvent_t*)ucc_malloc(team->num_streams * sizeof(cudaEvent_t), "alltoallv_ce.evtCompletions");
-        for (i = 0; i < team->num_streams; i++) {
-            CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&task->alltoallv_ce.evtCompletions[i], cudaEventDisableTiming), exit_err, status);
-        }
+        CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&task->alltoallv_ce.evtCompletion, cudaEventDisableTiming), exit_err, status);
     } else {
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: executor");
         task->alltoallv_ce.copy_post = ee_copy_post;
