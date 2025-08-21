@@ -53,16 +53,6 @@
 #define UCC_TL_CUDA_TEAM_CTX(_team)                                            \
     (ucc_derived_of((_team)->super.super.context, ucc_tl_cuda_context_t))
 
-/* For backward compatibility, map stream reference to the first stream */
-#define UCC_TL_CUDA_TEAM_STREAM(_team) ((_team)->streams[0])
-
-/* Get stream by index, or first stream if index is beyond num_streams */
-#define UCC_TL_CUDA_TEAM_STREAM_IDX(_team, _idx) \
-    ((_idx) < (_team)->num_streams ? (_team)->streams[_idx] : (_team)->streams[0])
-
-/* Get number of streams in the team */
-#define UCC_TL_CUDA_TEAM_NUM_STREAMS(_team) ((_team)->num_streams)
-
 #define UCC_TL_CUDA_TEAM_SYNC(_team, _rank, _id)                               \
     ({                                                                         \
         size_t _ctrl_size_rank =                                               \
@@ -112,7 +102,6 @@ typedef struct ucc_tl_cuda_lib_config {
     uint32_t            nvls_threads;        // Number of threads per block to use for NVLS algorithms
 #endif
     int                 alltoall_use_copy_engine;
-    uint32_t            num_streams;    // Number of CUDA streams to create per team
 } ucc_tl_cuda_lib_config_t;
 
 typedef struct ucc_tl_cuda_context_config {
@@ -202,8 +191,7 @@ typedef struct ucc_tl_cuda_team {
     ucc_tl_cuda_sync_state_t  *sync_state;         // Tracks the task currently using the sync segment of shared memory, if free - 0
     ucc_tl_cuda_shm_barrier_t *bar;                // Pointer to the first barrier in an array of size [0; 2 * max_concurrent]. First max_concurrent barriers are for normal mode, the second one for active set mode
     ucc_tl_cuda_scratch_t      scratch;
-    cudaStream_t              *streams;            // Array of CUDA streams
-    uint32_t                   num_streams;        // Number of streams in the array
+    cudaStream_t               stream;             // CUDA stream for the team
     ucc_tl_cuda_rank_id_t     *ids;
     int                       *shared_handles;
     ucc_team_oob_coll_t        oob;
@@ -240,6 +228,7 @@ struct ucc_tl_cuda_task {
             ucc_count_t           *rcnts;
             ucc_aint_t            *sdispl;
             ucc_aint_t            *rdispl;
+            cudaEvent_t            evtCompletion; // CUDA event for completion of the task
             ucc_ee_executor_task_t
                  *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];
             size_t (*get_size)(const ucc_tl_cuda_task_t *task, size_t *bytes,
@@ -250,7 +239,6 @@ struct ucc_tl_cuda_task {
                                       ucc_ee_executor_t       *executor,
                                       ucc_ee_executor_task_t **task,
                                       cudaStream_t             stream);
-            cudaEvent_t*          evtCompletions; // Array of CUDA events for each stream
         } alltoallv_ce;
         struct {
             int                     stage;
