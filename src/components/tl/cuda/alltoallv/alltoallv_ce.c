@@ -431,13 +431,10 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task
         dsts[op_count] = dst;
         sizes[op_count] = data_size;
 
-        // Setup attributes
+        // Setup attributes: leave location hints unset so runtime infers devices
         memset(&attrs[op_count], 0, sizeof(struct cudaMemcpyAttributes));
         attrs[op_count].srcAccessOrder = cudaMemcpySrcAccessOrderAny;
-        attrs[op_count].srcLocHint.id = (int) rank;
-        attrs[op_count].srcLocHint.type = cudaMemLocationTypeDevice;
-        attrs[op_count].dstLocHint.id = (int) peer;
-        attrs[op_count].dstLocHint.type = cudaMemLocationTypeDevice;
+        attrs[op_count].flags = cudaMemcpyFlagPreferOverlapWithCompute;
 
         attrsIdxs[op_count] = op_count;
 
@@ -451,8 +448,13 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task
         &fail_idx, stream);
 
     if (cerr != cudaSuccess) {
-        ucc_error("cudaMemcpyBatchAsync failed: %s (failIdx=%zu)",
-                  cudaGetErrorString(cerr), fail_idx);
+        if (fail_idx != SIZE_MAX) {
+            ucc_error("cudaMemcpyBatchAsync failed: %s (failIdx=%zu)",
+                      cudaGetErrorString(cerr), fail_idx);
+        } else {
+            ucc_error("cudaMemcpyBatchAsync failed: %s",
+                      cudaGetErrorString(cerr));
+        }
         status = UCC_ERR_NO_MESSAGE;
         goto exit;
     }
