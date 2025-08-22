@@ -11,6 +11,7 @@
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
 #include "components/mc/ucc_mc.h"
+#include "components/cl/ucc_cl_type.h" // for UCC_CL_HIER
 #include "utils/ucc_mpool.h"
 #include "utils/ucc_datastruct.h"
 #include "tl_cuda_ep_hash.h"
@@ -229,6 +230,7 @@ struct ucc_tl_cuda_task {
             ucc_aint_t            *sdispl;
             ucc_aint_t            *rdispl;
             cudaEvent_t            evtCompletion; // CUDA event for completion of the task
+            int                    use_copy_engine;
             ucc_ee_executor_task_t
                  *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];
             size_t (*get_size)(const ucc_tl_cuda_task_t *task, size_t *bytes,
@@ -333,4 +335,9 @@ struct ucc_tl_cuda_task {
     };
 };
 
+// Check if the task is part of a CL hier team, used for alltoallv_ce
+static inline int ucc_tl_cuda_task_is_cl_hier(const ucc_tl_cuda_task_t *task)
+{
+    return task && task->super.team && (task->super.team->params.scope == UCC_CL_HIER);
+}
 #endif
