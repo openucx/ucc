@@ -187,7 +187,6 @@ exit_err:
 ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team        = TASK_TEAM(task);
-    ucc_tl_cuda_lib_t  *lib         = UCC_TL_CUDA_TEAM_LIB(team);
     ucc_rank_t          rank        = UCC_TL_TEAM_RANK(team);
     ucc_tl_cuda_sync_t *sync        = TASK_SYNC(task, rank);
     ucc_ee_h            ee          = task->super.ee;
@@ -199,7 +198,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
     size_t              data_size, data_displ;
     ucc_rank_t          i, peer, psrc, pdst;
 
-    if (lib->cfg.alltoall_use_copy_engine) {
+    if (task->alltoallv_ce.use_copy_engine) {
         // If triggered post, use the stream from the executor
         if (ee) {
             stream = (cudaStream_t)ee->ee_context;
@@ -242,7 +241,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
         dst = PTR_OFFSET(task->alltoallv_ce.rbuf, data_displ);
 
         // If triggered post, use the stream from the executor
-        if (lib->cfg.alltoall_use_copy_engine && !ee) {
+        if (task->alltoallv_ce.use_copy_engine && !ee) {
             // Get the current stream
             stream = team->stream;
         }
@@ -280,7 +279,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
         dst                 = PTR_OFFSET(dst, data_displ);
 
         // If triggered post, use the stream from the executor
-        if (lib->cfg.alltoall_use_copy_engine && !ee) {
+        if (task->alltoallv_ce.use_copy_engine && !ee) {
             // Get the current stream
             stream = team->stream;
         }
@@ -296,7 +295,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
         task->alltoallv_ce.num_posted++;
     }
 
-    if (lib->cfg.alltoall_use_copy_engine) {
+    if (task->alltoallv_ce.use_copy_engine) {
         CUDA_CHECK_GOTO(
             cudaEventRecord(task->alltoallv_ce.evtCompletion, stream),
             exit, status);
@@ -483,7 +482,6 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    ucc_tl_cuda_lib_t  *lib  = UCC_TL_CUDA_TEAM_LIB(team);
     ucc_status_t        status;
     int                 i;
 
@@ -510,10 +508,15 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
     case ALLTOALL_CE_STAGE_POST_COPIES:
         /* Use batch copies only on CUDA 13.0+; otherwise fall back */
 #if CUDART_VERSION >= 13000
-        status = ucc_tl_cuda_alltoallv_ce_post_batch_copies(task);
+        if (task->alltoallv_ce.use_copy_engine) {
+            status = ucc_tl_cuda_alltoallv_ce_post_batch_copies(task);
+        } else {
+            status = ucc_tl_cuda_alltoallv_ce_post_copies(task);
+        }
 #else
         status = ucc_tl_cuda_alltoallv_ce_post_copies(task);
 #endif
+
         if (ucc_unlikely(status != UCC_OK)) {
             task->super.status = status;
             return;
@@ -521,7 +524,7 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_COPY;
         /* fall through */
     case ALLTOALL_CE_STAGE_COPY:
-        if (lib->cfg.alltoall_use_copy_engine) {
+        if (task->alltoallv_ce.use_copy_engine) {
             cudaError_t cuda_status =
             cudaEventQuery(task->alltoallv_ce.evtCompletion);
             if (cuda_status == cudaErrorNotReady) {
@@ -719,7 +722,14 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
         }
     }
 
-    if (lib->cfg.alltoall_use_copy_engine) {
+    if (ucc_tl_cuda_task_is_cl_hier(task)) {
+        tl_debug(UCC_TL_TEAM_LIB(team), "CL hier does not support copy engine, fallback to executor");
+        task->alltoallv_ce.use_copy_engine = 0;
+    } else {
+        task->alltoallv_ce.use_copy_engine = lib->cfg.alltoall_use_copy_engine;
+    }
+
+    if (task->alltoallv_ce.use_copy_engine) {
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: copy engine");
         task->super.triggered_post = ucc_tl_cuda_alltoallv_ce_triggered_post;
         task->alltoallv_ce.copy_post = cuda_copy_post;
