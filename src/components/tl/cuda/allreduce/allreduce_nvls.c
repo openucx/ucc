@@ -15,16 +15,8 @@
 
 
 enum {
-    STAGE_COPY,                /*< Copy src buffer to symmetric memory */
-    STAGE_COPY_WAIT,           /*< Wait for the copy to complete */
-    STAGE_COPY_BAR_START,      /*< Start barrier after copy */
-    STAGE_COPY_BAR_TEST,       /*< Test barrier after copy */
-    STAGE_KERNEL_START,        /*< Start kernel */
-    STAGE_KERNEL,              /*< Kernel is running */
-    STAGE_BARRIER_START,       /*< Start barrier after kernel */
-    STAGE_BARRIER_TEST,        /*< Test barrier after kernel */
-    STAGE_COPY_POST,           /*< Copy result buffer from symmetric memory to dst buffer */
-    STAGE_COPY_POST_WAIT,      /*< Wait for the copy to complete */
+    STAGE_KERNEL,    /*< Post memcpy to symmetric buffer, launch kernel, memcpy to destination */
+    STAGE_WAIT,      /*< Wait for the copies and kernel to complete */
 };
 
 ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
@@ -48,7 +40,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
              task, stream, (void *)task->allreduce_nvls.uc_va, (void *)task->allreduce_nvls.mc_va,
              task->allreduce_nvls.buf_size_bytes, UCC_IS_INPLACE(*args));
 
-    task->allreduce_nvls.stage = STAGE_COPY;
+    task->allreduce_nvls.stage = STAGE_KERNEL;
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
@@ -72,7 +64,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
     cudaError_t         cuda_status;
 
     switch (task->allreduce_nvls.stage) {
-    case STAGE_COPY:
+    case STAGE_KERNEL:
         // copy src buffer to symmetric memory first
         cuda_status =
             cudaMemcpyAsync((void *)uc_va, task->allreduce_nvls.sbuf,
@@ -84,98 +76,20 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             task->super.status = UCC_ERR_NO_MEMORY; // TODO: better error code?
             return;
         }
-        cuda_status = cudaEventRecord(
-            ((ucc_ec_cuda_event_t *)task->allreduce_nvls.evtCompletion)->event,
-            stream);
-        if (cuda_status != cudaSuccess) {
-            ucc_error("cudaEventRecord failed: %s",
-                      cudaGetErrorString(cuda_status));
-            task->super.status = UCC_ERR_NO_RESOURCE;
-            return;
-        }
-        task->allreduce_nvls.stage = STAGE_COPY_WAIT;
-        // fallthrough
-    case STAGE_COPY_WAIT:
-        cuda_status = cudaEventQuery(evt);
-        if (cuda_status == cudaErrorNotReady) {
-            task->super.status = UCC_INPROGRESS;
-            return;
-        }
-        if (cuda_status != cudaSuccess) {
-            ucc_error("cudaEventQuery failed %s",
-                      cudaGetErrorString(cuda_status));
-            task->super.status = UCC_ERR_NO_RESOURCE;
-            return;
-        }
-        task->allreduce_nvls.stage = STAGE_COPY_BAR_START;
-        // fallthrough
-    case STAGE_COPY_BAR_START:
-        status = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
-        if (status != UCC_OK) {
-            ucc_error("allreduce barrier start failed");
-            task->super.status = status;
-            return;
-        }
-        task->allreduce_nvls.stage = STAGE_COPY_BAR_TEST;
-        // fallthrough
-    case STAGE_COPY_BAR_TEST:
-        status = ucc_tl_cuda_shm_barrier_test(trank, task->bar);
-        if (status != UCC_OK) {
-            task->super.status = status;
-            return;
-        }
-        task->allreduce_nvls.stage = STAGE_KERNEL_START;
-        // fallthrough
-    case STAGE_KERNEL_START:
+
         status = post_allreduce_kernel(stream, sm_count, threads, mc_va,
                                        task->allreduce_nvls.buf_size_bytes,
-                                       trank, UCC_TL_TEAM_SIZE(team), dt);
+                                       (CUdeviceptr)TASK_NVLS_CONTROL_MC(task),
+                                       (CUdeviceptr)TASK_NVLS_CONTROL_UC(task),
+                                       sm_count * UCC_TL_TEAM_SIZE(team),
+                                       task->allreduce_nvls.coll_id,
+                                       trank,
+                                       UCC_TL_TEAM_SIZE(team), dt);
         if (status != UCC_OK) {
             ucc_error("failed to post allreduce kernel");
             task->super.status = status;
             return;
         }
-        cuda_status = cudaEventRecord(evt, stream);
-        if (cuda_status != cudaSuccess) {
-            ucc_error("cudaEventRecord failed: %s", cudaGetErrorString(cuda_status));
-            task->super.status = UCC_ERR_NO_RESOURCE;
-            return;
-        }
-        task->allreduce_nvls.stage = STAGE_KERNEL;
-        // fallthrough
-    case STAGE_KERNEL:
-        cuda_status = cudaEventQuery(evt);
-        if (cuda_status == cudaErrorNotReady) {
-            task->super.status = UCC_INPROGRESS;
-            return;
-        }
-        if (cuda_status != cudaSuccess) {
-            ucc_error("cudaEventQuery failed %s",
-                      cudaGetErrorString(cuda_status));
-            task->super.status = UCC_ERR_NO_RESOURCE;
-            return;
-        }
-        task->allreduce_nvls.stage = STAGE_BARRIER_START;
-        // fallthrough
-    case STAGE_BARRIER_START:
-        status = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
-        if (status != UCC_OK) {
-            ucc_error("allreduce barrier start failed");
-            task->super.status = status;
-            return;
-        }
-        task->allreduce_nvls.stage = STAGE_BARRIER_TEST;
-        // fallthrough
-    case STAGE_BARRIER_TEST:
-        status = ucc_tl_cuda_shm_barrier_test(trank, task->bar);
-        if (status != UCC_OK) {
-            task->super.status = status;
-            return;
-        }
-        tl_trace(UCC_TASK_LIB(task), "task: %p allreduce kernel is completed", task);
-        task->allreduce_nvls.stage = STAGE_COPY_POST;
-        // fallthrough
-    case STAGE_COPY_POST:
         cuda_status = cudaMemcpyAsync((void *)task->allreduce_nvls.rbuf,
                         (void *)uc_va,
                         task->allreduce_nvls.buf_size_bytes,
@@ -196,9 +110,9 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             task->super.status = UCC_ERR_NO_RESOURCE;
             return;
         }
-        task->allreduce_nvls.stage = STAGE_COPY_POST_WAIT;
+        task->allreduce_nvls.stage = STAGE_WAIT;
         // fallthrough
-    case STAGE_COPY_POST_WAIT:
+    case STAGE_WAIT:
         cuda_status = cudaEventQuery(evt);
         if (cuda_status == cudaErrorNotReady) {
             task->super.status = UCC_INPROGRESS;
@@ -233,7 +147,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_triggered_post(ucc_ee_h ee, ucc_ev_t *ev
     coll_task->ee = ee;
     tl_trace(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
 
-    task->allreduce_nvls.stage = STAGE_COPY;
+    task->allreduce_nvls.stage = STAGE_KERNEL;
 
     status = coll_task->post(coll_task);
     if (ucc_likely(status == UCC_OK)) {
@@ -298,6 +212,8 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
 
     task->allreduce_nvls.uc_va = (CUdeviceptr) TASK_SYMMETRIC_UC(task);
     task->allreduce_nvls.mc_va = (CUdeviceptr) TASK_SYMMETRIC_MC(task);
+
+    task->allreduce_nvls.coll_id = team->nvls.coll_ids[task->coll_id]++;
 
     *task_p = &task->super;
     return UCC_OK;

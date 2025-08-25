@@ -318,9 +318,10 @@ struct ucc_tl_cuda_task {
             void          *sbuf;
             void          *rbuf;
             size_t         buf_size_bytes;
-            CUdeviceptr   mc_va; // Memory handle for MC symmetric memory
-            CUdeviceptr   uc_va; // Memory handle for UC symmetric memory
+            CUdeviceptr    mc_va; // Memory handle for MC symmetric memory
+            CUdeviceptr    uc_va; // Memory handle for UC symmetric memory
             void          *evtCompletion;
+            size_t         coll_id; // Coll id for the NVLS task in flight slot
         } allreduce_nvls;
 #endif
     };
