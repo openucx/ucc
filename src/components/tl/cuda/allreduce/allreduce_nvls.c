@@ -79,9 +79,8 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
 
         status = post_allreduce_kernel(stream, sm_count, threads, mc_va,
                                        task->allreduce_nvls.buf_size_bytes,
-                                       (CUdeviceptr)TASK_NVLS_CONTROL_MC(task),
-                                       (CUdeviceptr)TASK_NVLS_CONTROL_UC(task),
-                                       sm_count * UCC_TL_TEAM_SIZE(team),
+                                       TASK_NVLS_CONTROL_MC(task),
+                                       TASK_NVLS_CONTROL_UC(task),
                                        task->allreduce_nvls.coll_id,
                                        trank,
                                        UCC_TL_TEAM_SIZE(team), dt);

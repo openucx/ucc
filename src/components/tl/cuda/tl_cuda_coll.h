@@ -66,7 +66,7 @@ extern const char
         ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                              \
         size_t _symm_payload_size = UCC_TL_CUDA_TEAM_LIB(_team)->cfg.nvls_symmetric_size;  \
         size_t _symm_size = _symm_payload_size + NVLS_CONTROL_SIZE;  \
-        (PTR_OFFSET(_team->nvls.mc_va, (_task)->coll_id * _symm_size + _symm_payload_size));            \
+        ((CUdeviceptr) PTR_OFFSET(_team->nvls.mc_va, (_task)->coll_id * _symm_size + _symm_payload_size));            \
     })
 
 #define TASK_NVLS_CONTROL_UC(_task)                                                 \
@@ -74,7 +74,7 @@ extern const char
         ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                              \
         size_t _symm_payload_size = UCC_TL_CUDA_TEAM_LIB(_team)->cfg.nvls_symmetric_size;  \
         size_t _symm_size = _symm_payload_size + NVLS_CONTROL_SIZE;  \
-        (PTR_OFFSET(_team->nvls.uc_va, (_task)->coll_id * _symm_size + _symm_payload_size));            \
+        ((CUdeviceptr) PTR_OFFSET(_team->nvls.uc_va, (_task)->coll_id * _symm_size + _symm_payload_size));            \
     })
 
 static inline void ucc_tl_cuda_task_reset(ucc_tl_cuda_task_t *task)

@@ -339,6 +339,9 @@ barrier:
     tl_debug(tl_team->context->lib, "initialized tl team: %p", team);
 
 #ifdef HAVE_NVLS
+    // zero out the nvls struct
+    memset(&team->nvls, 0, sizeof(team->nvls));
+    // initialize the nvls struct
     status = ucc_tl_cuda_nvls_init(team, tl_team->context);
     if (status != UCC_OK) {
         ucc_error("failed to init nvls multicast");

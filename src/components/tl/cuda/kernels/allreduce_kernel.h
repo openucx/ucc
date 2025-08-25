@@ -20,7 +20,6 @@ ucc_status_t post_allreduce_kernel(cudaStream_t stream, uint32_t sm_count,
                                    size_t src_size_bytes,
                                    CUdeviceptr mc_control_addr,
                                    CUdeviceptr uc_control_addr,
-                                   uint32_t expected_blocks, // total num of blocks in the multicast group, num gpus * num blocks per gpu, used for barrier synchronization
                                    uint64_t launch_counter, // launch counter for specific NVLS task in flight slot, used for barrier synchronization
                                    uint32_t rank,
                                    uint32_t tsize, ucc_datatype_t datatype);

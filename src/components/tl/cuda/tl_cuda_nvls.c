@@ -391,9 +391,8 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
         status = UCC_ERR_NO_MEMORY;
         goto cleanup;
     }
-    for (i = 0; i < lib->cfg.max_concurrent; ++i) {
-        nvls->coll_ids[i] = 0;
-    }
+    // Initialize the coll_ids to 0
+    memset(nvls->coll_ids, 0, lib->cfg.max_concurrent * sizeof(size_t));
 
     if (UCC_TL_TEAM_RANK(self) == 0) {
         // root rank initializes the arrival counter for each task

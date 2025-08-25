@@ -57,7 +57,6 @@ ucc_status_t post_allreduce_kernel(cudaStream_t stream, uint32_t sm_count,
                                    size_t src_size_bytes,
                                    CUdeviceptr mc_control_addr,
                                    CUdeviceptr uc_control_addr,
-                                   uint32_t expected_blocks,
                                    uint64_t launch_counter,
                                    uint32_t rank,
                                    uint32_t tsize, ucc_datatype_t datatype)
@@ -68,6 +67,7 @@ ucc_status_t post_allreduce_kernel(cudaStream_t stream, uint32_t sm_count,
     size_t    count_u32  = src_size_bytes / sizeof(uint32_t);
     ucc_tl_cuda_nvls_control_t *mc_bar = reinterpret_cast<ucc_tl_cuda_nvls_control_t *>(mc_control_addr);
     ucc_tl_cuda_nvls_control_t *uc_bar = reinterpret_cast<ucc_tl_cuda_nvls_control_t *>(uc_control_addr);
+    uint32_t expected_blocks = sm_count * tsize; // total num of blocks in the multicast group, num gpus * num blocks per gpu, used for barrier synchronization
 
     switch (datatype) {
     case UCC_DT_FLOAT32:
