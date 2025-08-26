@@ -199,7 +199,6 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
     pid_t              *shared_pids   = NULL;
     void               *uc_va = NULL, *mc_va = NULL;
     ucc_status_t        status = UCC_OK;
-    int                 i = 0;
 
     CUmemGenericAllocationHandle mcHandle = 0;
     CUmemGenericAllocationHandle memhandle = 0;
@@ -395,18 +394,12 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
     memset(nvls->coll_ids, 0, lib->cfg.max_concurrent * sizeof(size_t));
 
     if (UCC_TL_TEAM_RANK(self) == 0) {
-        // root rank initializes the arrival counter for each task
-        ucc_tl_cuda_nvls_control_t control;
-        control.arrival_counter = 0;
-
-        for (i = 0; i < lib->cfg.max_concurrent; ++i) {
-            void *control_uc =
-                PTR_OFFSET((void *)uc_va, i * (lib->cfg.nvls_symmetric_size +
-                                               NVLS_CONTROL_SIZE) +
-                                              lib->cfg.nvls_symmetric_size);
-            CUDA_CHECK(cudaMemcpy(control_uc, &control, sizeof(ucc_tl_cuda_nvls_control_t),
-                       cudaMemcpyHostToDevice));
-        }
+        // root rank zero-initializes the control region for each task slot
+        size_t stride = lib->cfg.nvls_symmetric_size + NVLS_CONTROL_SIZE;
+        void  *control_uc0 =
+            PTR_OFFSET((void *)uc_va, lib->cfg.nvls_symmetric_size);
+        CUDA_CHECK(cudaMemset2D(control_uc0, stride, 0, NVLS_CONTROL_SIZE,
+                                lib->cfg.max_concurrent));
     }
 
     ucc_free(shared_pids);
