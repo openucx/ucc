@@ -763,7 +763,7 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
     }
 
     /* Allocate per-call dedup bitmap if staging-based collective is used */
-    if (req->proto == MCAST_PROTO_EAGER) {
+    if (req->proto == MCAST_PROTO_EAGER && req->num_packets > 1) {
         size_t nbits   = (size_t)comm->commsize * (size_t)req->num_packets;
         size_t nbytes  = (nbits + 7) / 8;
         req->seen_bitmap_nbytes = nbytes;
