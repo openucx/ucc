@@ -178,6 +178,8 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_process_pp(ucc_tl_mlx5_mcast_coll_c
             /* we just received this packet and it is in order, but there is no
              * more space in window so we need to place this packet in the
              * pending queue for future processings */
+            tl_debug(comm->lib, "enqueue pending_q (window full): psn %u req->ag_counter %u to_recv %d num_left %d",
+                     pp->psn, req->ag_counter, req->to_recv, *num_left);
             ucc_list_add_tail(&comm->pending_q, &pp->super);
         } else {
             __builtin_prefetch(PTR_OFFSET(req->ptr, PSN_TO_RECV_OFFSET(pp->psn, req, comm)));
@@ -193,6 +195,8 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_process_pp(ucc_tl_mlx5_mcast_coll_c
         }
     } else if (!in_pending_queue) {
         /* add pp to the pending queue as it is out of order */
+        tl_debug(comm->lib, "enqueue pending_q (out-of-range): psn %u req->ag_counter %u last_acked %u wsize %d",
+                 pp->psn, req->ag_counter, comm->bcast_comm.last_acked, comm->bcast_comm.wsize);
         ucc_list_add_tail(&comm->pending_q, &pp->super);
     }
 
@@ -415,9 +419,6 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
 
     /* check if we have already received something */
     ucc_list_for_each_safe(pp, next, &comm->pending_q, super) {
-        if (recv_progressed >= num_left) {
-            break;
-        }
         ag_counter = (pp->psn / max_commsize) %
                       max_ag_counter;
         if (ag_counter == (req->ag_counter % max_ag_counter)) {
@@ -529,6 +530,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_poll_recv(ucc_tl_mlx5_mcast_coll_co
                 ucc_assert(!PSN_RECEIVED(psn, comm));
                 pp->psn    = psn;
                 pp->length = length;
+                tl_debug(comm->lib, "enqueue pending_q (future psn): psn %u comm->psn %u", psn, comm->psn);
                 ucc_list_add_tail(&comm->pending_q, &pp->super);
             } else {
                 ucc_assert(pp->context == 0);
