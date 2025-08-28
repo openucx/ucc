@@ -334,6 +334,12 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
 
                 dst_mem_type = comm->cuda_mem_enabled ? UCC_MEMORY_TYPE_CUDA : UCC_MEMORY_TYPE_HOST;
                 src_mem_type = UCC_MEMORY_TYPE_HOST; // staging buffer is always HOST
+                /* Debug: log first byte and destination index for validation */
+                if (pp->length > 0) {
+                    size_t dest_idx = (size_t)source_rank * (size_t)req->length + (size_t)((pp->length == comm->max_per_packet) ? (offset * pp->length) : (req->length - pp->length));
+                    tl_debug(comm->lib, "copy fragment: src %d offset %d len %d dest_idx %zu first_byte 0x%02x",
+                             source_rank, offset, pp->length, dest_idx, ((unsigned char*)pp->buf)[0]);
+                }
                 status       = ucc_tl_mlx5_mcast_memcpy(dest, dst_mem_type, (void*) pp->buf,
                                                          src_mem_type, pp->length, comm);
                 if (ucc_unlikely(status != UCC_OK)) {
