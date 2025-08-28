@@ -280,9 +280,13 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
             {
                 size_t idx = (size_t)source_rank * (size_t)req->num_packets + (size_t)offset;
                 if (req->recv_seen && idx < req->recv_seen_len && req->recv_seen[idx]) {
-                    /* already received this fragment: return pp to pool without touching user buffer */
+                    /* already received this fragment: drop duplicate without touching user buffer */
+                    tl_debug(comm->lib, "drop duplicate fragment: src %d ag_counter %u offset %d psn %u",
+                             source_rank, ag_counter, offset, pp->psn);
+                    comm->psn++;
                     pp->context = 0;
                     ucc_list_add_tail(&comm->bpool, &pp->super);
+                    comm->one_sided.posted_recv[pp->qp_id].posted_recvs_count--;
                     return UCC_OK;
                 }
                 if (req->recv_seen && idx < req->recv_seen_len) {
