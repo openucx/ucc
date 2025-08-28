@@ -1,3 +1,5 @@
+# Editor and tooling artifacts
+cscope.out
 # http://www.gnu.org/software/automake
 
 Makefile.in
