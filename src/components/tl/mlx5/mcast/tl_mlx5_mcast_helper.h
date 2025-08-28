@@ -462,6 +462,19 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
         real_num_comp = num_comp;
 
         for (i = 0; i < real_num_comp; i++) {
+            if (recv_progressed >= num_left) {
+                /* We have received enough for this request. Defer remaining
+                 * polled completions to pending_q for later processing. */
+                for (; i < real_num_comp; i++) {
+                    id         = wc[i].wr_id;
+                    pp         = (struct pp_packet*) (id);
+                    pp->length = wc[i].byte_len - GRH_LENGTH;
+                    pp->psn    = ntohl(wc[i].imm_data);
+                    tl_debug(comm->lib, "enqueue pending_q (excess batch): psn %u", pp->psn);
+                    ucc_list_add_tail(&comm->pending_q, &pp->super);
+                }
+                break;
+            }
             ucc_assert(wc[i].status == IBV_WC_SUCCESS);
             id         = wc[i].wr_id;
             pp         = (struct pp_packet*) (id);
