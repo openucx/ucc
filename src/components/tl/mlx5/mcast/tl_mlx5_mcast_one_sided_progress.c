@@ -326,7 +326,9 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
             }
         }
 
-        req->to_recv--;
+        if (req->to_recv > 0) {
+            req->to_recv--;
+        }
         comm->psn++;
         pp->context = 0;
         ucc_list_add_tail(&comm->bpool, &pp->super);

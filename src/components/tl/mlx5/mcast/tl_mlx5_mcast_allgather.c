@@ -24,9 +24,9 @@ do {                                                                            
 } while (0);
 
 #define MCAST_ALLGATHER_IN_PROGRESS(_req, _comm)                                      \
-        (_req->to_send || _req->to_recv || _comm->pending_send ||                     \
-        _comm->one_sided.pending_reads || (NULL != _req->allgather_rkeys_req) ||      \
-         (_req->ag_schedule != NULL && _req->step != _req->ag_schedule->total_steps))
+        (((_req->to_send) > 0) || ((_req->to_recv) > 0) || (_comm->pending_send) ||   \
+        (_comm->one_sided.pending_reads) || (NULL != (_req->allgather_rkeys_req)) ||  \
+         (((_req->ag_schedule) != NULL) && ((_req->step) != (_req->ag_schedule->total_steps))))
 
 static inline ucc_status_t
 ucc_tl_mlx5_mcast_check_staging_based_collective(ucc_tl_mlx5_mcast_coll_comm_t *comm,
@@ -144,11 +144,14 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_init_async_reliability_slots(ucc_tl
 {
     ucc_tl_mlx5_mcast_coll_comm_t *comm = req->comm;
     char                          *dest;
+    double                         t1, t2;
 
     ucc_assert(req->ag_counter == comm->allgather_comm.under_progress_counter);
 
     if (ONE_SIDED_ASYNCHRONOUS_PROTO == req->one_sided_reliability_scheme &&
         ONE_SIDED_INVALID == comm->one_sided.slots_state) {
+
+        t1 = ucc_get_time();
         /* copy the sendbuf and seqnum to the internal temp buf in case other processes need
          * to read from it */
         ucc_assert(req->length <= comm->one_sided.reliability_scheme_msg_threshold);
@@ -172,6 +175,9 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_init_async_reliability_slots(ucc_tl
         memcpy(dest, &req->ag_counter, ONE_SIDED_SLOTS_INFO_SIZE);
 
         comm->one_sided.slots_state = ONE_SIDED_VALID;
+        t2 = ucc_get_time();
+        fprintf(stderr, "[TIME] Rank %d: Reliability init for msg_size %zu took %.3f us\n", 
+                comm->rank, req->length, (t2-t1)*1000000);
     }
     return UCC_OK;
 }
