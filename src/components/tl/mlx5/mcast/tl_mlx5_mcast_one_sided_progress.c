@@ -276,6 +276,20 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
             /* staging based allgather */
             ucc_assert(coll_type == UCC_COLL_TYPE_ALLGATHER);
 
+            /* Drop duplicates: check per-(source,offset) bitmap */
+            {
+                size_t idx = (size_t)source_rank * (size_t)req->num_packets + (size_t)offset;
+                if (req->recv_seen && idx < req->recv_seen_len && req->recv_seen[idx]) {
+                    /* already received this fragment: return pp to pool without touching user buffer */
+                    pp->context = 0;
+                    ucc_list_add_tail(&comm->bpool, &pp->super);
+                    return UCC_OK;
+                }
+                if (req->recv_seen && idx < req->recv_seen_len) {
+                    req->recv_seen[idx] = 1;
+                }
+            }
+
             /* Use scratch buffer optimization when available for CUDA memory.
              * Both reliability and non-reliability paths coordinate properly with scratch buffer. */
             if (req->scratch_buf && comm->cuda_mem_enabled) {

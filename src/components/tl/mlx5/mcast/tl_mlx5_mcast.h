@@ -480,6 +480,9 @@ typedef struct ucc_tl_mlx5_mcast_coll_req {
     char                                               *scratch_buf;
     ucc_mc_buffer_header_t                             *scratch_buf_header;
     int                                                 scratch_packets_received;
+    /* Per-packet receive tracking to avoid double-processing (AG only) */
+    uint8_t                                            *recv_seen;
+    size_t                                              recv_seen_len;
 } ucc_tl_mlx5_mcast_coll_req_t;
 
 typedef struct ucc_tl_mlx5_mcast_oob_p2p_context {

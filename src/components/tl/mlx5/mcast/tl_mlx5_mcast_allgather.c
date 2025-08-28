@@ -790,6 +790,18 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
     req->to_recv    = comm->commsize * req->num_packets;
     req->progress   = ucc_tl_mlx5_mcast_do_staging_based_allgather;
 
+    /* Allocate per-packet receive tracking */
+    req->recv_seen_len = comm->commsize * req->num_packets;
+    if (req->recv_seen_len > 0) {
+        req->recv_seen = ucc_calloc(1, req->recv_seen_len, "recv_seen");
+        if (!req->recv_seen) {
+            status = UCC_ERR_NO_MEMORY;
+            goto failed;
+        }
+    } else {
+        req->recv_seen = NULL;
+    }
+
     if (comm->allgather_comm.truly_zero_copy_allgather_enabled) {
         status = ucc_tl_mlx5_mcast_prepare_zero_copy_allgather(comm, req);
         if (UCC_OK != status) {

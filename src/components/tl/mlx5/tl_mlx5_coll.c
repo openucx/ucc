@@ -92,6 +92,11 @@ ucc_status_t ucc_tl_mlx5_task_finalize(ucc_coll_task_t *coll_task)
             ucc_free(req->ag_schedule);
             req->ag_schedule = NULL;
         }
+        if (req->recv_seen) {
+            ucc_free(req->recv_seen);
+            req->recv_seen = NULL;
+            req->recv_seen_len = 0;
+        }
         if (req->scratch_buf_header) {
             ucc_mc_free(req->scratch_buf_header);
             req->scratch_buf_header = NULL;
