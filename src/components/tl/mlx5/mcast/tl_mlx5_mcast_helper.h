@@ -413,8 +413,16 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
     int               ag_counter;
     ucc_status_t      status;
 
+    /* If the caller doesn't need any packets, do not process pending_q */
+    if (num_left <= 0) {
+        return 0;
+    }
+
     /* check if we have already received something */
     ucc_list_for_each_safe(pp, next, &comm->pending_q, super) {
+        if (recv_progressed >= num_left) {
+            break;
+        }
         ag_counter = (pp->psn / max_commsize) %
                       max_ag_counter;
         if (ag_counter == (req->ag_counter % max_ag_counter)) {
