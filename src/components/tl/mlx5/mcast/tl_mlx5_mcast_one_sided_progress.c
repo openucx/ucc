@@ -236,6 +236,24 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
     // need to check the allgather call counter and ignore this packet if it does not match
 
     if (ag_counter == (req->ag_counter % ONE_SIDED_MAX_ZCOPY_COLL_COUNTER)) {
+        /* Dedup guard: drop duplicate (rank,offset) for this call */
+        if (req->seen_bitmap) {
+            size_t bit_idx   = (size_t)source_rank * (size_t)req->num_packets + (size_t)offset;
+            size_t byte_idx  = bit_idx >> 3;
+            uint8_t mask     = (uint8_t)(1u << (bit_idx & 7));
+            if (ucc_unlikely(byte_idx >= req->seen_bitmap_nbytes)) {
+                tl_error(comm->lib, "seen_bitmap overflow: byte_idx=%zu nbytes=%zu rank=%d offset=%d",
+                         byte_idx, req->seen_bitmap_nbytes, source_rank, offset);
+                return UCC_ERR_NO_MESSAGE;
+            }
+            if (req->seen_bitmap[byte_idx] & mask) {
+                /* duplicate - return pp to pool and skip counters/copies */
+                pp->context = 0;
+                ucc_list_add_tail(&comm->bpool, &pp->super);
+                return UCC_OK;
+            }
+            req->seen_bitmap[byte_idx] |= mask;
+        }
         /* Update reliability tracking FIRST before any data processing */
         if (comm->one_sided.reliability_enabled) {
             /* out of order recv'd packet that happen that is fatal in zero-copy

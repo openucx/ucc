@@ -705,6 +705,8 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
     req->scratch_buf              = NULL;
     req->scratch_buf_header       = NULL;
     req->scratch_packets_received = 0;
+    req->seen_bitmap              = NULL;
+    req->seen_bitmap_nbytes       = 0;
     /* - zero copy protocol only provides zero copy design at sender side
      * - truly zero copy protocol provides zero copy design at receiver side as well
      * here we select the sender side protocol
@@ -757,6 +759,19 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
         req->scratch_buf = req->scratch_buf_header->addr;
         tl_trace(comm->lib,
                  "allocated scratch buffer of size %zu for CUDA staging", scratch_size);
+    }
+
+    /* Allocate per-call dedup bitmap if staging-based collective is used */
+    if (req->proto == MCAST_PROTO_EAGER) {
+        size_t nbits   = (size_t)comm->commsize * (size_t)req->num_packets;
+        size_t nbytes  = (nbits + 7) / 8;
+        req->seen_bitmap_nbytes = nbytes;
+        req->seen_bitmap = (uint8_t*) ucc_calloc(1, nbytes, "mcast_allgather_seen_bitmap");
+        if (!req->seen_bitmap) {
+            tl_error(comm->lib, "failed to allocate seen bitmap of %zu bytes (nbits=%zu)", nbytes, nbits);
+            status = UCC_ERR_NO_MEMORY;
+            goto failed;
+        }
     }
 
     /* Register the send buffer for both zero-copy and CUDA staging protocols */
@@ -819,6 +834,9 @@ failed:
         }
         if (req->scratch_buf_header) {
             ucc_mc_free(req->scratch_buf_header);
+        }
+        if (req->seen_bitmap) {
+            ucc_free(req->seen_bitmap);
         }
         ucc_mpool_put(req);
     }

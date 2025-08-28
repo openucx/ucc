@@ -480,6 +480,9 @@ typedef struct ucc_tl_mlx5_mcast_coll_req {
     char                                               *scratch_buf;
     ucc_mc_buffer_header_t                             *scratch_buf_header;
     int                                                 scratch_packets_received;
+    /* Deduplication bitmap for staging-based allgather: one bit per (rank,offset) */
+    uint8_t                                            *seen_bitmap;
+    size_t                                              seen_bitmap_nbytes;
 } ucc_tl_mlx5_mcast_coll_req_t;
 
 typedef struct ucc_tl_mlx5_mcast_oob_p2p_context {

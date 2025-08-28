@@ -97,6 +97,11 @@ ucc_status_t ucc_tl_mlx5_task_finalize(ucc_coll_task_t *coll_task)
             req->scratch_buf_header = NULL;
             req->scratch_buf = NULL;
         }
+        if (req->seen_bitmap) {
+            ucc_free(req->seen_bitmap);
+            req->seen_bitmap = NULL;
+            req->seen_bitmap_nbytes = 0;
+        }
         ucc_mpool_put(req);
         tl_trace(UCC_TASK_LIB(task), "finalizing an mcast task %p", task);
         task->coll_mcast.req_handle = NULL;
