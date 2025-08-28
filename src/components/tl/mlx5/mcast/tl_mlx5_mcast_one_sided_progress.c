@@ -326,9 +326,7 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
             }
         }
 
-        if (req->to_recv > 0) {
-            req->to_recv--;
-        }
+        req->to_recv--;
         comm->psn++;
         pp->context = 0;
         ucc_list_add_tail(&comm->bpool, &pp->super);
@@ -336,6 +334,8 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
     } else if (ag_counter > (req->ag_counter % ONE_SIDED_MAX_ZCOPY_COLL_COUNTER)) {
         /* received out of order allgather/bcast packet - add it to queue for future
          * processing */
+        tl_debug(comm->lib, "enqueue pending_q (future counter): psn %u src %d ag_counter %u req_counter %u", 
+                 pp->psn, source_rank, ag_counter, (req->ag_counter % ONE_SIDED_MAX_ZCOPY_COLL_COUNTER));
         ucc_list_add_tail(&comm->pending_q, &pp->super);
     } else {
         /* received a packet which was left from previous iterations

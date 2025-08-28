@@ -24,9 +24,9 @@ do {                                                                            
 } while (0);
 
 #define MCAST_ALLGATHER_IN_PROGRESS(_req, _comm)                                      \
-        (((_req->to_send) > 0) || ((_req->to_recv) > 0) || (_comm->pending_send) ||   \
-        (_comm->one_sided.pending_reads) || (NULL != (_req->allgather_rkeys_req)) ||  \
-         (((_req->ag_schedule) != NULL) && ((_req->step) != (_req->ag_schedule->total_steps))))
+        ((_req->to_send || _req->to_recv || _comm->pending_send ||                    \
+        _comm->one_sided.pending_reads || (NULL != _req->allgather_rkeys_req) ||      \
+         (_req->ag_schedule != NULL && _req->step != _req->ag_schedule->total_steps)))
 
 static inline ucc_status_t
 ucc_tl_mlx5_mcast_check_staging_based_collective(ucc_tl_mlx5_mcast_coll_comm_t *comm,
