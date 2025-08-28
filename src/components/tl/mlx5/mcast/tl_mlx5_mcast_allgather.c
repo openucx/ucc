@@ -707,6 +707,7 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
     req->scratch_packets_received = 0;
     req->seen_bitmap              = NULL;
     req->seen_bitmap_nbytes       = 0;
+    req->duplicates_dropped       = 0;
     /* - zero copy protocol only provides zero copy design at sender side
      * - truly zero copy protocol provides zero copy design at receiver side as well
      * here we select the sender side protocol

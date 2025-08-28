@@ -247,9 +247,14 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
                 return UCC_ERR_NO_MESSAGE;
             }
             if (req->seen_bitmap[byte_idx] & mask) {
-                /* duplicate - return pp to pool and skip counters/copies */
+                /* duplicate - return pp to pool and skip counters/copies. Maintain counters */
                 pp->context = 0;
                 ucc_list_add_tail(&comm->bpool, &pp->super);
+                /* Mirror the normal receive tail: to_recv--, psn++, posted_recvs_count-- */
+                req->to_recv--;
+                comm->psn++;
+                comm->one_sided.posted_recv[pp->qp_id].posted_recvs_count--;
+                req->duplicates_dropped++;
                 return UCC_OK;
             }
             req->seen_bitmap[byte_idx] |= mask;
