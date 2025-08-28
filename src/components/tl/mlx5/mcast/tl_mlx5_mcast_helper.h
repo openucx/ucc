@@ -419,13 +419,16 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
                       max_ag_counter;
         if (ag_counter == (req->ag_counter % max_ag_counter)) {
             ucc_list_del(&pp->super);
+            int dup_prev = req->duplicates_dropped;
             status = ucc_tl_mlx5_mcast_process_packet_collective(comm, req, pp, coll_type);
             if (UCC_OK != status) {
                 tl_error(comm->lib, "process mcast packet failed, status %d",
                          status);
                 return -1;
             }
-            recv_progressed++;
+            if (req->duplicates_dropped == dup_prev) {
+                recv_progressed++;
+            }
         }
     };
 
@@ -469,6 +472,7 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
                                  coll_type, pp->psn, pp->length, req->num_packets,
                                  req->to_send, req->to_recv, num_left);
 
+            int dup_prev = req->duplicates_dropped;
             status = ucc_tl_mlx5_mcast_process_packet_collective(comm, req, pp, coll_type);
             if (UCC_OK != status) {
                 tl_error(comm->lib, "process mcast packet failed, status %d",
@@ -477,7 +481,9 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
                 goto exit;
             }
 
-            recv_progressed++;
+            if (req->duplicates_dropped == dup_prev) {
+                recv_progressed++;
+            }
             ucc_assert(pp->qp_id < MAX_GROUP_COUNT);
         }
 
