@@ -74,7 +74,7 @@ static ucc_status_t ucc_tl_ucp_service_coll_stop_executor(ucc_coll_task_t *task)
 ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           void *rbuf, ucc_datatype_t dt,
                                           size_t count, ucc_reduction_op_t op,
-                                          ucc_subset_t      subset,
+                                          ucc_subset_t subset,
                                           ucc_coll_task_t **task_p)
 {
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
@@ -140,7 +140,7 @@ free_task:
 
 ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
                                           void *rbuf, size_t msgsize,
-                                          ucc_subset_t      subset,
+                                          ucc_subset_t subset,
                                           ucc_coll_task_t **task_p)
 {
     ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
@@ -178,6 +178,14 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
     task->n_polls                       = npolls;
     task->super.progress                = ucc_tl_ucp_allgather_ring_progress;
     task->super.finalize                = ucc_tl_ucp_coll_finalize;
+    if (in_place) {
+        task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+    }
+
+    status = ucc_tl_ucp_service_coll_start_executor(&task->super);
+    if (status != UCC_OK) {
+        goto free_task;
+    }
 
     status = ucc_tl_ucp_allgather_ring_start(&task->super);
     if (status != UCC_OK) {
@@ -187,7 +195,8 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
     *task_p = &task->super;
     return status;
 finalize_coll:
-    ucc_tl_ucp_coll_finalize(*task_p);
+    ucc_tl_ucp_coll_finalize(&task->super);
+    ucc_tl_ucp_service_coll_stop_executor(&task->super);
 free_task:
     ucc_tl_ucp_put_task(task);
     return status;
@@ -195,7 +204,7 @@ free_task:
 
 ucc_status_t ucc_tl_ucp_service_bcast(ucc_base_team_t *team, void *buf,
                                       size_t msgsize, ucc_rank_t root,
-                                      ucc_subset_t      subset,
+                                      ucc_subset_t subset,
                                       ucc_coll_task_t **task_p)
 {
     ucc_tl_ucp_team_t   *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
@@ -239,7 +248,8 @@ free_task:
     return status;
 }
 
-void ucc_tl_ucp_service_update_id(ucc_base_team_t *team, uint16_t id) {
+void ucc_tl_ucp_service_update_id(ucc_base_team_t *team, uint16_t id)
+{
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
 
     tl_team->super.super.params.id  = id;
