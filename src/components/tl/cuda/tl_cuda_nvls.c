@@ -193,7 +193,7 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
 {
     ucc_tl_cuda_lib_t *lib             = ucc_derived_of(tl_context->lib, ucc_tl_cuda_lib_t);
     ucc_tl_cuda_nvls_t *nvls           = &self->nvls;
-    const size_t        symmetric_size = lib->cfg.max_concurrent * lib->cfg.nvls_symmetric_size;
+    const size_t        symmetric_size = lib->cfg.max_concurrent * (lib->cfg.nvls_symmetric_size + NVLS_CONTROL_SIZE);
     size_t              minGran = 0, gran = 0, mcSize = 0;
     int                 export_handle = 0, device = 0;
     pid_t              *shared_pids   = NULL;
@@ -385,6 +385,22 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
     nvls->mc_memhandle = memhandle;
     nvls->mc_size      = mcSize;
     nvls->mc_offset    = mcOffset;
+    nvls->coll_ids     = ucc_malloc(lib->cfg.max_concurrent * sizeof(size_t), "coll_ids");
+    if (!nvls->coll_ids) {
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup;
+    }
+    // Initialize the coll_ids to 0
+    memset(nvls->coll_ids, 0, lib->cfg.max_concurrent * sizeof(size_t));
+
+    if (UCC_TL_TEAM_RANK(self) == 0) {
+        // root rank zero-initializes the control region for each task slot
+        size_t stride = lib->cfg.nvls_symmetric_size + NVLS_CONTROL_SIZE;
+        void  *control_uc0 =
+            PTR_OFFSET((void *)uc_va, lib->cfg.nvls_symmetric_size);
+        CUDA_CHECK(cudaMemset2D(control_uc0, stride, 0, NVLS_CONTROL_SIZE,
+                                lib->cfg.max_concurrent));
+    }
 
     ucc_free(shared_pids);
     return UCC_OK;
@@ -439,5 +455,10 @@ ucc_status_t ucc_tl_cuda_nvls_destroy(struct ucc_tl_cuda_team *self,
         // release the multicast handle
         CUDADRV_FUNC(cuMemRelease(self->nvls.mc_handle));
     }
+
+    if (self->nvls.coll_ids) {
+        ucc_free(self->nvls.coll_ids);
+    }
+
     return UCC_OK;
 }

@@ -4,18 +4,10 @@
  * See file LICENSE for terms.
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "utils/arch/cuda_def.h"
 #include "../tl_cuda.h"
 
 #include "nvls.cuh"
-
-#ifdef __cplusplus
-}
-#endif
 
 __global__ void __launch_bounds__(UCC_TL_CUDA_MAX_NVLS_THREADS)
     reduce_scatter_kernel(float *src_addr, float *dst_addr, size_t src_count,

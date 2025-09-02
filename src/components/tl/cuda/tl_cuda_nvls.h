@@ -22,8 +22,12 @@ typedef struct ucc_tl_cuda_nvls {
     CUdeviceptr                  uc_va;        // Device pointer for unicast memory
     size_t                       mc_size;      // Size of multicast memory
     size_t                       mc_offset;    // Offset of the multicast memory
+    size_t                      *coll_ids;     // Coll id for the each task in flight slot, needed for barrier
 } ucc_tl_cuda_nvls_t;
 
+typedef struct ucc_tl_cuda_nvls_control {
+    uint64_t arrival_counter;
+} ucc_tl_cuda_nvls_control_t;
 
 ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self, ucc_base_context_t *tl_context);
 
