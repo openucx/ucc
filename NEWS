@@ -6,6 +6,16 @@
 
 ## Current
 
+## 1.5.1 (TBD)
+
+## New Features and Enhancements
+
+### CL/HIER
+- Fixed Wlto-type-mismatch {PR #1179}
+
+### Build and Test
+- ROCm cherrypick {PR #1183}
+
 ## 1.5.0 (July 31st, 2025)
 
 ## New Features and Enhancements
