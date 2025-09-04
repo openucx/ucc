@@ -130,7 +130,8 @@ std::string TestCase::str() {
             " team=" + team_str(team.type) +
             " mtype=" + ucc_memory_type_names[mem_type] +
             " msgsize=" + std::to_string(msgsize) +
-            " persistent=" + (persistent ? "1" : "0");
+            " persistent=" + (persistent ? "1" : "0") +
+            " local_registration=" + (local_registration ? "1" : "0");
     if (ucc_coll_inplace_supported(args.coll_type)) {
         _str += std::string(" inplace=") + (inplace ? "1" : "0");
     }
@@ -175,6 +176,7 @@ TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
                    TestCaseParams params) :
     team(_team), mem_type(params.mt), msgsize(params.msgsize),
     inplace(params.inplace), persistent(params.persistent),
+    local_registration(params.local_registration),
     test_max_size(params.max_size), dt(params.dt)
 {
     int rank;
@@ -184,6 +186,10 @@ TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
     check_buf      = NULL;
     sbuf_mc_header = NULL;
     rbuf_mc_header = NULL;
+    src_memh       = NULL;
+    dst_memh       = NULL;
+    src_memh_size  = 0;
+    dst_memh_size  = 0;
     test_skip      = TEST_SKIP_NONE;
     args.flags     = 0;
     args.mask      = 0;
@@ -213,13 +219,24 @@ TestCase::~TestCase()
     if (TEST_SKIP_NONE == test_skip) {
         UCC_CHECK(ucc_collective_finalize(req));
     }
+
     if (sbuf_mc_header) {
         UCC_CHECK(ucc_mc_free(sbuf_mc_header));
     }
+
     if (rbuf_mc_header) {
         UCC_CHECK(ucc_mc_free(rbuf_mc_header));
     }
+
     if (check_buf) {
         ucc_free(check_buf);
     }
+
+    if (src_memh) {
+        UCC_CHECK(ucc_mem_unmap(&src_memh));
+    }
+    if (dst_memh) {
+        UCC_CHECK(ucc_mem_unmap(&dst_memh));
+    }
+
 }

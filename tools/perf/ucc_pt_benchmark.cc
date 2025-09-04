@@ -40,7 +40,7 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
     switch (cfg.op_type) {
     case UCC_PT_OP_TYPE_ALLGATHER:
         coll = new ucc_pt_coll_allgather(cfg.dt, cfg.mt, cfg.inplace,
-                                         cfg.persistent, comm, generator);
+                                         cfg.persistent, cfg.mapped, comm, generator);
         break;
     case UCC_PT_OP_TYPE_ALLGATHERV:
         coll = new ucc_pt_coll_allgatherv(cfg.dt, cfg.mt, cfg.inplace,

@@ -143,8 +143,10 @@ typedef union ucc_tl_ucp_copy_task ucc_tl_ucp_copy_task_t;
 
 typedef ucc_status_t (*ucc_tl_ucp_copy_post_fn_t)(void *dst,
                                                   ucc_memory_type_t dst_mtype,
+                                                  ucp_mem_h dst_memh,
                                                   void *src,
                                                   ucc_memory_type_t src_mtype,
+                                                  ucp_mem_h src_memh,
                                                   size_t size,
                                                   ucc_tl_ucp_task_t *coll_task,
                                                   ucc_tl_ucp_copy_task_t **copy_task);
@@ -194,16 +196,22 @@ typedef ucc_status_t (*ucc_tl_ucp_send_nz_fn_t)(void *buffer, size_t msglen,
                                                 ucc_tl_ucp_team_t *team,
                                                 ucc_tl_ucp_task_t *task);
 
+typedef void (*ucc_tl_ucp_send_recv_counter_inc_fn_t)(uint32_t *counter);
+
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t            super;
     ucc_tl_ucp_context_config_t cfg;
+    ucc_thread_mode_t           thread_mode;
     ucc_tl_ucp_worker_t         worker;
     ucc_tl_ucp_worker_t         service_worker;
     struct {
-        ucc_tl_ucp_send_nb_fn_t ucc_tl_ucp_send_nb;
-        ucc_tl_ucp_recv_nb_fn_t ucc_tl_ucp_recv_nb;
-        ucc_tl_ucp_send_nz_fn_t ucc_tl_ucp_send_nz;
-        ucc_tl_ucp_recv_nz_fn_t ucc_tl_ucp_recv_nz;
+        ucc_tl_ucp_send_nb_fn_t               ucc_tl_ucp_send_nb;
+        ucc_tl_ucp_recv_nb_fn_t               ucc_tl_ucp_recv_nb;
+        ucc_tl_ucp_send_nz_fn_t               ucc_tl_ucp_send_nz;
+        ucc_tl_ucp_recv_nz_fn_t               ucc_tl_ucp_recv_nz;
+        ucp_send_nbx_callback_t               send_cb;
+        ucp_tag_recv_nbx_callback_t           recv_cb;
+        ucc_tl_ucp_send_recv_counter_inc_fn_t p2p_counter_inc;
     } sendrecv_cbs;
     uint32_t                    service_worker_throttling_count;
     ucc_mpool_t                 req_mp;
@@ -220,7 +228,7 @@ typedef struct ucc_tl_ucp_context {
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                     const ucc_base_config_t *);
-  
+
 extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 
 #define UCC_TL_UCP_SUPPORTED_COLLS                                             \

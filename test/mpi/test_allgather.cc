@@ -4,8 +4,10 @@
  * See file LICENSE for terms.
  */
 
+#include "core/ucc_dt.h"
 #include "test_mpi.h"
 #include "mpi_util.h"
+#include "ucc/api/ucc.h"
 
 TestAllgather::TestAllgather(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_ALLGATHER, params)
@@ -41,6 +43,32 @@ TestAllgather::TestAllgather(ucc_test_team_t &_team, TestCaseParams &params) :
     args.dst.info.count    = single_rank_count * size;
     args.dst.info.datatype = dt;
     args.dst.info.mem_type = mem_type;
+    if (local_registration) {
+        ucc_mem_map_t segments[1];
+        ucc_mem_map_params_t mem_map_params;
+
+        mem_map_params.n_segments          = 1;
+        mem_map_params.segments            = segments;
+
+        if (!inplace) {
+            mem_map_params.segments[0].address = args.src.info.buffer;
+            mem_map_params.segments[0].len     = args.src.info.count *
+                                                 ucc_dt_size(args.src.info.datatype);
+
+            UCC_CHECK(ucc_mem_map(team.ctx, UCC_MEM_MAP_MODE_EXPORT,
+                                  &mem_map_params, &src_memh_size, &src_memh));
+            args.src_memh.local_memh = src_memh;
+            args.mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH;
+        }
+
+        mem_map_params.segments[0].address = args.dst.info.buffer;
+        mem_map_params.segments[0].len     = args.dst.info.count *
+                                             ucc_dt_size(args.dst.info.datatype);
+        UCC_CHECK(ucc_mem_map(team.ctx, UCC_MEM_MAP_MODE_EXPORT,
+                              &mem_map_params, &dst_memh_size, &dst_memh));
+        args.dst_memh.local_memh = dst_memh;
+        args.mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH;
+    }
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }

@@ -119,6 +119,7 @@ sources =                 \
 	tl_ucp_dpu_offload.h  \
 	tl_ucp_dpu_offload.c  \
 	tl_ucp_copy.c         \
+	tl_ucp_sendrecv.c     \
 	$(allgather)          \
 	$(allgatherv)         \
 	$(alltoall)           \

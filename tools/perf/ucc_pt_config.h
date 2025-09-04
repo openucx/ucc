@@ -93,6 +93,7 @@ struct ucc_pt_benchmark_config {
     ucc_reduction_op_t op;
     bool               inplace;
     bool               persistent;
+    bool               mapped;
     bool               triggered;
     size_t             large_thresh;
     int                n_iter_small;

@@ -249,6 +249,7 @@ struct TestCaseParams {
     size_t msgsize;
     bool inplace;
     bool persistent;
+    bool local_registration;
     ucc_datatype_t dt;
     ucc_reduction_op_t op;
     ucc_memory_type_t mt;
@@ -267,7 +268,12 @@ protected:
     size_t msgsize;
     bool inplace;
     bool persistent;
+    bool local_registration;
     ucc_coll_req_h req;
+    ucc_mem_map_mem_h src_memh;
+    size_t src_memh_size;
+    ucc_mem_map_mem_h dst_memh;
+    size_t dst_memh_size;
     ucc_mc_buffer_header_t *sbuf_mc_header, *rbuf_mc_header;
     void *sbuf;
     void *rbuf;
@@ -321,6 +327,7 @@ class UccTestMpi {
     void *                    onesided_buffers[3];
     size_t                    test_max_size;
     bool                      triggered;
+    bool                      local_registration;
     void create_team(ucc_test_mpi_team_t t, bool is_onesided = false);
     void destroy_team(ucc_test_team_t &team);
     ucc_team_h create_ucc_team(MPI_Comm comm, bool is_onesided = false);
@@ -362,6 +369,10 @@ public:
     void set_triggered(bool _triggered)
     {
         triggered = _triggered;
+    }
+    void set_local_registration(bool _local_registration)
+    {
+        local_registration = _local_registration;
     }
     void set_count_vsizes(std::vector<ucc_test_vsize_flag_t> &_counts_vsize);
     void set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vsize);
