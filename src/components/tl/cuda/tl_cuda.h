@@ -11,6 +11,7 @@
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
 #include "components/mc/ucc_mc.h"
+#include "components/cl/ucc_cl_type.h" // for UCC_CL_HIER
 #include "utils/ucc_mpool.h"
 #include "utils/ucc_datastruct.h"
 #include "tl_cuda_ep_hash.h"
@@ -101,6 +102,7 @@ typedef struct ucc_tl_cuda_lib_config {
     uint32_t            nvls_sm_count;       // Number of blocks (SMs) to use for NVLS algorithms
     uint32_t            nvls_threads;        // Number of threads per block to use for NVLS algorithms
 #endif
+    int                 alltoall_use_copy_engine;
 } ucc_tl_cuda_lib_config_t;
 
 typedef struct ucc_tl_cuda_context_config {
@@ -190,7 +192,7 @@ typedef struct ucc_tl_cuda_team {
     ucc_tl_cuda_sync_state_t  *sync_state;         // Tracks the task currently using the sync segment of shared memory, if free - 0
     ucc_tl_cuda_shm_barrier_t *bar;                // Pointer to the first barrier in an array of size [0; 2 * max_concurrent]. First max_concurrent barriers are for normal mode, the second one for active set mode
     ucc_tl_cuda_scratch_t      scratch;
-    cudaStream_t               stream;
+    cudaStream_t               stream;             // CUDA stream for the team
     ucc_tl_cuda_rank_id_t     *ids;
     int                       *shared_handles;
     ucc_team_oob_coll_t        oob;
@@ -227,12 +229,18 @@ struct ucc_tl_cuda_task {
             ucc_count_t           *rcnts;
             ucc_aint_t            *sdispl;
             ucc_aint_t            *rdispl;
+            void                  *evtCompletion; // CUDA event for completion of the task
+            int                    use_copy_engine;
             ucc_ee_executor_task_t
                  *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];
             size_t (*get_size)(const ucc_tl_cuda_task_t *task, size_t *bytes,
                                ucc_rank_t block);
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
                                  size_t *displ_bytes, ucc_rank_t block);
+            ucc_status_t (*copy_post)(void *dst, void *src, size_t len,
+                                      ucc_ee_executor_t       *executor,
+                                      ucc_ee_executor_task_t **task,
+                                      cudaStream_t             stream);
         } alltoallv_ce;
         struct {
             int                     stage;
@@ -327,4 +335,9 @@ struct ucc_tl_cuda_task {
     };
 };
 
+// Check if the task is part of a CL hier team, used for alltoallv_ce
+static inline int ucc_tl_cuda_task_is_cl_hier(const ucc_tl_cuda_task_t *task)
+{
+    return task && task->super.team && (task->super.team->params.scope == UCC_CL_HIER);
+}
 #endif
