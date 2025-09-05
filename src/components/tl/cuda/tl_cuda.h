@@ -229,7 +229,7 @@ struct ucc_tl_cuda_task {
             ucc_count_t           *rcnts;
             ucc_aint_t            *sdispl;
             ucc_aint_t            *rdispl;
-            cudaEvent_t            evtCompletion; // CUDA event for completion of the task
+            void                  *evtCompletion; // CUDA event for completion of the task
             int                    use_copy_engine;
             ucc_ee_executor_task_t
                  *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];

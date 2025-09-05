@@ -54,31 +54,37 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     status   = ucc_tl_cuda_mem_info_get(args->src.info.buffer, data_len,
                                         &task->alltoallv_ce.mem_info_src);
     if (ucc_unlikely(status != UCC_OK)) {
-        goto exit_err;
+        return status;
     }
 
     if (team->topo->proxy_needed) {
         status = ucc_tl_cuda_mem_info_get(args->dst.info.buffer, data_len,
                                           &task->alltoallv_ce.mem_info_dst);
         if (ucc_unlikely(status != UCC_OK)) {
-            goto exit_err;
+            return status;
         }
     }
 
     if (ucc_tl_cuda_task_is_cl_hier(task)) {
-        tl_debug(UCC_TL_TEAM_LIB(team), "CL hier does not support copy engine, fallback to executor");
+        tl_debug(lib, "CL hier does not support copy engine, fallback to executor");
         task->alltoallv_ce.use_copy_engine = 0;
     } else {
         task->alltoallv_ce.use_copy_engine = lib->cfg.alltoall_use_copy_engine;
     }
 
     if (task->alltoallv_ce.use_copy_engine) {
-        ucc_debug("ucc_tl_cuda_alltoall_ce_init: copy engine");
+        tl_trace(lib, "ucc_tl_cuda_alltoall_ce_init: copy engine");
         task->super.triggered_post = ucc_tl_cuda_alltoallv_ce_triggered_post;
+
+        status = ucc_ec_create_event(&task->alltoallv_ce.evtCompletion, UCC_EE_CUDA_STREAM);
+        if (ucc_unlikely(status != UCC_OK)) {
+            tl_error(lib, "failed to create CUDA event");
+            ucc_tl_cuda_task_put(task);
+            return status;
+        }
         task->alltoallv_ce.copy_post = cuda_copy_post;
-        CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&task->alltoallv_ce.evtCompletion, cudaEventDisableTiming), exit_err, status);
     } else {
-        ucc_debug("ucc_tl_cuda_alltoall_ce_init: executor");
+        tl_trace(lib, "ucc_tl_cuda_alltoall_ce_init: executor");
         task->alltoallv_ce.copy_post = ee_copy_post;
         task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
@@ -91,7 +97,4 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     task->bar            = TASK_BAR(task);
 
     return UCC_OK;
-
-exit_err:
-    return status;
 }
