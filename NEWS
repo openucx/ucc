@@ -6,7 +6,71 @@
 
 ## Current
 
-## 1.4.0 (TBD)
+## 1.5.1 (TBD)
+
+## New Features and Enhancements
+
+### CL/HIER
+- Fixed Wlto-type-mismatch {PR #1179}
+
+### Build and Test
+- ROCm cherrypick {PR #1183}
+
+## 1.5.0 (July 31st, 2025)
+
+## New Features and Enhancements
+
+### Core
+- Enhanced error logs in context creation {PR #1135}
+- Added ucc net devices configuration {PR #1141}
+- Enhanced error logging in collective initialization {PR #1104}
+- Added support for ucc_mem_map and ucc_mem_unmap {PR #1070}
+
+### CL/HIER
+- Added flag for nonroot info {PR #1123}
+- Removed per node leader, fixed double free {PR #1126}
+
+### TL/UCP
+- Fixed allreduce knomial data consistency {PR #1145}
+- Fixed allgather oneshot {PR #1134}
+- Added allgather linear implementation {PR #1122}
+- Added fallback if memh not passed {PR #1136}
+
+### TL/MLX5
+- Added CUDA support for zero-copy multicast {PR #1118}
+- Added configuration to set IB QP SL {PR #1057}
+- Fixed segfault in multicast team creation {PR #1150}
+- Recovered from IPoIB issue in multicast init {PR #1140}
+- Added HCA-assisted copy & CUDA scratch design {PR #1154}
+- Added logging for multicast FORCE/TRY modes {PR #1156}
+- Fixed reliability initialization after multicast setup {PR #1163}
+- Added global status check {PR #1113}
+
+### TL/CUDA
+- Added NVLink SHARP (NVLS) Allreduce {PR #1148}
+- Added topology cache {PR #1137}
+- Added NVLink SHARP (NVLS) Reduce Scatter {PR #1144}
+
+### EC/CUDA
+- Linked with stdc++ {PR #1168}
+
+### EC/ROCM
+- Included stdbool.h for new versions of ROCm {PR #1146}
+
+### Build and Test
+- Updated CUDA architecture {PR #1143}
+- Changed to CUDA 12.9 {PR #1155}
+- Fixed coverity issues {PR #1152}
+- Added buffers for onesided tests {PR #1100}
+- Added missing progress calls {PR #1151}
+
+### Documentation
+- Updated component image 1.4.4 {PR #1153}
+
+### Tools
+- Added perftest generator {PR #1147}
+
+## 1.4.4 (April 25th, 2025)
 
 ## New Features and Enhancements
 
