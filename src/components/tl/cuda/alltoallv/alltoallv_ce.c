@@ -6,12 +6,13 @@
  */
 
 #include "alltoallv.h"
-#include "components/ec/ucc_ec.h"
 #include "core/ucc_ee.h"
 #include "tl_cuda_cache.h"
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 #include "utils/ucc_compiler_def.h"
+#include "components/ec/ucc_ec.h"
+#include "components/ec/cuda/ec_cuda_resources.h"
 
 #include <cuda_runtime.h>
 #include <driver_types.h>
@@ -64,7 +65,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_finalize(ucc_coll_task_t *coll_task)
 
     // Clean up completion events
     if (task->alltoallv_ce.evtCompletion) {
-        cudaEventDestroy(task->alltoallv_ce.evtCompletion);
+        ucc_ec_destroy_event(task->alltoallv_ce.evtCompletion, UCC_EE_CUDA_STREAM);
     }
 
     ucc_tl_cuda_task_put(task);
@@ -190,6 +191,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
     ucc_rank_t          rank        = UCC_TL_TEAM_RANK(team);
     ucc_tl_cuda_sync_t *sync        = TASK_SYNC(task, rank);
     ucc_ee_h            ee          = task->super.ee;
+    ucc_ec_cuda_event_t *ec_event   = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
+    cudaEvent_t         evt         = ec_event->event;
     ucc_status_t        status      = UCC_OK;
     cudaStream_t        stream      = 0;
     ucc_tl_cuda_sync_t *peer_sync;
@@ -297,7 +300,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
 
     if (task->alltoallv_ce.use_copy_engine) {
         CUDA_CHECK_GOTO(
-            cudaEventRecord(task->alltoallv_ce.evtCompletion, stream),
+            cudaEventRecord(evt, stream),
             exit, status);
     }
 
@@ -312,6 +315,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task
     ucc_rank_t          rank           = UCC_TL_TEAM_RANK(team);
     ucc_tl_cuda_sync_t *sync           = TASK_SYNC(task, rank);
     ucc_ee_h            ee             = task->super.ee;
+    ucc_ec_cuda_event_t *ec_event      = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
+    cudaEvent_t         evt            = ec_event->event;
     ucc_status_t        status         = UCC_OK;
     cudaStream_t        stream         = 0;
     size_t              op_count       = 0;
@@ -342,7 +347,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task
             stream = team->stream;
         }
         CUDA_CHECK_GOTO(
-            cudaEventRecord(task->alltoallv_ce.evtCompletion, stream),
+            cudaEventRecord(evt, stream),
             exit, status);
         task->alltoallv_ce.num_posted = 0;
         goto exit;
@@ -424,7 +429,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task
 
     // Record completion events
     CUDA_CHECK_GOTO(
-        cudaEventRecord(task->alltoallv_ce.evtCompletion, stream),
+        cudaEventRecord(evt, stream),
         exit, status);
 
 exit:
@@ -480,8 +485,10 @@ ucc_status_t ucc_tl_cuda_alltoallv_unmap(ucc_tl_cuda_task_t *task)
 
 void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_tl_cuda_task_t  *task     = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_team_t  *team     = TASK_TEAM(task);
+    ucc_ec_cuda_event_t *ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
+    cudaEvent_t         evt       = ec_event->event;
     ucc_status_t        status;
     int                 i;
 
@@ -526,12 +533,12 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
     case ALLTOALL_CE_STAGE_COPY:
         if (task->alltoallv_ce.use_copy_engine) {
             cudaError_t cuda_status =
-            cudaEventQuery(task->alltoallv_ce.evtCompletion);
+            cudaEventQuery(evt);
             if (cuda_status == cudaErrorNotReady) {
                 task->super.status = UCC_INPROGRESS;
                 return;
             } else if (cuda_status != cudaSuccess) {
-                ucc_error("error cudaEventQuery %s!",
+                tl_error(UCC_TASK_LIB(task), "error cudaEventQuery %s!",
                             cudaGetErrorString(cuda_status));
                 task->super.status = UCC_ERR_NO_MESSAGE;
                 ucc_assert(0);
@@ -733,7 +740,12 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: copy engine");
         task->super.triggered_post = ucc_tl_cuda_alltoallv_ce_triggered_post;
         task->alltoallv_ce.copy_post = cuda_copy_post;
-        CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&task->alltoallv_ce.evtCompletion, cudaEventDisableTiming), exit_err, status);
+        status = ucc_ec_create_event(&task->alltoallv_ce.evtCompletion, UCC_EE_CUDA_STREAM);
+        if (ucc_unlikely(status != UCC_OK)) {
+            tl_error(lib, "failed to create CUDA event");
+            ucc_tl_cuda_task_put(task);
+            return status;
+        }
     } else {
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: executor");
         task->alltoallv_ce.copy_post = ee_copy_post;
