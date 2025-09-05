@@ -27,7 +27,7 @@
 #define UCC_TL_CUDA_DEFAULT_SCORE 40
 #endif
 
-#define UCC_TL_CUDA_MAX_PEERS 8
+#define UCC_TL_CUDA_MAX_PEERS 72
 #define UCC_TL_CUDA_MAX_RING_CHUNKS 8
 
 #ifdef HAVE_NVLS
@@ -197,6 +197,8 @@ typedef struct ucc_tl_cuda_team {
     void                      *oob_req;
 #ifdef HAVE_NVLS
     ucc_tl_cuda_nvls_t         nvls;
+    int                        multi_node;
+    CUmemFabricHandle                       *shared_fabric_handles;
 #endif
 } ucc_tl_cuda_team_t;
 
