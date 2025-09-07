@@ -361,7 +361,7 @@ void ucc_pt_benchmark::print_header()
                   << std::setw(12) << "Size"
                   << std::setw(24) << "Time, us";
         if (config.full_print) {
-            std::cout << std::setw(42) << "Bandwidth, GB/s";
+            std::cout << std::setw(42) << "Bus Bandwidth, GB/s";
         }
         std::cout << std::endl;
         std::cout << std::setw(36) << "avg"
