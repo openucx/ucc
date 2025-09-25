@@ -94,6 +94,7 @@ typedef struct ucc_base_context_params {
     ucc_context_params_t params;
     int                  estimated_num_eps;
     int                  estimated_num_ppn;
+    int                  node_local_id;
     ucc_thread_mode_t    thread_mode;
     const char          *prefix;
     ucc_context_t       *context;

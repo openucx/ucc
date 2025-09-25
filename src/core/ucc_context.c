@@ -57,6 +57,10 @@ static ucc_config_field_t ucc_context_config_table[] = {
      "parameter will be affected. The parameter is only supported by UCX TL.",
      ucc_offsetof(ucc_context_config_t, net_devices), UCC_CONFIG_TYPE_STRING_ARRAY},
 
+    {"NODE_LOCAL_ID", "auto",
+     "An optimization hint for the local identificator on a single node.",
+     ucc_offsetof(ucc_context_config_t, node_local_id), UCC_CONFIG_TYPE_ULUNITS},
+
     {NULL}};
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
                           ucc_context_config_t, &ucc_config_global_list);
@@ -641,6 +645,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
     b_params.context           = ctx;
     b_params.estimated_num_eps = config->estimated_num_eps;
     b_params.estimated_num_ppn = config->estimated_num_ppn;
+    b_params.node_local_id     = config->node_local_id;
     b_params.prefix            = lib->full_prefix;
     b_params.thread_mode       = lib->attr.thread_mode;
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
