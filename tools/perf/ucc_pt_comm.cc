@@ -161,6 +161,9 @@ ucc_status_t ucc_pt_comm::init()
     cfg_mod = std::to_string(bootstrap->get_ppn());
     UCCCHECK_GOTO(ucc_context_config_modify(ctx_config, NULL,
                   "ESTIMATED_NUM_PPN", cfg_mod.c_str()), free_ctx_config, st);
+    cfg_mod = std::to_string(bootstrap->get_local_rank());
+    UCCCHECK_GOTO(ucc_context_config_modify(ctx_config, NULL,
+                  "NODE_LOCAL_ID", cfg_mod.c_str()), free_ctx_config, st);
     std::memset(&ctx_params, 0, sizeof(ucc_context_params_t));
     ctx_params.mask = UCC_CONTEXT_PARAM_FIELD_TYPE |
                       UCC_CONTEXT_PARAM_FIELD_OOB;
