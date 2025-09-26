@@ -124,6 +124,11 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
                 [],
                 [#include <ucs/memory/rcache.h>])
 
+            AC_CHECK_MEMBER(ucp_params_t.node_local_id,
+                [AC_DEFINE([HAVE_UCX_NODE_LOCAL_ID], [1], [flags for ucp config])],
+                [],
+                [#include <ucp/api/ucp.h>])
+
             AC_DEFINE([HAVE_UCX], 1, [Enable UCX support])
 
             AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <ucs/config/parser.h>
