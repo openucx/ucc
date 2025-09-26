@@ -60,7 +60,7 @@ ucc_tl_cuda_nvls_get_granularity(CUmulticastObjectProp *mcProp, size_t *minGran,
 static ucc_status_t
 ucc_tl_cuda_nvls_create_multicast_object(CUmulticastObjectProp        *mcProp,
                                          CUmemGenericAllocationHandle *mcHandle,
-                                         int *export_handle)
+                                         void *export_handle)
 {
     ucc_status_t status;
 
@@ -71,7 +71,7 @@ ucc_tl_cuda_nvls_create_multicast_object(CUmulticastObjectProp        *mcProp,
     }
 
     status = CUDADRV_FUNC(cuMemExportToShareableHandle(
-        export_handle, *mcHandle, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR, 0));
+        export_handle, *mcHandle, mcProp->handleTypes, 0));
     if (status != UCC_OK) {
         ucc_error("failed to export shareable handle");
         CUDADRV_FUNC(cuMemRelease(*mcHandle));
@@ -82,8 +82,8 @@ ucc_tl_cuda_nvls_create_multicast_object(CUmulticastObjectProp        *mcProp,
 }
 
 static ucc_status_t
-ucc_tl_cuda_nvls_share_handles(struct ucc_tl_cuda_team *self, int export_handle,
-                               pid_t *shared_pids)
+ucc_tl_cuda_nvls_share_handles_posix(struct ucc_tl_cuda_team *self, int export_handle,
+                                     pid_t *shared_pids)
 {
     ucc_status_t status;
     pid_t        currentPid = getpid();
@@ -129,8 +129,40 @@ ucc_tl_cuda_nvls_share_handles(struct ucc_tl_cuda_team *self, int export_handle,
 }
 
 static ucc_status_t
-ucc_tl_cuda_nvls_import_handle(struct ucc_tl_cuda_team *self, int export_handle,
-                               pid_t                         targetPid,
+ucc_tl_cuda_nvls_share_handles_fabric(struct ucc_tl_cuda_team *self, CUmemFabricHandle export_handle,
+                                      CUmemFabricHandle *shared_fabric_handles)
+{
+    ucc_status_t status;
+
+    // Share the export handle
+    if (UCC_TL_TEAM_RANK(self) == 0) {
+        self->shared_fabric_handles[0] = export_handle;
+    }
+
+    status = self->oob.allgather(&export_handle, self->shared_fabric_handles,
+                                 sizeof(export_handle), self->oob.coll_info,
+                                 &self->oob_req);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(self), "failed to allgather export fabric handle");
+        return status;
+    }
+
+    while (UCC_OK != (status = self->oob.req_test(self->oob_req))) {
+        if (status < 0) {
+            tl_error(UCC_TL_TEAM_LIB(self), "failed to test allgather export fabric handle");
+            return status;
+        }
+    }
+    self->oob.req_free(self->oob_req);
+    self->oob_req = NULL;
+
+    return UCC_OK;
+}
+
+static ucc_status_t
+ucc_tl_cuda_nvls_import_handle_posix(struct ucc_tl_cuda_team *self,
+                               int export_handle,
+                               pid_t targetPid,
                                CUmemGenericAllocationHandle *mcHandle)
 {
     int          pidFd, peerFd;
@@ -164,26 +196,51 @@ ucc_tl_cuda_nvls_import_handle(struct ucc_tl_cuda_team *self, int export_handle,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_tl_cuda_nvls_sync_barrier(struct ucc_tl_cuda_team *self)
+static ucc_status_t
+ucc_tl_cuda_nvls_import_handle_fabric(struct ucc_tl_cuda_team *self,
+                               CUmemFabricHandle export_handle,
+                               CUmemGenericAllocationHandle *mcHandle)
 {
-    ucc_status_t               status;
-    ucc_tl_cuda_shm_barrier_t *bar = UCC_TL_CUDA_TEAM_BARRIER(self, 0);
+    ucc_status_t status  = CUDADRV_FUNC(cuMemImportFromShareableHandle(mcHandle,
+        &export_handle, CU_MEM_HANDLE_TYPE_FABRIC));
 
-    status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(self), bar);
     if (status != UCC_OK) {
-        ucc_error("failed to start shm barrier");
+        ucc_error("failed to import handle from rank 0");
         return status;
     }
 
-    while ((status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(self),
-                                                  bar)) == UCC_INPROGRESS) {
-        // Wait for barrier completion
-    }
+    return UCC_OK;
+}
 
-    if (status != UCC_OK) {
-        ucc_error("failed to test shm barrier");
+static ucc_status_t ucc_tl_cuda_nvls_sync_barrier(struct ucc_tl_cuda_team *team)
+{
+    ucc_debug("RANK %d: syncing barrier using oob allgather", UCC_TL_TEAM_RANK(team));
+    int32_t barrier_value = 0x1234;
+    int32_t *shared_barrier_values = ucc_malloc(UCC_TL_TEAM_SIZE(team) * sizeof(barrier_value), "shared_barrier_values");
+    if (!shared_barrier_values) {
+        return UCC_ERR_NO_MEMORY;
+    }
+    // instead of barrier, launch collective operation using oob
+    ucc_status_t status = team->oob.allgather(&barrier_value, shared_barrier_values, sizeof(barrier_value),
+        team->oob.coll_info, &team->oob_req);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(team), "nvls sync barrier failed to init oob allgather %s", ucc_status_string(status));
+        ucc_free(shared_barrier_values);
         return status;
     }
+    // Wait for barrier completion
+    while (UCC_OK != (status = team->oob.req_test(team->oob_req))) {
+        if (status < 0) {
+            tl_error(UCC_TL_TEAM_LIB(team), "nvls sync barrier failed to test oob req %s", ucc_status_string(status));
+            ucc_free(shared_barrier_values);
+            return status;
+        }
+    }
+    team->oob.req_free(team->oob_req);
+    team->oob_req = NULL;
+    ucc_free(shared_barrier_values);
+
+    ucc_debug("RANK %d: synced barrier using oob allgather", UCC_TL_TEAM_RANK(team));
 
     return UCC_OK;
 }
@@ -197,12 +254,14 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
     size_t              minGran = 0, gran = 0, mcSize = 0;
     int                 export_handle = 0, device = 0;
     pid_t              *shared_pids   = NULL;
+    CUmemFabricHandle  fabric_handle;
+    // CUmemFabricHandle *shared_fabric_handles = NULL;
     void               *uc_va = NULL, *mc_va = NULL;
     ucc_status_t        status = UCC_OK;
 
     CUmemGenericAllocationHandle mcHandle = 0;
     CUmemGenericAllocationHandle memhandle = 0;
-    CUmemAllocationHandleType handleType = CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR;
+    CUmemAllocationHandleType handleType = self->multi_node ? CU_MEM_HANDLE_TYPE_FABRIC : CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR;
     CUmulticastObjectProp        mcProp  = {};
 
 
@@ -257,10 +316,23 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
         goto cleanup;
     }
 
+    // Allocate shared fabric handles array
+    self->shared_fabric_handles = ucc_malloc(
+        UCC_TL_TEAM_SIZE(self) * sizeof(fabric_handle), "shared_fabric_handles");
+    if (!self->shared_fabric_handles) {
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup;
+    }
+
     // Create multicast object on rank 0
     if (UCC_TL_TEAM_RANK(self) == 0) {
-        status = ucc_tl_cuda_nvls_create_multicast_object(&mcProp, &mcHandle,
+        if (self->multi_node) {
+            status = ucc_tl_cuda_nvls_create_multicast_object(&mcProp, &mcHandle,
+                                                          &fabric_handle);
+        } else {
+            status = ucc_tl_cuda_nvls_create_multicast_object(&mcProp, &mcHandle,
                                                           &export_handle);
+        }
         if (status != UCC_OK) {
             ucc_error("failed to create multicast object");
             goto cleanup;
@@ -268,16 +340,23 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
     }
 
     // Share handles across ranks
-    status = ucc_tl_cuda_nvls_share_handles(self, export_handle, shared_pids);
+    if (self->multi_node) {
+        status = ucc_tl_cuda_nvls_share_handles_fabric(self, fabric_handle, self->shared_fabric_handles);
+    } else {
+        status = ucc_tl_cuda_nvls_share_handles_posix(self, export_handle, shared_pids);
+    }
     if (status != UCC_OK) {
         goto cleanup;
     }
 
     // Import handle on non-root ranks
     if (UCC_TL_TEAM_RANK(self) != 0) {
-        export_handle = self->shared_handles[0];
-        status        = ucc_tl_cuda_nvls_import_handle(self, export_handle,
-                                                       shared_pids[0], &mcHandle);
+        if (self->multi_node) {
+            status        = ucc_tl_cuda_nvls_import_handle_fabric(self, self->shared_fabric_handles[0], &mcHandle);
+        } else {
+            status        = ucc_tl_cuda_nvls_import_handle_posix(self, self->shared_handles[0],
+                                                           shared_pids[0], &mcHandle);
+        }
         if (status != UCC_OK) {
             goto cleanup;
         }
@@ -289,7 +368,7 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
         ucc_error("failed to add device to multicast");
         goto cleanup;
     }
-    ucc_debug("rank %d: added device %d to multicast\n", UCC_TL_TEAM_RANK(self),
+    ucc_debug("RANK %d: added device %d to multicast\n", UCC_TL_TEAM_RANK(self),
               device);
 
     // Synchronize all ranks after adding devices
