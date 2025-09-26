@@ -746,10 +746,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
 
     if (ucc_tl_cuda_task_is_cl_hier(task)) {
         tl_debug(UCC_TL_TEAM_LIB(team), "CL hier does not support copy engine, fallback to executor");
-        ucc_print("CL hier does not support copy engine, fallback to executor");
         task->alltoallv_ce.use_copy_engine = 0;
     } else {
-        ucc_print("copy engine is enabled");
         task->alltoallv_ce.use_copy_engine = lib->cfg.alltoall_use_copy_engine;
     }
 
