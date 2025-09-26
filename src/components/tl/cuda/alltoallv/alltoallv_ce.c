@@ -191,9 +191,14 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
     ucc_rank_t          rank        = UCC_TL_TEAM_RANK(team);
     ucc_tl_cuda_sync_t *sync        = TASK_SYNC(task, rank);
     ucc_ee_h            ee          = task->super.ee;
-    ucc_ec_cuda_event_t *ec_event   = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
-    cudaEvent_t         evt         = ec_event->event;
+    ucc_ec_cuda_event_t *ec_event   = NULL;
+    cudaEvent_t         evt         = NULL;
     ucc_status_t        status      = UCC_OK;
+
+    if (task->alltoallv_ce.use_copy_engine) {
+        ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
+        evt = ec_event->event;
+    }
     cudaStream_t        stream      = 0;
     ucc_tl_cuda_sync_t *peer_sync;
     ucc_ee_executor_t  *exec;
@@ -315,9 +320,14 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task
     ucc_rank_t          rank           = UCC_TL_TEAM_RANK(team);
     ucc_tl_cuda_sync_t *sync           = TASK_SYNC(task, rank);
     ucc_ee_h            ee             = task->super.ee;
-    ucc_ec_cuda_event_t *ec_event      = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
-    cudaEvent_t         evt            = ec_event->event;
+    ucc_ec_cuda_event_t *ec_event      = NULL;
+    cudaEvent_t         evt            = NULL;
     ucc_status_t        status         = UCC_OK;
+
+    if (task->alltoallv_ce.use_copy_engine) {
+        ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
+        evt = ec_event->event;
+    }
     cudaStream_t        stream         = 0;
     size_t              op_count       = 0;
     const void        **srcs           = NULL;
@@ -487,10 +497,15 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t  *task     = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t  *team     = TASK_TEAM(task);
-    ucc_ec_cuda_event_t *ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
-    cudaEvent_t         evt       = ec_event->event;
+    ucc_ec_cuda_event_t *ec_event = NULL;
+    cudaEvent_t         evt       = NULL;
     ucc_status_t        status;
     int                 i;
+
+    if (task->alltoallv_ce.use_copy_engine) {
+        ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
+        evt = ec_event->event;
+    }
 
     switch (task->alltoallv_ce.stage) {
     case ALLTOALL_CE_STAGE_SYNC:
@@ -731,8 +746,10 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
 
     if (ucc_tl_cuda_task_is_cl_hier(task)) {
         tl_debug(UCC_TL_TEAM_LIB(team), "CL hier does not support copy engine, fallback to executor");
+        ucc_print("CL hier does not support copy engine, fallback to executor");
         task->alltoallv_ce.use_copy_engine = 0;
     } else {
+        ucc_print("copy engine is enabled");
         task->alltoallv_ce.use_copy_engine = lib->cfg.alltoall_use_copy_engine;
     }
 
