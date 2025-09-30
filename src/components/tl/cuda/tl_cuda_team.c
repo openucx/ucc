@@ -37,11 +37,15 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     self->stream      = NULL;
     self->topo        = NULL;
     self->scratch.loc = NULL;
+    self->ids         = NULL;
 
+#ifdef HAVE_NVLS
     if (!ucc_team_map_is_single_node(params->team, params->map)) {
-        tl_debug(tl_context->lib, "multinode team is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
+        tl_debug(tl_context->lib, "multinode team is supported");
+        self->seq_num = 1;
+        return UCC_OK;
     }
+#endif
 
     self->ids = ucc_malloc((UCC_TL_TEAM_SIZE(self) + 1) * sizeof(*(self->ids)),
                             "ids");
@@ -225,6 +229,17 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     volatile ucc_tl_cuda_sync_t *peer_sync;
     int i, j, shm_id;
 
+    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
+        team->scratch.rem[i] = NULL;
+    }
+
+#ifdef HAVE_NVLS
+    if (!ucc_team_map_is_single_node(team->super.super.params.team,
+                                     team->super.super.params.map)) {
+        goto nvls_init;
+    }
+#endif
+
     if (team->oob_req == NULL) {
         return UCC_OK;
     } else if (team->oob_req == (void*)0x1) {
@@ -239,10 +254,6 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     }
     team->oob.req_free(team->oob_req);
     team->oob_req = (void*)0x1;
-
-    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
-        team->scratch.rem[i] = NULL;
-    }
 
     status = ucc_tl_cuda_team_topo_create(&team->super, &team->topo);
     if (status != UCC_OK) {
@@ -342,6 +353,7 @@ barrier:
     tl_debug(tl_team->context->lib, "initialized tl team: %p", team);
 
 #ifdef HAVE_NVLS
+nvls_init:
     // zero out the nvls struct
     memset(&team->nvls, 0, sizeof(team->nvls));
     // initialize the nvls struct
