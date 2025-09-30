@@ -77,17 +77,33 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             return;
         }
 
-        status = post_allreduce_kernel(stream, sm_count, threads, mc_va,
-                                       task->allreduce_nvls.buf_size_bytes,
-                                       TASK_NVLS_CONTROL_MC(task),
-                                       TASK_NVLS_CONTROL_UC(task),
-                                       task->allreduce_nvls.coll_id,
-                                       trank,
-                                       UCC_TL_TEAM_SIZE(team), dt);
-        if (status != UCC_OK) {
-            ucc_error("failed to post allreduce kernel");
-            task->super.status = status;
-            return;
+        // Choose between dedicated barriers (optimal) or inline barriers (compatibility)
+        if (UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_dedicated_barriers) {
+            // DEDICATED BARRIERS: Separates sync from compute, eliminates contention
+            status = post_allreduce_kernel_dedicated_barriers(stream, sm_count, threads, mc_va,
+                                                             task->allreduce_nvls.buf_size_bytes,
+                                                             TASK_NVLS_CONTROL_MC(task),
+                                                             TASK_NVLS_CONTROL_UC(task),
+                                                             task->allreduce_nvls.coll_id,
+                                                             trank, UCC_TL_TEAM_SIZE(team), dt);
+            if (status != UCC_OK) {
+                ucc_error("failed to post allreduce kernel with dedicated barriers");
+                task->super.status = status;
+                return;
+            }
+        } else {
+            // INLINE BARRIERS: Original approach for compatibility/debugging
+            status = post_allreduce_kernel(stream, sm_count, threads, mc_va,
+                                          task->allreduce_nvls.buf_size_bytes,
+                                          TASK_NVLS_CONTROL_MC(task),
+                                          TASK_NVLS_CONTROL_UC(task),
+                                          task->allreduce_nvls.coll_id,
+                                          trank, UCC_TL_TEAM_SIZE(team), dt);
+            if (status != UCC_OK) {
+                ucc_error("failed to post allreduce kernel with inline barriers");
+                task->super.status = status;
+                return;
+            }
         }
         cuda_status = cudaMemcpyAsync((void *)task->allreduce_nvls.rbuf,
                         (void *)uc_va,
