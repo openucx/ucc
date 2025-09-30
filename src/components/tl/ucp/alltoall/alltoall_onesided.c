@@ -98,6 +98,9 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     int64_t            npolls    = task->alltoall_onesided.npolls;
     ucc_rank_t         peer      = (task->alltoall_onesided.peer + 1) % gsize;
     int64_t            cpolls    = 0;
+    /* To resolve remote virtual addresses, the dst_memh is the one that must
+     * have the rkey information. For this algorithm, we need to swap the
+     * src and dst handles to operate correctly */
     ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).dst_memh.local_memh;
     ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).src_memh.global_memh;
     uint32_t          *posted    = &task->onesided.get_posted;
