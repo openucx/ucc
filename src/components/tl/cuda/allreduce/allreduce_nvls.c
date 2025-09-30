@@ -180,12 +180,6 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_connected(team->topo))) {
-        tl_debug(UCC_TL_TEAM_LIB(team), "NVLS allreduce is supported only on fully connected "
-                  "NVLINK systems");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
     status = ucc_tl_cuda_task_init(coll_args, team, &task);
     if (ucc_unlikely(status != UCC_OK)) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to initialize CUDA task");
