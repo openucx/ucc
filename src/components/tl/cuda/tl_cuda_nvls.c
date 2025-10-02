@@ -225,39 +225,6 @@ ucc_tl_cuda_nvls_import_handle_fabric(struct ucc_tl_cuda_team *self,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_tl_cuda_nvls_sync_barrier(struct ucc_tl_cuda_team *team)
-{
-    ucc_debug("RANK %d: syncing barrier using oob allgather", UCC_TL_TEAM_RANK(team));
-    int32_t barrier_value = 0x1234;
-    int32_t *shared_barrier_values = ucc_malloc(UCC_TL_TEAM_SIZE(team) * sizeof(barrier_value), "shared_barrier_values");
-    if (!shared_barrier_values) {
-        return UCC_ERR_NO_MEMORY;
-    }
-    // instead of barrier, launch collective operation using oob
-    ucc_status_t status = team->oob.allgather(&barrier_value, shared_barrier_values, sizeof(barrier_value),
-        team->oob.coll_info, &team->oob_req);
-    if (UCC_OK != status) {
-        tl_error(UCC_TL_TEAM_LIB(team), "nvls sync barrier failed to init oob allgather %s", ucc_status_string(status));
-        ucc_free(shared_barrier_values);
-        return status;
-    }
-    // Wait for barrier completion
-    while (UCC_OK != (status = team->oob.req_test(team->oob_req))) {
-        if (status < 0) {
-            tl_error(UCC_TL_TEAM_LIB(team), "nvls sync barrier failed to test oob req %s", ucc_status_string(status));
-            ucc_free(shared_barrier_values);
-            return status;
-        }
-    }
-    team->oob.req_free(team->oob_req);
-    team->oob_req = NULL;
-    ucc_free(shared_barrier_values);
-
-    ucc_debug("RANK %d: synced barrier using oob allgather", UCC_TL_TEAM_RANK(team));
-
-    return UCC_OK;
-}
-
 ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
                                    ucc_base_context_t      *tl_context)
 {
@@ -396,12 +363,6 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
     ucc_debug("RANK %d: added device %d to multicast\n", UCC_TL_TEAM_RANK(self),
               device);
 
-    // Synchronize all ranks after adding devices
-    status = ucc_tl_cuda_nvls_sync_barrier(self);
-    if (status != UCC_OK) {
-        goto cleanup;
-    }
-
     // Allocate physical memory
     CUmemAllocationProp prop  = {};
     prop.type                 = CU_MEM_ALLOCATION_TYPE_PINNED;
@@ -449,12 +410,6 @@ ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
         cuMulticastBindAddr(mcHandle, mcOffset, (CUdeviceptr)uc_va, mcSize, 0));
     if (status != UCC_OK) {
         ucc_error("failed to bind memory to multicast");
-        goto cleanup;
-    }
-
-    // Synchronize after binding
-    status = ucc_tl_cuda_nvls_sync_barrier(self);
-    if (status != UCC_OK) {
         goto cleanup;
     }
 
