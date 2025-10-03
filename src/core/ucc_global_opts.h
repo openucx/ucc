@@ -11,7 +11,8 @@
 #include "utils/ucc_component.h"
 
 #include "utils/ucc_parser.h"
-#include "utils/ucc_log.h"
+//#include "utils/ucc_log.h"
+#include "utils/debug/types.h"
 
 typedef struct ucc_global_config {
     /* Log level above which log messages will be printed*/
@@ -37,6 +38,26 @@ typedef struct ucc_global_config {
     size_t                     profile_log_size;
     char                      *cfg_filename;
     ucc_file_config_t         *file_cfg;
+    /* Log file */
+    char                       *log_file;
+
+    /* Maximal log file size */
+    size_t                     log_file_size;
+
+    /* Maximal backup log files count that could be created by log infrastructure */
+    unsigned                   log_file_rotate;
+
+    /* Size of log buffer for one message */
+    size_t                     log_buffer_size;
+
+    /* Maximal amount of packet data to print per packet */
+    size_t                     log_data_size;
+
+    /* Enable ucs_print() output */
+    int                        log_print_enable;
+
+    /* Log level to trigger error handling */
+    ucc_log_level_t            log_level_trigger;
 } ucc_global_config_t;
 
 extern ucc_global_config_t ucc_global_config;

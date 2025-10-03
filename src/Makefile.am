@@ -80,6 +80,7 @@ noinst_HEADERS =                       \
 	utils/ucc_time.h                   \
 	utils/ucc_sys.h                    \
 	utils/ucc_assert.h                 \
+	utils/debug/log.h                  \
 	components/base/ucc_base_iface.h   \
 	components/cl/ucc_cl.h             \
 	components/cl/ucc_cl_log.h         \
@@ -132,6 +133,7 @@ libucc_la_SOURCES =                   \
 	utils/arch/x86_64/cpu.c           \
 	utils/arch/aarch64/cpu.c          \
 	utils/ucc_assert.c                \
+	utils/debug/log.c                 \
 	components/base/ucc_base_iface.c  \
 	components/cl/ucc_cl.c            \
 	components/tl/ucc_tl.c            \
