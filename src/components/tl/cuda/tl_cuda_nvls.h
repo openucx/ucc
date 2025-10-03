@@ -15,18 +15,16 @@
 // Forward declaration to avoid circular dependency
 struct ucc_tl_cuda_team;
 
-// clang-format off
 typedef struct ucc_tl_cuda_nvls {
     CUmemGenericAllocationHandle mc_handle;    // Multicast handle
     CUmemGenericAllocationHandle mc_memhandle; // Multicast memory handle
-    CUdeviceptr                  mc_va;        // Device pointer for multicast memory
-    CUdeviceptr                  uc_va;        // Device pointer for unicast memory
+    CUdeviceptr                  mc_va;        // Device pointer for multicast
+    CUdeviceptr                  uc_va;        // Device pointer for unicast
     size_t                       mc_size;      // Size of multicast memory
     size_t                       mc_offset;    // Offset of multicast memory
-    size_t                      *coll_ids;     // Coll id for each task in flight slot
+    size_t                      *coll_ids;     // Coll id for each task
     int                          is_multinode; // Whether the team is multi-node
 } ucc_tl_cuda_nvls_t;
-// clang-format on
 
 typedef struct ucc_tl_cuda_nvls_control {
     uint64_t arrival_counter;
