@@ -18,19 +18,18 @@
 #include <driver_types.h>
 #include <string.h>
 
-
 enum {
-    ALLTOALL_CE_STAGE_SYNC,  /*< Wait for free SYNC segment */
-    ALLTOALL_CE_STAGE_SETUP, /*< Wait for memhandle setup to finish */
+    ALLTOALL_CE_STAGE_SYNC,        /*< Wait for free SYNC segment */
+    ALLTOALL_CE_STAGE_SETUP,       /*< Wait for memhandle setup to finish */
     ALLTOALL_CE_STAGE_POST_COPIES, /*< Post copies */
-    ALLTOALL_CE_STAGE_COPY, /*< Wait for all copies to finish */
-    ALLTOALL_CE_STAGE_BAR,  /*< Wait for other ranks to finish */
+    ALLTOALL_CE_STAGE_COPY,        /*< Wait for all copies to finish */
+    ALLTOALL_CE_STAGE_BAR,         /*< Wait for other ranks to finish */
 };
 
 //NOLINTNEXTLINE(misc-unused-parameters): stream parameter unused as executor manages execution
-ucc_status_t ee_copy_post(void *dst, void *src, size_t len,
-                       ucc_ee_executor_t       *executor,
-                       ucc_ee_executor_task_t **task, cudaStream_t stream)
+ucc_status_t ee_copy_post(void *dst, const void *src, size_t len,
+                          ucc_ee_executor_t       *executor,
+                          ucc_ee_executor_task_t **task, cudaStream_t stream)
 {
     (void)stream; /* Unused parameter */
     ucc_ee_executor_task_args_t exec_args = {0};
@@ -42,19 +41,15 @@ ucc_status_t ee_copy_post(void *dst, void *src, size_t len,
 }
 
 //NOLINTNEXTLINE(misc-unused-parameters): executor and task unused as operation handled by CUDA
-ucc_status_t cuda_copy_post(void *dst, void *src, size_t len,
-                       ucc_ee_executor_t       *executor,
-                       ucc_ee_executor_task_t **task, cudaStream_t stream)
+ucc_status_t cuda_copy_post(void *dst, const void *src, size_t len,
+                            ucc_ee_executor_t       *executor,
+                            ucc_ee_executor_task_t **task, cudaStream_t stream)
 {
     (void)executor; /* Unused parameter */
     (void)task;     /* Unused parameter */
-    ucc_status_t status;
-    CUDA_CHECK_GOTO(
-        cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, stream),
-        exit_err, status);
+    CUDA_CHECK(
+        cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, stream));
     return UCC_OK;
-exit_err:
-    return status;
 }
 
 ucc_status_t ucc_tl_cuda_alltoallv_ce_finalize(ucc_coll_task_t *coll_task)
@@ -65,7 +60,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_finalize(ucc_coll_task_t *coll_task)
 
     // Clean up completion events
     if (task->alltoallv_ce.evtCompletion) {
-        ucc_ec_destroy_event(task->alltoallv_ce.evtCompletion, UCC_EE_CUDA_STREAM);
+        ucc_ec_destroy_event(task->alltoallv_ce.evtCompletion,
+                             UCC_EE_CUDA_STREAM);
     }
 
     ucc_tl_cuda_task_put(task);
@@ -77,9 +73,9 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_start(ucc_tl_cuda_task_t *task)
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
     ucc_status_t        status;
-    ucc_coll_args_t    *args    = &TASK_ARGS(task);
-    ucc_ee_h            ee      = task->super.ee;
-    cudaStream_t        stream  = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
+    ucc_ee_h            ee   = task->super.ee;
+    cudaStream_t stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
 
     // For Alltoallv: copy counts and displ. to SHM for remote GPUs to access (if required)
     if (UCC_COLL_TYPE_ALLTOALLV == args->coll_type) {
@@ -126,8 +122,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
     ucc_tl_cuda_cache_t         *cache;
     ucc_status_t                 status;
     ucc_rank_t                   i, dst;
-    ucc_ee_h                     ee     = task->super.ee;
-    cudaStream_t                 stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
+    ucc_ee_h                     ee = task->super.ee;
+    cudaStream_t stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
 
     status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), task->bar);
     if (status != UCC_OK) {
@@ -162,7 +158,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
     }
 
     for (i = 0; i < team->topo->num_proxies; i++) {
-        dst = team->topo->proxies[i].dst;
+        dst       = team->topo->proxies[i].dst;
         peer_sync = TASK_SYNC(task, dst);
         cache     = ucc_tl_cuda_get_cache(team, dst);
         if (ucc_unlikely(!cache)) {
@@ -187,19 +183,19 @@ exit_err:
 
 ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t *team        = TASK_TEAM(task);
-    ucc_rank_t          rank        = UCC_TL_TEAM_RANK(team);
-    ucc_tl_cuda_sync_t *sync        = TASK_SYNC(task, rank);
-    ucc_ee_h            ee          = task->super.ee;
-    ucc_ec_cuda_event_t *ec_event   = NULL;
-    cudaEvent_t         evt         = NULL;
-    ucc_status_t        status      = UCC_OK;
+    ucc_tl_cuda_team_t  *team     = TASK_TEAM(task);
+    ucc_rank_t           rank     = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_sync_t  *sync     = TASK_SYNC(task, rank);
+    ucc_ee_h             ee       = task->super.ee;
+    ucc_ec_cuda_event_t *ec_event = NULL;
+    cudaEvent_t          evt      = NULL;
+    ucc_status_t         status   = UCC_OK;
 
     if (task->alltoallv_ce.use_copy_engine) {
         ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
-        evt = ec_event->event;
+        evt      = ec_event->event;
     }
-    cudaStream_t        stream      = 0;
+    cudaStream_t        stream = 0;
     ucc_tl_cuda_sync_t *peer_sync;
     ucc_ee_executor_t  *exec;
     void               *src, *dst;
@@ -284,7 +280,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
                                 peer_sync->mem_info_dst.offset);
         data_displ = task->alltoallv_ce.get_offset(
             task, peer_sync->alltoallv_ce.rdispl_bytes, psrc);
-        dst                 = PTR_OFFSET(dst, data_displ);
+        dst = PTR_OFFSET(dst, data_displ);
 
         // If triggered post, use the stream from the executor
         if (task->alltoallv_ce.use_copy_engine && !ee) {
@@ -304,9 +300,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
     }
 
     if (task->alltoallv_ce.use_copy_engine) {
-        CUDA_CHECK_GOTO(
-            cudaEventRecord(evt, stream),
-            exit, status);
+        CUDA_CHECK_GOTO(cudaEventRecord(evt, stream), exit, status);
     }
 
 exit:
@@ -314,36 +308,38 @@ exit:
 }
 
 #if CUDART_VERSION >= 13000
-ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task)
+ucc_status_t
+ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t *team           = TASK_TEAM(task);
-    ucc_rank_t          rank           = UCC_TL_TEAM_RANK(team);
-    ucc_tl_cuda_sync_t *sync           = TASK_SYNC(task, rank);
-    ucc_ee_h            ee             = task->super.ee;
-    ucc_ec_cuda_event_t *ec_event      = NULL;
-    cudaEvent_t         evt            = NULL;
-    ucc_status_t        status         = UCC_OK;
+    ucc_tl_cuda_team_t  *team     = TASK_TEAM(task);
+    ucc_rank_t           rank     = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_sync_t  *sync     = TASK_SYNC(task, rank);
+    ucc_ee_h             ee       = task->super.ee;
+    ucc_ec_cuda_event_t *ec_event = NULL;
+    cudaEvent_t          evt      = NULL;
+    ucc_status_t         status   = UCC_OK;
 
     if (task->alltoallv_ce.use_copy_engine) {
         ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
-        evt = ec_event->event;
+        evt      = ec_event->event;
     }
-    cudaStream_t        stream         = 0;
-    size_t              op_count       = 0;
-    const void        **srcs           = NULL;
-    void              **dsts           = NULL;
-    size_t             *sizes          = NULL;
-    struct cudaMemcpyAttributes *attrs = NULL;
-    size_t             *attrsIdxs      = NULL;
-    ucc_rank_t          i, peer;
-    void               *src, *dst;
-    size_t              data_size, data_displ;
+    cudaStream_t                 stream    = 0;
+    size_t                       op_count  = 0;
+    const void                 **srcs      = NULL;
+    void                       **dsts      = NULL;
+    size_t                      *sizes     = NULL;
+    struct cudaMemcpyAttributes *attrs     = NULL;
+    size_t                      *attrsIdxs = NULL;
+    ucc_rank_t                   i, peer;
+    void                        *src, *dst;
+    size_t                       data_size, data_displ;
 
     // Count total operations
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
-        peer = (rank + i) % UCC_TL_TEAM_SIZE(team);
+        peer                          = (rank + i) % UCC_TL_TEAM_SIZE(team);
         ucc_tl_cuda_sync_t *peer_sync = TASK_SYNC(task, peer);
-        data_size = task->alltoallv_ce.get_size(task, peer_sync->alltoallv_ce.sbytes, rank);
+        data_size                     = task->alltoallv_ce.get_size(
+            task, peer_sync->alltoallv_ce.sbytes, rank);
         if (data_size > 0) {
             op_count++;
         }
@@ -356,16 +352,14 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task
         } else {
             stream = team->stream;
         }
-        CUDA_CHECK_GOTO(
-            cudaEventRecord(evt, stream),
-            exit, status);
+        CUDA_CHECK_GOTO(cudaEventRecord(evt, stream), exit, status);
         task->alltoallv_ce.num_posted = 0;
         goto exit;
     }
 
     // Allocate arrays
-    srcs = ucc_malloc(op_count * sizeof(const void *), "srcs");
-    dsts = ucc_malloc(op_count * sizeof(void *), "dsts");
+    srcs  = ucc_malloc(op_count * sizeof(const void *), "srcs");
+    dsts  = ucc_malloc(op_count * sizeof(void *), "dsts");
     sizes = ucc_malloc(op_count * sizeof(size_t), "sizes");
     attrs = ucc_malloc(op_count * sizeof(struct cudaMemcpyAttributes), "attrs");
     attrsIdxs = ucc_malloc(op_count * sizeof(size_t), "attrsIdxs");
@@ -387,7 +381,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task
 
         ucc_tl_cuda_sync_t *peer_sync = TASK_SYNC(task, peer);
 
-        data_size = task->alltoallv_ce.get_size(task, peer_sync->alltoallv_ce.sbytes, rank);
+        data_size = task->alltoallv_ce.get_size(
+            task, peer_sync->alltoallv_ce.sbytes, rank);
         if (data_size == 0) {
             continue;
         }
@@ -409,14 +404,14 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task
             task, sync->alltoallv_ce.rdispl_bytes, peer);
         dst = PTR_OFFSET(task->alltoallv_ce.rbuf, data_displ);
 
-        srcs[op_count] = (const void *)src;
-        dsts[op_count] = dst;
+        srcs[op_count]  = (const void *)src;
+        dsts[op_count]  = dst;
         sizes[op_count] = data_size;
 
         // Setup attributes: leave location hints unset so runtime infers devices
         memset(&attrs[op_count], 0, sizeof(struct cudaMemcpyAttributes));
         attrs[op_count].srcAccessOrder = cudaMemcpySrcAccessOrderAny;
-        attrs[op_count].flags = cudaMemcpyFlagPreferOverlapWithCompute;
+        attrs[op_count].flags          = cudaMemcpyFlagPreferOverlapWithCompute;
 
         attrsIdxs[op_count] = op_count;
 
@@ -424,13 +419,12 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task
     }
 
     // Launch batch copy
-    cudaError_t cerr = cudaMemcpyBatchAsync(
-        dsts, (const void * const *)srcs, sizes, op_count,
-        attrs, attrsIdxs, op_count, stream);
+    cudaError_t cerr =
+        cudaMemcpyBatchAsync(dsts, (const void *const *)srcs, sizes, op_count,
+                             attrs, attrsIdxs, op_count, stream);
 
     if (cerr != cudaSuccess) {
-        ucc_error("cudaMemcpyBatchAsync failed: %s",
-                      cudaGetErrorString(cerr));
+        ucc_error("cudaMemcpyBatchAsync failed: %s", cudaGetErrorString(cerr));
         status = UCC_ERR_NO_MESSAGE;
         goto exit;
     }
@@ -438,9 +432,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task
     task->alltoallv_ce.num_posted = op_count;
 
     // Record completion events
-    CUDA_CHECK_GOTO(
-        cudaEventRecord(evt, stream),
-        exit, status);
+    CUDA_CHECK_GOTO(cudaEventRecord(evt, stream), exit, status);
 
 exit:
     ucc_free(srcs);
@@ -454,7 +446,7 @@ exit:
 
 ucc_status_t ucc_tl_cuda_alltoallv_unmap(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_tl_cuda_team_t          *team = TASK_TEAM(task);
     ucc_rank_t                   i, dst;
     volatile ucc_tl_cuda_sync_t *peer_sync;
     ucc_tl_cuda_cache_t         *cache;
@@ -463,7 +455,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_unmap(ucc_tl_cuda_task_t *task)
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
         if (i == UCC_TL_TEAM_RANK(team) ||
             !ucc_tl_cuda_team_topo_is_direct(&team->super, team->topo,
-                                            UCC_TL_TEAM_RANK(team), i)) {
+                                             UCC_TL_TEAM_RANK(team), i)) {
             continue;
         }
         peer_sync = TASK_SYNC(task, i);
@@ -478,9 +470,9 @@ ucc_status_t ucc_tl_cuda_alltoallv_unmap(ucc_tl_cuda_task_t *task)
     }
 
     for (i = 0; i < team->topo->num_proxies; i++) {
-        dst = team->topo->proxies[i].dst;
+        dst       = team->topo->proxies[i].dst;
         peer_sync = TASK_SYNC(task, dst);
-        cache = ucc_tl_cuda_get_cache(team, dst);
+        cache     = ucc_tl_cuda_get_cache(team, dst);
 
         status = ucc_tl_cuda_unmap_memhandle(
             (uintptr_t)peer_sync->mem_info_dst.ptr,
@@ -495,16 +487,16 @@ ucc_status_t ucc_tl_cuda_alltoallv_unmap(ucc_tl_cuda_task_t *task)
 
 void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t  *task     = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t  *team     = TASK_TEAM(task);
+    ucc_tl_cuda_task_t  *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_team_t  *team = TASK_TEAM(task);
     ucc_ec_cuda_event_t *ec_event = NULL;
-    cudaEvent_t         evt       = NULL;
-    ucc_status_t        status;
-    int                 i;
+    cudaEvent_t          evt      = NULL;
+    ucc_status_t         status;
+    int                  i;
 
     if (task->alltoallv_ce.use_copy_engine) {
         ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
-        evt = ec_event->event;
+        evt      = ec_event->event;
     }
 
     switch (task->alltoallv_ce.stage) {
@@ -547,14 +539,13 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
         /* fall through */
     case ALLTOALL_CE_STAGE_COPY:
         if (task->alltoallv_ce.use_copy_engine) {
-            cudaError_t cuda_status =
-            cudaEventQuery(evt);
+            cudaError_t cuda_status = cudaEventQuery(evt);
             if (cuda_status == cudaErrorNotReady) {
                 task->super.status = UCC_INPROGRESS;
                 return;
             } else if (cuda_status != cudaSuccess) {
                 tl_error(UCC_TASK_LIB(task), "error cudaEventQuery %s!",
-                            cudaGetErrorString(cuda_status));
+                         cudaGetErrorString(cuda_status));
                 task->super.status = UCC_ERR_NO_MESSAGE;
                 ucc_assert(0);
                 return;
@@ -609,7 +600,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_start(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
 
     // if not triggered post or copy engine is used, we need to start from sync
-    if (task->alltoallv_ce.stage != ALLTOALL_CE_STAGE_POST_COPIES && task->alltoallv_ce.stage != ALLTOALL_CE_STAGE_COPY) {
+    if (task->alltoallv_ce.stage != ALLTOALL_CE_STAGE_POST_COPIES &&
+        task->alltoallv_ce.stage != ALLTOALL_CE_STAGE_COPY) {
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_SYNC;
     }
 
@@ -665,7 +657,7 @@ size_t ucc_tl_cuda_alltoallv_get_offset(const ucc_tl_cuda_task_t *task,
 ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
                                                      ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t *task  = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_status_t        status;
     ucc_ev_t            post_event;
 
@@ -673,7 +665,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     coll_task->ee = ee;
     tl_debug(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
     coll_task->triggered_post_setup(coll_task);
-
 
     /* Use batch copies only on CUDA 13.0+; otherwise fall back */
 #if CUDART_VERSION >= 13000
@@ -735,8 +726,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
 
     if (team->topo->proxy_needed) {
         data_len = ucc_dt_size(args->dst.info_v.datatype) *
-                ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
-                                              UCC_TL_TEAM_SIZE(team));
+                   ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
+                                                 UCC_TL_TEAM_SIZE(team));
         status = ucc_tl_cuda_mem_info_get(args->dst.info_v.buffer, data_len,
                                           &task->alltoallv_ce.mem_info_dst);
         if (ucc_unlikely(status != UCC_OK)) {
@@ -745,7 +736,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
     }
 
     if (ucc_tl_cuda_task_is_cl_hier(task)) {
-        tl_debug(UCC_TL_TEAM_LIB(team), "CL hier does not support copy engine, fallback to executor");
+        tl_debug(UCC_TL_TEAM_LIB(team),
+                 "CL hier does not support copy engine, fallback to executor");
         task->alltoallv_ce.use_copy_engine = 0;
     } else {
         task->alltoallv_ce.use_copy_engine = lib->cfg.alltoall_use_copy_engine;
@@ -753,18 +745,17 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
 
     if (task->alltoallv_ce.use_copy_engine) {
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: copy engine");
-        task->super.triggered_post = ucc_tl_cuda_alltoallv_ce_triggered_post;
+        task->super.triggered_post   = ucc_tl_cuda_alltoallv_ce_triggered_post;
         task->alltoallv_ce.copy_post = cuda_copy_post;
-        status = ucc_ec_create_event(&task->alltoallv_ce.evtCompletion, UCC_EE_CUDA_STREAM);
+        status = ucc_ec_create_event(&task->alltoallv_ce.evtCompletion,
+                                     UCC_EE_CUDA_STREAM);
         if (ucc_unlikely(status != UCC_OK)) {
-            tl_error(lib, "failed to create CUDA event");
-            ucc_tl_cuda_task_put(task);
             return status;
         }
     } else {
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: executor");
-        task->alltoallv_ce.copy_post = ee_copy_post;
-        task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+        task->alltoallv_ce.copy_post  = ee_copy_post;
+        task->super.flags            |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
 
     task->super.post = ucc_tl_cuda_alltoallv_ce_start;

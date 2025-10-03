@@ -14,14 +14,16 @@
 
 //NOLINTNEXTLINE
 size_t ucc_tl_cuda_alltoall_get_size(const ucc_tl_cuda_task_t *task,
-                                     size_t *cnts, ucc_rank_t block) //NOLINT: cnts is unused
+                                     size_t                   *cnts,
+                                     ucc_rank_t block) //NOLINT: cnts is unused
 {
     return ucc_dt_size(TASK_ARGS(task).dst.info.datatype) *
            (TASK_ARGS(task).dst.info.count / UCC_TL_TEAM_SIZE(TASK_TEAM(task)));
 }
 
-size_t ucc_tl_cuda_alltoall_get_offset(const ucc_tl_cuda_task_t *task,
-                                       size_t *displ, ucc_rank_t block) //NOLINT: displ is unused
+size_t
+ucc_tl_cuda_alltoall_get_offset(const ucc_tl_cuda_task_t *task, size_t *displ,
+                                ucc_rank_t block) //NOLINT: displ is unused
 {
     return ucc_dt_size(TASK_ARGS(task).dst.info.datatype) *
            (TASK_ARGS(task).dst.info.count /
@@ -45,10 +47,10 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     task->alltoallv_ce.rbuf       = args->dst.info.buffer;
     task->alltoallv_ce.stage      = 0;
     /* NOT used for alltoall */
-    task->alltoallv_ce.scnts      = 0;
-    task->alltoallv_ce.rcnts      = 0;
-    task->alltoallv_ce.sdispl     = 0;
-    task->alltoallv_ce.rdispl     = 0;
+    task->alltoallv_ce.scnts  = 0;
+    task->alltoallv_ce.rcnts  = 0;
+    task->alltoallv_ce.sdispl = 0;
+    task->alltoallv_ce.rdispl = 0;
 
     data_len = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
     status   = ucc_tl_cuda_mem_info_get(args->src.info.buffer, data_len,
@@ -66,7 +68,8 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     }
 
     if (ucc_tl_cuda_task_is_cl_hier(task)) {
-        tl_debug(lib, "CL hier does not support copy engine, fallback to executor");
+        tl_trace(lib,
+                 "CL hier does not support copy engine, fallback to executor");
         task->alltoallv_ce.use_copy_engine = 0;
     } else {
         task->alltoallv_ce.use_copy_engine = lib->cfg.alltoall_use_copy_engine;
@@ -76,20 +79,19 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
         tl_trace(lib, "ucc_tl_cuda_alltoall_ce_init: copy engine");
         task->super.triggered_post = ucc_tl_cuda_alltoallv_ce_triggered_post;
 
-        status = ucc_ec_create_event(&task->alltoallv_ce.evtCompletion, UCC_EE_CUDA_STREAM);
+        status = ucc_ec_create_event(&task->alltoallv_ce.evtCompletion,
+                                     UCC_EE_CUDA_STREAM);
         if (ucc_unlikely(status != UCC_OK)) {
-            tl_error(lib, "failed to create CUDA event");
-            ucc_tl_cuda_task_put(task);
             return status;
         }
         task->alltoallv_ce.copy_post = cuda_copy_post;
     } else {
         tl_trace(lib, "ucc_tl_cuda_alltoall_ce_init: executor");
-        task->alltoallv_ce.copy_post = ee_copy_post;
-        task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+        task->alltoallv_ce.copy_post  = ee_copy_post;
+        task->super.flags            |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
 
-    task->super.post           = ucc_tl_cuda_alltoallv_ce_start;
+    task->super.post = ucc_tl_cuda_alltoallv_ce_start;
     task->super.triggered_post_setup =
         ucc_tl_cuda_alltoallv_ce_triggered_post_setup;
     task->super.progress = ucc_tl_cuda_alltoallv_ce_progress;

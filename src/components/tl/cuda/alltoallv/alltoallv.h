@@ -40,8 +40,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_init(ucc_base_coll_args_t *coll_args,
  * @return UCC_OK on success, error code otherwise
  */
 ucc_status_t cuda_copy_post(void *dst, void *src, size_t len,
-                       ucc_ee_executor_t       *executor,
-                       ucc_ee_executor_task_t **task, cudaStream_t stream);
+                            ucc_ee_executor_t       *executor,
+                            ucc_ee_executor_task_t **task, cudaStream_t stream);
 
 /**
  * @brief Post a copy operation using the UCC executor
@@ -59,12 +59,14 @@ ucc_status_t cuda_copy_post(void *dst, void *src, size_t len,
  * @return UCC_OK on success, error code otherwise
  */
 ucc_status_t ee_copy_post(void *dst, void *src, size_t len,
-                       ucc_ee_executor_t       *executor,
-                       ucc_ee_executor_task_t **task, cudaStream_t stream);
+                          ucc_ee_executor_t       *executor,
+                          ucc_ee_executor_task_t **task, cudaStream_t stream);
 
-ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
-                                                     ucc_coll_task_t *coll_task);
+ucc_status_t
+ucc_tl_cuda_alltoallv_ce_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
+                                        ucc_coll_task_t *coll_task);
 
-ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task);
+ucc_status_t
+ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task);
 
 #endif
