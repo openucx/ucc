@@ -6,6 +6,7 @@
 
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
+#include "utils/ucc_log.h"
 
 using Param_0 = std::tuple<int, ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
 using Param_1 = std::tuple<ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
