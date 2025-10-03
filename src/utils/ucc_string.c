@@ -9,6 +9,9 @@
 #include "ucc_coll_utils.h"
 #include <ctype.h>
 #include <ucs/sys/string.h>
+#include <utils/ucc_sys.h>
+#include <time.h>
+#include <unistd.h>
 
 char **ucc_str_split(const char *str, const char *delim)
 {
@@ -17,6 +20,7 @@ char **ucc_str_split(const char *str, const char *delim)
     char   **out;
     char    *str_copy, *token, *saveptr;
     int      i;
+
     out = ucc_malloc(alloc_size * sizeof(char *), "str_split");
     if (!out) {
         ucc_error("failed to allocate %zd bytes for str_split",
@@ -235,4 +239,110 @@ ssize_t ucc_string_find_in_list(const char *str, const char **string_list,
     }
 
     return -1;
+}
+
+void ucc_strncpy_zero(char *dest, const char *src, size_t max)
+{
+    if (max) {
+        strncpy(dest, src, max - 1);
+        dest[max - 1] = '\0';
+    }
+}
+
+void ucc_snprintf_zero(char *buf, size_t size, const char *fmt, ...)
+{
+    va_list ap;
+
+    memset(buf, 0, size);
+    va_start(ap, fmt);
+    // NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized)
+    vsnprintf(buf, size, fmt, ap);
+    va_end(ap);
+}
+
+ucc_status_t ucc_string_alloc_path_buffer(char **buffer_p, const char *name)
+{
+    char *temp_buffer = ucc_malloc(PATH_MAX, name);
+
+    if (temp_buffer == NULL) {
+        ucc_error("failed to allocate memory for %s", name);
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    *buffer_p = temp_buffer;
+    return UCC_OK;
+}
+
+void ucc_fill_filename_template(const char *tmpl, char *buf, size_t max)
+{
+    char *p, *end;
+    const char *pf, *pp;
+    size_t length;
+    time_t t;
+
+    p = buf;
+    end = buf + max - 1;
+    *end = 0;
+    pf = tmpl;
+    while (*pf != 0 && p < end) {
+        pp = strchr(pf, '%');
+        if (pp == NULL) {
+            strncpy(p, pf, end - p);
+            p = end;
+            break;
+        }
+
+        length = ucs_min(pp - pf, end - p);
+        strncpy(p, pf, length);
+        p += length;
+        /* default length of the modifier (e.g. %p) */
+        length = 2;
+
+        switch (*(pp + 1)) {
+        case 'p':
+            snprintf(p, end - p, "%d", getpid());
+            break;
+        case 'h':
+            snprintf(p, end - p, "%s", ucc_hostname());
+            break;
+        case 'c':
+            snprintf(p, end - p, "%02d", ucc_get_first_cpu());
+            break;
+        case 't':
+            t = time(NULL);
+            strftime(p, end - p, "%Y-%m-%d-%H-%M-%S", localtime(&t));
+            break;
+        case 'u':
+            snprintf(p, end - p, "%s", ucc_basename(ucc_get_user_name()));
+            break;
+        case 'e':
+            snprintf(p, end - p, "%s", ucc_basename(ucc_get_exe()));
+            break;
+        case 'i':
+            snprintf(p, end - p, "%u", geteuid());
+            break;
+        default:
+            *(p++) = *pp;
+            length = 1;
+            break;
+        }
+
+        pf = pp + length;
+        p += strlen(p);
+    }
+    *p = 0;
+}
+
+/* NOLINTNEXTLINE */
+char *ucc_strdup(const char *src, const char *name)
+{
+    char *str = strdup(src);
+    return str;
+}
+
+const char* ucc_basename(const char *path)
+{
+    const char *name = strrchr(path, '/');
+
+    return (name == NULL) ? path : name + 1;
 }

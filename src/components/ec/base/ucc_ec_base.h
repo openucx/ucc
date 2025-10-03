@@ -11,6 +11,7 @@
 #include "utils/ucc_component.h"
 #include "utils/ucc_class.h"
 #include "utils/ucc_parser.h"
+#include "utils/ucc_log.h"
 
 typedef struct ucc_ec_config {
     ucc_log_component_config_t log_component;

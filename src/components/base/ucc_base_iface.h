@@ -272,7 +272,7 @@ typedef struct ucc_base_coll_alg_info {
                                     &ucc_config_global_list)
 
 #define ucc_base_log(_lib, _level, fmt, ...)                           \
-    ucc_log_component(_level, (_lib)->log_component, fmt,              \
+    ucc_log_component(_level, &(_lib)->log_component, fmt,             \
                       ##__VA_ARGS__)
 
 #define base_error(_lib, _fmt, ...)                                 \

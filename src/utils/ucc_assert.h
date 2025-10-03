@@ -12,10 +12,12 @@
 #if ENABLE_DEBUG == 1 || UCC_ENABLE_ASSERT == 1
 #include <assert.h>
 #define ucc_assert(_cond) ucc_assert_always(_cond)
+#define ucc_assertv(_cond) ucc_assertv_always(_cond)
 #define ucc_assert_system(_cond) assert(_cond)
 #else
-#define ucc_assert(_cond)
-#define ucc_assert_system(_cond)
+#define ucc_assert(_cond) do {} while(0)
+#define ucc_assert_system(_cond) do {} while(0)
+#define ucc_assertv(_cond) do {} while(0)
 #endif
 
 BEGIN_C_DECLS
@@ -58,6 +60,13 @@ void ucc_fatal_error_message(const char *file, unsigned line,
 void ucc_fatal_error_format(const char *file, unsigned line,
                             const char *function, const char *format, ...)
     UCC_F_NORETURN;
+
+/**
+ * Generate a fatal error
+ */
+#define ucc_fatal(_fmt, ...) \
+    ucc_fatal_error_format(__FILE__, __LINE__, __func__, \
+                            "Fatal: " _fmt, ## __VA_ARGS__)
 
 END_C_DECLS
 
