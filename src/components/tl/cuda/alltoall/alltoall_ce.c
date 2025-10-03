@@ -79,7 +79,7 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
         tl_trace(lib, "ucc_tl_cuda_alltoall_ce_init: copy engine");
         task->super.triggered_post = ucc_tl_cuda_alltoallv_ce_triggered_post;
 
-        status = ucc_ec_create_event(&task->alltoallv_ce.evtCompletion,
+        status = ucc_ec_create_event(&task->alltoallv_ce.evt_completion,
                                      UCC_EE_CUDA_STREAM);
         if (ucc_unlikely(status != UCC_OK)) {
             return status;
@@ -87,8 +87,8 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
         task->alltoallv_ce.copy_post = cuda_copy_post;
     } else {
         tl_trace(lib, "ucc_tl_cuda_alltoall_ce_init: executor");
-        task->alltoallv_ce.copy_post  = ee_copy_post;
-        task->super.flags            |= UCC_COLL_TASK_FLAG_EXECUTOR;
+        task->alltoallv_ce.copy_post = ee_copy_post;
+        task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
 
     task->super.post = ucc_tl_cuda_alltoallv_ce_start;

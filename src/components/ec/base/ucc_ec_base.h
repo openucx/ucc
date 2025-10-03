@@ -142,9 +142,9 @@ typedef struct ucc_eee_task_reduce_strided {
 
 /* Copies len bytes from "src" into "dst" */
 typedef struct ucc_eee_task_copy {
-    void * src;
-    void * dst;
-    size_t len;
+    const void *src;
+    void       *dst;
+    size_t      len;
 } ucc_eee_task_copy_t;
 
 enum ucc_eee_task_flags {

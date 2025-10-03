@@ -12,6 +12,7 @@
 #include "utils/arch/cuda_def.h"
 #include "utils/ucc_compiler_def.h"
 #include "components/ec/ucc_ec.h"
+#include "components/tl/ucc_tl_log.h"
 #include "components/ec/cuda/ec_cuda_resources.h"
 
 #include <cuda_runtime.h>
@@ -59,8 +60,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_finalize(ucc_coll_task_t *coll_task)
     tl_trace(UCC_TASK_LIB(task), "finalizing task %p", task);
 
     // Clean up completion events
-    if (task->alltoallv_ce.evtCompletion) {
-        ucc_ec_destroy_event(task->alltoallv_ce.evtCompletion,
+    if (task->alltoallv_ce.evt_completion) {
+        ucc_ec_destroy_event(task->alltoallv_ce.evt_completion,
                              UCC_EE_CUDA_STREAM);
     }
 
@@ -190,17 +191,17 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
     ucc_ec_cuda_event_t *ec_event = NULL;
     cudaEvent_t          evt      = NULL;
     ucc_status_t         status   = UCC_OK;
+    cudaStream_t         stream   = 0;
+    ucc_tl_cuda_sync_t  *peer_sync;
+    ucc_ee_executor_t   *exec;
+    void                *src, *dst;
+    size_t               data_size, data_displ;
+    ucc_rank_t           i, peer, psrc, pdst;
 
     if (task->alltoallv_ce.use_copy_engine) {
-        ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
+        ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evt_completion;
         evt      = ec_event->event;
     }
-    cudaStream_t        stream = 0;
-    ucc_tl_cuda_sync_t *peer_sync;
-    ucc_ee_executor_t  *exec;
-    void               *src, *dst;
-    size_t              data_size, data_displ;
-    ucc_rank_t          i, peer, psrc, pdst;
 
     if (task->alltoallv_ce.use_copy_engine) {
         // If triggered post, use the stream from the executor
@@ -210,7 +211,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
         // copy engine is used, so no executor is needed
         exec = NULL;
     } else {
-        stream = 0;
         status = ucc_coll_task_get_executor(&task->super, &exec);
         if (ucc_unlikely(status != UCC_OK)) {
             goto exit;
@@ -244,12 +244,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
             task, sync->alltoallv_ce.rdispl_bytes, peer);
         dst = PTR_OFFSET(task->alltoallv_ce.rbuf, data_displ);
 
-        // If triggered post, use the stream from the executor
-        if (task->alltoallv_ce.use_copy_engine && !ee) {
-            // Get the current stream
-            stream = team->stream;
-        }
-
         status = task->alltoallv_ce.copy_post(
             dst, src, data_size, exec,
             &task->alltoallv_ce.exec_task[task->alltoallv_ce.num_posted],
@@ -282,12 +276,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
             task, peer_sync->alltoallv_ce.rdispl_bytes, psrc);
         dst = PTR_OFFSET(dst, data_displ);
 
-        // If triggered post, use the stream from the executor
-        if (task->alltoallv_ce.use_copy_engine && !ee) {
-            // Get the current stream
-            stream = team->stream;
-        }
-
         status = task->alltoallv_ce.copy_post(
             dst, src, data_size, exec,
             &task->alltoallv_ce.exec_task[task->alltoallv_ce.num_posted],
@@ -311,18 +299,13 @@ exit:
 ucc_status_t
 ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t  *team     = TASK_TEAM(task);
-    ucc_rank_t           rank     = UCC_TL_TEAM_RANK(team);
-    ucc_tl_cuda_sync_t  *sync     = TASK_SYNC(task, rank);
-    ucc_ee_h             ee       = task->super.ee;
-    ucc_ec_cuda_event_t *ec_event = NULL;
-    cudaEvent_t          evt      = NULL;
-    ucc_status_t         status   = UCC_OK;
-
-    if (task->alltoallv_ce.use_copy_engine) {
-        ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
-        evt      = ec_event->event;
-    }
+    ucc_tl_cuda_team_t          *team      = TASK_TEAM(task);
+    ucc_rank_t                   rank      = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_sync_t          *sync      = TASK_SYNC(task, rank);
+    ucc_ee_h                     ee        = task->super.ee;
+    ucc_ec_cuda_event_t         *ec_event  = NULL;
+    cudaEvent_t                  evt       = NULL;
+    ucc_status_t                 status    = UCC_OK;
     cudaStream_t                 stream    = 0;
     size_t                       op_count  = 0;
     const void                 **srcs      = NULL;
@@ -333,6 +316,11 @@ ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task)
     ucc_rank_t                   i, peer;
     void                        *src, *dst;
     size_t                       data_size, data_displ;
+
+    if (task->alltoallv_ce.use_copy_engine) {
+        ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evt_completion;
+        evt      = ec_event->event;
+    }
 
     // Count total operations
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
@@ -495,7 +483,7 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
     int                  i;
 
     if (task->alltoallv_ce.use_copy_engine) {
-        ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evtCompletion;
+        ec_event = (ucc_ec_cuda_event_t *)task->alltoallv_ce.evt_completion;
         evt      = ec_event->event;
     }
 
@@ -547,7 +535,6 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
                 tl_error(UCC_TASK_LIB(task), "error cudaEventQuery %s!",
                          cudaGetErrorString(cuda_status));
                 task->super.status = UCC_ERR_NO_MESSAGE;
-                ucc_assert(0);
                 return;
             }
 
@@ -663,7 +650,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
 
     ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
     coll_task->ee = ee;
-    tl_debug(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
+    tl_trace(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
     coll_task->triggered_post_setup(coll_task);
 
     /* Use batch copies only on CUDA 13.0+; otherwise fall back */
@@ -673,7 +660,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     status = ucc_tl_cuda_alltoallv_ce_post_copies(task);
 #endif
     if (ucc_unlikely(status != UCC_OK)) {
-        ucc_error("failed to post copies\n");
+        tl_error(UCC_TASK_LIB(task), "failed to post copies");
         return status;
     }
     task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_COPY;
@@ -736,7 +723,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
     }
 
     if (ucc_tl_cuda_task_is_cl_hier(task)) {
-        tl_debug(UCC_TL_TEAM_LIB(team),
+        tl_trace(UCC_TL_TEAM_LIB(team),
                  "CL hier does not support copy engine, fallback to executor");
         task->alltoallv_ce.use_copy_engine = 0;
     } else {
@@ -747,15 +734,15 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
         ucc_debug("ucc_tl_cuda_alltoallv_ce_init: copy engine");
         task->super.triggered_post   = ucc_tl_cuda_alltoallv_ce_triggered_post;
         task->alltoallv_ce.copy_post = cuda_copy_post;
-        status = ucc_ec_create_event(&task->alltoallv_ce.evtCompletion,
+        status = ucc_ec_create_event(&task->alltoallv_ce.evt_completion,
                                      UCC_EE_CUDA_STREAM);
         if (ucc_unlikely(status != UCC_OK)) {
             return status;
         }
     } else {
-        ucc_debug("ucc_tl_cuda_alltoallv_ce_init: executor");
-        task->alltoallv_ce.copy_post  = ee_copy_post;
-        task->super.flags            |= UCC_COLL_TASK_FLAG_EXECUTOR;
+        ucc_trace("ucc_tl_cuda_alltoallv_ce_init: executor");
+        task->alltoallv_ce.copy_post = ee_copy_post;
+        task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
 
     task->super.post = ucc_tl_cuda_alltoallv_ce_start;

@@ -229,7 +229,7 @@ struct ucc_tl_cuda_task {
             ucc_count_t           *rcnts;
             ucc_aint_t            *sdispl;
             ucc_aint_t            *rdispl;
-            void                  *evtCompletion; // CUDA event for completion of the task
+            void                  *evt_completion; // CUDA event for completion of the task
             int                    use_copy_engine;
             ucc_ee_executor_task_t
                  *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];
@@ -317,8 +317,8 @@ struct ucc_tl_cuda_task {
                                 ucc_rank_t                block);
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
                                  ucc_rank_t                block);
-            cudaEvent_t             evtCopy;
-            cudaEvent_t             evtCompletion;
+            cudaEvent_t             evt_copy;
+            cudaEvent_t             evt_completion;
         } reduce_scatterv_nvls;
         struct {
             int            stage;
@@ -328,7 +328,7 @@ struct ucc_tl_cuda_task {
             size_t         buf_size_bytes;
             CUdeviceptr    mc_va; // Memory handle for MC symmetric memory
             CUdeviceptr    uc_va; // Memory handle for UC symmetric memory
-            void          *evtCompletion;
+            void          *evt_completion;
             size_t         coll_id; // Coll id for the NVLS task in flight slot
         } allreduce_nvls;
 #endif
