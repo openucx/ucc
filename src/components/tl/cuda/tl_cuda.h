@@ -237,7 +237,7 @@ struct ucc_tl_cuda_task {
                                ucc_rank_t block);
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
                                  size_t *displ_bytes, ucc_rank_t block);
-            ucc_status_t (*copy_post)(void *dst, void *src, size_t len,
+            ucc_status_t (*copy_post)(void *dst, const void *src, size_t len,
                                       ucc_ee_executor_t       *executor,
                                       ucc_ee_executor_task_t **task,
                                       cudaStream_t             stream);
@@ -335,9 +335,4 @@ struct ucc_tl_cuda_task {
     };
 };
 
-// Check if the task is part of a CL hier team, used for alltoallv_ce
-static inline int ucc_tl_cuda_task_is_cl_hier(const ucc_tl_cuda_task_t *task)
-{
-    return task && task->super.team && (task->super.team->params.scope == UCC_CL_HIER);
-}
 #endif

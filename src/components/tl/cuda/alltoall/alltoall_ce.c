@@ -67,7 +67,7 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
         }
     }
 
-    if (ucc_tl_cuda_task_is_cl_hier(task)) {
+    if (ucc_coll_task_is_cl_hier(&task->super)) {
         tl_trace(lib,
                  "CL hier does not support copy engine, fallback to executor");
         task->alltoallv_ce.use_copy_engine = 0;

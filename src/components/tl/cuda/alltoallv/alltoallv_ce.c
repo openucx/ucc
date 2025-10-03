@@ -15,9 +15,7 @@
 #include "components/tl/ucc_tl_log.h"
 #include "components/ec/cuda/ec_cuda_resources.h"
 
-#include <cuda_runtime.h>
-#include <driver_types.h>
-#include <string.h>
+#include <string.h> // memcpy memset
 
 enum {
     ALLTOALL_CE_STAGE_SYNC,        /*< Wait for free SYNC segment */
@@ -722,7 +720,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
         }
     }
 
-    if (ucc_tl_cuda_task_is_cl_hier(task)) {
+    if (ucc_coll_task_is_cl_hier(&task->super)) {
         tl_trace(UCC_TL_TEAM_LIB(team),
                  "CL hier does not support copy engine, fallback to executor");
         task->alltoallv_ce.use_copy_engine = 0;
