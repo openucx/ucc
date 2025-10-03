@@ -12,19 +12,19 @@
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 
-//NOLINTNEXTLINE
+//NOLINTNEXTLINE(misc-unused-parameters): cnts parameter unused in alltoall variant
 size_t ucc_tl_cuda_alltoall_get_size(const ucc_tl_cuda_task_t *task,
-                                     size_t                   *cnts,
-                                     ucc_rank_t block) //NOLINT: cnts is unused
+                                     size_t *cnts, ucc_rank_t block)
 {
+    (void)cnts; /* Unused parameter */
     return ucc_dt_size(TASK_ARGS(task).dst.info.datatype) *
            (TASK_ARGS(task).dst.info.count / UCC_TL_TEAM_SIZE(TASK_TEAM(task)));
 }
 
-size_t
-ucc_tl_cuda_alltoall_get_offset(const ucc_tl_cuda_task_t *task, size_t *displ,
-                                ucc_rank_t block) //NOLINT: displ is unused
+size_t ucc_tl_cuda_alltoall_get_offset(const ucc_tl_cuda_task_t *task,
+                                       size_t *displ, ucc_rank_t block)
 {
+    (void)displ; /* Unused parameter */
     return ucc_dt_size(TASK_ARGS(task).dst.info.datatype) *
            (TASK_ARGS(task).dst.info.count /
             UCC_TL_TEAM_SIZE(TASK_TEAM(task))) *
