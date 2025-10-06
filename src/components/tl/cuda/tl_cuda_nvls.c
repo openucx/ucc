@@ -104,19 +104,10 @@ static ucc_status_t ucc_tl_cuda_nvls_share_handles_posix(
 
     // If oob_req is NULL, initiate the allgather
     if (self->oob_req == NULL) {
-        ucc_debug(
-            "RANK %d: initiating allgather for PIDs and handles",
-            UCC_TL_TEAM_RANK(self));
-
         // Prepare local data (each rank populates its own data)
         if (UCC_TL_TEAM_RANK(self) == 0) {
             self->nvls.share_data[0].handle = export_handle;
             self->nvls.share_data[0].pid    = getpid();
-            ucc_debug(
-                "RANK %d: local data: handle = %d, pid = %d",
-                UCC_TL_TEAM_RANK(self),
-                self->nvls.share_data[0].handle,
-                self->nvls.share_data[0].pid);
         }
 
         // Initiate single allgather for both PID and export handle
@@ -136,10 +127,7 @@ static ucc_status_t ucc_tl_cuda_nvls_share_handles_posix(
 
     // Test the request status
     status = self->oob.req_test(self->oob_req);
-    ucc_debug(
-        "RANK %d: allgather for PIDs and handles status: %d",
-        UCC_TL_TEAM_RANK(self),
-        status);
+
     // If still in progress, return immediately (non-blocking)
     if (status > 0) {
         return UCC_INPROGRESS;
@@ -215,10 +203,7 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
 {
     int          pidFd, peerFd;
     ucc_status_t status;
-    ucc_debug(
-        "RANK %d: importing handle for pid %d",
-        UCC_TL_TEAM_RANK(self),
-        targetPid);
+
     pidFd = syscall(SYS_pidfd_open, targetPid, 0);
     if (pidFd < 0) {
         tl_error(
@@ -243,8 +228,20 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
     status  = CUDADRV_FUNC(cuMemImportFromShareableHandle(
         mcHandle, p, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR));
 
-    close(peerFd);
-    close(pidFd);
+    if (close(peerFd) != 0) {
+        tl_error(
+            UCC_TL_TEAM_LIB(self),
+            "failed to close peerFd: %s (errno=%d)",
+            strerror(errno),
+            errno);
+    }
+    if (close(pidFd) != 0) {
+        tl_error(
+            UCC_TL_TEAM_LIB(self),
+            "failed to close pidFd: %s (errno=%d)",
+            strerror(errno),
+            errno);
+    }
 
     if (status != UCC_OK) {
         tl_error(
@@ -282,8 +279,8 @@ ucc_status_t ucc_tl_cuda_nvls_init(
                                   (lib->cfg.nvls_symmetric_size +
                                    NVLS_CONTROL_SIZE);
     size_t                       mcSize    = 0;
-    void                        *uc_va     = NULL;
-    void                        *mc_va     = NULL;
+    CUdeviceptr                  uc_va     = 0;
+    CUdeviceptr                  mc_va     = 0;
     ucc_status_t                 status    = UCC_OK;
     CUmemGenericAllocationHandle mcHandle  = 0;
     CUmemGenericAllocationHandle memhandle = 0;
@@ -470,53 +467,48 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         accessDesc.flags           = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
 
         // Reserve and map unicast virtual address space
-        status                     = CUDADRV_FUNC(cuMemAddressReserve(
-            (CUdeviceptr *)&uc_va, mcSize, nvls->minGran, 0U, 0));
+        status                     = CUDADRV_FUNC(
+            cuMemAddressReserve(&uc_va, mcSize, nvls->minGran, 0U, 0));
         if (status != UCC_OK) {
             ucc_error("failed to reserve virtual address space");
             goto cleanup;
         }
 
-        status = CUDADRV_FUNC(
-            cuMemMap((CUdeviceptr)uc_va, mcSize, 0, memhandle, 0));
+        status = CUDADRV_FUNC(cuMemMap(uc_va, mcSize, 0, memhandle, 0));
         if (status != UCC_OK) {
             ucc_error("failed to map memory allocation");
             goto cleanup;
         }
 
-        status = CUDADRV_FUNC(
-            cuMemSetAccess((CUdeviceptr)uc_va, mcSize, &accessDesc, 1));
+        status = CUDADRV_FUNC(cuMemSetAccess(uc_va, mcSize, &accessDesc, 1));
         if (status != UCC_OK) {
             ucc_error("failed to set memory access");
             goto cleanup;
         }
 
         // Bind memory to multicast object
-        size_t mcOffset = 0;
-        status          = CUDADRV_FUNC(cuMulticastBindAddr(
-            nvls->mc_handle, mcOffset, (CUdeviceptr)uc_va, mcSize, 0));
+        status = CUDADRV_FUNC(cuMulticastBindAddr(
+            nvls->mc_handle, 0 /*mcOffset*/, uc_va, mcSize, 0));
         if (status != UCC_OK) {
             ucc_error("failed to bind memory to multicast");
             goto cleanup;
         }
 
         // Reserve and map multicast virtual address space
-        status = CUDADRV_FUNC(cuMemAddressReserve(
-            (CUdeviceptr *)&mc_va, mcSize, nvls->minGran, 0U, 0));
+        status = CUDADRV_FUNC(
+            cuMemAddressReserve(&mc_va, mcSize, nvls->minGran, 0U, 0));
         if (status != UCC_OK) {
             ucc_error("failed to reserve multicast virtual address space");
             goto cleanup;
         }
 
-        status = CUDADRV_FUNC(
-            cuMemMap((CUdeviceptr)mc_va, mcSize, 0, nvls->mc_handle, 0));
+        status = CUDADRV_FUNC(cuMemMap(mc_va, mcSize, 0, nvls->mc_handle, 0));
         if (status != UCC_OK) {
             ucc_error("failed to map multicast memory");
             goto cleanup;
         }
 
-        status = CUDADRV_FUNC(
-            cuMemSetAccess((CUdeviceptr)mc_va, mcSize, &accessDesc, 1));
+        status = CUDADRV_FUNC(cuMemSetAccess(mc_va, mcSize, &accessDesc, 1));
         if (status != UCC_OK) {
             ucc_error("failed to set multicast memory access");
             goto cleanup;
@@ -525,14 +517,14 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         ucc_debug(
             "Rank: %d symmetric memory is set: %p [%ld bytes]\n",
             UCC_TL_TEAM_RANK(self),
-            mc_va,
+            (void *)mc_va,
             mcSize);
 
         // Store the handles for cleanup in team destroy
-        nvls->mc_va        = (CUdeviceptr)mc_va;
-        nvls->uc_va        = (CUdeviceptr)uc_va;
+        nvls->mc_va        = mc_va;
+        nvls->uc_va        = uc_va;
         nvls->mc_memhandle = memhandle;
-        nvls->mc_offset    = mcOffset;
+        nvls->mc_offset    = 0; // mcOffset;
         nvls->coll_ids     = ucc_malloc(
             lib->cfg.max_concurrent * sizeof(size_t), "coll_ids");
         if (!nvls->coll_ids) {
@@ -545,8 +537,7 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         if (UCC_TL_TEAM_RANK(self) == 0) {
             // root rank zero-initializes the control region for each task slot
             size_t stride = lib->cfg.nvls_symmetric_size + NVLS_CONTROL_SIZE;
-            void  *control_uc0 = PTR_OFFSET(
-                (void *)uc_va, lib->cfg.nvls_symmetric_size);
+            void  *control_uc0 = (void *)(uc_va + lib->cfg.nvls_symmetric_size);
             CUDA_CHECK(cudaMemset2D(
                 control_uc0,
                 stride,
@@ -583,30 +574,58 @@ cleanup:
         nvls->share_data = NULL;
     }
 
-    // Clean up CUDA resources - check local variables, not nvls struct
-    // since nvls fields may not be initialized yet
-    if (mc_va) {
-        CUDADRV_FUNC(cuMemUnmap((CUdeviceptr)mc_va, mcSize));
-        CUDADRV_FUNC(cuMemAddressFree((CUdeviceptr)mc_va, mcSize));
+    // Clean up CUDA resources - check local variables for partial allocations
+    // Unmap and free multicast VA if it was reserved/mapped
+    if (mc_va != 0) {
+        if (CUDADRV_FUNC(cuMemUnmap(mc_va, mcSize)) != UCC_OK) {
+            tl_warn(
+                UCC_TL_TEAM_LIB(self), "failed to unmap mc_va during cleanup");
+        }
+        if (CUDADRV_FUNC(cuMemAddressFree(mc_va, mcSize)) != UCC_OK) {
+            tl_warn(
+                UCC_TL_TEAM_LIB(self), "failed to free mc_va during cleanup");
+        }
     }
 
-    if (uc_va) {
-        CUDADRV_FUNC(cuMemUnmap((CUdeviceptr)uc_va, mcSize));
-        CUDADRV_FUNC(cuMemAddressFree((CUdeviceptr)uc_va, mcSize));
+    // Unmap and free unicast VA if it was reserved/mapped
+    if (uc_va != 0) {
+        if (CUDADRV_FUNC(cuMemUnmap(uc_va, mcSize)) != UCC_OK) {
+            tl_warn(
+                UCC_TL_TEAM_LIB(self), "failed to unmap uc_va during cleanup");
+        }
+        if (CUDADRV_FUNC(cuMemAddressFree(uc_va, mcSize)) != UCC_OK) {
+            tl_warn(
+                UCC_TL_TEAM_LIB(self), "failed to free uc_va during cleanup");
+        }
     }
 
-    if (memhandle) {
-        CUDADRV_FUNC(cuMemRelease(memhandle));
+    // Release memory handle if it was created
+    if (memhandle != 0) {
+        if (CUDADRV_FUNC(cuMemRelease(memhandle)) != UCC_OK) {
+            tl_warn(
+                UCC_TL_TEAM_LIB(self),
+                "failed to release memhandle during cleanup");
+        }
     }
 
-    // Only rank 0 owns the multicast handle
-    if (UCC_TL_TEAM_RANK(self) == 0 && mcHandle) {
-        CUDADRV_FUNC(cuMemRelease(mcHandle));
+    // Only rank 0 owns and should clean up the multicast handle
+    if (UCC_TL_TEAM_RANK(self) == 0 && mcHandle != 0) {
+        if (CUDADRV_FUNC(cuMemRelease(mcHandle)) != UCC_OK) {
+            tl_warn(
+                UCC_TL_TEAM_LIB(self),
+                "failed to release mcHandle during cleanup");
+        }
     }
 
     if (self->shared_handles) {
         ucc_free(self->shared_handles);
         self->shared_handles = NULL;
+    }
+
+    // Free coll_ids if allocated
+    if (nvls->coll_ids) {
+        ucc_free(nvls->coll_ids);
+        nvls->coll_ids = NULL;
     }
 
     return status;
