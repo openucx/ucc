@@ -350,13 +350,6 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         if (!nvls->share_data) {
             return UCC_ERR_NO_MEMORY;
         }
-        // Allocate shared handles array
-        self->shared_handles = ucc_malloc(
-            UCC_TL_TEAM_SIZE(self) * sizeof(int), "shared_handles");
-        if (!self->shared_handles) {
-            status = UCC_ERR_NO_MEMORY;
-            goto cleanup;
-        }
 
         // Allocate shared PIDs array
         nvls->shared_pids = ucc_malloc(
@@ -605,18 +598,14 @@ cleanup:
         }
     }
 
-    // Only rank 0 owns and should clean up the multicast handle
-    if (UCC_TL_TEAM_RANK(self) == 0 && mcHandle != 0) {
-        if (CUDADRV_FUNC(cuMemRelease(mcHandle)) != UCC_OK) {
+    // Release multicast handle if it was created or imported
+    if (nvls->mc_handle != 0) {
+        if (CUDADRV_FUNC(cuMemRelease(nvls->mc_handle)) != UCC_OK) {
             tl_error(
                 UCC_TL_TEAM_LIB(self),
-                "failed to release mcHandle during cleanup");
+                "failed to release mc_handle during cleanup");
         }
-    }
-
-    if (self->shared_handles) {
-        ucc_free(self->shared_handles);
-        self->shared_handles = NULL;
+        nvls->mc_handle = 0;
     }
 
     // Free coll_ids if allocated
@@ -641,16 +630,19 @@ ucc_status_t ucc_tl_cuda_nvls_destroy(
         device = 0; // fallback to device 0
     }
 
-    if (UCC_TL_TEAM_RANK(self) == 0) {
-        // Rank 0: unbind and release multicast object
-        if (self->nvls.mc_handle) {
-            CUDADRV_FUNC(cuMulticastUnbind(
-                self->nvls.mc_handle,
-                device,
-                self->nvls.mc_offset,
-                self->nvls.mc_size));
-            CUDADRV_FUNC(cuMemRelease(self->nvls.mc_handle));
-        }
+    // Rank 0: unbind the multicast object
+    if (UCC_TL_TEAM_RANK(self) == 0 && self->nvls.mc_handle) {
+        CUDADRV_FUNC(cuMulticastUnbind(
+            self->nvls.mc_handle,
+            device,
+            self->nvls.mc_offset,
+            self->nvls.mc_size));
+    }
+
+    // ALL ranks: release their multicast handle (created or imported)
+    if (self->nvls.mc_handle) {
+        CUDADRV_FUNC(cuMemRelease(self->nvls.mc_handle));
+        self->nvls.mc_handle = 0;
     }
 
     // ALL ranks: clean up their mapped memory
@@ -674,11 +666,6 @@ ucc_status_t ucc_tl_cuda_nvls_destroy(
     if (self->nvls.share_data) {
         ucc_free(self->nvls.share_data);
         self->nvls.share_data = NULL;
-    }
-    // ALL ranks: free shared_handles
-    if (self->shared_handles) {
-        ucc_free(self->shared_handles);
-        self->shared_handles = NULL;
     }
     return UCC_OK;
 }
