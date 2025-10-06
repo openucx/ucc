@@ -578,11 +578,11 @@ cleanup:
     // Unmap and free multicast VA if it was reserved/mapped
     if (mc_va != 0) {
         if (CUDADRV_FUNC(cuMemUnmap(mc_va, mcSize)) != UCC_OK) {
-            tl_warn(
+            tl_error(
                 UCC_TL_TEAM_LIB(self), "failed to unmap mc_va during cleanup");
         }
         if (CUDADRV_FUNC(cuMemAddressFree(mc_va, mcSize)) != UCC_OK) {
-            tl_warn(
+            tl_error(
                 UCC_TL_TEAM_LIB(self), "failed to free mc_va during cleanup");
         }
     }
@@ -590,11 +590,11 @@ cleanup:
     // Unmap and free unicast VA if it was reserved/mapped
     if (uc_va != 0) {
         if (CUDADRV_FUNC(cuMemUnmap(uc_va, mcSize)) != UCC_OK) {
-            tl_warn(
+            tl_error(
                 UCC_TL_TEAM_LIB(self), "failed to unmap uc_va during cleanup");
         }
         if (CUDADRV_FUNC(cuMemAddressFree(uc_va, mcSize)) != UCC_OK) {
-            tl_warn(
+            tl_error(
                 UCC_TL_TEAM_LIB(self), "failed to free uc_va during cleanup");
         }
     }
@@ -602,7 +602,7 @@ cleanup:
     // Release memory handle if it was created
     if (memhandle != 0) {
         if (CUDADRV_FUNC(cuMemRelease(memhandle)) != UCC_OK) {
-            tl_warn(
+            tl_error(
                 UCC_TL_TEAM_LIB(self),
                 "failed to release memhandle during cleanup");
         }
@@ -611,7 +611,7 @@ cleanup:
     // Only rank 0 owns and should clean up the multicast handle
     if (UCC_TL_TEAM_RANK(self) == 0 && mcHandle != 0) {
         if (CUDADRV_FUNC(cuMemRelease(mcHandle)) != UCC_OK) {
-            tl_warn(
+            tl_error(
                 UCC_TL_TEAM_LIB(self),
                 "failed to release mcHandle during cleanup");
         }
