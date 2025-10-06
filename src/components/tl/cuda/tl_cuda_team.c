@@ -29,6 +29,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     uint32_t      resource_num = lib->cfg.max_concurrent * 2;
     ucc_tl_cuda_shm_barrier_t *bar;
     ucc_status_t status;
+    cudaError_t st;
     int shm_id, i, j;
     size_t ctrl_size, alloc_size, scratch_size;
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
@@ -132,7 +133,14 @@ free_devices:
         self->sync = (void*)(-1);
     }
 free_scratch:
-    cudaFree(self->scratch.loc);
+    st = cudaFree(self->scratch.loc);
+    if (st != cudaSuccess) {
+        tl_error(
+            tl_context->lib,
+            "cudaFree failed: %d (%s)",
+            st,
+            cudaGetErrorName(st));
+    }
 free_ids:
     ucc_free(self->ids);
     return status;
@@ -376,6 +384,62 @@ nvls_init:
     return UCC_OK;
 
 exit_err:
+    // Clean up CUDA stream if created
+    if (team->stream) {
+        cudaError_t st = cudaStreamDestroy(team->stream);
+        if (st != cudaSuccess) {
+            tl_warn(tl_team->context->lib, "cudaStreamDestroy failed during "
+                    "cleanup: %d (%s)", st, cudaGetErrorName(st));
+        }
+        team->stream = NULL;
+    }
+
+    // Clean up partially created IPC events (local events)
+    for (i = 0; i < resource_num; i++) {
+        sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
+        if (sync->ipc_event_local) {
+            cudaError_t st = cudaEventDestroy(sync->ipc_event_local);
+            if (st != cudaSuccess) {
+                tl_warn(tl_team->context->lib, "cudaEventDestroy failed during "
+                        "cleanup: %d (%s)", st, cudaGetErrorName(st));
+            }
+            sync->ipc_event_local = NULL;
+        }
+        // Clean up opened remote event handles
+        for (j = 0; j < UCC_TL_TEAM_SIZE(team); j++) {
+            if (j == UCC_TL_TEAM_RANK(team)) {
+                continue;
+            }
+            if (sync->data[j].ipc_event_remote) {
+                cudaError_t st = cudaEventDestroy(sync->data[j].ipc_event_remote);
+                if (st != cudaSuccess) {
+                    tl_warn(tl_team->context->lib, "cudaEventDestroy failed "
+                            "during cleanup: %d (%s)", st, cudaGetErrorName(st));
+                }
+                sync->data[j].ipc_event_remote = NULL;
+            }
+        }
+    }
+
+    // Clean up mapped scratch memory
+    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
+        if (team->scratch.rem[i]) {
+            ucc_tl_cuda_unmap_memhandle((uintptr_t)team->scratch.rem_info[i].ptr,
+                                        team->scratch.rem[i],
+                                        ucc_tl_cuda_get_cache(team, i), 1);
+            team->scratch.rem[i] = NULL;
+        }
+    }
+
+    // Clean up shared memory if attached by non-root
+    if (UCC_TL_TEAM_RANK(team) != 0 && team->sync != (void*)-1) {
+        if (shmdt(team->sync) != 0) {
+            tl_warn(tl_team->context->lib, "shmdt failed during cleanup: %s",
+                    strerror(errno));
+        }
+        team->sync = (void*)-1;
+    }
+
     return status;
 }
 
