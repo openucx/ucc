@@ -198,7 +198,8 @@ typedef struct ucc_tl_cuda_team {
     ucc_team_oob_coll_t        oob;
     void                      *oob_req;
 #ifdef HAVE_NVLS
-    ucc_tl_cuda_nvls_t         nvls;
+    ucc_tl_cuda_nvls_t       nvls;
+    ucc_tl_cuda_nvls_state_t state; // State of the nvls initialization
 #endif
 } ucc_tl_cuda_team_t;
 

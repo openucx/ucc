@@ -193,7 +193,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
     }
 
     task->allreduce_nvls.dt = coll_args->args.dst.info.datatype;
-    tl_debug(UCC_TL_TEAM_LIB(team), "NVLS allreduce datatype: %s", ucc_datatype_str(task->allreduce_nvls.dt));
+    tl_trace(UCC_TL_TEAM_LIB(team), "NVLS allreduce datatype: %s", ucc_datatype_str(task->allreduce_nvls.dt));
 
     task->super.post           = ucc_tl_cuda_allreduce_nvls_start;
     task->super.triggered_post = ucc_tl_cuda_allreduce_nvls_triggered_post;

@@ -40,6 +40,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     self->ids         = NULL;
 
 #ifdef HAVE_NVLS
+    self->state = UCC_TL_CUDA_NVLS_STATE_INIT;
     if (!ucc_team_map_is_single_node(params->team, params->map)) {
         tl_debug(tl_context->lib, "multinode team is supported");
         self->seq_num = 1;
@@ -234,6 +235,9 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     }
 
 #ifdef HAVE_NVLS
+    if (team->state != UCC_TL_CUDA_NVLS_STATE_INIT) {
+        goto nvls_init;
+    }
     if (!ucc_team_map_is_single_node(team->super.super.params.team,
                                      team->super.super.params.map)) {
         goto nvls_init;
@@ -354,10 +358,15 @@ barrier:
 
 #ifdef HAVE_NVLS
 nvls_init:
-    // zero out the nvls struct
-    memset(&team->nvls, 0, sizeof(team->nvls));
+    if (team->state == UCC_TL_CUDA_NVLS_STATE_INIT) {
+        // zero out the nvls struct
+        memset(&team->nvls, 0, sizeof(team->nvls));
+    }
     // initialize the nvls struct
     status = ucc_tl_cuda_nvls_init(team, tl_team->context);
+    if (status == UCC_INPROGRESS) {
+        return status;
+    }
     if (status != UCC_OK) {
         ucc_error("failed to init nvls multicast");
         goto exit_err;

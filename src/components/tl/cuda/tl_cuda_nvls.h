@@ -15,25 +15,62 @@
 // Forward declaration to avoid circular dependency
 struct ucc_tl_cuda_team;
 
+typedef struct {
+    pid_t pid;
+    int   handle;
+} ucc_tl_cuda_nvls_share_data_t;
+
+typedef enum {
+    UCC_TL_CUDA_NVLS_STATE_INIT,
+    UCC_TL_CUDA_NVLS_STATE_SHARE_HANDLES,
+    UCC_TL_CUDA_NVLS_STATE_IMPORT_HANDLE,
+    UCC_TL_CUDA_NVLS_STATE_ADD_DEVICE,
+} ucc_tl_cuda_nvls_state_t;
+
 typedef struct ucc_tl_cuda_nvls {
-    CUmemGenericAllocationHandle mc_handle;    // Multicast handle
-    CUmemGenericAllocationHandle mc_memhandle; // Multicast memory handle
-    CUdeviceptr                  mc_va;        // Device pointer for multicast
-    CUdeviceptr                  uc_va;        // Device pointer for unicast
-    size_t                       mc_size;      // Size of multicast memory
-    size_t                       mc_offset;    // Offset of multicast memory
-    size_t                      *coll_ids;     // Coll id for each task
-    int                          is_multinode; // Whether the team is multi-node
+    // Multicast handle
+    CUmemGenericAllocationHandle   mc_handle;
+    // Multicast memory handle
+    CUmemGenericAllocationHandle   mc_memhandle;
+    // Device pointer for multicast
+    CUdeviceptr                    mc_va;
+    // Device pointer for unicast
+    CUdeviceptr                    uc_va;
+    // Size of multicast memory
+    size_t                         mc_size;
+    // Offset of multicast memory
+    size_t                         mc_offset;
+    // Coll id for each task
+    size_t                        *coll_ids;
+    // Whether the team is multi-node
+    int                            is_multinode;
+    // Temporary buffer for allgather
+    ucc_tl_cuda_nvls_share_data_t *share_data;
+    // State variables for re-entrant initialization
+    // POSIX file descriptor handle
+    int                            export_handle;
+    // Fabric handle for multi-node
+    CUmemFabricHandle              fabric_handle;
+    // Array of PIDs from all ranks
+    pid_t                         *shared_pids;
+    // Array of fabric handles
+    CUmemFabricHandle             *shared_fabric_handles;
+    // CUDA device ID
+    int                            device;
+    // Minimum granularity
+    size_t                         minGran;
+    // Granularity
+    size_t                         gran;
 } ucc_tl_cuda_nvls_t;
 
 typedef struct ucc_tl_cuda_nvls_control {
     uint64_t arrival_counter;
 } ucc_tl_cuda_nvls_control_t;
 
-ucc_status_t ucc_tl_cuda_nvls_init(struct ucc_tl_cuda_team *self,
-                                   ucc_base_context_t      *tl_context);
+ucc_status_t ucc_tl_cuda_nvls_init(
+    struct ucc_tl_cuda_team *self, ucc_base_context_t *tl_context);
 
-ucc_status_t ucc_tl_cuda_nvls_destroy(struct ucc_tl_cuda_team *self,
-                                      ucc_base_context_t      *tl_context);
+ucc_status_t ucc_tl_cuda_nvls_destroy(
+    struct ucc_tl_cuda_team *self, ucc_base_context_t *tl_context);
 
 #endif // UCC_TL_CUDA_NVLS_H_
