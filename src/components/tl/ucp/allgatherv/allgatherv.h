@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -20,7 +20,7 @@ extern ucc_base_coll_alg_info_t
              ucc_tl_ucp_allgatherv_algs[UCC_TL_UCP_ALLGATHERV_ALG_LAST + 1];
 
 #define UCC_TL_UCP_ALLGATHERV_DEFAULT_ALG_SELECT_STR                           \
-    "allgatherv:@0"
+    "allgatherv:0-4k:@knomial#allgatherv:4k-inf:@ring"
 
 char *ucc_tl_ucp_allgatherv_score_str_get(ucc_tl_ucp_team_t *team);
 
