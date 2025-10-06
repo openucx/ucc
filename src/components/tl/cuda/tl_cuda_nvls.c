@@ -201,6 +201,7 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
     struct ucc_tl_cuda_team *self, int export_handle, pid_t targetPid,
     CUmemGenericAllocationHandle *mcHandle)
 {
+    void        *p;
     int          pidFd, peerFd;
     ucc_status_t status;
 
@@ -224,8 +225,8 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
         return UCC_ERR_NO_RESOURCE;
     }
 
-    void *p = (void *)((uint64_t)peerFd);
-    status  = CUDADRV_FUNC(cuMemImportFromShareableHandle(
+    p      = (void *)((uint64_t)peerFd);
+    status = CUDADRV_FUNC(cuMemImportFromShareableHandle(
         mcHandle, p, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR));
 
     if (close(peerFd) != 0) {
@@ -391,7 +392,6 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         }
         self->state = UCC_TL_CUDA_NVLS_STATE_SHARE_HANDLES;
         // fall through
-
     case UCC_TL_CUDA_NVLS_STATE_SHARE_HANDLES:
         // Share handles across ranks (uses state-stored values)
         if (nvls->is_multinode) {
@@ -409,7 +409,6 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         }
         self->state = UCC_TL_CUDA_NVLS_STATE_IMPORT_HANDLE;
         // fall through
-
     case UCC_TL_CUDA_NVLS_STATE_IMPORT_HANDLE:
         // Import handle on non-root ranks
         if (UCC_TL_TEAM_RANK(self) != 0) {
@@ -430,7 +429,6 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         }
         self->state = UCC_TL_CUDA_NVLS_STATE_ADD_DEVICE;
         // fall through
-
     case UCC_TL_CUDA_NVLS_STATE_ADD_DEVICE:
         // Add device to multicast object
         status = CUDADRV_FUNC(
@@ -552,7 +550,6 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         ucc_free(nvls->shared_fabric_handles);
         nvls->shared_fabric_handles = NULL;
         break;
-
     default:
         break;
     }
