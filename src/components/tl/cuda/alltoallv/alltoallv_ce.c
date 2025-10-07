@@ -303,14 +303,13 @@ static ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(
     ucc_ee_h                     ee        = task->super.ee;
     ucc_ec_cuda_event_t         *ec_event  = NULL;
     cudaEvent_t                  evt       = NULL;
-    ucc_status_t                 status    = UCC_OK;
     cudaStream_t                 stream    = 0;
     size_t                       op_count  = 0;
-    const void                 **srcs      = NULL;
-    void                       **dsts      = NULL;
-    size_t                      *sizes     = NULL;
-    struct cudaMemcpyAttributes *attrs     = NULL;
-    size_t                      *attrsIdxs = NULL;
+    const void                 **srcs;
+    void                       **dsts;
+    size_t                      *sizes;
+    struct cudaMemcpyAttributes *attrs;
+    size_t                      *attrsIdxs;
     ucc_tl_cuda_sync_t          *peer_sync;
     ucc_rank_t                   i, peer;
     void                        *src, *dst;
@@ -323,9 +322,9 @@ static ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(
 
     // Count total operations
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
-        peer                          = (rank + i) % UCC_TL_TEAM_SIZE(team);
-        ucc_tl_cuda_sync_t *peer_sync = TASK_SYNC(task, peer);
-        data_size                     = task->alltoallv_ce.get_size(
+        peer      = (rank + i) % UCC_TL_TEAM_SIZE(team);
+        peer_sync = TASK_SYNC(task, peer);
+        data_size = task->alltoallv_ce.get_size(
             task, peer_sync->alltoallv_ce.sbytes, rank);
         if (data_size > 0) {
             op_count++;
@@ -336,30 +335,23 @@ static ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(
 
     // If there is nothing to copy, just record completion and return
     if (op_count == 0) {
-        CUDA_CHECK_GOTO(cudaEventRecord(evt, stream), exit, status);
+        CUDA_CHECK(cudaEventRecord(evt, stream));
         task->alltoallv_ce.num_posted = 0;
-        goto exit;
+        return UCC_OK;
     }
 
-    // Allocate arrays
-    srcs  = ucc_malloc(op_count * sizeof(const void *), "srcs");
-    dsts  = ucc_malloc(op_count * sizeof(void *), "dsts");
-    sizes = ucc_malloc(op_count * sizeof(size_t), "sizes");
-    attrs = ucc_malloc(op_count * sizeof(struct cudaMemcpyAttributes), "attrs");
-    attrsIdxs = ucc_malloc(op_count * sizeof(size_t), "attrsIdxs");
-
-    if (!srcs || !dsts || !sizes || !attrs || !attrsIdxs) {
-        status = UCC_ERR_NO_MEMORY;
-        goto exit;
-    }
+    // Allocate arrays on stack (bounded by small team size for single-node NVLink)
+    srcs      = alloca(op_count * sizeof(const void *));
+    dsts      = alloca(op_count * sizeof(void *));
+    sizes     = alloca(op_count * sizeof(size_t));
+    attrs     = alloca(op_count * sizeof(struct cudaMemcpyAttributes));
+    attrsIdxs = alloca(op_count * sizeof(size_t));
 
     op_count = 0;
 
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
-        peer = (rank + i) % UCC_TL_TEAM_SIZE(team);
-
-        ucc_tl_cuda_sync_t *peer_sync = TASK_SYNC(task, peer);
-
+        peer      = (rank + i) % UCC_TL_TEAM_SIZE(team);
+        peer_sync = TASK_SYNC(task, peer);
         data_size = task->alltoallv_ce.get_size(
             task, peer_sync->alltoallv_ce.sbytes, rank);
         if (data_size == 0) {
@@ -398,7 +390,7 @@ static ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(
     }
 
     // Launch batch copy
-    CUDA_CHECK_GOTO(
+    CUDA_CHECK(
         cudaMemcpyBatchAsync(
             dsts,
             (const void *const *)srcs,
@@ -407,22 +399,14 @@ static ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(
             attrs,
             attrsIdxs,
             op_count,
-            stream),
-        exit,
-        status);
+            stream));
 
     task->alltoallv_ce.num_posted = op_count;
 
     // Record completion events
-    CUDA_CHECK_GOTO(cudaEventRecord(evt, stream), exit, status);
+    CUDA_CHECK(cudaEventRecord(evt, stream));
 
-exit:
-    ucc_free(srcs);
-    ucc_free(dsts);
-    ucc_free(sizes);
-    ucc_free(attrs);
-    ucc_free(attrsIdxs);
-    return status;
+    return UCC_OK;
 }
 #endif
 
