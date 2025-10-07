@@ -71,10 +71,10 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_start(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
-    ucc_status_t        status;
     ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucc_ee_h            ee   = task->super.ee;
     cudaStream_t stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
+    ucc_status_t status;
 
     // For Alltoallv: copy counts and displ. to SHM for remote GPUs to access (if required)
     if (UCC_COLL_TYPE_ALLTOALLV == args->coll_type) {
@@ -116,13 +116,13 @@ exit_err:
 
 ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t          *team = TASK_TEAM(task);
+    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_ee_h            ee   = task->super.ee;
+    cudaStream_t stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
     volatile ucc_tl_cuda_sync_t *peer_sync, *sync;
     ucc_tl_cuda_cache_t         *cache;
     ucc_status_t                 status;
     ucc_rank_t                   i, dst;
-    ucc_ee_h                     ee = task->super.ee;
-    cudaStream_t stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
 
     status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), task->bar);
     if (status != UCC_OK) {
@@ -294,8 +294,8 @@ exit:
 }
 
 #if CUDART_VERSION >= 13000
-ucc_status_t
-ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task)
+static ucc_status_t ucc_tl_cuda_alltoallv_ce_post_batch_copies(
+    ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t          *team      = TASK_TEAM(task);
     ucc_rank_t                   rank      = UCC_TL_TEAM_RANK(team);
@@ -311,6 +311,7 @@ ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task)
     size_t                      *sizes     = NULL;
     struct cudaMemcpyAttributes *attrs     = NULL;
     size_t                      *attrsIdxs = NULL;
+    ucc_tl_cuda_sync_t          *peer_sync;
     ucc_rank_t                   i, peer;
     void                        *src, *dst;
     size_t                       data_size, data_displ;
@@ -331,13 +332,10 @@ ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task)
         }
     }
 
+    stream = ee ? (cudaStream_t)ee->ee_context : team->stream;
+
     // If there is nothing to copy, just record completion and return
     if (op_count == 0) {
-        if (ee) {
-            stream = (cudaStream_t)ee->ee_context;
-        } else {
-            stream = team->stream;
-        }
         CUDA_CHECK_GOTO(cudaEventRecord(evt, stream), exit, status);
         task->alltoallv_ce.num_posted = 0;
         goto exit;
@@ -355,11 +353,6 @@ ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task)
         goto exit;
     }
 
-    if (ee) {
-        stream = (cudaStream_t)ee->ee_context;
-    } else {
-        stream = team->stream;
-    }
     op_count = 0;
 
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
@@ -405,15 +398,18 @@ ucc_tl_cuda_alltoallv_ce_post_batch_copies(ucc_tl_cuda_task_t *task)
     }
 
     // Launch batch copy
-    cudaError_t cerr =
-        cudaMemcpyBatchAsync(dsts, (const void *const *)srcs, sizes, op_count,
-                             attrs, attrsIdxs, op_count, stream);
-
-    if (cerr != cudaSuccess) {
-        ucc_error("cudaMemcpyBatchAsync failed: %s", cudaGetErrorString(cerr));
-        status = UCC_ERR_NO_MESSAGE;
-        goto exit;
-    }
+    CUDA_CHECK_GOTO(
+        cudaMemcpyBatchAsync(
+            dsts,
+            (const void *const *)srcs,
+            sizes,
+            op_count,
+            attrs,
+            attrsIdxs,
+            op_count,
+            stream),
+        exit,
+        status);
 
     task->alltoallv_ce.num_posted = op_count;
 
@@ -624,6 +620,44 @@ ucc_tl_cuda_alltoallv_ce_triggered_post_setup(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
+ucc_status_t ucc_tl_cuda_alltoallv_ce_setup_copy_engine(
+    ucc_tl_cuda_task_t *task, ucc_tl_cuda_lib_t *lib,
+    const char *init_func_name)
+{
+    ucc_status_t status;
+
+    if (ucc_coll_task_is_cl_hier(&task->super)) {
+        tl_trace(
+            lib, "CL hier does not support copy engine, fallback to executor");
+        task->alltoallv_ce.use_copy_engine = 0;
+    } else {
+        task->alltoallv_ce.use_copy_engine = lib->cfg.alltoall_use_copy_engine;
+    }
+
+    if (task->alltoallv_ce.use_copy_engine) {
+        tl_trace(lib, "%s: copy engine", init_func_name);
+        task->super.triggered_post   = ucc_tl_cuda_alltoallv_ce_triggered_post;
+        task->alltoallv_ce.copy_post = cuda_copy_post;
+        status                       = ucc_ec_create_event(
+            &task->alltoallv_ce.evt_completion, UCC_EE_CUDA_STREAM);
+        if (ucc_unlikely(status != UCC_OK)) {
+            return status;
+        }
+    } else {
+        tl_trace(lib, "%s: executor", init_func_name);
+        task->alltoallv_ce.copy_post = ee_copy_post;
+        task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+    }
+
+    task->super.post = ucc_tl_cuda_alltoallv_ce_start;
+    task->super
+        .triggered_post_setup = ucc_tl_cuda_alltoallv_ce_triggered_post_setup;
+    task->super.progress      = ucc_tl_cuda_alltoallv_ce_progress;
+    task->super.finalize      = ucc_tl_cuda_alltoallv_ce_finalize;
+    task->bar                 = TASK_BAR(task);
+    return UCC_OK;
+}
+
 //NOLINTNEXTLINE: task is unused
 size_t ucc_tl_cuda_alltoallv_get_size(const ucc_tl_cuda_task_t *task,
                                       size_t *sizes, ucc_rank_t block)
@@ -706,52 +740,22 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
     status = ucc_tl_cuda_mem_info_get(args->src.info_v.buffer, data_len,
                                       &task->alltoallv_ce.mem_info_src);
     if (ucc_unlikely(status != UCC_OK)) {
-        goto exit_err;
+        return status;
     }
 
     if (team->topo->proxy_needed) {
         data_len = ucc_dt_size(args->dst.info_v.datatype) *
-                   ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
-                                                 UCC_TL_TEAM_SIZE(team));
-        status = ucc_tl_cuda_mem_info_get(args->dst.info_v.buffer, data_len,
-                                          &task->alltoallv_ce.mem_info_dst);
-        if (ucc_unlikely(status != UCC_OK)) {
-            goto exit_err;
-        }
-    }
-
-    if (ucc_coll_task_is_cl_hier(&task->super)) {
-        tl_trace(UCC_TL_TEAM_LIB(team),
-                 "CL hier does not support copy engine, fallback to executor");
-        task->alltoallv_ce.use_copy_engine = 0;
-    } else {
-        task->alltoallv_ce.use_copy_engine = lib->cfg.alltoall_use_copy_engine;
-    }
-
-    if (task->alltoallv_ce.use_copy_engine) {
-        ucc_debug("ucc_tl_cuda_alltoallv_ce_init: copy engine");
-        task->super.triggered_post   = ucc_tl_cuda_alltoallv_ce_triggered_post;
-        task->alltoallv_ce.copy_post = cuda_copy_post;
-        status = ucc_ec_create_event(&task->alltoallv_ce.evt_completion,
-                                     UCC_EE_CUDA_STREAM);
+                   ucc_coll_args_get_total_count(
+                       args, args->dst.info_v.counts, UCC_TL_TEAM_SIZE(team));
+        status = ucc_tl_cuda_mem_info_get(
+            args->dst.info_v.buffer,
+            data_len,
+            &task->alltoallv_ce.mem_info_dst);
         if (ucc_unlikely(status != UCC_OK)) {
             return status;
         }
-    } else {
-        ucc_trace("ucc_tl_cuda_alltoallv_ce_init: executor");
-        task->alltoallv_ce.copy_post = ee_copy_post;
-        task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
 
-    task->super.post = ucc_tl_cuda_alltoallv_ce_start;
-    task->super.triggered_post_setup =
-        ucc_tl_cuda_alltoallv_ce_triggered_post_setup;
-
-    task->super.progress = ucc_tl_cuda_alltoallv_ce_progress;
-    task->super.finalize = ucc_tl_cuda_alltoallv_ce_finalize;
-    task->bar            = TASK_BAR(task);
-    return UCC_OK;
-
-exit_err:
-    return status;
+    return ucc_tl_cuda_alltoallv_ce_setup_copy_engine(
+        task, lib, "ucc_tl_cuda_alltoallv_ce_init");
 }

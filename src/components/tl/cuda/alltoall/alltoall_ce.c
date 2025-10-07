@@ -54,50 +54,20 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     task->alltoallv_ce.rdispl = 0;
 
     data_len = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
-    status   = ucc_tl_cuda_mem_info_get(args->src.info.buffer, data_len,
-                                        &task->alltoallv_ce.mem_info_src);
+    status   = ucc_tl_cuda_mem_info_get(
+        args->src.info.buffer, data_len, &task->alltoallv_ce.mem_info_src);
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
     }
 
     if (team->topo->proxy_needed) {
-        status = ucc_tl_cuda_mem_info_get(args->dst.info.buffer, data_len,
-                                          &task->alltoallv_ce.mem_info_dst);
+        status = ucc_tl_cuda_mem_info_get(
+            args->dst.info.buffer, data_len, &task->alltoallv_ce.mem_info_dst);
         if (ucc_unlikely(status != UCC_OK)) {
             return status;
         }
     }
 
-    if (ucc_coll_task_is_cl_hier(&task->super)) {
-        tl_trace(lib,
-                 "CL hier does not support copy engine, fallback to executor");
-        task->alltoallv_ce.use_copy_engine = 0;
-    } else {
-        task->alltoallv_ce.use_copy_engine = lib->cfg.alltoall_use_copy_engine;
-    }
-
-    if (task->alltoallv_ce.use_copy_engine) {
-        tl_trace(lib, "ucc_tl_cuda_alltoall_ce_init: copy engine");
-        task->super.triggered_post = ucc_tl_cuda_alltoallv_ce_triggered_post;
-
-        status = ucc_ec_create_event(&task->alltoallv_ce.evt_completion,
-                                     UCC_EE_CUDA_STREAM);
-        if (ucc_unlikely(status != UCC_OK)) {
-            return status;
-        }
-        task->alltoallv_ce.copy_post = cuda_copy_post;
-    } else {
-        tl_trace(lib, "ucc_tl_cuda_alltoall_ce_init: executor");
-        task->alltoallv_ce.copy_post = ee_copy_post;
-        task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
-    }
-
-    task->super.post = ucc_tl_cuda_alltoallv_ce_start;
-    task->super.triggered_post_setup =
-        ucc_tl_cuda_alltoallv_ce_triggered_post_setup;
-    task->super.progress = ucc_tl_cuda_alltoallv_ce_progress;
-    task->super.finalize = ucc_tl_cuda_alltoallv_ce_finalize;
-    task->bar            = TASK_BAR(task);
-
-    return UCC_OK;
+    return ucc_tl_cuda_alltoallv_ce_setup_copy_engine(
+        task, lib, "ucc_tl_cuda_alltoall_ce_init");
 }
