@@ -13,15 +13,10 @@
 
 #define CONGESTION_THRESHOLD 8
 
-void         ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask);
-void         ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask);
-ucc_status_t ucc_tl_ucp_alltoall_onesided_get_start(ucc_coll_task_t *ctask);
-ucc_status_t ucc_tl_ucp_alltoall_onesided_put_start(ucc_coll_task_t *ctask);
-
 /* Common helper function to check completion and handle polling */
 static inline int alltoall_onesided_handle_completion(
     ucc_tl_ucp_task_t *task, uint32_t *posted, uint32_t *completed,
-    size_t nreqs, int64_t npolls, ucc_rank_t peer, int64_t *cumulative_polls)
+    uint32_t nreqs, int64_t npolls, ucc_rank_t peer, int64_t *cumulative_polls)
 {
     if ((*posted - *completed) >= nreqs) {
         while (*cumulative_polls < npolls) {
@@ -32,7 +27,6 @@ static inline int alltoall_onesided_handle_completion(
             }
         }
         if (*cumulative_polls >= npolls) {
-            task->alltoall_onesided.peer = peer;
             return 0; /* Return 0 to indicate should return */
         }
     }
@@ -49,15 +43,13 @@ static inline void alltoall_onesided_wait_completion(ucc_tl_ucp_task_t *task,
         while (polls++ < npolls) {
             ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
             if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
+                task->super.status = UCC_OK;
                 return;
             }
         }
-        ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
-        if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
-            return;
-        }
         return;
     }
+    task->super.status = UCC_OK;
 }
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_sched_start(ucc_coll_task_t *ctask)
@@ -94,9 +86,8 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     ptrdiff_t          dest      = (ptrdiff_t)TASK_ARGS(task).dst.info.buffer;
     ucc_rank_t         grank     = UCC_TL_TEAM_RANK(team);
     ucc_rank_t         gsize     = UCC_TL_TEAM_SIZE(team);
-    size_t             ntokens   = task->alltoall_onesided.tokens;
+    uint32_t           ntokens   = task->alltoall_onesided.tokens;
     int64_t            npolls    = task->alltoall_onesided.npolls;
-    ucc_rank_t         peer      = (task->alltoall_onesided.peer + 1) % gsize;
     int64_t            cpolls    = 0;
     /* To resolve remote virtual addresses, the dst_memh is the one that must
      * have the rkey information. For this algorithm, we need to swap the
@@ -105,6 +96,7 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).src_memh.global_memh;
     uint32_t          *posted    = &task->onesided.get_posted;
     uint32_t          *completed = &task->onesided.get_completed;
+    ucc_rank_t         peer      = (grank + *posted + 1) % gsize;
     size_t             nelems;
 
     nelems = TASK_ARGS(task).src.info.count;
@@ -112,7 +104,7 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
 
     for (; *posted < gsize; peer = (peer + 1) % gsize) {
         UCPCHECK_GOTO(ucc_tl_ucp_get_nb(PTR_OFFSET(dest, peer * nelems),
-                                        (void *)PTR_OFFSET(src, grank * nelems),
+                                        PTR_OFFSET(src, grank * nelems),
                                         nelems, peer, src_memh, dst_memh, team,
                                         task),
                       task, out);
@@ -125,9 +117,6 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     }
 
     alltoall_onesided_wait_completion(task, npolls);
-    if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
-        task->super.status = UCC_OK;
-    }
 out:
     return;
 }
@@ -140,14 +129,14 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
     ptrdiff_t          dest      = (ptrdiff_t)TASK_ARGS(task).dst.info.buffer;
     ucc_rank_t         grank     = UCC_TL_TEAM_RANK(team);
     ucc_rank_t         gsize     = UCC_TL_TEAM_SIZE(team);
-    size_t             ntokens   = task->alltoall_onesided.tokens;
+    uint32_t           ntokens   = task->alltoall_onesided.tokens;
     int64_t            npolls    = task->alltoall_onesided.npolls;
-    ucc_rank_t         peer      = (task->alltoall_onesided.peer + 1) % gsize;
     int64_t            cpolls    = 0;
     ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).src_memh.local_memh;
     ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).dst_memh.global_memh;
     uint32_t          *posted    = &task->onesided.put_posted;
     uint32_t          *completed = &task->onesided.put_completed;
+    ucc_rank_t         peer      = (grank + *posted + 1) % gsize;
     size_t             nelems;
 
     nelems = TASK_ARGS(task).src.info.count;
@@ -155,8 +144,8 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
 
     for (; *posted < gsize; peer = (peer + 1) % gsize) {
         UCPCHECK_GOTO(
-            ucc_tl_ucp_put_nb((void *)(src + peer * nelems),
-                              (void *)PTR_OFFSET(dest, grank * nelems), nelems,
+            ucc_tl_ucp_put_nb(PTR_OFFSET(src, peer * nelems),
+                              PTR_OFFSET(dest, grank * nelems), nelems,
                               peer, src_memh, dst_memh, team, task),
             task, out);
 
@@ -168,92 +157,26 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
     }
 
     alltoall_onesided_wait_completion(task, npolls);
-    if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task)) {
-        task->super.status = UCC_OK;
-    }
 out:
     return;
 }
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_get_start(ucc_coll_task_t *ctask)
 {
-    ucc_tl_ucp_task_t *task      = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
-    ptrdiff_t          src       = (ptrdiff_t)TASK_ARGS(task).src.info.buffer;
-    ptrdiff_t          dest      = (ptrdiff_t)TASK_ARGS(task).dst.info.buffer;
-    ucc_rank_t         grank     = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t         gsize     = UCC_TL_TEAM_SIZE(team);
-    size_t             nelems    = TASK_ARGS(task).src.info.count;
-    size_t             ntokens   = task->alltoall_onesided.tokens;
-    size_t             npolls    = task->alltoall_onesided.npolls;
-    int64_t            cpolls    = 0;
-    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).dst_memh.local_memh;
-    ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).src_memh.global_memh;
-    uint32_t          *posted    = &task->onesided.get_posted;
-    uint32_t          *completed = &task->onesided.get_completed;
-    ucc_rank_t         peer;
+    ucc_tl_ucp_task_t *task = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team = TASK_TEAM(task);
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-
-    nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
-    for (peer = (grank + 1) % gsize; *posted < gsize;
-         peer = (peer + 1) % gsize) {
-        UCPCHECK_GOTO(ucc_tl_ucp_get_nb(PTR_OFFSET(dest, peer * nelems),
-                                        (void *)PTR_OFFSET(src, grank * nelems),
-                                        nelems, peer, src_memh, dst_memh, team,
-                                        task),
-                      task, out);
-
-        if (!alltoall_onesided_handle_completion(task, posted, completed,
-                                                 ntokens, npolls, peer,
-                                                 &cpolls)) {
-            break;
-        }
-    }
-    task->alltoall_onesided.peer = peer;
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-out:
-    return task->super.status;
 }
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_put_start(ucc_coll_task_t *ctask)
 {
-    ucc_tl_ucp_task_t *task      = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
-    ptrdiff_t          src       = (ptrdiff_t)TASK_ARGS(task).src.info.buffer;
-    ptrdiff_t          dest      = (ptrdiff_t)TASK_ARGS(task).dst.info.buffer;
-    ucc_rank_t         grank     = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t         gsize     = UCC_TL_TEAM_SIZE(team);
-    size_t             nelems    = TASK_ARGS(task).src.info.count;
-    size_t             nreqs     = task->alltoall_onesided.tokens;
-    size_t             npolls    = task->alltoall_onesided.npolls;
-    int64_t            cpolls    = 0;
-    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).src_memh.local_memh;
-    ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).dst_memh.global_memh;
-    uint32_t          *posted    = &task->onesided.put_posted;
-    uint32_t          *completed = &task->onesided.put_completed;
-    ucc_rank_t         peer;
+    ucc_tl_ucp_task_t *task = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team = TASK_TEAM(task);
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-
-    nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
-    for (peer = (grank + 1) % gsize; *posted < gsize;
-         peer = (peer + 1) % gsize) {
-        UCPCHECK_GOTO(
-            ucc_tl_ucp_put_nb((void *)(src + peer * nelems),
-                              (void *)PTR_OFFSET(dest, grank * nelems), nelems,
-                              peer, src_memh, dst_memh, team, task),
-            task, out);
-
-        if (!alltoall_onesided_handle_completion(task, posted, completed, nreqs,
-                                                 npolls, peer, &cpolls)) {
-            break;
-        }
-    }
-    task->alltoall_onesided.peer = peer;
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-out:
-    return task->super.status;
 }
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
@@ -267,17 +190,17 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
         .team = team->params.team,
         .args.coll_type = UCC_COLL_TYPE_BARRIER,
     };
-    size_t                       perc_bw =
+    size_t                       perc_bw     =
         UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_percent_bw;
-    ucc_on_off_auto_value_t      is_get  = 
-        UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_enable_get;
+    ucc_tl_ucp_alltoall_onesided_alg_t alg   =
+        UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_alg;
+    ucc_tl_ucp_schedule_t       *tl_schedule = NULL;
     ucc_coll_task_t             *barrier_task;
     ucc_coll_task_t             *a2a_task;
     ucc_tl_ucp_task_t           *task;
     ucc_status_t                 status;
-    ucc_tl_ucp_schedule_t       *tl_schedule;
     size_t                       nelems;
-    size_t                       rate;
+    double                       rate;
     size_t                       ratio;
     ucp_ep_h                     ep;
     ucp_ep_evaluate_perf_param_t param;
@@ -291,14 +214,30 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
             tl_error(UCC_TL_TEAM_LIB(tl_team),
                      "non memory mapped buffers are not supported");
             status = UCC_ERR_NOT_SUPPORTED;
-            goto out;
+            return status;
         }
     }
+
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH)) {
         coll_args->args.src_memh.global_memh = NULL;
+    } else {
+        if (!(coll_args->args.flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)) {
+            tl_error(UCC_TL_TEAM_LIB(tl_team),
+                "onesided alltoall requires global memory handles for src buffers");
+            status = UCC_ERR_INVALID_PARAM;
+            return status;
+        }
     }
+
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH)) {
         coll_args->args.dst_memh.global_memh = NULL;
+    } else {
+        if (!(coll_args->args.flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)) {
+            tl_error(UCC_TL_TEAM_LIB(tl_team),
+                "onesided alltoall requires global memory handles for dst buffers");
+            status = UCC_ERR_INVALID_PARAM;
+            return status;
+        }
     }
     status = ucc_tl_ucp_get_schedule(tl_team, coll_args,
                                      (ucc_tl_ucp_schedule_t **)&tl_schedule);
@@ -311,14 +250,18 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     schedule->super.progress = NULL;
     schedule->super.finalize = ucc_tl_ucp_alltoall_onesided_sched_finalize;
 
-    sbgp                 = ucc_topo_get_sbgp(tl_team->topo, UCC_SBGP_NODE);
+    sbgp = ucc_topo_get_sbgp(tl_team->topo, UCC_SBGP_NODE);
+    if (sbgp->status == UCC_SBGP_NOT_EXISTS) {
+        status = UCC_ERR_NOT_SUPPORTED;
+        goto out;
+    }
     task                 = ucc_tl_ucp_init_task(coll_args, team);
     task->super.finalize = ucc_tl_ucp_alltoall_onesided_finalize;
     a2a_task             = &task->super;
 
     status = ucc_tl_ucp_coll_init(&barrier_coll_args, team, &barrier_task);
     if (status != UCC_OK) {
-        return status;
+        goto out;
     }
     if (perc_bw > 100) {
         perc_bw = 100;
@@ -336,17 +279,17 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
         &ep);
     ucp_ep_evaluate_perf(ep, &param, &attr);
 
-    rate  = (1 / attr.estimated_time);
-    rate  = rate * (double)(perc_bw / 100.0);
-    ratio = nelems * sbgp->group_size;
+    rate  = (1 / attr.estimated_time) * (double)(perc_bw / 100.0);
+    ratio = (nelems > 0) ? nelems * sbgp->group_size : 1;
     task->alltoall_onesided.tokens = rate / ratio;
     if (task->alltoall_onesided.tokens < 1) {
         task->alltoall_onesided.tokens = 1;
     }
     npolls = task->n_polls;
-    if (is_get == UCC_CONFIG_ON || (is_get == UCC_CONFIG_AUTO &&
+    if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET ||
+       (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO &&
                                     sbgp->group_size >= CONGESTION_THRESHOLD)) {
-        npolls = 1 << (size_t)(log2(nelems * ucc_dt_size(TASK_ARGS(task).src.info.datatype)));
+        npolls = nelems * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
         if (npolls < task->n_polls) {
             npolls = task->n_polls;
         }
@@ -356,8 +299,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
         task->super.post     = ucc_tl_ucp_alltoall_onesided_put_start;
         task->super.progress = ucc_tl_ucp_alltoall_onesided_put_progress;
     }
-    task->alltoall_onesided.npolls    = npolls;
-    task->alltoall_onesided.peer      = 0;
+    task->alltoall_onesided.npolls = npolls;
 
     ucc_schedule_add_task(schedule, a2a_task);
     ucc_task_subscribe_dep(&schedule->super, a2a_task,
@@ -367,6 +309,8 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     ucc_task_subscribe_dep(a2a_task, barrier_task,
                            UCC_EVENT_COMPLETED);
     *task_h = &schedule->super;
+    return status;
 out:
+    ucc_tl_ucp_put_schedule(&tl_schedule->super.super);
     return status;
 }
