@@ -168,15 +168,18 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
                                              ucc_base_team_t      *tl_team,
                                              ucc_coll_task_t     **task_p)
 {
-    ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
+    ucc_tl_cuda_team_t *team      = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
+    size_t              buf_size  = coll_args->args.dst.info.count *
+                                      ucc_dt_size(coll_args->args.dst.info.datatype);
     ucc_tl_cuda_task_t *task;
     ucc_status_t        status;
 
-    if (coll_args->args.op != UCC_OP_SUM ||
+    if (buf_size < 1024 ||
+        coll_args->args.op != UCC_OP_SUM ||
         (coll_args->args.dst.info.datatype != UCC_DT_FLOAT32 &&
          coll_args->args.dst.info.datatype != UCC_DT_BFLOAT16)) {
         tl_debug(UCC_TL_TEAM_LIB(team), "NVLS allreduce is supported only with SUM operation "
-                  "and float32 or bfloat16 datatype");
+                  "and float32 or bfloat16 datatype, with message size >= 1024 bytes");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
