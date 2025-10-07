@@ -23,7 +23,7 @@ typedef struct ucc_tl_cuda_cache_region {
 } ucc_tl_cuda_cache_region_t;
 
 typedef struct ucc_tl_cuda_cache {
-    pthread_rwlock_t  lock;       /**< protests the page table */
+    pthread_rwlock_t  lock;       /**< Protects the page table */
     ucs_pgtable_t     pgtable;    /**< Page table to hold the regions */
     char             *name;       /**< Name */
 } ucc_tl_cuda_cache_t;
