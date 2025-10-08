@@ -20,7 +20,7 @@ ucc_pt_config::ucc_pt_config() {
     bench.op             = UCC_OP_SUM;
     bench.inplace        = false;
     bench.persistent     = false;
-    bench.mapped         = false;
+    bench.map_type       = UCC_PT_MAP_TYPE_NONE;
     bench.triggered      = false;
     bench.n_iter_small   = 1000;
     bench.n_warmup_small = 100;
@@ -88,6 +88,12 @@ const std::map<std::string, ucc_datatype_t> ucc_pt_datatype_map = {
     {"float128_complex", UCC_DT_FLOAT128_COMPLEX},
 };
 
+const std::map<std::string, ucc_pt_map_type_t> ucc_pt_map_type_map = {
+    {"none", UCC_PT_MAP_TYPE_NONE},
+    {"local", UCC_PT_MAP_TYPE_LOCAL},
+    {"global", UCC_PT_MAP_TYPE_GLOBAL},
+};
+
 ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
 {
     int c;
@@ -102,7 +108,7 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
     optind = 1;
 
     while (1) {
-        c = getopt_long(argc, argv, "c:b:e:d:f:m:n:w:o:N:r:S:iphFTM", long_options, &option_index);
+        c = getopt_long(argc, argv, "c:b:e:d:f:m:n:w:o:N:r:S:M:iphFT", long_options, &option_index);
         if (c == -1)
             break;
         if (c == 0) { // long option
@@ -263,7 +269,12 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                 bench.persistent = true;
                 break;
             case 'M':
-                bench.mapped = true;
+                if (ucc_pt_map_type_map.count(optarg) == 0) {
+                    std::cerr << "invalid map type: " << optarg
+                              << std::endl;
+                    return UCC_ERR_INVALID_PARAM;
+                }
+                bench.map_type = ucc_pt_map_type_map.at(optarg);
                 break;
             case 'T':
                 bench.triggered = true;
