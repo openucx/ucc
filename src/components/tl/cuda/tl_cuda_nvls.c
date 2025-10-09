@@ -10,6 +10,7 @@
 #include "tl_cuda_coll.h"
 #include "core/ucc_team.h"
 #include "utils/arch/cuda_def.h"
+#include "utils/ucc_math.h"
 
 #include <cudaTypedefs.h> // for CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR
 
@@ -98,9 +99,35 @@ static ucc_status_t ucc_tl_cuda_nvls_get_granularity(
     return UCC_OK;
 }
 
-static ucc_status_t ucc_tl_cuda_nvls_create_multicast_object(
+static ucc_status_t ucc_tl_cuda_nvls_create_multicast_object_posix(
     ucc_tl_cuda_team_t *team, CUmulticastObjectProp *mc_prop,
-    CUmemGenericAllocationHandle *mc_handle, void *export_handle)
+    CUmemGenericAllocationHandle *mc_handle, int *export_handle)
+{
+    ucc_status_t status;
+
+    status = CUDADRV_FUNC(cuMulticastCreate(mc_handle, mc_prop));
+    if (status != UCC_OK) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to create multicast object");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    // For POSIX file descriptors, CUDA API writes the fd to the memory pointed to by the first arg
+    // The API expects void* but will write an int-sized value
+    status = CUDADRV_FUNC(cuMemExportToShareableHandle(
+        (void *)export_handle, *mc_handle, mc_prop->handleTypes, 0));
+    if (status != UCC_OK) {
+        tl_error(
+            UCC_TL_TEAM_LIB(team), "failed to export POSIX shareable handle");
+        CUDADRV_FUNC(cuMemRelease(*mc_handle));
+        return status;
+    }
+
+    return UCC_OK;
+}
+
+static ucc_status_t ucc_tl_cuda_nvls_create_multicast_object_fabric(
+    ucc_tl_cuda_team_t *team, CUmulticastObjectProp *mc_prop,
+    CUmemGenericAllocationHandle *mc_handle, CUmemFabricHandle *export_handle)
 {
     ucc_status_t status;
 
@@ -113,7 +140,8 @@ static ucc_status_t ucc_tl_cuda_nvls_create_multicast_object(
     status = CUDADRV_FUNC(cuMemExportToShareableHandle(
         export_handle, *mc_handle, mc_prop->handleTypes, 0));
     if (status != UCC_OK) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to export shareable handle");
+        tl_error(
+            UCC_TL_TEAM_LIB(team), "failed to export fabric shareable handle");
         CUDADRV_FUNC(cuMemRelease(*mc_handle));
         return status;
     }
@@ -121,30 +149,34 @@ static ucc_status_t ucc_tl_cuda_nvls_create_multicast_object(
     return UCC_OK;
 }
 
-static ucc_status_t ucc_tl_cuda_nvls_share_handles_posix(
-    ucc_tl_cuda_team_t *team, int export_handle)
+static ucc_status_t ucc_tl_cuda_nvls_share_handles(
+    ucc_tl_cuda_team_t *team, ucc_tl_cuda_nvls_handle_t *local_handle)
 {
     ucc_status_t status;
 
     // If oob_req is NULL, initiate the allgather
     if (team->oob_req == NULL) {
-        // Prepare local data (each rank populates its own data)
+        // Prepare local data based on handle type
+        // In both cases, only rank 0 creates and exports the handle
         if (UCC_TL_TEAM_RANK(team) == 0) {
-            team->nvls.share_data[0].handle = export_handle;
-            team->nvls.share_data[0].pid    = getpid();
+            // Copy the local handle to the share buffer
+            team->nvls.share_data[0] = *local_handle;
         }
 
-        // Initiate single allgather for both PID and export handle
+        // Initiate single allgather for handle data
         status = team->oob.allgather(
             team->nvls.share_data,
             team->nvls.share_data,
-            sizeof(ucc_tl_cuda_nvls_share_data_t),
+            sizeof(ucc_tl_cuda_nvls_handle_t),
             team->oob.coll_info,
             &team->oob_req);
         if (status != UCC_OK) {
             tl_error(
                 UCC_TL_TEAM_LIB(team),
-                "failed to initiate allgather for PIDs and handles");
+                "failed to initiate allgather for handles (type: %s)",
+                local_handle->type == UCC_TL_CUDA_NVLS_HANDLE_TYPE_FABRIC
+                    ? "fabric"
+                    : "posix");
             ucc_free(team->nvls.share_data);
             team->nvls.share_data = NULL;
             return status;
@@ -163,7 +195,10 @@ static ucc_status_t ucc_tl_cuda_nvls_share_handles_posix(
     if (status < 0) {
         tl_error(
             UCC_TL_TEAM_LIB(team),
-            "failed to test allgather for PIDs and handles");
+            "failed to test allgather for handles (type: %s)",
+            local_handle->type == UCC_TL_CUDA_NVLS_HANDLE_TYPE_FABRIC
+                ? "fabric"
+                : "posix");
         goto cleanup_on_error;
     }
 
@@ -181,57 +216,27 @@ cleanup_on_error:
     return status;
 }
 
-static ucc_status_t ucc_tl_cuda_nvls_share_handles_fabric(
-    struct ucc_tl_cuda_team *team, CUmemFabricHandle export_handle,
-    CUmemFabricHandle *shared_fabric_handles)
-{
-    ucc_status_t status;
-
-    if (team->oob_req == NULL) {
-        // Share the export handle
-        if (UCC_TL_TEAM_RANK(team) == 0) {
-            shared_fabric_handles[0] = export_handle;
-        }
-        status = team->oob.allgather(
-            &export_handle,
-            shared_fabric_handles,
-            sizeof(export_handle),
-            team->oob.coll_info,
-            &team->oob_req);
-        if (UCC_OK != status) {
-            tl_error(
-                UCC_TL_TEAM_LIB(team),
-                "failed to allgather export fabric handle");
-            return status;
-        }
-    }
-
-    status = team->oob.req_test(team->oob_req);
-    if (status != UCC_OK) {
-        if (status < 0) {
-            tl_error(
-                UCC_TL_TEAM_LIB(team),
-                "failed to test allgather export fabric handle");
-            team->oob.req_free(team->oob_req);
-            team->oob_req = NULL;
-            return status;
-        }
-        return status;
-    }
-    team->oob.req_free(team->oob_req);
-    team->oob_req = NULL;
-    return UCC_OK;
-}
-
 static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
-    struct ucc_tl_cuda_team *team, int export_handle, pid_t target_pid,
+    struct ucc_tl_cuda_team *team, ucc_tl_cuda_nvls_handle_t *share_data,
     CUmemGenericAllocationHandle *mc_handle)
 {
-    void        *p;
+    void        *os_handle;
     int          pid_fd, peer_fd;
     ucc_status_t status;
+    int          export_handle;
+    pid_t        target_pid;
 
-    pid_fd = syscall(SYS_pidfd_open, target_pid, 0);
+    if (share_data->type != UCC_TL_CUDA_NVLS_HANDLE_TYPE_POSIX) {
+        tl_error(
+            UCC_TL_TEAM_LIB(team),
+            "expected POSIX handle type but got fabric handle type");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    export_handle = share_data->data.posix.handle;
+    target_pid    = share_data->data.posix.pid;
+
+    pid_fd        = syscall(SYS_pidfd_open, target_pid, 0);
     if (pid_fd < 0) {
         tl_error(
             UCC_TL_TEAM_LIB(team),
@@ -251,9 +256,9 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
         return UCC_ERR_NO_RESOURCE;
     }
 
-    p      = (void *)((uint64_t)peer_fd);
-    status = CUDADRV_FUNC(cuMemImportFromShareableHandle(
-        mc_handle, p, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR));
+    os_handle = (void *)((uint64_t)peer_fd);
+    status    = CUDADRV_FUNC(cuMemImportFromShareableHandle(
+        mc_handle, os_handle, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR));
 
     if (close(peer_fd) != 0) {
         tl_error(
@@ -281,11 +286,20 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
 }
 
 static ucc_status_t ucc_tl_cuda_nvls_import_handle_fabric(
-    struct ucc_tl_cuda_team *team, CUmemFabricHandle export_handle,
+    struct ucc_tl_cuda_team *team, ucc_tl_cuda_nvls_handle_t *share_data,
     CUmemGenericAllocationHandle *mc_handle)
 {
-    ucc_status_t status = CUDADRV_FUNC(cuMemImportFromShareableHandle(
-        mc_handle, &export_handle, CU_MEM_HANDLE_TYPE_FABRIC));
+    ucc_status_t status;
+
+    if (share_data->type != UCC_TL_CUDA_NVLS_HANDLE_TYPE_FABRIC) {
+        tl_error(
+            UCC_TL_TEAM_LIB(team),
+            "expected fabric handle type but got POSIX handle type");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    status = CUDADRV_FUNC(cuMemImportFromShareableHandle(
+        mc_handle, &share_data->data.fabric, CU_MEM_HANDLE_TYPE_FABRIC));
 
     if (status != UCC_OK) {
         tl_error(
@@ -316,6 +330,7 @@ ucc_status_t ucc_tl_cuda_nvls_init(
     CUmemGenericAllocationHandle mem_handle = 0;
     CUmulticastObjectProp        mc_prop    = {};
     CUmemAllocationProp          prop       = {};
+    CUmemAccessDesc              accessDesc = {};
     CUmemAllocationHandleType    handle_types;
 
     switch (team->state) {
@@ -369,62 +384,54 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         }
 
         // Calculate aligned size
-        mc_size = ((symmetric_size + nvls->gran - 1) / nvls->gran) * nvls->gran;
+        mc_size          = ucc_align_up(symmetric_size, nvls->gran);
         mc_prop.size     = mc_size;
         nvls->mc_size    = mc_size; // Store for later use
 
         // Allocate buffer for gathering data from all ranks
-        nvls->share_data = ucc_malloc(
-            sizeof(ucc_tl_cuda_nvls_share_data_t) * UCC_TL_TEAM_SIZE(team),
+        nvls->share_data = (ucc_tl_cuda_nvls_handle_t *)ucc_malloc(
+            sizeof(ucc_tl_cuda_nvls_handle_t) * UCC_TL_TEAM_SIZE(team),
             "nvls_share_data");
         if (!nvls->share_data) {
             return UCC_ERR_NO_MEMORY;
         }
 
-        // Allocate shared PIDs array
-        nvls->shared_pids = ucc_malloc(
-            UCC_TL_TEAM_SIZE(team) * sizeof(pid_t), "shared_pids");
-        if (!nvls->shared_pids) {
-            status = UCC_ERR_NO_MEMORY;
-            goto cleanup;
-        }
-
-        // Allocate shared fabric handles array
-        nvls->shared_fabric_handles = ucc_malloc(
-            UCC_TL_TEAM_SIZE(team) * sizeof(CUmemFabricHandle),
-            "shared_fabric_handles");
-        if (!nvls->shared_fabric_handles) {
-            status = UCC_ERR_NO_MEMORY;
-            goto cleanup;
-        }
-
         // Create multicast object on rank 0
         if (UCC_TL_TEAM_RANK(team) == 0) {
+            // Initialize local handle type
+            nvls->local_handle.type = nvls->is_multinode
+                                          ? UCC_TL_CUDA_NVLS_HANDLE_TYPE_FABRIC
+                                          : UCC_TL_CUDA_NVLS_HANDLE_TYPE_POSIX;
+
             if (nvls->is_multinode) {
-                status = ucc_tl_cuda_nvls_create_multicast_object(
-                    team, &mc_prop, &mc_handle, &nvls->fabric_handle);
+                status = ucc_tl_cuda_nvls_create_multicast_object_fabric(
+                    team,
+                    &mc_prop,
+                    &mc_handle,
+                    &nvls->local_handle.data.fabric);
             } else {
-                status = ucc_tl_cuda_nvls_create_multicast_object(
-                    team, &mc_prop, &mc_handle, &nvls->export_handle);
+                status = ucc_tl_cuda_nvls_create_multicast_object_posix(
+                    team,
+                    &mc_prop,
+                    &mc_handle,
+                    &nvls->local_handle.data.posix.handle);
             }
             if (status != UCC_OK) {
                 tl_error(
                     UCC_TL_TEAM_LIB(team), "failed to create multicast object");
                 goto cleanup;
             }
+            // Store PID for POSIX handles
+            if (!nvls->is_multinode) {
+                nvls->local_handle.data.posix.pid = getpid();
+            }
             nvls->mc_handle = mc_handle;
         }
         team->state = UCC_TL_CUDA_NVLS_STATE_SHARE_HANDLES;
         // fall through
     case UCC_TL_CUDA_NVLS_STATE_SHARE_HANDLES:
-        // Share handles across ranks (uses state-stored values)
-        if (nvls->is_multinode) {
-            status = ucc_tl_cuda_nvls_share_handles_fabric(
-                team, nvls->fabric_handle, nvls->shared_fabric_handles);
-        } else {
-            status = ucc_tl_cuda_nvls_share_handles_posix(
-                team, nvls->export_handle);
-        }
+        // Share handles across ranks using unified function
+        status = ucc_tl_cuda_nvls_share_handles(team, &nvls->local_handle);
         if (status == UCC_INPROGRESS) {
             return status;
         }
@@ -438,13 +445,10 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         if (UCC_TL_TEAM_RANK(team) != 0) {
             if (nvls->is_multinode) {
                 status = ucc_tl_cuda_nvls_import_handle_fabric(
-                    team, nvls->shared_fabric_handles[0], &mc_handle);
+                    team, &nvls->share_data[0], &mc_handle);
             } else {
                 status = ucc_tl_cuda_nvls_import_handle_posix(
-                    team,
-                    nvls->share_data[0].handle,
-                    nvls->share_data[0].pid,
-                    &mc_handle);
+                    team, &nvls->share_data[0], &mc_handle);
             }
             if (status != UCC_OK) {
                 goto cleanup;
@@ -454,6 +458,7 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         team->state = UCC_TL_CUDA_NVLS_STATE_ADD_DEVICE;
         // fall through
     case UCC_TL_CUDA_NVLS_STATE_ADD_DEVICE:
+    {
         // Add device to multicast object
         status = CUDADRV_FUNC(
             cuMulticastAddDevice(nvls->mc_handle, nvls->device));
@@ -486,13 +491,13 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         }
 
         // Set up memory access descriptor
-        CUmemAccessDesc accessDesc = {};
-        accessDesc.location.type   = CU_MEM_LOCATION_TYPE_DEVICE;
-        accessDesc.location.id     = nvls->device;
-        accessDesc.flags           = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+        memset(&accessDesc, 0, sizeof(accessDesc));
+        accessDesc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+        accessDesc.location.id   = nvls->device;
+        accessDesc.flags         = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
 
         // Reserve and map unicast virtual address space
-        status                     = CUDADRV_FUNC(
+        status                   = CUDADRV_FUNC(
             cuMemAddressReserve(&uc_va, mc_size, nvls->minGran, 0U, 0));
         if (status != UCC_OK) {
             tl_error(
@@ -557,7 +562,7 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         nvls->uc_va        = uc_va;
         nvls->mc_memhandle = mem_handle;
         nvls->mc_offset    = 0; // mcOffset;
-        nvls->coll_ids     = ucc_malloc(
+        nvls->coll_ids     = (size_t *)ucc_malloc(
             lib->cfg.max_concurrent * sizeof(size_t), "coll_ids");
         if (!nvls->coll_ids) {
             status = UCC_ERR_NO_MEMORY;
@@ -576,12 +581,8 @@ ucc_status_t ucc_tl_cuda_nvls_init(
                 lib->cfg.max_concurrent));
         }
 
-        // Free state-stored temporary buffers
-        ucc_free(nvls->shared_pids);
-        nvls->shared_pids = NULL;
-        ucc_free(nvls->shared_fabric_handles);
-        nvls->shared_fabric_handles = NULL;
         break;
+    }
     default:
         break;
     }
@@ -590,14 +591,6 @@ ucc_status_t ucc_tl_cuda_nvls_init(
 
 cleanup:
     // Cleanup on error - free state-stored temporary allocations
-    if (nvls->shared_pids) {
-        ucc_free(nvls->shared_pids);
-        nvls->shared_pids = NULL;
-    }
-    if (nvls->shared_fabric_handles) {
-        ucc_free(nvls->shared_fabric_handles);
-        nvls->shared_fabric_handles = NULL;
-    }
     if (nvls->share_data) {
         ucc_free(nvls->share_data);
         nvls->share_data = NULL;
