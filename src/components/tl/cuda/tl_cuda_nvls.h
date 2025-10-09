@@ -7,13 +7,12 @@
 #ifndef UCC_TL_CUDA_NVLS_H_
 #define UCC_TL_CUDA_NVLS_H_
 
-#include <cuda_runtime.h>
 #include <cuda.h>
-#include <cudaTypedefs.h>                   // For CU_MEM_CREATE_USAGE_MULTICAST
-#include "components/base/ucc_base_iface.h" // For ucc_base_context_t
+#include "ucc/api/ucc_status.h"
 
 // Forward declaration to avoid circular dependency
 struct ucc_tl_cuda_team;
+struct ucc_base_context;
 
 typedef struct {
     pid_t pid;
@@ -68,9 +67,8 @@ typedef struct ucc_tl_cuda_nvls_control {
 } ucc_tl_cuda_nvls_control_t;
 
 ucc_status_t ucc_tl_cuda_nvls_init(
-    struct ucc_tl_cuda_team *self, ucc_base_context_t *tl_context);
+    struct ucc_tl_cuda_team *team, struct ucc_base_context *tl_context);
 
-ucc_status_t ucc_tl_cuda_nvls_destroy(
-    struct ucc_tl_cuda_team *self, ucc_base_context_t *tl_context);
+ucc_status_t ucc_tl_cuda_nvls_destroy(struct ucc_tl_cuda_team *team);
 
 #endif // UCC_TL_CUDA_NVLS_H_
