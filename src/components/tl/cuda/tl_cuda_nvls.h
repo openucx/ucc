@@ -14,10 +14,21 @@
 struct ucc_tl_cuda_team;
 struct ucc_base_context;
 
+typedef enum {
+    UCC_TL_CUDA_NVLS_HANDLE_TYPE_POSIX,
+    UCC_TL_CUDA_NVLS_HANDLE_TYPE_FABRIC
+} ucc_tl_cuda_nvls_handle_type_t;
+
 typedef struct {
-    pid_t pid;
-    int   handle;
-} ucc_tl_cuda_nvls_share_data_t;
+    ucc_tl_cuda_nvls_handle_type_t type;
+    union {
+        struct {
+            pid_t pid;
+            int   handle;
+        } posix;
+        CUmemFabricHandle fabric;
+    } data;
+} ucc_tl_cuda_nvls_handle_t;
 
 typedef enum {
     UCC_TL_CUDA_NVLS_STATE_INIT,
@@ -28,38 +39,32 @@ typedef enum {
 
 typedef struct ucc_tl_cuda_nvls {
     // Multicast handle
-    CUmemGenericAllocationHandle   mc_handle;
+    CUmemGenericAllocationHandle mc_handle;
     // Multicast memory handle
-    CUmemGenericAllocationHandle   mc_memhandle;
+    CUmemGenericAllocationHandle mc_memhandle;
     // Device pointer for multicast
-    CUdeviceptr                    mc_va;
+    CUdeviceptr                  mc_va;
     // Device pointer for unicast
-    CUdeviceptr                    uc_va;
+    CUdeviceptr                  uc_va;
     // Size of multicast memory
-    size_t                         mc_size;
+    size_t                       mc_size;
     // Offset of multicast memory
-    size_t                         mc_offset;
+    size_t                       mc_offset;
     // Coll id for each task
-    size_t                        *coll_ids;
+    size_t                      *coll_ids;
     // Whether the team is multi-node
-    int                            is_multinode;
+    int                          is_multinode;
     // Temporary buffer for allgather
-    ucc_tl_cuda_nvls_share_data_t *share_data;
+    ucc_tl_cuda_nvls_handle_t   *share_data;
     // State variables for re-entrant initialization
-    // POSIX file descriptor handle
-    int                            export_handle;
-    // Fabric handle for multi-node
-    CUmemFabricHandle              fabric_handle;
-    // Array of PIDs from all ranks
-    pid_t                         *shared_pids;
-    // Array of fabric handles
-    CUmemFabricHandle             *shared_fabric_handles;
+    // Handle for export (POSIX or fabric)
+    ucc_tl_cuda_nvls_handle_t    local_handle;
     // CUDA device ID
-    int                            device;
+    int                          device;
     // Minimum granularity
-    size_t                         minGran;
+    size_t                       minGran;
     // Granularity
-    size_t                         gran;
+    size_t                       gran;
 } ucc_tl_cuda_nvls_t;
 
 typedef struct ucc_tl_cuda_nvls_control {
