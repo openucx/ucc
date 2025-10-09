@@ -11,6 +11,8 @@
 #include "core/ucc_team.h"
 #include "utils/arch/cuda_def.h"
 
+#include <cudaTypedefs.h> // for CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR
+
 #include <sys/syscall.h> // for pidfd_open and pidfd_getfd
 #include <unistd.h>      // for close()
 
@@ -288,9 +290,12 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_fabric(
 }
 
 ucc_status_t ucc_tl_cuda_nvls_init(
-    struct ucc_tl_cuda_team *team, ucc_base_context_t *tl_context)
+    struct ucc_tl_cuda_team *team, struct ucc_base_context *tl_context)
 {
+    ucc_tl_cuda_context_t *ctx = ucc_derived_of(
+        tl_context, ucc_tl_cuda_context_t);
     ucc_tl_cuda_lib_t *lib = ucc_derived_of(tl_context->lib, ucc_tl_cuda_lib_t);
+
     ucc_tl_cuda_nvls_t *nvls           = &team->nvls;
     const size_t        symmetric_size = lib->cfg.max_concurrent *
                                   (lib->cfg.nvls_symmetric_size +
@@ -309,9 +314,16 @@ ucc_status_t ucc_tl_cuda_nvls_init(
     case UCC_TL_CUDA_NVLS_STATE_INIT:
         // Initialize nvls struct to ensure safe cleanup on error
         memset(nvls, 0, sizeof(*nvls));
-
+        // Get current device from context
+        nvls->device       = ctx->device;
         nvls->is_multinode = !ucc_team_map_is_single_node(
             team->super.super.params.team, team->super.super.params.map);
+
+        status = ucc_tl_cuda_nvls_check_support(team, nvls->device);
+        if (status != UCC_OK) {
+            return status;
+        }
+
         handle_types        = nvls->is_multinode
                                   ? CU_MEM_HANDLE_TYPE_FABRIC
                                   : CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR;
@@ -331,19 +343,6 @@ ucc_status_t ucc_tl_cuda_nvls_init(
             mc_prop.size,
             mc_prop.handleTypes,
             mc_prop.flags);
-
-        // Get current device and check support
-        CUDA_CHECK(cudaGetDevice(&nvls->device));
-        tl_debug(
-            UCC_TL_TEAM_LIB(team),
-            "RANK %d: device: %d\n",
-            UCC_TL_TEAM_RANK(team),
-            nvls->device);
-
-        status = ucc_tl_cuda_nvls_check_support(team, nvls->device);
-        if (status != UCC_OK) {
-            return status;
-        }
 
         // Get granularity requirements
         status = ucc_tl_cuda_nvls_get_granularity(
@@ -648,18 +647,9 @@ cleanup:
     return status;
 }
 
-ucc_status_t ucc_tl_cuda_nvls_destroy(
-    struct ucc_tl_cuda_team *team, ucc_base_context_t *tl_context)
+ucc_status_t ucc_tl_cuda_nvls_destroy(ucc_tl_cuda_team_t *team)
 {
-    int device = 0;
-
-    // Get the actual device used during init
-    if (CUDA_FUNC(cudaGetDevice(&device)) != UCC_OK) {
-        tl_error(
-            UCC_TL_TEAM_LIB(team),
-            "failed to get current device during cleanup");
-        device = 0; // fallback to device 0
-    }
+    int device = team->nvls.device;
 
     // Rank 0: unbind the multicast object
     if (UCC_TL_TEAM_RANK(team) == 0 && team->nvls.mc_handle) {

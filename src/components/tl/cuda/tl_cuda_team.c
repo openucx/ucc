@@ -168,7 +168,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
 
 #ifdef HAVE_NVLS
     // destroy the nvls context
-    ucc_tl_cuda_nvls_destroy(self, self->super.super.context);
+    ucc_tl_cuda_nvls_destroy(self);
 #endif
 
     if (self->ids) {
@@ -369,7 +369,7 @@ barrier:
         }
     }
     team->oob_req = NULL;
-    tl_debug(tl_team->context->lib, "initialized tl team: %p", team);
+    tl_debug(lib, "initialized tl team: %p", team);
 
 #ifdef HAVE_NVLS
 nvls_init:
@@ -381,7 +381,7 @@ nvls_init:
     status = ucc_tl_cuda_nvls_init(team, tl_team->context);
     switch (status) {
     case UCC_ERR_NOT_SUPPORTED:
-        tl_debug(tl_team->context->lib, "NVLS is not supported");
+        tl_debug(lib, "NVLS is not supported");
         break;
     case UCC_INPROGRESS:
         return status;
@@ -399,8 +399,12 @@ exit_err:
     if (team->stream) {
         cudaError_t st = cudaStreamDestroy(team->stream);
         if (st != cudaSuccess) {
-            tl_warn(tl_team->context->lib, "cudaStreamDestroy failed during "
-                    "cleanup: %d (%s)", st, cudaGetErrorName(st));
+            tl_warn(
+                lib,
+                "cudaStreamDestroy failed during "
+                "cleanup: %d (%s)",
+                st,
+                cudaGetErrorName(st));
         }
         team->stream = NULL;
     }
@@ -414,7 +418,7 @@ exit_err:
                 cudaError_t st = cudaEventDestroy(sync->ipc_event_local);
                 if (st != cudaSuccess) {
                     tl_warn(
-                        tl_team->context->lib,
+                        lib,
                         "cudaEventDestroy failed during "
                         "cleanup: %d (%s)",
                         st,
@@ -432,7 +436,7 @@ exit_err:
                         sync->data[j].ipc_event_remote);
                     if (st != cudaSuccess) {
                         tl_warn(
-                            tl_team->context->lib,
+                            lib,
                             "cudaEventDestroy failed "
                             "during cleanup: %d (%s)",
                             st,
@@ -457,7 +461,7 @@ exit_err:
     // Clean up shared memory if attached by non-root
     if (UCC_TL_TEAM_RANK(team) != 0 && team->sync != (void*)-1) {
         if (shmdt(team->sync) != 0) {
-            tl_warn(tl_team->context->lib, "shmdt failed during cleanup: %s",
+            tl_warn(lib, "shmdt failed during cleanup: %s",
                     strerror(errno));
         }
         team->sync = (void*)-1;
