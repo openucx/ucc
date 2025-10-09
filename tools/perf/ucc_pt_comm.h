@@ -25,6 +25,7 @@ class ucc_pt_comm {
     ucc_ee_executor_t *executor;
     ucc_pt_bootstrap *bootstrap;
     void set_gpu_device();
+    void *onesided_buf;
 public:
     ucc_pt_comm(ucc_pt_comm_config config);
     int get_rank();
@@ -33,11 +34,13 @@ public:
     ucc_ee_h get_ee();
     ucc_team_h get_team();
     ucc_context_h get_context();
+    void *get_onesided_buf();
     ~ucc_pt_comm();
     ucc_status_t init();
     ucc_status_t barrier();
     ucc_status_t allreduce(double* in, double *out, size_t size,
                            ucc_reduction_op_t op);
+    ucc_status_t bcast(void *data, size_t size, int root);
     ucc_status_t finalize();
 };
 

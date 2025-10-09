@@ -53,6 +53,18 @@ typedef enum {
     UCC_PT_OP_TYPE_LAST
 } ucc_pt_op_type_t;
 
+typedef enum {
+    UCC_PT_MAP_TYPE_NONE,
+    UCC_PT_MAP_TYPE_LOCAL,
+    UCC_PT_MAP_TYPE_GLOBAL,
+    UCC_PT_MAP_TYPE_LAST
+} ucc_pt_map_type_t;
+
+typedef enum {
+    UCC_PT_GEN_TYPE_EXP,
+    UCC_PT_GEN_TYPE_FILE
+} ucc_pt_gen_type_t;
+
 static inline const char* ucc_pt_op_type_str(ucc_pt_op_type_t op)
 {
     if ((uint64_t)op < (uint64_t)UCC_COLL_TYPE_LAST) {
@@ -71,11 +83,6 @@ static inline const char* ucc_pt_op_type_str(ucc_pt_op_type_t op)
     return NULL;
 }
 
-typedef enum {
-    UCC_PT_GEN_TYPE_EXP,
-    UCC_PT_GEN_TYPE_FILE
-} ucc_pt_gen_type_t;
-
 struct ucc_pt_gen_config {
     ucc_pt_gen_type_t type;
     size_t exp_min;
@@ -91,9 +98,9 @@ struct ucc_pt_benchmark_config {
     ucc_datatype_t     dt;
     ucc_memory_type_t  mt;
     ucc_reduction_op_t op;
+    ucc_pt_map_type_t  map_type;
     bool               inplace;
     bool               persistent;
-    bool               mapped;
     bool               triggered;
     size_t             large_thresh;
     int                n_iter_small;
