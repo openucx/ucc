@@ -491,7 +491,6 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         }
 
         // Set up memory access descriptor
-        memset(&accessDesc, 0, sizeof(accessDesc));
         accessDesc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
         accessDesc.location.id   = nvls->device;
         accessDesc.flags         = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
