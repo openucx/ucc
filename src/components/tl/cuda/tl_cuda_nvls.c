@@ -15,8 +15,8 @@
 #include <sys/syscall.h> // for pidfd_open and pidfd_getfd
 #include <unistd.h>      // for close()
 
-static ucc_status_t ucc_tl_cuda_nvls_check_support(
-    ucc_tl_cuda_team_t *team, int device, int is_multinode)
+ucc_status_t ucc_tl_cuda_nvls_check_support(
+    ucc_tl_cuda_lib_t *lib, int device, int is_multinode)
 {
     int          mutlicast_supported, fabric_supported;
     ucc_status_t status;
@@ -25,7 +25,7 @@ static ucc_status_t ucc_tl_cuda_nvls_check_support(
         &mutlicast_supported, CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED, device));
     if (status != UCC_OK) {
         tl_error(
-            UCC_TL_TEAM_LIB(team),
+            lib,
             "failed to query multicast support on device %d: %d",
             device,
             status);
@@ -38,7 +38,7 @@ static ucc_status_t ucc_tl_cuda_nvls_check_support(
         device));
     if (status != UCC_OK) {
         tl_error(
-            UCC_TL_TEAM_LIB(team),
+            lib,
             "failed to query fabric handle support on device %d: %d",
             device,
             status);
@@ -46,24 +46,18 @@ static ucc_status_t ucc_tl_cuda_nvls_check_support(
     }
 
     tl_debug(
-        UCC_TL_TEAM_LIB(team),
+        lib,
         "MULTICAST_SUPPORTED: %d, HANDLE_TYPE_FABRIC_SUPPORTED: %d\n",
         mutlicast_supported,
         fabric_supported);
 
     if (!mutlicast_supported) {
-        tl_error(
-            UCC_TL_TEAM_LIB(team),
-            "multicast not supported on device %d",
-            device);
+        tl_error(lib, "multicast not supported on device %d", device);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (is_multinode && !fabric_supported) {
-        tl_error(
-            UCC_TL_TEAM_LIB(team),
-            "fabric handle not supported on device %d",
-            device);
+        tl_error(lib, "fabric handle not supported on device %d", device);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -341,7 +335,7 @@ ucc_status_t ucc_tl_cuda_nvls_init(
             team->super.super.params.team, team->super.super.params.map);
 
         status = ucc_tl_cuda_nvls_check_support(
-            team, nvls->device, nvls->is_multinode);
+            lib, nvls->device, nvls->is_multinode);
         if (status != UCC_OK) {
             return status;
         }
