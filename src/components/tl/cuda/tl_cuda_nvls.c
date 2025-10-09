@@ -12,8 +12,6 @@
 #include "utils/arch/cuda_def.h"
 #include "utils/ucc_math.h"
 
-#include <cudaTypedefs.h> // for CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR
-
 #include <sys/syscall.h> // for pidfd_open and pidfd_getfd
 #include <unistd.h>      // for close()
 
