@@ -47,6 +47,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         self->seq_num = 1;
         return UCC_OK;
     }
+#else
+    if (!ucc_team_map_is_single_node(params->team, params->map)) {
+        tl_debug(tl_context->lib, "multinode team is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 #endif
 
     self->ids = ucc_malloc((UCC_TL_TEAM_SIZE(self) + 1) * sizeof(*(self->ids)),
@@ -395,28 +400,40 @@ exit_err:
     }
 
     // Clean up partially created IPC events (local events)
-    for (i = 0; i < resource_num; i++) {
-        sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
-        if (sync->ipc_event_local) {
-            cudaError_t st = cudaEventDestroy(sync->ipc_event_local);
-            if (st != cudaSuccess) {
-                tl_warn(tl_team->context->lib, "cudaEventDestroy failed during "
-                        "cleanup: %d (%s)", st, cudaGetErrorName(st));
-            }
-            sync->ipc_event_local = NULL;
-        }
-        // Clean up opened remote event handles
-        for (j = 0; j < UCC_TL_TEAM_SIZE(team); j++) {
-            if (j == UCC_TL_TEAM_RANK(team)) {
-                continue;
-            }
-            if (sync->data[j].ipc_event_remote) {
-                cudaError_t st = cudaEventDestroy(sync->data[j].ipc_event_remote);
+    // Only access sync structures if shared memory was successfully attached
+    if (team->sync != (void *)-1) {
+        for (i = 0; i < resource_num; i++) {
+            sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
+            if (sync->ipc_event_local) {
+                cudaError_t st = cudaEventDestroy(sync->ipc_event_local);
                 if (st != cudaSuccess) {
-                    tl_warn(tl_team->context->lib, "cudaEventDestroy failed "
-                            "during cleanup: %d (%s)", st, cudaGetErrorName(st));
+                    tl_warn(
+                        tl_team->context->lib,
+                        "cudaEventDestroy failed during "
+                        "cleanup: %d (%s)",
+                        st,
+                        cudaGetErrorName(st));
                 }
-                sync->data[j].ipc_event_remote = NULL;
+                sync->ipc_event_local = NULL;
+            }
+            // Clean up opened remote event handles
+            for (j = 0; j < UCC_TL_TEAM_SIZE(team); j++) {
+                if (j == UCC_TL_TEAM_RANK(team)) {
+                    continue;
+                }
+                if (sync->data[j].ipc_event_remote) {
+                    cudaError_t st = cudaEventDestroy(
+                        sync->data[j].ipc_event_remote);
+                    if (st != cudaSuccess) {
+                        tl_warn(
+                            tl_team->context->lib,
+                            "cudaEventDestroy failed "
+                            "during cleanup: %d (%s)",
+                            st,
+                            cudaGetErrorName(st));
+                    }
+                    sync->data[j].ipc_event_remote = NULL;
+                }
             }
         }
     }
@@ -438,6 +455,14 @@ exit_err:
                     strerror(errno));
         }
         team->sync = (void*)-1;
+    }
+
+    // Reset oob_req state to prevent re-entry into partially initialized code
+    // If we set oob_req to (void*)0x1 but then hit an error, we must reset it
+    // so that subsequent calls to this function will return the error immediately
+    // rather than attempting to continue from the barrier checkpoint
+    if (team->oob_req == (void *)0x1) {
+        team->oob_req = NULL;
     }
 
     return status;
