@@ -64,6 +64,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
     self->oob         = params->params.oob;
+    self->oob_req     = NULL;
     self->stream      = NULL;
     self->topo        = NULL;
     self->scratch.loc = NULL;
