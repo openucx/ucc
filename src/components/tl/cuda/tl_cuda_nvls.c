@@ -17,11 +17,11 @@
 static ucc_status_t ucc_tl_cuda_nvls_check_support(
     ucc_tl_cuda_team_t *team, int device)
 {
-    int          supported, fabric_supported;
+    int          mutlicast_supported, fabric_supported;
     ucc_status_t status;
 
     status = CUDADRV_FUNC(cuDeviceGetAttribute(
-        &supported, CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED, device));
+        &mutlicast_supported, CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED, device));
     if (status != UCC_OK) {
         tl_error(
             UCC_TL_TEAM_LIB(team),
@@ -47,10 +47,10 @@ static ucc_status_t ucc_tl_cuda_nvls_check_support(
     tl_debug(
         UCC_TL_TEAM_LIB(team),
         "MULTICAST_SUPPORTED: %d, HANDLE_TYPE_FABRIC_SUPPORTED: %d\n",
-        supported,
+        mutlicast_supported,
         fabric_supported);
 
-    if (!supported) {
+    if (!mutlicast_supported) {
         tl_error(
             UCC_TL_TEAM_LIB(team),
             "multicast not supported on device %d",
