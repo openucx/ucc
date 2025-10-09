@@ -249,10 +249,12 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
 
 #ifdef HAVE_NVLS
     if (team->state != UCC_TL_CUDA_NVLS_STATE_INIT) {
+        // in that case nvls initialization is in progress
         goto nvls_init;
     }
     if (!ucc_team_map_is_single_node(team->super.super.params.team,
                                      team->super.super.params.map)) {
+        // for multinode team skip tl/cuda initialization since it is not supported
         goto nvls_init;
     }
 #endif
@@ -377,11 +379,15 @@ nvls_init:
     }
     // initialize the nvls struct
     status = ucc_tl_cuda_nvls_init(team, tl_team->context);
-    if (status == UCC_INPROGRESS) {
+    switch (status) {
+    case UCC_ERR_NOT_SUPPORTED:
+        tl_debug(tl_team->context->lib, "NVLS is not supported");
+        break;
+    case UCC_INPROGRESS:
         return status;
-    }
-    if (status != UCC_OK) {
-        ucc_error("failed to init nvls multicast");
+    case UCC_OK:
+        break;
+    default:
         goto exit_err;
     }
 #endif
