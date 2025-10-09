@@ -11,6 +11,7 @@
 #include "ucc/api/ucc_status.h"
 
 // Forward declaration to avoid circular dependency
+struct ucc_tl_cuda_lib;
 struct ucc_tl_cuda_team;
 struct ucc_base_context;
 
@@ -70,6 +71,9 @@ typedef struct ucc_tl_cuda_nvls {
 typedef struct ucc_tl_cuda_nvls_control {
     uint64_t arrival_counter;
 } ucc_tl_cuda_nvls_control_t;
+
+ucc_status_t ucc_tl_cuda_nvls_check_support(
+    struct ucc_tl_cuda_lib *lib, int device, int is_multinode);
 
 ucc_status_t ucc_tl_cuda_nvls_init(
     struct ucc_tl_cuda_team *team, struct ucc_base_context *tl_context);
