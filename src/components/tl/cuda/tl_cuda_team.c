@@ -18,6 +18,35 @@
 #include "utils/ucc_sys.h"
 #include <sys/shm.h>
 
+// Returns supported collectives depending on NVLS availability
+// and whether the team is single-node or multi-node.
+static uint64_t ucc_tl_cuda_get_supported_colls(const ucc_tl_cuda_team_t *team)
+{
+    const int is_multinode = !ucc_team_map_is_single_node(
+        team->super.super.params.team, team->super.super.params.map);
+
+    // Base TL/CUDA collectives that are supported without NVLS
+    uint64_t base_tl_cuda_colls =
+        (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |
+         UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |
+         UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE_SCATTER |
+         UCC_COLL_TYPE_REDUCE_SCATTERV);
+
+#ifdef HAVE_NVLS
+    // With NVLS compiled in, ALLREDUCE is supported. For multi-node teams,
+    // the TL/CUDA initialization is skipped and only NVLS path is active.
+    // Reduce-scatter NVLS currently requires fully connected NVLINK (single
+    // node), so on multi-node expose only ALLREDUCE.
+    if (is_multinode) {
+        return UCC_COLL_TYPE_ALLREDUCE;
+    }
+    return base_tl_cuda_colls | UCC_COLL_TYPE_ALLREDUCE;
+#else
+    (void)is_multinode; // unused
+    return base_tl_cuda_colls;
+#endif
+}
+
 UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
@@ -494,13 +523,13 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
     team_info.init                = ucc_tl_cuda_coll_init;
     team_info.num_mem_types       = 1;
     team_info.supported_mem_types = &mt;
-    team_info.supported_colls     = UCC_TL_CUDA_SUPPORTED_COLLS;
+    team_info.supported_colls     = ucc_tl_cuda_get_supported_colls(team);
     team_info.size                = UCC_TL_TEAM_SIZE(team);
 
     status =
         ucc_coll_score_build_default(tl_team, UCC_TL_CUDA_DEFAULT_SCORE,
                                      ucc_tl_cuda_coll_init,
-                                     UCC_TL_CUDA_SUPPORTED_COLLS,
+                                     team_info.supported_colls,
                                      &mt, 1, &score);
     if (UCC_OK != status) {
         return status;
