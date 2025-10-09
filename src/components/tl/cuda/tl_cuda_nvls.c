@@ -17,7 +17,7 @@
 #include <unistd.h>      // for close()
 
 static ucc_status_t ucc_tl_cuda_nvls_check_support(
-    ucc_tl_cuda_team_t *team, int device)
+    ucc_tl_cuda_team_t *team, int device, int is_multinode)
 {
     int          mutlicast_supported, fabric_supported;
     ucc_status_t status;
@@ -56,6 +56,14 @@ static ucc_status_t ucc_tl_cuda_nvls_check_support(
         tl_error(
             UCC_TL_TEAM_LIB(team),
             "multicast not supported on device %d",
+            device);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (is_multinode && !fabric_supported) {
+        tl_error(
+            UCC_TL_TEAM_LIB(team),
+            "fabric handle not supported on device %d",
             device);
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -319,7 +327,8 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         nvls->is_multinode = !ucc_team_map_is_single_node(
             team->super.super.params.team, team->super.super.params.map);
 
-        status = ucc_tl_cuda_nvls_check_support(team, nvls->device);
+        status = ucc_tl_cuda_nvls_check_support(
+            team, nvls->device, nvls->is_multinode);
         if (status != UCC_OK) {
             return status;
         }
