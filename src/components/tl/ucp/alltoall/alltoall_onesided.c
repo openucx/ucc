@@ -147,6 +147,7 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
                               PTR_OFFSET(dest, grank * nelems), nelems,
                               peer, src_memh, dst_memh, team, task),
             task, out);
+        UCPCHECK_GOTO(ucc_tl_ucp_ep_flush(peer, team, task), task, out);
 
         if (!alltoall_onesided_handle_completion(task, posted, completed,
                                                  ntokens, npolls)) {
@@ -263,7 +264,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     nelems             = nelems / UCC_TL_TEAM_SIZE(tl_team);
     param.field_mask   = UCP_EP_PERF_PARAM_FIELD_MESSAGE_SIZE;
     attr.field_mask    = UCP_EP_PERF_ATTR_FIELD_ESTIMATED_TIME;
-    param.message_size = (1 << 20);
+    param.message_size = nelems * ucc_dt_size(TASK_ARGS(task).src.info.datatype);;
     ucc_tl_ucp_get_ep(
         tl_team, (UCC_TL_TEAM_RANK(tl_team) + 1) % UCC_TL_TEAM_SIZE(tl_team),
         &ep);

@@ -62,6 +62,9 @@ void ucc_tl_ucp_put_completion_cb(void *request, ucs_status_t status,
 void ucc_tl_ucp_get_completion_cb(void *request, ucs_status_t status,
                                   void *user_data);
 
+void ucc_tl_ucp_flush_completion_cb(void *request, ucs_status_t status,
+                                    void *user_data);
+
 void ucc_tl_ucp_recv_completion_cb_st(void *request, ucs_status_t status,
                                       const ucp_tag_recv_info_t *info,
                                       void *user_data);
@@ -531,7 +534,8 @@ static inline ucc_status_t ucc_tl_ucp_flush(ucc_tl_ucp_team_t *team)
 }
 
 static inline ucc_status_t ucc_tl_ucp_ep_flush(ucc_rank_t dest_group_rank,
-                                               ucc_tl_ucp_team_t *team)
+                                               ucc_tl_ucp_team_t *team,
+                                               ucc_tl_ucp_task_t *task)
 {
     ucp_request_param_t req_param = {0};
     ucc_status_t        status;
@@ -543,12 +547,19 @@ static inline ucc_status_t ucc_tl_ucp_ep_flush(ucc_rank_t dest_group_rank,
         return status;
     }
 
+    req_param.op_attr_mask =
+        UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA;
+    req_param.cb.send   = ucc_tl_ucp_flush_completion_cb;
+    req_param.user_data = (void *)task;
+
     req = ucp_ep_flush_nbx(ep, &req_param);
+    task->flush_posted++;
     if (UCS_OK != req) {
         if (UCS_PTR_IS_ERR(req)) {
             return ucs_status_to_ucc_status(UCS_PTR_STATUS(req));
         }
-        ucp_request_free(req);
+    } else {
+        task->flush_completed++;
     }
     return UCC_OK;
 }
