@@ -101,7 +101,7 @@ ucc_status_t ucc_tl_cuda_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
         if (ucc_tl_cuda_nvls_check_support(
                 ucc_derived_of(lib, ucc_tl_cuda_lib_t),
                 0 /* device */,
-                1 /* is_multinode */)) {
+                1 /* is_multinode */) == UCC_OK) {
             attr->super.max_team_size = UCC_TL_CUDA_MAX_NVLS_PEERS;
         } else {
             attr->super.max_team_size = UCC_TL_CUDA_MAX_PEERS;
