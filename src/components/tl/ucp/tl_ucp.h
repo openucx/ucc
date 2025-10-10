@@ -42,44 +42,53 @@ typedef struct ucc_tl_ucp_iface {
 /* Extern iface should follow the pattern: ucc_tl_<tl_name> */
 extern ucc_tl_ucp_iface_t ucc_tl_ucp;
 
+typedef enum ucc_tl_ucp_alltoall_onesided_alg_type {
+    UCC_TL_UCP_ALLTOALL_ONESIDED_PUT,
+    UCC_TL_UCP_ALLTOALL_ONESIDED_GET,
+    UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO,
+    UCC_TL_UCP_ALLTOALL_ONESIDED_LAST
+} ucc_tl_ucp_alltoall_onesided_alg_t;
+
 typedef struct ucc_tl_ucp_lib_config {
-    ucc_tl_lib_config_t      super;
-    uint32_t                 kn_radix;
-    uint32_t                 fanin_kn_radix;
-    uint32_t                 fanout_kn_radix;
-    uint32_t                 barrier_kn_radix;
-    size_t                   allreduce_sliding_window_buf_size;
-    uint32_t                 allreduce_sliding_window_put_window_size;
-    uint32_t                 allreduce_sliding_window_num_get_bufs;
-    ucc_mrange_uint_t        allreduce_kn_radix;
-    ucc_mrange_uint_t        allreduce_sra_kn_radix;
-    uint32_t                 reduce_scatter_kn_radix;
-    ucc_mrange_uint_t        allgather_kn_radix;
-    uint32_t                 bcast_kn_radix;
-    ucc_mrange_uint_t        bcast_sag_kn_radix;
-    uint32_t                 reduce_kn_radix;
-    ucc_pipeline_params_t    reduce_srg_kn_pipeline;
-    ucc_mrange_uint_t        reduce_srg_kn_radix;
-    uint32_t                 gather_kn_radix;
-    uint32_t                 gatherv_linear_num_posts;
-    uint32_t                 scatter_kn_radix;
-    ucc_on_off_auto_value_t  scatter_kn_enable_recv_zcopy;
-    uint32_t                 scatterv_linear_num_posts;
-    unsigned long            alltoall_pairwise_num_posts;
-    unsigned long            alltoallv_pairwise_num_posts;
-    unsigned long            allgather_batched_num_posts;
-    ucc_pipeline_params_t    allreduce_sra_kn_pipeline;
-    int                      reduce_avg_pre_op;
-    int                      reduce_scatter_ring_bidirectional;
-    int                      reduce_scatterv_ring_bidirectional;
-    uint32_t                 alltoallv_hybrid_radix;
-    size_t                   alltoallv_hybrid_buff_size;
-    size_t                   alltoallv_hybrid_chunk_byte_limit;
-    uint32_t                 alltoallv_hybrid_num_scratch_sends;
-    uint32_t                 alltoallv_hybrid_num_scratch_recvs;
-    uint32_t                 alltoallv_hybrid_pairwise_num_posts;
-    ucc_ternary_auto_value_t use_topo;
-    int                      use_reordering;
+    ucc_tl_lib_config_t                super;
+    uint32_t                           kn_radix;
+    uint32_t                           fanin_kn_radix;
+    uint32_t                           fanout_kn_radix;
+    uint32_t                           barrier_kn_radix;
+    size_t                             allreduce_sliding_window_buf_size;
+    uint32_t                           allreduce_sliding_window_put_window_size;
+    uint32_t                           allreduce_sliding_window_num_get_bufs;
+    ucc_mrange_uint_t                  allreduce_kn_radix;
+    ucc_mrange_uint_t                  allreduce_sra_kn_radix;
+    uint32_t                           reduce_scatter_kn_radix;
+    ucc_mrange_uint_t                  allgather_kn_radix;
+    uint32_t                           bcast_kn_radix;
+    ucc_mrange_uint_t                  bcast_sag_kn_radix;
+    uint32_t                           reduce_kn_radix;
+    ucc_pipeline_params_t              reduce_srg_kn_pipeline;
+    ucc_mrange_uint_t                  reduce_srg_kn_radix;
+    uint32_t                           gather_kn_radix;
+    uint32_t                           gatherv_linear_num_posts;
+    uint32_t                           scatter_kn_radix;
+    ucc_on_off_auto_value_t            scatter_kn_enable_recv_zcopy;
+    uint32_t                           scatterv_linear_num_posts;
+    unsigned long                      alltoall_pairwise_num_posts;
+    unsigned long                      alltoallv_pairwise_num_posts;
+    unsigned long                      allgather_batched_num_posts;
+    ucc_pipeline_params_t              allreduce_sra_kn_pipeline;
+    int                                reduce_avg_pre_op;
+    int                                reduce_scatter_ring_bidirectional;
+    int                                reduce_scatterv_ring_bidirectional;
+    uint32_t                           alltoallv_hybrid_radix;
+    size_t                             alltoallv_hybrid_buff_size;
+    size_t                             alltoallv_hybrid_chunk_byte_limit;
+    uint32_t                           alltoallv_hybrid_num_scratch_sends;
+    uint32_t                           alltoallv_hybrid_num_scratch_recvs;
+    uint32_t                           alltoallv_hybrid_pairwise_num_posts;
+    ucc_ternary_auto_value_t           use_topo;
+    int                                use_reordering;
+    uint32_t                           alltoall_onesided_percent_bw;
+    ucc_tl_ucp_alltoall_onesided_alg_t alltoall_onesided_alg;
 } ucc_tl_ucp_lib_config_t;
 
 typedef enum ucc_tl_ucp_local_copy_type {

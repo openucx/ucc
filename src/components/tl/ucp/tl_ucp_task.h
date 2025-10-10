@@ -215,8 +215,14 @@ typedef struct ucc_tl_ucp_task {
             ucc_rank_t              iteration;
             int                     phase;
         } alltoall_bruck;
+        struct {
+            uint32_t                tokens;
+            uint32_t                npolls;
+        } alltoall_onesided;
         char                        plugin_data[UCC_TL_UCP_TASK_PLUGIN_MAX_DATA];
     };
+    uint32_t flush_posted;
+    uint32_t flush_completed;
 } ucc_tl_ucp_task_t;
 
 static inline void ucc_tl_ucp_task_reset(ucc_tl_ucp_task_t *task,
@@ -226,6 +232,8 @@ static inline void ucc_tl_ucp_task_reset(ucc_tl_ucp_task_t *task,
     task->tagged.send_completed = 0;
     task->tagged.recv_posted    = 0;
     task->tagged.recv_completed = 0;
+    task->flush_posted          = 0;
+    task->flush_completed       = 0;
     task->super.status          = status;
 }
 
