@@ -243,16 +243,17 @@ typedef struct ucc_tl_ucp_task {
     uint32_t flush_posted;
     uint32_t flush_completed;
     struct {
-        ucc_mem_map_memh_t        *src_local;
-        ucc_mem_map_memh_t        *dst_local;
-        ucc_mem_map_memh_t       **src_global;
-        ucc_mem_map_memh_t       **dst_global;
-        ucc_tl_ucp_dyn_seg_args_t *exchange_args;
-        void                      *global_buffer;
-        ucc_service_coll_req_t    *scoll_req_sizes; /* For sizes allgather */
-        ucc_service_coll_req_t    *scoll_req_data; /* For data ex allgather */
-        int                        exchange_step;
-        ucc_status_t               exchange_status;
+        ucc_mem_map_memh_t                *src_local;
+        ucc_mem_map_memh_t                *dst_local;
+        ucc_mem_map_memh_t               **src_global;
+        ucc_mem_map_memh_t               **dst_global;
+        ucc_tl_ucp_dyn_seg_args_t         *exchange_args;
+        void                              *global_buffer;
+        ucc_service_coll_req_t            *scoll_req_sizes; /* For sizes allgather */
+        ucc_service_coll_req_t            *scoll_req_data; /* For data ex allgather */
+        int                                exchange_step;
+        ucc_status_t                       exchange_status;
+        ucc_tl_ucp_alltoall_onesided_alg_t alg;
     } dynamic_segments;
 } ucc_tl_ucp_task_t;
 
