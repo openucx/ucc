@@ -817,7 +817,6 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
         if (data->rkey) {
             ucp_rkey_destroy(data->rkey);
         }
-        // Free the data structure itself
         ucc_free(data);
         memh->tl_data = NULL;
     } else {
@@ -827,7 +826,6 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
 
     /* Free the TL data structure */
     if (data) {
-        ucc_free(data);
         memh->tl_data = NULL;
     }
 
