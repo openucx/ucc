@@ -24,7 +24,7 @@ static uint64_t ucc_tl_cuda_get_supported_colls(const ucc_tl_cuda_team_t *team)
 {
     const int is_multinode = !ucc_team_map_is_single_node(
         team->super.super.params.team, team->super.super.params.map);
-
+    ucc_status_t status;
     // Base TL/CUDA collectives that are supported without NVLS
     uint64_t base_tl_cuda_colls =
         (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |
@@ -37,6 +37,13 @@ static uint64_t ucc_tl_cuda_get_supported_colls(const ucc_tl_cuda_team_t *team)
     // the TL/CUDA initialization is skipped and only NVLS path is active.
     // Reduce-scatter NVLS currently requires fully connected NVLINK (single
     // node), so on multi-node expose only ALLREDUCE.
+    status = ucc_tl_cuda_nvls_check_support(
+        ucc_derived_of(team->super.super.context->lib, ucc_tl_cuda_lib_t),
+        0 /* device */,
+        is_multinode);
+    if (status != UCC_OK) {
+        return base_tl_cuda_colls;
+    }
     if (is_multinode) {
         return UCC_COLL_TYPE_ALLREDUCE;
     }
@@ -69,11 +76,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     self->topo        = NULL;
     self->scratch.loc = NULL;
     self->ids         = NULL;
+    shm_id = -1;
+    self->sync = (void*)-1;
 
 #ifdef HAVE_NVLS
     self->state = UCC_TL_CUDA_NVLS_STATE_INIT;
     if (!ucc_team_map_is_single_node(params->team, params->map)) {
-        tl_debug(tl_context->lib, "multinode team is supported");
+        tl_debug(tl_context->lib, "nvls multinode team regime");
         self->seq_num = 1;
         return UCC_OK;
     }
@@ -113,8 +122,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
                 sizeof(ucc_tl_cuda_sync_state_t) * lib->cfg.max_concurrent;
     ctrl_size *= 2; // active sets
 
-    shm_id = -1;
-    self->sync = (void*)-1;
     if (UCC_TL_TEAM_RANK(self) == 0) {
         alloc_size = ctrl_size;
         status = ucc_sysv_alloc(&alloc_size, (void**)&self->sync, &shm_id);
@@ -412,12 +419,24 @@ nvls_init:
     switch (status) {
     case UCC_ERR_NOT_SUPPORTED:
         tl_debug(lib, "NVLS is not supported");
+        if (!ucc_team_map_is_single_node(team->super.super.params.team,
+                                         team->super.super.params.map)) {
+            ucc_error("NVLS is not supported for multi-node team");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
         break;
     case UCC_INPROGRESS:
         return status;
     case UCC_OK:
         break;
     default:
+        ucc_error(
+            "failed to initialize NVLS with status (%d) %s",
+            status,
+            ucc_status_string(status));
+        // overwrite status since NVLS related calls might have failed
+        // and we need to set tl/cuda to not supported
+        status = UCC_ERR_NOT_SUPPORTED;
         goto exit_err;
     }
 #endif
@@ -441,7 +460,7 @@ exit_err:
 
     // Clean up partially created IPC events (local events)
     // Only access sync structures if shared memory was successfully attached
-    if (team->sync != (void *)-1) {
+    if (team->sync != (void *)-1 && team->sync != NULL) {
         for (i = 0; i < resource_num; i++) {
             sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
             if (sync->ipc_event_local) {

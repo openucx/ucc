@@ -36,18 +36,12 @@
 #define UCC_TL_CUDA_MAX_NVLS_SM_COUNT 32
 #define UCC_TL_CUDA_MAX_NVLS_THREADS 1024
 
-#define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
-     UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
-     UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_ALLREDUCE |                           \
-     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV)
-#else
+#endif /* HAVE_NVLS */
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
     (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
      UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
      UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE_SCATTER |                      \
      UCC_COLL_TYPE_REDUCE_SCATTERV)
-#endif /* HAVE_NVLS */
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_cuda_lib_t))

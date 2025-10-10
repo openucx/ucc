@@ -58,6 +58,7 @@ typedef struct ucc_tl_cuda_nvls {
     // Temporary buffer for allgather
     ucc_tl_cuda_nvls_handle_t   *share_data;
     // State variables for re-entrant initialization
+    ucc_status_t                 status_supported;
     // Handle for export (POSIX or fabric)
     ucc_tl_cuda_nvls_handle_t    local_handle;
     // CUDA device ID
