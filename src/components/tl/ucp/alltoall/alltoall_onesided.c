@@ -119,6 +119,10 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     }
 
     alltoall_onesided_wait_completion(task, npolls);
+    if (task->super.status == UCC_OK &&
+        (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
+        task->super.status = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
+    }
 out:
     return;
 }
@@ -139,6 +143,7 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
     uint32_t          *completed = &task->onesided.put_completed;
     ucc_rank_t         peer      = (grank + *posted + 1) % gsize;
     size_t             nelems;
+    ucc_status_t       status;
 
     if (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG) {
         status = ucc_tl_ucp_test_dynamic_segment(task);
@@ -172,6 +177,10 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
     }
 
     alltoall_onesided_wait_completion(task, npolls);
+    if (task->super.status == UCC_OK &&
+        (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
+        task->super.status = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
+    }
 out:
     return;
 }
@@ -270,28 +279,22 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
         goto out;
     }
 
-    /* initialize dynamic segments */
-    if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_PUT ||
-        alg == UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO &&
-            sbgp->group_size < CONGESTION_THRESHOLD)
-        {
-        status = ucc_tl_ucp_coll_dynamic_segment_init(&coll_args->args, task);
-        if (UCC_OK != status) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
-                    "failed to initialize dynamic segments");
-            goto out;
-        }
-    } else {
-        tl_error(UCC_TL_TEAM_LIB(tl_team),
-                    "dynamic segments does not support GET-based algorithms\n"
-                    "please use mapped buffers or set UCC_TL_UCP_ALLTOALL_ONESIDED_ALG=put");
-        status = UCC_ERR_NOT_SUPPORTED;
-        goto out;
-    }
-
     task                 = ucc_tl_ucp_init_task(coll_args, team);
     task->super.finalize = ucc_tl_ucp_alltoall_onesided_finalize;
     a2a_task             = &task->super;
+
+    /* initialize dynamic segments */
+    if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET ||
+       (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO &&
+                                    sbgp->group_size >= CONGESTION_THRESHOLD)) {
+        alg = UCC_TL_UCP_ALLTOALL_ONESIDED_GET;
+    }
+    status = ucc_tl_ucp_coll_dynamic_segment_init(&coll_args->args, alg, task);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(tl_team),
+                "failed to initialize dynamic segments");
+            goto out;
+    }
 
     status = ucc_tl_ucp_coll_init(&barrier_coll_args, team, &barrier_task);
     if (status != UCC_OK) {
@@ -321,9 +324,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     }
     task->super.post = ucc_tl_ucp_alltoall_onesided_start;
     npolls           = task->n_polls;
-    if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET ||
-       (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO &&
-                                    sbgp->group_size >= CONGESTION_THRESHOLD)) {
+    if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET) {
         npolls = nelems * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
         if (npolls < task->n_polls) {
             npolls = task->n_polls;

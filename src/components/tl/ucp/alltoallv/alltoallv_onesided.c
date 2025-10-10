@@ -179,7 +179,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
     task->super.progress = ucc_tl_ucp_alltoallv_onesided_progress;
 
     status = ucc_tl_ucp_coll_dynamic_segment_init(
-        &coll_args->args, task);
+        &coll_args->args, UCC_TL_UCP_ALLTOALL_ONESIDED_PUT, task);
     if (UCC_OK != status) {
         tl_error(UCC_TL_TEAM_LIB(tl_team),
                  "failed to initialize dynamic segments");
