@@ -24,7 +24,9 @@ static uint64_t ucc_tl_cuda_get_supported_colls(const ucc_tl_cuda_team_t *team)
 {
     const int is_multinode = !ucc_team_map_is_single_node(
         team->super.super.params.team, team->super.super.params.map);
+#ifdef HAVE_NVLS
     ucc_status_t status;
+#endif
     // Base TL/CUDA collectives that are supported without NVLS
     uint64_t base_tl_cuda_colls =
         (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |
@@ -430,10 +432,17 @@ nvls_init:
     case UCC_OK:
         break;
     default:
-        ucc_error(
+        tl_error(lib,
             "failed to initialize NVLS with status (%d) %s",
             status,
             ucc_status_string(status));
+        // For multi-node teams in NVLS-only mode, no IPC resources were allocated
+        // so just return NOT_SUPPORTED to allow fallback to other TLs
+        if (!ucc_team_map_is_single_node(team->super.super.params.team,
+                                         team->super.super.params.map)) {
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+        // For single-node teams, NVLS failure means cleanup is needed
         // overwrite status since NVLS related calls might have failed
         // and we need to set tl/cuda to not supported
         status = UCC_ERR_NOT_SUPPORTED;
