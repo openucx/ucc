@@ -296,7 +296,9 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_fabric(
     if (status != UCC_OK) {
         tl_error(
             UCC_TL_TEAM_LIB(team),
-            "failed to import fabric handle from rank 0");
+            "failed to import fabric handle from rank 0. status (%d) %s",
+            status,
+            ucc_status_string(status));
         return status;
     }
 
@@ -410,8 +412,18 @@ ucc_status_t ucc_tl_cuda_nvls_init(
             }
             if (status != UCC_OK) {
                 tl_error(
-                    UCC_TL_TEAM_LIB(team), "failed to create multicast object");
-                goto cleanup;
+                    UCC_TL_TEAM_LIB(team),
+                    "failed to create multicast object. status (%d) %s",
+                    status,
+                    ucc_status_string(status));
+                // goto cleanup;
+                // Store the error status to the caller
+                // We need to share invalid handle to unblock peers
+                // we will propagate the error status to the caller later
+                nvls->status_supported = UCC_ERR_NOT_SUPPORTED;
+            }
+            else {
+                nvls->status_supported = UCC_OK;
             }
             // Store PID for POSIX handles
             if (!nvls->is_multinode) {
@@ -446,6 +458,11 @@ ucc_status_t ucc_tl_cuda_nvls_init(
                 goto cleanup;
             }
             nvls->mc_handle = mc_handle;
+        }
+        if (nvls->status_supported != UCC_OK) {
+            // Propagate the supported status to the caller
+            status = nvls->status_supported;
+            goto cleanup;
         }
         team->state = UCC_TL_CUDA_NVLS_STATE_ADD_DEVICE;
         // fall through
