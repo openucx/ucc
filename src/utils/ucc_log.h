@@ -10,83 +10,17 @@
 #include "config.h"
 #include "core/ucc_global_opts.h"
 #include "core/ucc_dt.h"
-#include <ucs/debug/log_def.h>
-
-#define UCC_LOG_LEVEL_ERROR UCS_LOG_LEVEL_ERROR
-#define UCC_LOG_LEVEL_WARN  UCS_LOG_LEVEL_WARN
-#define UCC_LOG_LEVEL_DIAG  UCS_LOG_LEVEL_DIAG
-#define UCC_LOG_LEVEL_INFO  UCS_LOG_LEVEL_INFO
-#define UCC_LOG_LEVEL_DEBUG UCS_LOG_LEVEL_DEBUG
-#define UCC_LOG_LEVEL_TRACE UCS_LOG_LEVEL_TRACE
-
-#define ucc_log_get_buffer_size ucs_log_get_buffer_size
-#define ucc_log_fatal_error ucs_log_fatal_error
-#define ucc_log_flush ucs_log_flush
-
-/* Generic wrapper macro to invoke ucs logging backend */
-#define ucc_log_component(_level, _component, _fmt, ...)                       \
-    do {                                                                       \
-        ucs_log_component(_level, &_component, _fmt, ##__VA_ARGS__);           \
-    } while (0)
-
-/* Global logger: to be used anywhere when special log level settings are not required */
-#define ucc_log_component_global(_level, fmt, ...)                             \
-    ucc_log_component(_level, ucc_global_config.log_component, fmt,            \
-                      ##__VA_ARGS__)
-#define ucc_error(_fmt, ...)                                                   \
-    ucc_log_component_global(UCS_LOG_LEVEL_ERROR, _fmt, ##__VA_ARGS__)
-#define ucc_warn(_fmt, ...)                                                    \
-    ucc_log_component_global(UCS_LOG_LEVEL_WARN, _fmt, ##__VA_ARGS__)
-#define ucc_diag(_fmt, ...)                                                    \
-    ucc_log_component_global(UCS_LOG_LEVEL_DIAG, _fmt, ##__VA_ARGS__)
-#define ucc_info(_fmt, ...)                                                    \
-    ucc_log_component_global(UCS_LOG_LEVEL_INFO, _fmt, ##__VA_ARGS__)
-#define ucc_debug(_fmt, ...)                                                   \
-    ucc_log_component_global(UCS_LOG_LEVEL_DEBUG, _fmt, ##__VA_ARGS__)
-#define ucc_trace(_fmt, ...)                                                   \
-    ucc_log_component_global(UCS_LOG_LEVEL_TRACE, _fmt, ##__VA_ARGS__)
-#define ucc_trace_req(_fmt, ...)                                               \
-    ucc_log_component_global(UCS_LOG_LEVEL_TRACE_REQ, _fmt, ##__VA_ARGS__)
-#define ucc_trace_data(_fmt, ...)                                              \
-    ucc_log_component_global(UCS_LOG_LEVEL_TRACE_DATA, _fmt, ##__VA_ARGS__)
-#define ucc_trace_async(_fmt, ...)                                             \
-    ucc_log_component_global(UCS_LOG_LEVEL_TRACE_ASYNC, _fmt, ##__VA_ARGS__)
-#define ucc_trace_func(_fmt, ...)                                              \
-    ucc_log_component_global(UCS_LOG_LEVEL_TRACE_FUNC, "%s(" _fmt ")",         \
-                             __FUNCTION__, ##__VA_ARGS__)
-#define ucc_trace_poll(_fmt, ...)                                              \
-    ucc_log_component_global(UCS_LOG_LEVEL_TRACE_POLL, _fmt, ##__VA_ARGS__)
+#include "utils/debug/log_def.h"
 
 /* Collective trace logger */
 #define ucc_log_component_collective_trace(_level, fmt, ...)                   \
-    ucc_log_component(_level, ucc_global_config.coll_trace, fmt,               \
+    ucc_log_component(_level, &ucc_global_config.coll_trace, fmt,              \
                       ##__VA_ARGS__)
 
 #define ucc_coll_trace_info(_fmt, ...)                                         \
-    ucc_log_component_collective_trace(UCS_LOG_LEVEL_INFO, _fmt, ##__VA_ARGS__)
+    ucc_log_component_collective_trace(UCC_LOG_LEVEL_INFO, _fmt, ##__VA_ARGS__)
 #define ucc_coll_trace_debug(_fmt, ...)                                        \
-    ucc_log_component_collective_trace(UCS_LOG_LEVEL_DEBUG, _fmt, ##__VA_ARGS__)
-
-/**
- * Print a message regardless of current log level. Output can be
- * enabled/disabled via environment variable/configuration settings.
- *
- * During debugging it can be useful to add a few prints to the code
- * without changing a current log level. Also it is useful to be able
- * to see messages only from specific processes. For example, one may
- * want to see prints only from rank 0 when debugging MPI.
- *
- * The function is intended for debugging only. It should not be used
- * in the real code.
- */
-
-#define ucc_print(_fmt, ...)                                                   \
-    do {                                                                       \
-        ucs_log_dispatch(__FILE__, __LINE__, __FUNCTION__,                     \
-                          UCS_LOG_LEVEL_PRINT,                                 \
-                          &ucc_global_config.log_component,                    \
-                          _fmt, ## __VA_ARGS__);                               \
-    } while(0)
+    ucc_log_component_collective_trace(UCC_LOG_LEVEL_DEBUG, _fmt, ##__VA_ARGS__)
 
 static inline const char* ucc_coll_type_str(ucc_coll_type_t ct)
 {

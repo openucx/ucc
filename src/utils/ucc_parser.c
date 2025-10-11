@@ -1001,3 +1001,13 @@ void ucc_config_release_uint_ranged(void *ptr, const void *arg) //NOLINT
 {
     ucc_mrange_uint_destroy(ptr);
 }
+
+size_t ucc_config_memunits_get(size_t config_size, size_t auto_size,
+                               size_t max_size)
+{
+    if (config_size == UCC_MEMUNITS_AUTO) {
+        return auto_size;
+    } else {
+        return ucs_min(config_size, max_size);
+    }
+}
