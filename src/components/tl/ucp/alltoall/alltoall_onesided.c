@@ -100,6 +100,22 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     uint32_t          *completed = &task->onesided.get_completed;
     ucc_rank_t         peer      = (grank + *posted + 1) % gsize;
     size_t             nelems;
+    ucc_status_t       status;
+
+    if (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG) {
+        status = ucc_tl_ucp_test_dynamic_segment(task);
+        if (status == UCC_INPROGRESS) {
+            return;
+        }
+        if (UCC_OK != status) {
+            task->super.status = status;
+            tl_error(UCC_TL_TEAM_LIB(team),
+                     "failed to exchange dynamic segments");
+            return;
+        }
+        src_memh = task->dynamic_segments.dst_local;
+        dst_memh = (ucc_mem_map_mem_h *)task->dynamic_segments.src_global;
+    }
 
     /* TODO: change when dynamic segments supports global src_memh */
     nelems = TASK_ARGS(task).src.info.count;
@@ -119,11 +135,12 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     }
 
     alltoall_onesided_wait_completion(task, npolls);
-    if (task->super.status == UCC_OK &&
+out:
+    if (task->super.status != UCC_INPROGRESS &&
         (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
         task->super.status = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
     }
-out:
+
     return;
 }
 
@@ -177,11 +194,12 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
     }
 
     alltoall_onesided_wait_completion(task, npolls);
-    if (task->super.status == UCC_OK &&
+out:
+    if (task->super.status != UCC_INPROGRESS &&
         (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
         task->super.status = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
     }
-out:
+
     return;
 }
 
