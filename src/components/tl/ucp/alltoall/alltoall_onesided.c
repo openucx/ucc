@@ -140,8 +140,6 @@ out:
         (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
         task->super.status = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
     }
-
-    return;
 }
 
 void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
@@ -199,8 +197,6 @@ out:
         (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
         task->super.status = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
     }
-
-    return;
 }
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
