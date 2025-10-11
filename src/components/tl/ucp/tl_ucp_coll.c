@@ -230,10 +230,12 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_init,
         return status;
     }
     memset(&task->dynamic_segments, 0, sizeof(task->dynamic_segments));
-    task->dynamic_segments.src_local = src_memh;
-    task->dynamic_segments.dst_local = dst_memh;
-    task->dynamic_segments.alg       = alg;
-    task->flags                     |= UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG;
+    task->dynamic_segments.src_local  = src_memh;
+    task->dynamic_segments.dst_local  = dst_memh;
+    task->dynamic_segments.src_global = NULL;
+    task->dynamic_segments.dst_global = NULL;
+    task->dynamic_segments.alg        = alg;
+    task->flags                      |= UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG;
     return status;
 }
 
@@ -285,7 +287,11 @@ static inline void dynamic_segment_memh_pack(ucc_context_h              ctx,
     memcpy(
         PTR_OFFSET(memh->pack_buffer, UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t)),
         pack_buffer, pack_size);
-    memcpy(memh->tl_h, args->dst_memh_local->tl_h, sizeof(ucc_mem_map_tl_t));
+    if (is_src == IS_DST) {
+        memcpy(memh->tl_h, args->dst_memh_local->tl_h, sizeof(ucc_mem_map_tl_t));
+    } else {
+        memcpy(memh->tl_h, args->src_memh_local->tl_h, sizeof(ucc_mem_map_tl_t));
+    }
     memh->mode    = UCC_MEM_MAP_MODE_EXPORT;
     memh->context = ctx;
     memh->address = address;
@@ -489,18 +495,17 @@ dynamic_segment_pack_and_exchange_data_start(ucc_tl_ucp_dyn_seg_args_t *args,
     subset.map.strided.stride = 1;
     subset.myrank             = UCC_TL_TEAM_RANK(tl_team);
 
-    /* Only pack destination handles for one-sided operations */
-    dynamic_segment_memh_pack((ucc_context_h)&ctx->super.super, args, IS_DST);
-
-    /* Only copy destination handles to exchange buffer */
     /* Include outer TL header (name + size) in the copy size in addition to memh struct */
     copy_size = sizeof(ucc_mem_map_memh_t) + UCC_MEM_MAP_TL_NAME_LEN +
                 sizeof(size_t);
     if (coll_type == UCC_COLL_TYPE_ALLTOALL &&
         args->task->dynamic_segments.alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET) {
+        /* Only pack destination handles for one-sided operations */
+        dynamic_segment_memh_pack((ucc_context_h)&ctx->super.super, args, IS_SRC);
         copy_size += args->src_pack_size;
         memcpy(args->exchange_buffer, args->src_memh_pack, copy_size);
     } else {
+        dynamic_segment_memh_pack((ucc_context_h)&ctx->super.super, args, IS_DST);
         copy_size += args->dst_pack_size;
         memcpy(args->exchange_buffer, args->dst_memh_pack, copy_size);
     }
@@ -557,7 +562,7 @@ dynamic_segment_import_memory_handles(ucc_tl_ucp_dyn_seg_args_t *args)
 
     /* Only allocate destination handles for one-sided operations */
     global =
-        ucc_calloc(core_team->size, sizeof(ucc_mem_map_memh_t *), "dst_global");
+        ucc_calloc(core_team->size, sizeof(ucc_mem_map_memh_t *), "global");
     if (!global) {
         tl_error(UCC_TASK_LIB(args->task),
                  "failed to allocate global memory handles");
@@ -570,7 +575,7 @@ dynamic_segment_import_memory_handles(ucc_tl_ucp_dyn_seg_args_t *args)
            - dst_memh_pack: sizeof(ucc_mem_map_memh_t) + max_individual_pack_size + sizeof(size_t) * 2
         */
         offset = i * args->exchange_size;
-        /* Map context-rank index i to the team rank index where dst_global is indexed */
+        /* Map context-rank index i to the team rank index where global is indexed */
         if (i == UCC_RANK_INVALID) {
             tl_error(UCC_TASK_LIB(args->task),
                      "invalid team index for context rank %d", i);
@@ -817,22 +822,17 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_finalize,
         for (i = 0; i < team_size; i++) {
             if (task->dynamic_segments.src_global[i] &&
                 task->dynamic_segments.src_global[i]->tl_h) {
-                /* Only unmap if this was actually imported (not self-reference) */
-                if (task->dynamic_segments.src_global[i]->mode ==
-                    UCC_MEM_MAP_MODE_IMPORT) {
-                    status = ucc_tl_ucp_mem_unmap(
-                        &ctx->super.super, UCC_MEM_MAP_MODE_IMPORT,
-                        task->dynamic_segments.src_global[i]->tl_h);
-                    if (status != UCC_OK) {
-                        tl_error(UCC_TASK_LIB(task),
-                                 "failed to unmap src global memory handle for "
-                                 "rank %d",
-                                 i);
-                    }
+                status = ucc_tl_ucp_mem_unmap(
+                    &ctx->super.super, UCC_MEM_MAP_MODE_IMPORT,
+                    task->dynamic_segments.src_global[i]->tl_h);
+                if (status != UCC_OK) {
+                    tl_error(UCC_TASK_LIB(task),
+                             "failed to unmap src global memory handle for "
+                             "rank %d",
+                             i);
                 }
                 ucc_free(task->dynamic_segments.src_global[i]->tl_h);
                 task->dynamic_segments.src_global[i]->tl_h = NULL;
-                ucc_free(task->dynamic_segments.src_global[i]);
                 task->dynamic_segments.src_global[i] = NULL;
             }
         }
