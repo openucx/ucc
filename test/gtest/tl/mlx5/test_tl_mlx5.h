@@ -43,9 +43,9 @@ class test_tl_mlx5 : public ucc::test {
     bool is_cx7_vendor_id() const
     {
         struct ibv_device_attr device_attr;
-        GTEST_ASSERT_EQ(ibv_query_device(ctx, &device_attr), 0);
-        return device_attr->vendor_id == 0x02c9 &&
-               device_attr->vendor_part_id == 4129;
+        ibv_query_device(ctx, &device_attr);
+        return device_attr.vendor_id == 0x02c9 &&
+               device_attr.vendor_part_id == 4129;
     }
 };
 

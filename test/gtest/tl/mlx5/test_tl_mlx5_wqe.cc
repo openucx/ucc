@@ -41,9 +41,7 @@ UCC_TEST_P(test_tl_mlx5_transpose, transposeWqe)
     int            i, j, k;
 
     if (is_cx7_vendor_id()) {
-        GTEST_SKIP() << "The test needs CX7 but got vendor_id="
-                     << device_attr.vendor_id
-                     << ", vendor_part_id=" << device_attr.vendor_part_id;
+        GTEST_SKIP() << "The test needs CX7";
     }
 
     // Skips if do not match HW limitations
@@ -271,9 +269,7 @@ UCC_TEST_P(test_tl_mlx5_wait_on_data, waitOnDataWqe)
     struct ibv_send_wr wr;
 
     if (is_cx7_vendor_id()) {
-        GTEST_SKIP() << "The test needs CX7 but got vendor_id="
-                     << device_attr.vendor_id
-                     << ", vendor_part_id=" << device_attr.vendor_part_id;
+        GTEST_SKIP() << "The test needs CX7";
     }
 
     memset(buffer, 0, 3 * sizeof(uint64_t));
