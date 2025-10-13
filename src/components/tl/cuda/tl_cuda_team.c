@@ -35,23 +35,25 @@ static uint64_t ucc_tl_cuda_get_supported_colls(const ucc_tl_cuda_team_t *team)
          UCC_COLL_TYPE_REDUCE_SCATTERV);
 
 #ifdef HAVE_NVLS
-    // With NVLS compiled in, ALLREDUCE is supported. For multi-node teams,
-    // the TL/CUDA initialization is skipped and only NVLS path is active.
-    // Reduce-scatter NVLS currently requires fully connected NVLINK (single
-    // node), so on multi-node expose only ALLREDUCE.
+    // With NVLS compiled in, ALLREDUCE may be supported via NVLS.
+    // For multi-node teams, advertise ONLY NVLS ALLREDUCE if supported;
+    // otherwise advertise nothing for TL/CUDA (prevent non-NVLS colls).
+    // For single-node teams, advertise base TL/CUDA colls and add ALLREDUCE
+    // only if NVLS is supported.
     status = ucc_tl_cuda_nvls_check_support(
         ucc_derived_of(team->super.super.context->lib, ucc_tl_cuda_lib_t),
         0 /* device */,
         is_multinode);
-    if (status != UCC_OK) {
-        return base_tl_cuda_colls;
-    }
     if (is_multinode) {
-        return UCC_COLL_TYPE_ALLREDUCE;
+        return (status == UCC_OK) ? UCC_COLL_TYPE_ALLREDUCE : 0;
     }
-    return base_tl_cuda_colls | UCC_COLL_TYPE_ALLREDUCE;
+    return (status == UCC_OK) ? (base_tl_cuda_colls | UCC_COLL_TYPE_ALLREDUCE)
+                              : base_tl_cuda_colls;
 #else
-    (void)is_multinode; // unused
+    if (is_multinode) {
+        // TL/CUDA is not supported for multi-node teams
+        return 0;
+    }
     return base_tl_cuda_colls;
 #endif
 }
@@ -80,6 +82,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     self->ids         = NULL;
     shm_id = -1;
     self->sync = (void*)-1;
+    /* Defensive init: ensure remote scratch mapping arrays are NULL/zeroed
+       even if we return early (e.g., multinode NVLS regime or failures) */
+    for (i = 0; i < UCC_TL_CUDA_MAX_PEERS; i++) {
+        self->scratch.rem[i] = NULL;
+        memset(&self->scratch.rem_info[i], 0, sizeof(self->scratch.rem_info[i]));
+    }
 
 #ifdef HAVE_NVLS
     self->state = UCC_TL_CUDA_NVLS_STATE_INIT;
@@ -104,9 +112,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
 
     // active set
     scratch_size = resource_num * lib->cfg.scratch_size;
-    status = CUDA_FUNC(cudaMalloc(&self->scratch.loc, scratch_size));
+    status       = CUDA_FUNC(cudaMalloc(&self->scratch.loc, scratch_size));
     if (status != UCC_OK) {
-        tl_error(tl_context->lib, "failed to alloc scratch buffer");
+        tl_error(
+            tl_context->lib,
+            "failed to alloc scratch buffer size: %ld bytes for rank: %d",
+            scratch_size,
+            UCC_TL_TEAM_RANK(self));
         goto free_ids;
     }
 
@@ -247,7 +259,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
         }
     }
     for (i = 0; i < UCC_TL_TEAM_SIZE(self); i++) {
-        if (self->scratch.rem[i]) {
+        if (self->scratch.rem[i] && self->scratch.rem_info[i].ptr) {
             ucc_tl_cuda_unmap_memhandle((uintptr_t)self->scratch.rem_info[i].ptr,
                                         self->scratch.rem[i],
                                         ucc_tl_cuda_get_cache(self, i), 1);
@@ -282,10 +294,6 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     volatile ucc_tl_cuda_sync_t *peer_sync;
     int i, j, shm_id;
 
-    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
-        team->scratch.rem[i] = NULL;
-    }
-
 #ifdef HAVE_NVLS
     if (team->state != UCC_TL_CUDA_NVLS_STATE_INIT) {
         // in that case nvls initialization is in progress
@@ -312,6 +320,10 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     }
     team->oob.req_free(team->oob_req);
     team->oob_req = (void*)0x1;
+
+    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
+        team->scratch.rem[i] = NULL;
+    }
 
     status = ucc_tl_cuda_team_topo_create(&team->super, &team->topo);
     if (status != UCC_OK) {
