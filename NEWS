@@ -6,6 +6,38 @@
 
 ## Current
 
+## 1.6.0 (October 13, 2025)
+
+## New Features and Enhancements
+
+### Core
+- Added UCC_DEBUGGER_WAIT environment variable {PR #1130}
+
+### CL/HIER
+- Fixed Wlto-type-mismatch {PR #1179}
+
+### TL/CUDA
+- Fixed printing of device PCI id {PR #1053}
+- Added NVLS improvements and bfloat16 data type support {PR #1162}
+- Added NVLS barrier {PR #1180}
+- Added Alltoall(v) copy engine {PR #1138}
+
+### TL/UCP
+- Removed a debug print statement {PR #1177}
+- Added knomial allgather with mapped buffers {PR #1176}
+- Added node local id config {PR #1189}
+- Enable knomial allgatherv {PR #1188}
+- Added congestion avoidant onesided Alltoall {PR #1096}
+
+### Build and Test
+- Added check to see if target exists in CMAKE {PR #1173}
+- Fixed build with GCC 14 {PR #1190}
+- Added gtest and mpi test for ucc_mem_map and ucc_mem_unmap {PR #1165}
+
+### Tools
+- Updated perftest to print BusBW {PR #1186}
+- Added support for onesided alltoall in perftest {PR #1194}
+
 ## 1.5.0 (July 31st, 2025)
 
 ## New Features and Enhancements
