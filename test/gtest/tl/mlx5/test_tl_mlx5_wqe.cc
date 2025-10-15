@@ -40,7 +40,7 @@ UCC_TEST_P(test_tl_mlx5_transpose, transposeWqe)
     struct ibv_mr *src_mr, *dst_mr;
     int            i, j, k;
 
-    if (is_cx7_vendor_id()) {
+    if (!is_cx7_vendor_id()) {
         GTEST_SKIP() << "The test needs CX7";
     }
 
@@ -268,7 +268,7 @@ UCC_TEST_P(test_tl_mlx5_wait_on_data, waitOnDataWqe)
     struct ibv_sge     sg;
     struct ibv_send_wr wr;
 
-    if (is_cx7_vendor_id()) {
+    if (!is_cx7_vendor_id()) {
         GTEST_SKIP() << "The test needs CX7";
     }
 
