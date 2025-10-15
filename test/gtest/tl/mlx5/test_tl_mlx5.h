@@ -38,6 +38,15 @@ class test_tl_mlx5 : public ucc::test {
     test_tl_mlx5();
     virtual ~test_tl_mlx5();
     virtual void SetUp() override;
+
+    // Check for Mellanox/NVIDIA vendor ID (0x02c9) and CX7 (MT4129) vendor_part_id
+    bool is_cx7_vendor_id() const
+    {
+        struct ibv_device_attr device_attr;
+        ibv_query_device(ctx, &device_attr);
+        return device_attr.vendor_id == 0x02c9 &&
+               device_attr.vendor_part_id == 4129;
+    }
 };
 
 #endif
