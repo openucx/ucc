@@ -15,6 +15,7 @@
 #include "components/base/ucc_base_iface.h"
 #include "components/ec/ucc_ec.h"
 #include "components/mc/ucc_mc.h"
+#include "components/cl/ucc_cl_type.h"
 
 #define MAX_LISTENERS 4
 
@@ -256,4 +257,11 @@ static inline ucc_status_t ucc_task_subscribe_dep(ucc_coll_task_t *target,
     (((ucc_coll_task_t *)_task)->team->context->ucc_context)
 
 #define UCC_TASK_THREAD_MODE(_task) (UCC_TASK_CORE_CTX(_task)->thread_mode)
+
+/* Check if the task is part of a CL hier team */
+static inline int ucc_coll_task_is_cl_hier(const ucc_coll_task_t *task)
+{
+    return task && task->team && (task->team->params.scope == UCC_CL_HIER);
+}
+
 #endif

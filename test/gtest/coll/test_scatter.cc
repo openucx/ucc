@@ -115,7 +115,7 @@ class test_scatter : public UccCollArgs, public ucc::test {
         int      root              = ctxs[0]->args->root;
         size_t   single_rank_count = (ctxs[0])->args->dst.info.count;
         size_t   dt_size = ucc_dt_size((ctxs[0])->args->dst.info.datatype);
-        uint8_t *dsts;
+        uint8_t *dsts = nullptr;
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             dsts = (uint8_t *)ucc_malloc(single_rank_count * dt_size, "dsts buf");

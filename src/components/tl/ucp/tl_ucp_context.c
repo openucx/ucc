@@ -218,6 +218,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         ucp_params.estimated_num_eps = params->estimated_num_eps;
     }
 
+#ifdef HAVE_UCX_NODE_LOCAL_ID
+    if (params->node_local_id != UCC_ULUNITS_AUTO) {
+        ucp_params.field_mask |= UCP_PARAM_FIELD_NODE_LOCAL_ID;
+        ucp_params.node_local_id = params->node_local_id;
+    }
+#endif
+
     UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context),
               "failed to init ucp context", err_cfg, self);
     ucp_config_release(ucp_config);
@@ -751,6 +758,8 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, ucc_mem_map_m
         ucc_status = ucc_tl_ucp_mem_map_export(ctx, memh->address, memh->len, mode, m_data);
         if (UCC_OK != ucc_status) {
             tl_error(ctx->super.super.lib, "failed to export memory handles");
+            ucc_free(m_data);
+            return ucc_status;
         }
     } else if (mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
         ucc_status = ucc_tl_ucp_mem_map_offload_import(ctx, memh->address, memh->len,
@@ -783,6 +792,15 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
                      "ucp_mem_unmap failed with error code %d", status);
             return ucs_status_to_ucc_status(status);
         }
+        /* Free the UCP-allocated buffers that are not freed by the core context */
+        if (data->packed_memh) {
+            ucp_memh_buffer_release(data->packed_memh, NULL);
+            data->packed_memh = NULL;
+        }
+        if (data->rinfo.packed_key) {
+            ucp_rkey_buffer_release(data->rinfo.packed_key);
+            data->rinfo.packed_key = NULL;
+        }
     } else if (mode == UCC_MEM_MAP_MODE_IMPORT || mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
         // need to free rkeys (data->rkey) , packed memh (data->packed_memh)
         if (data->packed_memh) {
@@ -798,6 +816,13 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
         ucc_error("Unknown mem map mode entered: %d", mode);
         return UCC_ERR_INVALID_PARAM;
     }
+
+    /* Free the TL data structure */
+    if (data) {
+        ucc_free(data);
+        memh->tl_data = NULL;
+    }
+
     return UCC_OK;
 }
 

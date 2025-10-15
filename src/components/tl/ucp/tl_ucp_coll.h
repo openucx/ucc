@@ -201,7 +201,8 @@ static inline ucc_status_t ucc_tl_ucp_test_ring(ucc_tl_ucp_task_t *task)
 
 #define UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(_task)                           \
     (((_task)->onesided.put_posted == (_task)->onesided.put_completed) &&      \
-     ((_task)->onesided.get_posted == (_task)->onesided.get_completed))
+     ((_task)->onesided.get_posted == (_task)->onesided.get_completed) &&      \
+     ((_task)->flush_posted == (_task)->flush_completed))
 
 #define UCC_TL_UCP_TASK_ONESIDED_SYNC_COMPLETE(_task, _end)                    \
     (*((long *)(TASK_ARGS(_task).global_work_buffer)) == _end)

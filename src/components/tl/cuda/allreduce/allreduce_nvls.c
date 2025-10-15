@@ -50,7 +50,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_task_t *task      = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team      = TASK_TEAM(task);
     ucc_rank_t          trank     = UCC_TL_TEAM_RANK(team);
-    ucc_ec_cuda_event_t *ec_event = (ucc_ec_cuda_event_t *)task->allreduce_nvls.evtCompletion;
+    ucc_ec_cuda_event_t *ec_event = (ucc_ec_cuda_event_t *)task->allreduce_nvls.evt_completion;
     cudaEvent_t         evt       = ec_event->event;
     CUdeviceptr         mc_va     = task->allreduce_nvls.mc_va;
     CUdeviceptr         uc_va     = task->allreduce_nvls.uc_va;
@@ -128,7 +128,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_finalize(ucc_coll_task_t *task)
 
     tl_trace(UCC_TASK_LIB(tl_task), "task: %p allreduce_nvls_finalize", task);
 
-    ucc_ec_destroy_event(tl_task->allreduce_nvls.evtCompletion, UCC_EE_CUDA_STREAM);
+    ucc_ec_destroy_event(tl_task->allreduce_nvls.evt_completion, UCC_EE_CUDA_STREAM);
 
     ucc_tl_cuda_task_put(tl_task);
     return UCC_OK;
@@ -188,14 +188,13 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
 
     status = ucc_tl_cuda_task_init(coll_args, team, &task);
     if (ucc_unlikely(status != UCC_OK)) {
-        ucc_error("failed to initialize CUDA task");
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to initialize CUDA task");
         return status;
     }
 
-    status = ucc_ec_create_event(&task->allreduce_nvls.evtCompletion, UCC_EE_CUDA_STREAM);
+    status = ucc_ec_create_event(&task->allreduce_nvls.evt_completion, UCC_EE_CUDA_STREAM);
     if (ucc_unlikely(status != UCC_OK)) {
-        ucc_error("failed to create CUDA event");
-        ucc_tl_cuda_task_put(task);
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to create CUDA event");
         return status;
     }
 

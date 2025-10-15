@@ -12,7 +12,7 @@
 
 ucc_pt_coll_allgather::ucc_pt_coll_allgather(ucc_datatype_t dt,
                          ucc_memory_type mt, bool is_inplace,
-                         bool is_persistent, bool is_mapped,
+                         bool is_persistent, ucc_pt_map_type_t map_type,
                          ucc_pt_comm *communicator,
                          ucc_pt_generator_base *generator) : ucc_pt_coll(communicator, generator)
 
@@ -54,7 +54,7 @@ ucc_pt_coll_allgather::ucc_pt_coll_allgather(ucc_datatype_t dt,
         coll_args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
 
-    if (is_mapped) {
+    if (map_type == UCC_PT_MAP_TYPE_LOCAL) {
         ucc_context_h        ctx = comm->get_context();
         ucc_mem_map_t        segments[1];
         ucc_mem_map_params_t mem_map_params;
@@ -80,6 +80,10 @@ ucc_pt_coll_allgather::ucc_pt_coll_allgather(ucc_datatype_t dt,
             coll_args.src_memh.local_memh = src_memh;
             coll_args.mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH;
         }
+    } else if (map_type != UCC_PT_MAP_TYPE_NONE) {
+        std::cerr << "Only local mapping is supported for perftest allgather"
+                  << std::endl;
+        goto exit;
     }
 
     return;

@@ -12,23 +12,115 @@
 
 ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
                         ucc_memory_type mt, bool is_inplace,
-                        bool is_persistent,
+                        bool is_persistent, ucc_pt_map_type_t map_type,
                         ucc_pt_comm *communicator,
                         ucc_pt_generator_base *generator) : ucc_pt_coll(communicator, generator)
 {
+    size_t src_count_size = generator->get_src_count_max() * ucc_dt_size(dt);
+    size_t dst_count_size = generator->get_dst_count_max() * ucc_dt_size(dt);
+    ucc_status_t st;
+
     has_inplace_   = true;
     has_reduction_ = false;
     has_range_     = true;
     has_bw_        = true;
     root_shift_    = 0;
 
+   UCCCHECK_GOTO(ucc_pt_alloc(&dst_header, dst_count_size, mt),
+                 exit, st);
+
+    if (!is_inplace) {
+        UCCCHECK_GOTO(ucc_pt_alloc(&src_header, src_count_size, mt),
+                      exit, st);
+    }
+
     coll_args.mask              = 0;
     coll_args.flags             = 0;
     coll_args.coll_type         = UCC_COLL_TYPE_ALLTOALL;
     coll_args.src.info.datatype = dt;
     coll_args.src.info.mem_type = mt;
+    coll_args.src.info.buffer   = src_header->addr;
     coll_args.dst.info.datatype = dt;
     coll_args.dst.info.mem_type = mt;
+    coll_args.dst.info.buffer   = dst_header->addr;
+
+    if (map_type == UCC_PT_MAP_TYPE_LOCAL) {
+        ucc_context_h        ctx = comm->get_context();
+        ucc_mem_map_t        segments[1];
+        ucc_mem_map_params_t mem_map_params;
+        size_t               dst_memh_size, src_memh_size;
+
+        mem_map_params.n_segments          = 1;
+        mem_map_params.segments            = segments;
+
+        mem_map_params.segments[0].address = dst_header->addr;
+        mem_map_params.segments[0].len     = dst_count_size;
+        UCCCHECK_GOTO(ucc_mem_map(ctx, UCC_MEM_MAP_MODE_EXPORT,
+                                  &mem_map_params, &dst_memh_size, &dst_memh),
+                      exit, st);
+        coll_args.dst_memh.local_memh = dst_memh;
+        coll_args.mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH;
+
+        if (!is_inplace) {
+            mem_map_params.segments[0].address = src_header->addr;
+            mem_map_params.segments[0].len     = src_count_size;
+            UCCCHECK_GOTO(ucc_mem_map(ctx, UCC_MEM_MAP_MODE_EXPORT,
+                                      &mem_map_params, &src_memh_size, &src_memh),
+                      exit, st);
+            coll_args.src_memh.local_memh = src_memh;
+            coll_args.mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH;
+        }
+    } else if (map_type == UCC_PT_MAP_TYPE_GLOBAL) {
+        ucc_context_h        ctx = comm->get_context();
+        ucc_mem_map_t        segments[1];
+        ucc_mem_map_params_t mem_map_params;
+        size_t               dst_memh_size, src_memh_size;
+
+        coll_args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+        mem_map_params.n_segments          = 1;
+        mem_map_params.segments            = segments;
+
+        mem_map_params.segments[0].address = dst_header->addr;
+        mem_map_params.segments[0].len     = dst_count_size;
+        UCCCHECK_GOTO(ucc_mem_map(ctx, UCC_MEM_MAP_MODE_EXPORT,
+                                  &mem_map_params, &dst_memh_size, &dst_memh),
+                      exit, st);
+
+        dst_memh_global = new ucc_mem_map_mem_h[comm->get_size()];
+        for (int i = 0; i < comm->get_size(); i++) {
+            dst_memh_global[i] = new char[dst_memh_size];
+            if (i == comm->get_rank()) {
+                memcpy(dst_memh_global[i], dst_memh, dst_memh_size);
+            }
+
+            comm->bcast(dst_memh_global[i], dst_memh_size, i);
+        }
+        for (int i = 0; i < comm->get_size(); i++) {
+            ucc_mem_map(ctx, UCC_MEM_MAP_MODE_IMPORT, &mem_map_params, &dst_memh_size,
+                        &dst_memh_global[i]);
+        }
+
+        coll_args.dst_memh.global_memh = dst_memh_global;
+        coll_args.mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH;
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL;
+
+        if (!is_inplace) {
+            mem_map_params.segments[0].address = src_header->addr;
+            mem_map_params.segments[0].len     = src_count_size;
+            UCCCHECK_GOTO(ucc_mem_map(ctx, UCC_MEM_MAP_MODE_EXPORT,
+                                      &mem_map_params, &src_memh_size, &src_memh),
+                          exit, st);
+            coll_args.src_memh.local_memh = src_memh;
+            coll_args.mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH;
+        }
+    } else if (map_type != UCC_PT_MAP_TYPE_NONE) {
+        std::cerr << "unsupported map type for perftest alltoall" << std::endl;
+        goto exit;
+    }
+
+    coll_args.global_work_buffer = comm->get_onesided_buf();
+    coll_args.mask |= UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
 
     if (is_inplace) {
         coll_args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
@@ -39,44 +131,33 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
         coll_args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
         coll_args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
+
+    return;
+exit:
+    if (dst_header) {
+        ucc_pt_free(dst_header);
+        dst_header = NULL;
+    }
+
+    if (src_header) {
+        ucc_pt_free(src_header);
+        src_header = NULL;
+    }
+
+    throw std::runtime_error("failed to initialize alltoall arguments");
 }
 
 ucc_status_t ucc_pt_coll_alltoall::init_args(ucc_pt_test_args_t &test_args)
 {
     ucc_coll_args_t &args      = test_args.coll_args;
-    size_t           dt_size   = ucc_dt_size(coll_args.src.info.datatype);
-    ucc_status_t     st        = UCC_OK;
 
     args = coll_args;
     args.dst.info.count = generator->get_dst_count();
-    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header,
-                               args.dst.info.count * dt_size,
-                               args.dst.info.mem_type),
-                  exit, st);
-    args.dst.info.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
         args.src.info.count = generator->get_src_count();
-        UCCCHECK_GOTO(ucc_pt_alloc(&src_header,
-                                   args.src.info.count * dt_size,
-                                   args.src.info.mem_type),
-                      free_dst, st);
-        args.src.info.buffer = src_header->addr;
     }
+
     return UCC_OK;
-free_dst:
-    ucc_pt_free(dst_header);
-exit:
-    return st;
-}
-
-void ucc_pt_coll_alltoall::free_args(ucc_pt_test_args_t &test_args)
-{
-    ucc_coll_args_t &args = test_args.coll_args;
-
-    if (!UCC_IS_INPLACE(args)) {
-        ucc_pt_free(src_header);
-    }
-    ucc_pt_free(dst_header);
 }
 
 float ucc_pt_coll_alltoall::get_bw(float time_ms, int grsize,
@@ -88,4 +169,43 @@ float ucc_pt_coll_alltoall::get_bw(float time_ms, int grsize,
                             ucc_dt_size(args.src.info.datatype);
 
     return (S / time_ms) * ((N - 1) / N) / 1000.0;
+}
+
+ucc_pt_coll_alltoall::~ucc_pt_coll_alltoall()
+{
+    if (src_memh) {
+        ucc_mem_unmap(&src_memh);
+    }
+
+    if (dst_memh) {
+        ucc_mem_unmap(&dst_memh);
+    }
+
+    if (src_header) {
+        ucc_pt_free(src_header);
+    }
+
+    if (dst_header) {
+        ucc_pt_free(dst_header);
+    }
+
+    if (dst_memh_global) {
+        for (int i = 0; i < comm->get_size(); i++) {
+            if (dst_memh_global[i]) {
+                ucc_mem_unmap(&dst_memh_global[i]);
+                delete[] static_cast<char*>(dst_memh_global[i]);
+            }
+        }
+        delete[] dst_memh_global;
+    }
+
+    if (src_memh_global) {
+        for (int i = 0; i < comm->get_size(); i++) {
+            if (src_memh_global[i]) {
+                ucc_mem_unmap(&src_memh_global[i]);
+                delete[] static_cast<char*>(src_memh_global[i]);
+            }
+        }
+        delete[] src_memh_global;
+    }
 }

@@ -57,6 +57,10 @@ static ucc_config_field_t ucc_context_config_table[] = {
      "parameter will be affected. The parameter is only supported by UCX TL.",
      ucc_offsetof(ucc_context_config_t, net_devices), UCC_CONFIG_TYPE_STRING_ARRAY},
 
+    {"NODE_LOCAL_ID", "auto",
+     "An optimization hint for the local identificator on a single node.",
+     ucc_offsetof(ucc_context_config_t, node_local_id), UCC_CONFIG_TYPE_ULUNITS},
+
     {NULL}};
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
                           ucc_context_config_t, &ucc_config_global_list);
@@ -641,6 +645,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
     b_params.context           = ctx;
     b_params.estimated_num_eps = config->estimated_num_eps;
     b_params.estimated_num_ppn = config->estimated_num_ppn;
+    b_params.node_local_id     = config->node_local_id;
     b_params.prefix            = lib->full_prefix;
     b_params.thread_mode       = lib->attr.thread_mode;
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
@@ -1195,10 +1200,24 @@ ucc_status_t ucc_mem_map_import(ucc_context_h        context,
     }
 
     local_memh = *memh;
+
+    if (ctx->n_tl_ctx == 0) {
+        ucc_debug("No TL contexts available for import");
+        local_memh->mode    = mode;
+        local_memh->context = ctx;
+        *memh_size          = 0;
+        return UCC_OK;
+    }
+
     /* memh should have been used in exchanges or from a remote process,
        addresses, etc. likely garbage. fix it */
     local_memh->tl_h = (ucc_mem_map_tl_t *)ucc_calloc(
         ctx->n_tl_ctx, sizeof(ucc_mem_map_tl_t), "tl memh");
+    if (!local_memh->tl_h) {
+        ucc_error("failed to allocate tl memh for import");
+        return UCC_ERR_NO_MEMORY;
+    }
+
     for (i = 0; i < ctx->n_tl_ctx; i++) {
         offset = 0;
         for (int j = 0; j < local_memh->num_tls; j++) {
@@ -1212,6 +1231,7 @@ ucc_status_t ucc_mem_map_import(ucc_context_h        context,
                     local_memh, &local_memh->tl_h[j]);
                 if (status < UCC_ERR_NOT_IMPLEMENTED) {
                     ucc_error("failed to import mem map memh %d", status);
+                    ucc_free(local_memh->tl_h);
                     return status;
                 }
             }
@@ -1246,6 +1266,16 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     int                       tls;
     int                       tlh_index;
 
+    if (!params) {
+        ucc_error("params cannot be NULL");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    if (ctx->n_tl_ctx == 0) {
+        ucc_debug("No TL contexts available for export");
+        return UCC_OK;
+    }
+
     if (mode == UCC_MEM_MAP_MODE_EXPORT) {
         local_memh = (ucc_mem_map_memh_t *)ucc_calloc(1, sizeof(ucc_mem_map_memh_t),
                                                       "local memh");
@@ -1270,17 +1300,6 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
         }
         local_memh = *memh;
     }
-    packed_buffers =
-        (void **)ucc_calloc(ctx->n_tl_ctx, sizeof(void *), "packed buffers");
-    if (!packed_buffers) {
-        if (mode == UCC_MEM_MAP_MODE_EXPORT) {
-            ucc_free(local_memh->tl_h);
-            ucc_free(local_memh);
-        }
-        ucc_error("failed to allocate space for packed buffers");
-        return UCC_ERR_NO_MEMORY;
-    }
-
     if (mode != UCC_MEM_MAP_MODE_EXPORT_OFFLOAD) {
         /* map all the memory */
         for (i = 0; i < ctx->n_tl_ctx; i++) {
@@ -1301,6 +1320,16 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
                 }
             }
         }
+    }
+    packed_buffers =
+        (void **)ucc_calloc(ctx->n_tl_ctx, sizeof(void *), "packed buffers");
+    if (!packed_buffers) {
+        if (mode == UCC_MEM_MAP_MODE_EXPORT) {
+            ucc_free(local_memh->tl_h);
+            ucc_free(local_memh);
+        }
+        ucc_error("failed to allocate space for packed buffers");
+        return UCC_ERR_NO_MEMORY;
     }
     /* now pack all the memories */
     for (i = 0; i < ctx->n_tl_ctx; i++) {
@@ -1399,9 +1428,6 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
             ucc_free(packed_buffers[i]);
             offset += local_memh->tl_h[i].packed_size;
         }
-        for (; i < ctx->n_tl_ctx; i++) {
-            ucc_free(packed_buffers[i]);
-        }
     }
 
     exported_memh->mode        = mode;
@@ -1429,8 +1455,10 @@ failed_mem_map:
                                          UCC_MEM_MAP_MODE_EXPORT,
                                          &local_memh->tl_h[j]);
     }
+    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
+        ucc_free(local_memh->tl_h);
+    }
     ucc_free(local_memh);
-    ucc_free(packed_buffers);
     *memh      = NULL;
     *memh_size = 0;
     return status;
@@ -1446,6 +1474,10 @@ ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_mode_t mode,
     }
     if (mode == UCC_MEM_MAP_MODE_IMPORT || mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
         return ucc_mem_map_import(context, mode, params, memh_size, memh);
+    }
+    if (!params) {
+        ucc_error("params cannot be NULL");
+        return UCC_ERR_INVALID_PARAM;
     }
     if (params->n_segments > 1) {
         ucc_error("UCC only supports one mapping per call");
@@ -1469,6 +1501,11 @@ ucc_status_t ucc_mem_unmap(ucc_mem_map_mem_h *memh)
         return UCC_ERR_INVALID_PARAM;
     }
 
+    if (!*memh) {
+        ucc_warn("unable to free NULL memory handle");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
     lmemh = *memh;
     ctx   = (ucc_context_t *)lmemh->context;
     tls   = &ctx->all_tls;
@@ -1487,5 +1524,16 @@ ucc_status_t ucc_mem_unmap(ucc_mem_map_mem_h *memh)
             }
         }
     }
+
+    /* Free the TL handles array if it was allocated separately */
+    if (lmemh->tl_h && (lmemh->mode == UCC_MEM_MAP_MODE_EXPORT ||
+                        lmemh->mode == UCC_MEM_MAP_MODE_IMPORT)) {
+        ucc_free(lmemh->tl_h);
+    }
+
+    /* Free the memory handle structure */
+    ucc_free(lmemh);
+    *memh = NULL;
+
     return UCC_OK;
 }

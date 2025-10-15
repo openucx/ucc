@@ -82,6 +82,7 @@ gtest_SOURCES =                           \
 	core/test_service_coll.cc             \
 	core/test_timeout.cc                  \
 	core/test_utils.cc                    \
+	core/test_mem_map.cc                  \
 	coll/test_barrier.cc                  \
 	coll/test_alltoall.cc                 \
 	coll/test_alltoallv.cc                \
@@ -148,6 +149,7 @@ noinst_HEADERS =                         \
 	common/test.h                        \
 	common/test_ucc.h                    \
 	core/test_context.h                  \
+	core/test_mem_map.h                  \
 	core/test_mc_reduce.h                \
 	coll/test_allreduce_sliding_window.h \
 	coll_score/test_score.h
