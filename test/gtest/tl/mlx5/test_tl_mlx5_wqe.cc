@@ -342,13 +342,13 @@ UCC_TEST_P(test_tl_mlx5_umr_wqe, umrWqe)
     int      src_size              = (bytes_count + bytes_skip) * repeat_count;
     int      dst_size              = bytes_count * nbr_srcs * repeat_count;
     int      send_mem_access_flags = 0;
-    int      recv_mem_access_flags =
-        IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE;
+    void    *umr_entries_buf       = nullptr;
+    int      recv_mem_access_flags = IBV_ACCESS_LOCAL_WRITE |
+                                     IBV_ACCESS_REMOTE_WRITE;
     DT                           src[nbr_srcs][src_size], dst[dst_size];
     struct ibv_mr *              src_mr[nbr_srcs], *dst_mr, *umr_entries_mr;
     struct mlx5dv_mkey *         umr_mkey;
     struct mlx5dv_mkey_init_attr umr_mkey_init_attr;
-    void *                       umr_entries_buf;
     size_t                       umr_buf_size;
     struct mlx5dv_mr_interleaved mkey_entries[nbr_srcs];
     struct ibv_wc                wcs[1];
