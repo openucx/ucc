@@ -53,18 +53,19 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
 
 void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t *task      = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t *team      = TASK_TEAM(task);
-    ucc_rank_t          trank     = UCC_TL_TEAM_RANK(team);
-    ucc_ec_cuda_event_t *ec_event = (ucc_ec_cuda_event_t *)task->allreduce_nvls.evt_completion;
-    cudaEvent_t         evt       = ec_event->event;
-    CUdeviceptr         mc_va     = task->allreduce_nvls.mc_va;
-    CUdeviceptr         uc_va     = task->allreduce_nvls.uc_va;
-    ucc_ee_h            ee        = task->super.ee;
-    cudaStream_t        stream    = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
-    ucc_datatype_t      dt        = task->allreduce_nvls.dt;
-    uint32_t            sm_count  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_sm_count;
-    uint32_t            threads   = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_threads;
+    ucc_tl_cuda_task_t  *task  = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_team_t  *team  = TASK_TEAM(task);
+    ucc_rank_t           trank = UCC_TL_TEAM_RANK(team);
+    ucc_ec_cuda_event_t *ec_event = (ucc_ec_cuda_event_t *)
+                                        task->allreduce_nvls.evt_completion;
+    cudaEvent_t    evt    = ec_event->event;
+    CUdeviceptr    mc_va  = task->allreduce_nvls.mc_va;
+    CUdeviceptr    uc_va  = task->allreduce_nvls.uc_va;
+    ucc_ee_h       ee     = task->super.ee;
+    cudaStream_t   stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
+    ucc_datatype_t dt     = task->allreduce_nvls.dt;
+    uint32_t       sm_count = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_sm_count;
+    uint32_t       threads  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_threads;
 
     ucc_status_t   status;
     cudaError_t    cuda_status;
@@ -72,18 +73,14 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
     switch (task->allreduce_nvls.stage) {
     case STAGE_KERNEL:
         // copy src buffer to symmetric memory first
-        cuda_status = cudaMemcpyAsync(
+        status = CUDA_FUNC(cudaMemcpyAsync(
             (void *)uc_va,
             task->allreduce_nvls.sbuf,
             task->allreduce_nvls.buf_size_bytes,
             cudaMemcpyDeviceToDevice,
-            stream);
-        if (cuda_status != cudaSuccess) {
-            tl_error(
-                UCC_TASK_LIB(task),
-                "cudaMemcpyAsync failed: %s",
-                cudaGetErrorString(cuda_status));
-            task->super.status = UCC_ERR_NO_MEMORY; // TODO: better error code?
+            stream));
+        if (status != UCC_OK) {
+            task->super.status = status;
             return;
         }
 
@@ -104,34 +101,19 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             task->super.status = status;
             return;
         }
-        cuda_status = cudaMemcpyAsync(
+        status = CUDA_FUNC(cudaMemcpyAsync(
             (void *)task->allreduce_nvls.rbuf,
             (void *)uc_va,
             task->allreduce_nvls.buf_size_bytes,
             cudaMemcpyDeviceToDevice,
-            stream);
-        if (cuda_status != cudaSuccess) {
-            tl_error(
-                UCC_TASK_LIB(task),
-                "task: %p, cudaMemcpyAsync failed: %s, stream: %p, sbuf: "
-                "%p, rbuf: %p, uc_va: %p, buf_size_bytes: %zu",
-                task,
-                cudaGetErrorString(cuda_status),
-                stream,
-                task->allreduce_nvls.sbuf,
-                task->allreduce_nvls.rbuf,
-                (void *)uc_va,
-                task->allreduce_nvls.buf_size_bytes);
-            task->super.status = UCC_ERR_NO_RESOURCE;
+            stream));
+        if (status != UCC_OK) {
+            task->super.status = status;
             return;
         }
-        cuda_status = cudaEventRecord(evt, stream);
-        if (cuda_status != cudaSuccess) {
-            tl_error(
-                UCC_TASK_LIB(task),
-                "cudaEventRecord failed: %s",
-                cudaGetErrorString(cuda_status));
-            task->super.status = UCC_ERR_NO_RESOURCE;
+        status = CUDA_FUNC(cudaEventRecord(evt, stream));
+        if (status != UCC_OK) {
+            task->super.status = status;
             return;
         }
         task->allreduce_nvls.stage = STAGE_WAIT;
@@ -153,7 +135,8 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_finalize(ucc_coll_task_t *task)
 
     tl_trace(UCC_TASK_LIB(tl_task), "task: %p allreduce_nvls_finalize", task);
 
-    ucc_ec_destroy_event(tl_task->allreduce_nvls.evt_completion, UCC_EE_CUDA_STREAM);
+    ucc_ec_destroy_event(
+        tl_task->allreduce_nvls.evt_completion, UCC_EE_CUDA_STREAM);
 
     ucc_tl_cuda_task_put(tl_task);
     return UCC_OK;
@@ -219,7 +202,8 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(
         return status;
     }
 
-    status = ucc_ec_create_event(&task->allreduce_nvls.evt_completion, UCC_EE_CUDA_STREAM);
+    status = ucc_ec_create_event(
+        &task->allreduce_nvls.evt_completion, UCC_EE_CUDA_STREAM);
     if (ucc_unlikely(status != UCC_OK)) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to create CUDA event");
         return status;
