@@ -25,8 +25,8 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     std::default_random_engine eng;
     size_t                     dt_size, count;
     int                        rank, nprocs, rank_count;
-    bool                       is_onesided;
     void                      *work_buf;
+    bool                       is_onesided;
 
     dt          = params.dt;
     dt_size     = ucc_dt_size(dt);
@@ -109,17 +109,21 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
         sbuf = sbuf_mc_header->addr;
         rbuf = rbuf_mc_header->addr;
     } else {
-        sbuf                    = params.buffers[MEM_SEND_SEGMENT];
-        rbuf                    = params.buffers[MEM_RECV_SEGMENT];
+        /* Traditional onesided: use pre-mapped buffers */
+        sbuf = params.buffers[MEM_SEND_SEGMENT];
+        rbuf = params.buffers[MEM_RECV_SEGMENT];
+    }
+
+    if (is_onesided) {
         work_buf                = params.buffers[MEM_WORK_SEGMENT];
         args.global_work_buffer = work_buf;
     }
 
-    args.src.info_v.buffer = sbuf;
+    args.src.info_v.buffer   = sbuf;
     args.src.info_v.datatype = dt;
     args.src.info_v.mem_type = mem_type;
 
-    args.dst.info_v.buffer = rbuf;
+    args.dst.info_v.buffer   = rbuf;
     args.dst.info_v.datatype = dt;
     args.dst.info_v.mem_type = mem_type;
 
