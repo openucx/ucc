@@ -66,6 +66,11 @@ static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
      "Number of threads per block to use for NVLS",
      ucc_offsetof(ucc_tl_cuda_lib_config_t, nvls_threads),
      UCC_CONFIG_TYPE_UINT},
+
+    {"NVLS_DEDICATED_BARRIERS", "1",
+     "Use dedicated barrier kernels (1) to eliminate contention or inline barriers (0) for compatibility",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, nvls_dedicated_barriers),
+     UCC_CONFIG_TYPE_BOOL},
 #endif
 
     {"ALLTOALL_USE_COPY_ENGINE", "y",
