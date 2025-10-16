@@ -87,16 +87,18 @@ ucc_ee_h ucc_pt_comm::get_ee()
     return ee;
 }
 
-ucc_ee_executor_t* ucc_pt_comm::get_executor()
+ucc_ee_executor_t *ucc_pt_comm::get_executor()
 {
     ucc_ee_executor_params_t executor_params;
     ucc_status_t             status;
 
     if (!executor) {
         executor_params.mask = UCC_EE_EXECUTOR_PARAM_FIELD_TYPE;
-        if (cfg.mt ==  UCC_MEMORY_TYPE_HOST) {
+        if (cfg.mt == UCC_MEMORY_TYPE_HOST) {
             executor_params.ee_type = UCC_EE_CPU_THREAD;
-        } else if (cfg.mt == UCC_MEMORY_TYPE_CUDA) {
+        } else if (
+            cfg.mt == UCC_MEMORY_TYPE_CUDA ||
+            cfg.mt == UCC_MEMORY_TYPE_CUDA_MANAGED) {
             executor_params.ee_type = UCC_EE_CUDA_STREAM;
         } else if (cfg.mt == UCC_MEMORY_TYPE_ROCM) {
             executor_params.ee_type = UCC_EE_ROCM_STREAM;
