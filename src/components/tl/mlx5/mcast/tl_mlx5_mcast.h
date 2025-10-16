@@ -651,9 +651,9 @@ ucc_status_t ucc_tl_mlx5_mcast_clean_ctx(ucc_tl_mlx5_mcast_coll_context_t *ctx);
 #define tl_mlx5_mcast_log(_mcast_enabled, _lib, _intended_level, _fmt, ...) \
     do { \
         if ((_mcast_enabled) == UCC_YES) { \
-            ucc_log_component((_intended_level), (_lib)->log_component, (_fmt), ##__VA_ARGS__); \
+            ucc_log_component((_intended_level), &((_lib)->log_component), (_fmt), ##__VA_ARGS__); \
         } else if ((_mcast_enabled) == UCC_TRY) { \
-            ucc_log_component(UCC_LOG_LEVEL_DEBUG, (_lib)->log_component, (_fmt), ##__VA_ARGS__); \
+            ucc_log_component(UCC_LOG_LEVEL_DEBUG, &((_lib)->log_component), (_fmt), ##__VA_ARGS__); \
         } \
     } while(0)
 

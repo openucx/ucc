@@ -6,6 +6,7 @@
 
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
+#include "utils/ucc_log.h"
 
 using Param_0 = std::tuple<int, ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t, bool>;
 using Param_1 = std::tuple<ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t, bool>;
@@ -243,7 +244,7 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Values(1,3,8192), // count
         ::testing::Values(TEST_INPLACE, TEST_NO_INPLACE), // inplace
         ::testing::Bool() // contig dst buf displacements
-        )); 
+        ));
 
 class test_allgatherv_1 : public test_allgatherv,
         public ::testing::WithParamInterface<Param_1> {};
