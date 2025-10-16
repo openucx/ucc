@@ -24,11 +24,6 @@ ucc_status_t ucc_tl_cuda_nvls_check_support(
     status = CUDADRV_FUNC(cuDeviceGetAttribute(
         &mutlicast_supported, CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED, device));
     if (status != UCC_OK) {
-        tl_error(
-            lib,
-            "failed to query multicast support on device %d: %d",
-            device,
-            status);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -37,11 +32,6 @@ ucc_status_t ucc_tl_cuda_nvls_check_support(
         CU_DEVICE_ATTRIBUTE_HANDLE_TYPE_FABRIC_SUPPORTED,
         device));
     if (status != UCC_OK) {
-        tl_error(
-            lib,
-            "failed to query fabric handle support on device %d: %d",
-            device,
-            status);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -52,12 +42,12 @@ ucc_status_t ucc_tl_cuda_nvls_check_support(
         fabric_supported);
 
     if (!mutlicast_supported) {
-        tl_error(lib, "multicast not supported on device %d", device);
+        tl_debug(lib, "multicast not supported on device %d", device);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (is_multinode && !fabric_supported) {
-        tl_error(lib, "fabric handle not supported on device %d", device);
+        tl_debug(lib, "fabric handle not supported on device %d", device);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -65,26 +55,19 @@ ucc_status_t ucc_tl_cuda_nvls_check_support(
 }
 
 static ucc_status_t ucc_tl_cuda_nvls_get_granularity(
-    ucc_tl_cuda_team_t *team, CUmulticastObjectProp *mc_prop, size_t *min_gran,
-    size_t *gran)
+    CUmulticastObjectProp *mc_prop, size_t *min_gran, size_t *gran)
 {
     ucc_status_t status;
 
     status = CUDADRV_FUNC(cuMulticastGetGranularity(
         min_gran, mc_prop, CU_MULTICAST_GRANULARITY_MINIMUM));
     if (status != UCC_OK) {
-        tl_error(
-            UCC_TL_TEAM_LIB(team),
-            "failed to get multicast granularity minimum");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     status = CUDADRV_FUNC(cuMulticastGetGranularity(
         gran, mc_prop, CU_MULTICAST_GRANULARITY_RECOMMENDED));
     if (status != UCC_OK) {
-        tl_error(
-            UCC_TL_TEAM_LIB(team),
-            "failed to get multicast granularity recommended");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -92,14 +75,13 @@ static ucc_status_t ucc_tl_cuda_nvls_get_granularity(
 }
 
 static ucc_status_t ucc_tl_cuda_nvls_create_multicast_object_posix(
-    ucc_tl_cuda_team_t *team, CUmulticastObjectProp *mc_prop,
-    CUmemGenericAllocationHandle *mc_handle, int *export_handle)
+    CUmulticastObjectProp *mc_prop, CUmemGenericAllocationHandle *mc_handle,
+    int *export_handle)
 {
     ucc_status_t status;
 
     status = CUDADRV_FUNC(cuMulticastCreate(mc_handle, mc_prop));
     if (status != UCC_OK) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to create multicast object");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -108,8 +90,6 @@ static ucc_status_t ucc_tl_cuda_nvls_create_multicast_object_posix(
     status = CUDADRV_FUNC(cuMemExportToShareableHandle(
         (void *)export_handle, *mc_handle, mc_prop->handleTypes, 0));
     if (status != UCC_OK) {
-        tl_error(
-            UCC_TL_TEAM_LIB(team), "failed to export POSIX shareable handle");
         CUDADRV_FUNC(cuMemRelease(*mc_handle));
         return status;
     }
@@ -118,22 +98,19 @@ static ucc_status_t ucc_tl_cuda_nvls_create_multicast_object_posix(
 }
 
 static ucc_status_t ucc_tl_cuda_nvls_create_multicast_object_fabric(
-    ucc_tl_cuda_team_t *team, CUmulticastObjectProp *mc_prop,
-    CUmemGenericAllocationHandle *mc_handle, CUmemFabricHandle *export_handle)
+    CUmulticastObjectProp *mc_prop, CUmemGenericAllocationHandle *mc_handle,
+    CUmemFabricHandle *export_handle)
 {
     ucc_status_t status;
 
     status = CUDADRV_FUNC(cuMulticastCreate(mc_handle, mc_prop));
     if (status != UCC_OK) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to create multicast object");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     status = CUDADRV_FUNC(cuMemExportToShareableHandle(
         export_handle, *mc_handle, mc_prop->handleTypes, 0));
     if (status != UCC_OK) {
-        tl_error(
-            UCC_TL_TEAM_LIB(team), "failed to export fabric shareable handle");
         CUDADRV_FUNC(cuMemRelease(*mc_handle));
         return status;
     }
@@ -364,7 +341,7 @@ ucc_status_t ucc_tl_cuda_nvls_init(
 
         // Get granularity requirements
         status = ucc_tl_cuda_nvls_get_granularity(
-            team, &mc_prop, &nvls->minGran, &nvls->gran);
+            &mc_prop, &nvls->minGran, &nvls->gran);
         if (status != UCC_OK) {
             return status;
         }
@@ -399,13 +376,9 @@ ucc_status_t ucc_tl_cuda_nvls_init(
 
             if (nvls->is_multinode) {
                 status = ucc_tl_cuda_nvls_create_multicast_object_fabric(
-                    team,
-                    &mc_prop,
-                    &mc_handle,
-                    &nvls->local_handle.data.fabric);
+                    &mc_prop, &mc_handle, &nvls->local_handle.data.fabric);
             } else {
                 status = ucc_tl_cuda_nvls_create_multicast_object_posix(
-                    team,
                     &mc_prop,
                     &mc_handle,
                     &nvls->local_handle.data.posix.handle);
@@ -421,8 +394,7 @@ ucc_status_t ucc_tl_cuda_nvls_init(
                 // We need to share invalid handle to unblock peers
                 // we will propagate the error status to the caller later
                 nvls->status_supported = UCC_ERR_NOT_SUPPORTED;
-            }
-            else {
+            } else {
                 nvls->status_supported = UCC_OK;
             }
             // Store PID for POSIX handles
