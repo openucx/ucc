@@ -47,6 +47,7 @@ runs_on_dockers:
       tag: "${BUILD_NUMBER}",
       arch: "x86_64",
       uri: "${UCC_URI_SUFFIX}",
+      # url: "harbor.mellanox.com/torch-ucc/ucc/1.0.0/x86_64/centos8/cuda12.9:932",
       build_args: "--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}",
       cloud: "swx-k8s",
     }
@@ -54,21 +55,21 @@ runs_on_dockers:
 # bare metal
 runs_on_agents:
   - nodeLabel: "swx-clx01"
+  - nodeLabel: "swx-clx02"
   - nodeLabel: "ml-test-node-gpu"
 
 timeout_minutes: 360
 
 steps:
-  #============================================================================
-  - name: Start docker
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    #containerSelector: "{name:'skip-container'}"
-    run: |
-      echo "INFO: Start docker containers"
-      DOCKER_IMAGE_NAME="${UCC_DOCKER_IMAGE_NAME}:${BUILD_ID}"
-      docker pull ${DOCKER_IMAGE_NAME}
-      docker create -ti --rm $DOCKER_OPT ${DOCKER_IMAGE_NAME} /bin/bash > /tmp/ucc_docker-"${BUILD_TAG}".id
-      docker start $(cat /tmp/ucc_docker-"${BUILD_TAG}".id)
+  # #============================================================================
+  # - name: Start docker
+  #   agentSelector: "{nodeLabel: 'swx-clx02'}"
+  #   #containerSelector: "{name:'skip-container'}"
+  #   run: |
+  #     echo "INFO: Start docker containers"
+  #     DOCKER_IMAGE_NAME="${UCC_DOCKER_IMAGE_NAME}:${BUILD_ID}"
+  #     docker pull ${DOCKER_IMAGE_NAME}
+  #     docker run -td --rm --name=ucc_docker-"${BUILD_TAG}" $DOCKER_OPT ${DOCKER_IMAGE_NAME}
   #============================================================================
   - name: Run Coverity
     credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0"
@@ -81,13 +82,15 @@ steps:
     archiveArtifacts: .ci/scripts/cov-build/*
   #============================================================================
   - name: Run UCC / Torch-UCC tests
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    agentSelector: "{nodeLabel: 'swx-clx02'}"
     run: |
       echo "INFO: Run UCC tests"
       hostname
-      timeout -k 20 90m docker exec $(cat /tmp/ucc_docker-"${BUILD_TAG}".id) bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
+      DOCKER_IMAGE_NAME="${UCC_DOCKER_IMAGE_NAME}:${BUILD_ID}"
+      docker pull ${DOCKER_IMAGE_NAME}
+      timeout -k 20 90m docker run -t --rm --name "ucc_docker-${BUILD_TAG}" bash -c "${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
     always: |
-      docker rm --force $(cat /tmp/ucc_docker-"${BUILD_TAG}".id)
+      docker rm --force ucc_docker-"${BUILD_TAG}" || true
   #============================================================================
   - name: Run docker containers
     agentSelector: "{nodeLabel: 'swx-clx01'}"
@@ -95,6 +98,7 @@ steps:
     run: |
       echo "INFO: Run docker containers"
       ${WORKSPACE}/.ci/scripts/run_docker.sh
+
   #============================================================================
   - name: Run UCC MPI tests
     agentSelector: "{nodeLabel: 'swx-clx01'}"
@@ -102,12 +106,18 @@ steps:
       [ "$UCC_MPI_TESTS" = "false" ] && { echo "MPI tests were skipped !!!";exit 0; }
       echo "INFO: Run UCC MPI tests"
       ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh
+    onfail: |
+      ${WORKSPACE}/.ci/scripts/stop_docker.sh
+
   #============================================================================
   - name: Run DLRM tests (UCC/GPU)
     agentSelector: "{nodeLabel: 'swx-clx01'}"
     run: |
       echo "INFO: Run DLRM tests (UCC/GPU)"
       ${WORKSPACE}/.ci/scripts/run_dlrm_docker.sh
+    onfail: |
+      ${WORKSPACE}/.ci/scripts/stop_docker.sh
+
   #============================================================================
   - name: Stop docker containers
     agentSelector: "{nodeLabel: 'swx-clx01'}"
