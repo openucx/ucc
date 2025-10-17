@@ -66,9 +66,9 @@ HOST_LIST="$(cat "$HOSTFILE" | xargs hostlist)"
 
 pdsh -w "${HOST_LIST}" -R ssh hostname
 
-echo "INFO: clean up docker artefacts on ..."
-pdsh -w "${HOST_LIST}" -R ssh docker system prune --all --volumes --force
-echo "INFO: clean up docker artefacts on ... DONE"
+# echo "INFO: clean up docker artefacts on ..."
+# pdsh -w "${HOST_LIST}" -R ssh docker system prune --all --volumes --force
+# echo "INFO: clean up docker artefacts on ... DONE"
 
 pdsh -w "${HOST_LIST}" -R ssh docker pull "${DOCKER_IMAGE_NAME}"
 
