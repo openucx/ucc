@@ -67,8 +67,14 @@ HOST_LIST="$(cat "$HOSTFILE" | xargs hostlist)"
 pdsh -w "${HOST_LIST}" -R ssh hostname
 
 echo "INFO: clean up docker artefacts on ..."
-pdsh -w "${HOST_LIST}" -R ssh docker system prune --all --volumes --force
+pdsh -w "${HOST_LIST}" -R ssh "docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | grep -v '^${UCC_DOCKER_IMAGE_NAME}:base' | awk '{print \$2}' | xargs -r docker rmi -f"
 echo "INFO: clean up docker artefacts on ... DONE"
+
+echo "INFO: Pulling base image (${UCC_DOCKER_IMAGE_NAME}:base) on all hosts ..."
+# we want to keep the base image localy to speed up pull of CI image
+pdsh -w "${HOST_LIST}" -R ssh docker pull "${UCC_DOCKER_IMAGE_NAME}:base"
+
+echo "INFO: Pulling base image (${UCC_DOCKER_IMAGE_NAME}:base) on all hosts ... DONE"
 
 pdsh -w "${HOST_LIST}" -R ssh docker pull "${DOCKER_IMAGE_NAME}"
 
