@@ -85,7 +85,7 @@ steps:
     run: |
       echo "INFO: Run UCC tests"
       hostname
-      docker exec $(cat /tmp/ucc_docker-"${BUILD_TAG}".id) bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
+      timeout -k 20 90m docker exec $(cat /tmp/ucc_docker-"${BUILD_TAG}".id) bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
     always: |
       docker rm --force $(cat /tmp/ucc_docker-"${BUILD_TAG}".id)
   #============================================================================
