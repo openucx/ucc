@@ -8,19 +8,10 @@ registry_path: "/torch-ucc"
 registry_auth: "05d98651-e11c-4a57-9cc6-52df79014b89"
 
 volumes:
-  - { mountPath: "/hpc/local", hostPath: "/hpc/local" }
-  - { mountPath: "/auto/sw_tools", hostPath: "/auto/sw_tools" }
-  - {
-      mountPath: "/.autodirect/mtrswgwork",
-      hostPath: "/.autodirect/mtrswgwork",
-    }
-  - {
-      mountPath: "/.autodirect/sw/release",
-      hostPath: "/.autodirect/sw/release",
-    }
+  - { mountPath: "/home/swx-jenkins", hostPath: "/labhome/swx-jenkins" }
 
 env:
-  CUDA_VER: '12.9'
+  CUDA_VER: 12.9
   UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}"
   UCC_DOCKER_IMAGE_NAME: "${registry_host}${registry_path}/${UCC_URI_SUFFIX}"
   NVIDIA_ROOT_DIR: "/opt/nvidia"
@@ -28,10 +19,11 @@ env:
   BIN_DIR: "${NVIDIA_ROOT_DIR}/bin"
   DOCKER_OPT: "--pull always --network=host --uts=host --ipc=host --ulimit stack=67108864 --ulimit memlock=-1 --security-opt seccomp=unconfined --cap-add=SYS_ADMIN --device=/dev/infiniband/ --gpus all"
 
-docker_opt: "$DOCKER_OPT"
-
 kubernetes:
-  cloud: "swx-k8s"
+  cloud: il-ipp-blossom-prod
+  namespace: hpcx
+  limits: "{memory: 16Gi, cpu: 16000m}"
+  requests: "{memory: 16Gi, cpu: 16000m}"
 
 credentials:
   - {
@@ -40,6 +32,7 @@ credentials:
       passwordVariable: "UCC_PASSWORD",
     }
 
+# cloud pod to build the shared docker image
 runs_on_dockers:
   - {
       file: ".ci/Dockerfile.ngc_pytorch",
@@ -47,28 +40,38 @@ runs_on_dockers:
       tag: "${BUILD_NUMBER}",
       arch: "x86_64",
       uri: "${UCC_URI_SUFFIX}",
-      build_args: "--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}",
-      cloud: "swx-k8s",
+      build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER}",
+    }
+  - {
+      file: ".ci/dockerfiles/Dockerfile.build_helper",
+      name: "build_helper",
+      tag: "latest",
+      arch: "x86_64",
+      uri: "$arch/$name",
+      build_args: "--no-cache",
     }
 
 # bare metal
 runs_on_agents:
   - nodeLabel: "swx-clx01"
+  - nodeLabel: "swx-clx02"
   - nodeLabel: "ml-test-node-gpu"
 
 timeout_minutes: 360
 
 steps:
   #============================================================================
-  - name: Start docker
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    #containerSelector: "{name:'skip-container'}"
+  - name: Init docker
+    agentSelector:
+      - "{nodeLabel: 'swx-clx01'}"
+      - "{nodeLabel: 'swx-clx02'}"
     run: |
-      echo "INFO: Start docker containers"
-      DOCKER_IMAGE_NAME="${UCC_DOCKER_IMAGE_NAME}:${BUILD_ID}"
-      docker pull ${DOCKER_IMAGE_NAME}
-      docker create -ti --rm $DOCKER_OPT ${DOCKER_IMAGE_NAME} /bin/bash > /tmp/ucc_docker-"${BUILD_TAG}".id
-      docker start $(cat /tmp/ucc_docker-"${BUILD_TAG}".id)
+      set -x
+      # make sure we always have base image for faster pull of CI image
+      docker pull "${UCC_DOCKER_IMAGE_NAME}:base"
+      # pull the CI image
+      docker pull "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+
   #============================================================================
   - name: Run Coverity
     credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0"
@@ -79,22 +82,27 @@ steps:
       echo "Running coverity"
       ${WORKSPACE}/.ci/scripts/coverity.sh
     archiveArtifacts: .ci/scripts/cov-build/*
+
   #============================================================================
   - name: Run UCC / Torch-UCC tests
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    agentSelector: "{nodeLabel: 'swx-clx02'}"
     run: |
+      set -x
       echo "INFO: Run UCC tests"
       hostname
-      timeout -k 20 90m docker exec $(cat /tmp/ucc_docker-"${BUILD_TAG}".id) bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
+      timeout -k 20 90m docker run -t --rm --name="ucc_tests_${BUILD_NUMBER}" $DOCKER_OPT "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}" bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
     always: |
-      docker rm --force $(cat /tmp/ucc_docker-"${BUILD_TAG}".id)
+      docker rm --force "ucc_tests_${BUILD_NUMBER}" || true
+
   #============================================================================
   - name: Run docker containers
     agentSelector: "{nodeLabel: 'swx-clx01'}"
-    #containerSelector: "{name:'skip-container'}"
     run: |
       echo "INFO: Run docker containers"
       ${WORKSPACE}/.ci/scripts/run_docker.sh
+    onfail: |
+      ${WORKSPACE}/.ci/scripts/stop_docker.sh
+
   #============================================================================
   - name: Run UCC MPI tests
     agentSelector: "{nodeLabel: 'swx-clx01'}"
@@ -102,16 +110,23 @@ steps:
       [ "$UCC_MPI_TESTS" = "false" ] && { echo "MPI tests were skipped !!!";exit 0; }
       echo "INFO: Run UCC MPI tests"
       ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh
+    onfail: |
+      ${WORKSPACE}/.ci/scripts/stop_docker.sh
+
   #============================================================================
   - name: Run DLRM tests (UCC/GPU)
     agentSelector: "{nodeLabel: 'swx-clx01'}"
     run: |
       echo "INFO: Run DLRM tests (UCC/GPU)"
       ${WORKSPACE}/.ci/scripts/run_dlrm_docker.sh
-  #============================================================================
-  - name: Stop docker containers
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    run: |
-      echo "INFO: Stop docker containers"
+    always: |
       ${WORKSPACE}/.ci/scripts/stop_docker.sh
-  #============================================================================
+
+pipeline_stop:
+  containerSelector: "{name:'build_helper'}"
+  run: |
+    set -x
+    export HOSTFILE=${WORKSPACE}/.ci/configs/swx-clx01/hostfile.txt
+    export BUILD_NUMBER=${BUILD_NUMBER}
+    export UCC_DOCKER_IMAGE_NAME=${UCC_DOCKER_IMAGE_NAME}
+    sudo -E -u swx-jenkins ${WORKSPACE}/.ci/scripts/clean_docker.sh

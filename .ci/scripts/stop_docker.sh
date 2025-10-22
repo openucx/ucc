@@ -15,11 +15,11 @@ if [ ! -f "${HOSTFILE}" ]; then
     exit 1
 fi
 
-DOCKER_CONTAINER_NAME="torch_ucc"
+DOCKER_CONTAINER_NAME="torch_ucc_${BUILD_NUMBER}"
 
 # shellcheck disable=SC2002
 HOST_LIST="$(cat "$HOSTFILE" | xargs hostlist)"
 
 echo "INFO: stop docker container on ..."
-pdsh -w "${HOST_LIST}" -R ssh docker stop ${DOCKER_CONTAINER_NAME}
+pdsh -w "${HOST_LIST}" -R ssh docker stop "${DOCKER_CONTAINER_NAME}"
 echo "INFO: stop docker container on ... DONE"
