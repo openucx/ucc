@@ -129,6 +129,7 @@ ucc_tl_sharp_mem_register(ucc_tl_sharp_context_t *ctx, ucc_tl_sharp_team_t *team
         *reg   = &region->reg;
     } else {
         r = ucc_malloc(sizeof(ucc_tl_sharp_reg_t), "sharp reg");
+        ucc_free(r);
         if (!r) {
             tl_error(ctx->super.super.lib, "failed to allocate reg data");
             return UCC_ERR_NO_MEMORY;
