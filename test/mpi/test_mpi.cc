@@ -41,11 +41,11 @@ static ucc_status_t oob_allgather_free(void *req)
 UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
                        int is_local, bool with_onesided)
 {
+    ucc_mem_map_t        segments[UCC_TEST_N_MEM_SEGMENTS] = {0};
     ucc_lib_config_h     lib_config;
     ucc_context_config_h ctx_config;
     int                  size, rank;
     char                *prev_env;
-    ucc_mem_map_t        segments[UCC_TEST_N_MEM_SEGMENTS];
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -636,10 +636,20 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
                                         params.count_bits = count_bits;
                                         params.displ_bits = displ_bits;
                                         params.buffers    = onesided_bufs;
+                                        params.use_dynamic_segments = false;
 
                                         auto tcs = TestCase::init(team, c, nt, params);
                                         auto res = exec_tests(tcs, triggered, persistent);
                                         rst.insert(rst.end(), res.begin(), res.end());
+
+                                        /* Test dynamic segments for onesided alltoallv */
+                                        if ((c == UCC_COLL_TYPE_ALLTOALLV) &&
+                                            (team.ctx != ctx) && (mt == UCC_MEMORY_TYPE_HOST)) {
+                                            params.use_dynamic_segments = true;
+                                            auto tcs_dynseg = TestCase::init(team, c, nt, params);
+                                            auto res_dynseg = exec_tests(tcs_dynseg, triggered, persistent);
+                                            rst.insert(rst.end(), res_dynseg.begin(), res_dynseg.end());
+                                        }
                                     }
                                 }
                             }
