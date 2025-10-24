@@ -32,21 +32,16 @@
 #define UCC_TL_CUDA_MAX_RING_CHUNKS 8
 
 #ifdef HAVE_NVLS
+#define UCC_TL_CUDA_MAX_NVLS_PEERS 144
 #define UCC_TL_CUDA_MAX_NVLS_SM_COUNT 32
 #define UCC_TL_CUDA_MAX_NVLS_THREADS 1024
 
-#define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
-     UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
-     UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_ALLREDUCE |                           \
-     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV)
-#else
+#endif /* HAVE_NVLS */
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
     (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
      UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
      UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE_SCATTER |                      \
      UCC_COLL_TYPE_REDUCE_SCATTERV)
-#endif /* HAVE_NVLS */
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_cuda_lib_t))
@@ -194,11 +189,11 @@ typedef struct ucc_tl_cuda_team {
     ucc_tl_cuda_scratch_t      scratch;
     cudaStream_t               stream;             // CUDA stream for the team
     ucc_tl_cuda_rank_id_t     *ids;
-    int                       *shared_handles;
     ucc_team_oob_coll_t        oob;
     void                      *oob_req;
 #ifdef HAVE_NVLS
-    ucc_tl_cuda_nvls_t         nvls;
+    ucc_tl_cuda_nvls_t       nvls;
+    ucc_tl_cuda_nvls_state_t state; // State of the nvls initialization
 #endif
 } ucc_tl_cuda_team_t;
 
