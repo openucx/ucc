@@ -43,6 +43,16 @@ if [ "x$DEV" == "x" ]; then
     exit -1
 fi
 
+# Verify the IB port is actually Up (not just Active in ibstat)
+ib_port_state=$(ssh $HEAD_NODE "ibdev2netdev" | grep "$DEV" | grep -c "Up" || true)
+if [ "$ib_port_state" -eq 0 ]; then
+    echo "ERROR: InfiniBand device $DEV port is Down on $HEAD_NODE"
+    echo "Please bring up the port with: sudo ip link set <interface> up"
+    ssh $HEAD_NODE "ibdev2netdev"
+    exit 1
+fi
+echo "INFO: Using InfiniBand device $DEV (port is Up)"
+
 function mpi_params {
     ppn=$1
     nnodes=$2
@@ -89,7 +99,9 @@ for MT in "" "-T"; do
 
     echo "INFO: UCC MPI unit tests (NCCL) ..."
     # shellcheck disable=SC2086
+    # Configure NCCL to use the same IB device as UCX for bootstrap communication
     nccl_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp,nccl -x UCC_TL_NCCL_TUNE=cuda:inf "
+    nccl_args+=" -x NCCL_IB_HCA=${DEV} -x NCCL_DEBUG=WARN "
     mpirun $(mpi_params $NGPUS) $nccl_args $EXE $MT $TG --mtypes cuda
     echo "INFO: UCC MPI unit tests (NCCL) ... DONE"
 

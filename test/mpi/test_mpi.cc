@@ -467,8 +467,13 @@ void set_gpu_device(test_set_gpu_device_t set_device)
     }
 #if defined(HAVE_CUDA)
     CUDA_CHECK(cudaSetDevice(device_id));
+    // Force CUDA context creation for the device
+    // Without this, cuCtxGetCurrent() in TL/CUDA will return NULL
+    CUDA_CHECK(cudaFree(0));
 #elif defined(HAVE_HIP)
     HIP_CHECK(hipSetDevice(device_id));
+    // Force HIP context creation for the device
+    HIP_CHECK(hipFree(0));
 #endif
 
 }
