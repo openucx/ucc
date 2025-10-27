@@ -121,9 +121,10 @@ ucc_status_t ucc_cl_basic_team_create_test(ucc_base_team_t *cl_team)
                          UCC_TL_CTX_IFACE(team->team_create_req->descs[i].ctx)->
                          super.name);
             } else {
-                cl_debug(ctx->super.super.lib, "failed to create tl %s team: (%d)",
+                cl_debug(ctx->super.super.lib, "failed to create tl %s team: (%d) %s",
                          UCC_TL_CTX_IFACE(team->team_create_req->descs[i].ctx)->
-                         super.name, team->team_create_req->descs[i].status);
+                         super.name, team->team_create_req->descs[i].status,
+                         ucc_status_string(team->team_create_req->descs[i].status));
             }
         }
         ucc_team_multiple_req_free(team->team_create_req);

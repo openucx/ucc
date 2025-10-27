@@ -18,6 +18,46 @@
 #include "utils/ucc_sys.h"
 #include <sys/shm.h>
 
+// Returns supported collectives depending on NVLS availability
+// and whether the team is single-node or multi-node.
+static uint64_t ucc_tl_cuda_get_supported_colls(const ucc_tl_cuda_team_t *team)
+{
+    const int is_multinode = !ucc_team_map_is_single_node(
+        team->super.super.params.team, team->super.super.params.map);
+#ifdef HAVE_NVLS
+    ucc_status_t status;
+#endif
+    // Base TL/CUDA collectives that are supported without NVLS
+    uint64_t base_tl_cuda_colls =
+        (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |
+         UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |
+         UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE_SCATTER |
+         UCC_COLL_TYPE_REDUCE_SCATTERV);
+
+#ifdef HAVE_NVLS
+    // With NVLS compiled in, ALLREDUCE may be supported via NVLS.
+    // For multi-node teams, advertise ONLY NVLS ALLREDUCE if supported;
+    // otherwise advertise nothing for TL/CUDA (prevent non-NVLS colls).
+    // For single-node teams, advertise base TL/CUDA colls and add ALLREDUCE
+    // only if NVLS is supported.
+    status = ucc_tl_cuda_nvls_check_support(
+        ucc_derived_of(team->super.super.context->lib, ucc_tl_cuda_lib_t),
+        0 /* device */,
+        is_multinode);
+    if (is_multinode) {
+        return (status == UCC_OK) ? UCC_COLL_TYPE_ALLREDUCE : 0;
+    }
+    return (status == UCC_OK) ? (base_tl_cuda_colls | UCC_COLL_TYPE_ALLREDUCE)
+                              : base_tl_cuda_colls;
+#else
+    if (is_multinode) {
+        // TL/CUDA is not supported for multi-node teams
+        return 0;
+    }
+    return base_tl_cuda_colls;
+#endif
+}
+
 UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
@@ -29,19 +69,39 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     uint32_t      resource_num = lib->cfg.max_concurrent * 2;
     ucc_tl_cuda_shm_barrier_t *bar;
     ucc_status_t status;
+    cudaError_t st;
     int shm_id, i, j;
     size_t ctrl_size, alloc_size, scratch_size;
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
     self->oob         = params->params.oob;
+    self->oob_req     = NULL;
     self->stream      = NULL;
     self->topo        = NULL;
     self->scratch.loc = NULL;
+    self->ids         = NULL;
+    shm_id = -1;
+    self->sync = (void*)-1;
+    /* Defensive init: ensure remote scratch mapping arrays are NULL/zeroed
+       even if we return early (e.g., multinode NVLS regime or failures) */
+    for (i = 0; i < UCC_TL_CUDA_MAX_PEERS; i++) {
+        self->scratch.rem[i] = NULL;
+        memset(&self->scratch.rem_info[i], 0, sizeof(self->scratch.rem_info[i]));
+    }
 
+#ifdef HAVE_NVLS
+    self->state = UCC_TL_CUDA_NVLS_STATE_INIT;
+    if (!ucc_team_map_is_single_node(params->team, params->map)) {
+        tl_debug(tl_context->lib, "nvls multinode team regime");
+        self->seq_num = 1;
+        return UCC_OK;
+    }
+#else
     if (!ucc_team_map_is_single_node(params->team, params->map)) {
         tl_debug(tl_context->lib, "multinode team is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
+#endif
 
     self->ids = ucc_malloc((UCC_TL_TEAM_SIZE(self) + 1) * sizeof(*(self->ids)),
                             "ids");
@@ -52,9 +112,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
 
     // active set
     scratch_size = resource_num * lib->cfg.scratch_size;
-    status = CUDA_FUNC(cudaMalloc(&self->scratch.loc, scratch_size));
+    status       = CUDA_FUNC(cudaMalloc(&self->scratch.loc, scratch_size));
     if (status != UCC_OK) {
-        tl_error(tl_context->lib, "failed to alloc scratch buffer");
+        tl_error(
+            tl_context->lib,
+            "failed to alloc scratch buffer size: %ld bytes for rank: %d",
+            scratch_size,
+            UCC_TL_TEAM_RANK(self));
         goto free_ids;
     }
 
@@ -72,8 +136,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
                 sizeof(ucc_tl_cuda_sync_state_t) * lib->cfg.max_concurrent;
     ctrl_size *= 2; // active sets
 
-    shm_id = -1;
-    self->sync = (void*)-1;
     if (UCC_TL_TEAM_RANK(self) == 0) {
         alloc_size = ctrl_size;
         status = ucc_sysv_alloc(&alloc_size, (void**)&self->sync, &shm_id);
@@ -127,7 +189,14 @@ free_devices:
         self->sync = (void*)(-1);
     }
 free_scratch:
-    cudaFree(self->scratch.loc);
+    st = cudaFree(self->scratch.loc);
+    if (st != cudaSuccess) {
+        tl_error(
+            tl_context->lib,
+            "cudaFree failed: %d (%s)",
+            st,
+            cudaGetErrorName(st));
+    }
 free_ids:
     ucc_free(self->ids);
     return status;
@@ -150,7 +219,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
 
 #ifdef HAVE_NVLS
     // destroy the nvls context
-    ucc_tl_cuda_nvls_destroy(self, self->super.super.context);
+    ucc_tl_cuda_nvls_destroy(self);
 #endif
 
     if (self->ids) {
@@ -190,7 +259,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
         }
     }
     for (i = 0; i < UCC_TL_TEAM_SIZE(self); i++) {
-        if (self->scratch.rem[i]) {
+        if (self->scratch.rem[i] && self->scratch.rem_info[i].ptr) {
             ucc_tl_cuda_unmap_memhandle((uintptr_t)self->scratch.rem_info[i].ptr,
                                         self->scratch.rem[i],
                                         ucc_tl_cuda_get_cache(self, i), 1);
@@ -224,6 +293,18 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     ucc_tl_cuda_shm_barrier_t *bar;
     volatile ucc_tl_cuda_sync_t *peer_sync;
     int i, j, shm_id;
+
+#ifdef HAVE_NVLS
+    if (team->state != UCC_TL_CUDA_NVLS_STATE_INIT) {
+        // in that case nvls initialization is in progress
+        goto nvls_init;
+    }
+    if (!ucc_team_map_is_single_node(team->super.super.params.team,
+                                     team->super.super.params.map)) {
+        // for multinode team skip tl/cuda initialization since it is not supported
+        goto nvls_init;
+    }
+#endif
 
     if (team->oob_req == NULL) {
         return UCC_OK;
@@ -339,15 +420,44 @@ barrier:
         }
     }
     team->oob_req = NULL;
-    tl_debug(tl_team->context->lib, "initialized tl team: %p", team);
+    tl_debug(lib, "initialized tl team: %p", team);
 
 #ifdef HAVE_NVLS
-    // zero out the nvls struct
-    memset(&team->nvls, 0, sizeof(team->nvls));
+nvls_init:
+    if (team->state == UCC_TL_CUDA_NVLS_STATE_INIT) {
+        // zero out the nvls struct
+        memset(&team->nvls, 0, sizeof(team->nvls));
+    }
     // initialize the nvls struct
     status = ucc_tl_cuda_nvls_init(team, tl_team->context);
-    if (status != UCC_OK) {
-        ucc_error("failed to init nvls multicast");
+    switch (status) {
+    case UCC_ERR_NOT_SUPPORTED:
+        tl_debug(lib, "NVLS is not supported");
+        if (!ucc_team_map_is_single_node(team->super.super.params.team,
+                                         team->super.super.params.map)) {
+            ucc_error("NVLS is not supported for multi-node team");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+        break;
+    case UCC_INPROGRESS:
+        return status;
+    case UCC_OK:
+        break;
+    default:
+        tl_error(lib,
+            "failed to initialize NVLS with status (%d) %s",
+            status,
+            ucc_status_string(status));
+        // For multi-node teams in NVLS-only mode, no IPC resources were allocated
+        // so just return NOT_SUPPORTED to allow fallback to other TLs
+        if (!ucc_team_map_is_single_node(team->super.super.params.team,
+                                         team->super.super.params.map)) {
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+        // For single-node teams, NVLS failure means cleanup is needed
+        // overwrite status since NVLS related calls might have failed
+        // and we need to set tl/cuda to not supported
+        status = UCC_ERR_NOT_SUPPORTED;
         goto exit_err;
     }
 #endif
@@ -355,6 +465,88 @@ barrier:
     return UCC_OK;
 
 exit_err:
+    // Clean up CUDA stream if created
+    if (team->stream) {
+        cudaError_t st = cudaStreamDestroy(team->stream);
+        if (st != cudaSuccess) {
+            tl_warn(
+                lib,
+                "cudaStreamDestroy failed during "
+                "cleanup: %d (%s)",
+                st,
+                cudaGetErrorName(st));
+        }
+        team->stream = NULL;
+    }
+
+    // Clean up partially created IPC events (local events)
+    // Only access sync structures if shared memory was successfully attached
+    if (team->sync != (void *)-1 && team->sync != NULL) {
+        for (i = 0; i < resource_num; i++) {
+            sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
+            if (sync->ipc_event_local) {
+                cudaError_t st = cudaEventDestroy(sync->ipc_event_local);
+                if (st != cudaSuccess) {
+                    tl_warn(
+                        lib,
+                        "cudaEventDestroy failed during "
+                        "cleanup: %d (%s)",
+                        st,
+                        cudaGetErrorName(st));
+                }
+                sync->ipc_event_local = NULL;
+            }
+            // Clean up opened remote event handles
+            for (j = 0; j < UCC_TL_TEAM_SIZE(team); j++) {
+                if (j == UCC_TL_TEAM_RANK(team)) {
+                    continue;
+                }
+                if (sync->data[j].ipc_event_remote) {
+                    cudaError_t st = cudaEventDestroy(
+                        sync->data[j].ipc_event_remote);
+                    if (st != cudaSuccess) {
+                        tl_warn(
+                            lib,
+                            "cudaEventDestroy failed "
+                            "during cleanup: %d (%s)",
+                            st,
+                            cudaGetErrorName(st));
+                    }
+                    sync->data[j].ipc_event_remote = NULL;
+                }
+            }
+        }
+    }
+
+    // Clean up mapped scratch memory
+    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
+        if (team->scratch.rem[i] && team->scratch.rem_info[i].ptr) {
+            ucc_tl_cuda_unmap_memhandle(
+                (uintptr_t)team->scratch.rem_info[i].ptr,
+                team->scratch.rem[i],
+                ucc_tl_cuda_get_cache(team, i),
+                1);
+            team->scratch.rem[i] = NULL;
+        }
+    }
+
+    // Clean up shared memory if attached by non-root
+    if (UCC_TL_TEAM_RANK(team) != 0 && team->sync != (void*)-1) {
+        if (shmdt(team->sync) != 0) {
+            tl_warn(lib, "shmdt failed during cleanup: %s",
+                    strerror(errno));
+        }
+        team->sync = (void*)-1;
+    }
+
+    // Reset oob_req state to prevent re-entry into partially initialized code
+    // If we set oob_req to (void*)0x1 but then hit an error, we must reset it
+    // so that subsequent calls to this function will return the error immediately
+    // rather than attempting to continue from the barrier checkpoint
+    if (team->oob_req == (void *)0x1) {
+        team->oob_req = NULL;
+    }
+
     return status;
 }
 
@@ -374,13 +566,13 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
     team_info.init                = ucc_tl_cuda_coll_init;
     team_info.num_mem_types       = 1;
     team_info.supported_mem_types = &mt;
-    team_info.supported_colls     = UCC_TL_CUDA_SUPPORTED_COLLS;
+    team_info.supported_colls     = ucc_tl_cuda_get_supported_colls(team);
     team_info.size                = UCC_TL_TEAM_SIZE(team);
 
     status =
         ucc_coll_score_build_default(tl_team, UCC_TL_CUDA_DEFAULT_SCORE,
                                      ucc_tl_cuda_coll_init,
-                                     UCC_TL_CUDA_SUPPORTED_COLLS,
+                                     team_info.supported_colls,
                                      &mt, 1, &score);
     if (UCC_OK != status) {
         return status;
