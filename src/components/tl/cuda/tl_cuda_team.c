@@ -520,10 +520,12 @@ exit_err:
 
     // Clean up mapped scratch memory
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
-        if (team->scratch.rem[i]) {
-            ucc_tl_cuda_unmap_memhandle((uintptr_t)team->scratch.rem_info[i].ptr,
-                                        team->scratch.rem[i],
-                                        ucc_tl_cuda_get_cache(team, i), 1);
+        if (team->scratch.rem[i] && team->scratch.rem_info[i].ptr) {
+            ucc_tl_cuda_unmap_memhandle(
+                (uintptr_t)team->scratch.rem_info[i].ptr,
+                team->scratch.rem[i],
+                ucc_tl_cuda_get_cache(team, i),
+                1);
             team->scratch.rem[i] = NULL;
         }
     }
