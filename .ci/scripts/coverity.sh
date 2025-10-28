@@ -34,6 +34,7 @@ COV_ANALYSE_OPTIONS+=" --enable-fnptr"
 COV_ANALYSE_OPTIONS+=" --fnptr-models"
 COV_ANALYSE_OPTIONS+=" --checker-option INFINITE_LOOP:report_bound_type_mismatch:true"
 COV_ANALYSE_OPTIONS+=" --checker-option RESOURCE_LEAK:allow_unimpl:true"
+COV_ANALYSE_OPTIONS+=" --aggressiveness-level medium"
 
 function show_usage() {
     echo ""
