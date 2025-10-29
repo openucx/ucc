@@ -1,0 +1,28 @@
+{
+    "labels": ["Ready-For-Review"],
+    "triggerOnUpdates": true,
+    "shouldUpdateDescription": false,
+    "strictness": 2,
+    "fixWithAI": false,
+    "includeBranches": ["master"],
+    "summarySection": {
+      "included": true,
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    "issuesTableSection": {
+      "included": true,
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    "confidenceScoreSection": {
+      "included": true,
+      "collapsible": true,
+      "defaultOpen": false
+    },
+    "sequenceDiagramSection": {
+      "included": false,
+      "collapsible": false,
+      "defaultOpen": false
+    }
+}
