@@ -276,4 +276,25 @@ static inline unsigned ucc_tl_ucp_get_knomial_radix(ucc_tl_ucp_team_t *team,
     return radix;
 }
 
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t *coll_args,
+                                                  ucc_tl_ucp_alltoall_onesided_alg_t alg,
+                                                  ucc_tl_ucp_task_t   *task);
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_exchange_nb(ucc_tl_ucp_task_t *task);
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task);
+
+static inline ucc_status_t ucc_tl_ucp_test_dynamic_segment(ucc_tl_ucp_task_t *task)
+{
+    if (!(task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
+        return UCC_OK;
+    }
+
+    if (task->dynamic_segments.exchange_step < 5) {
+        return ucc_tl_ucp_coll_dynamic_segment_exchange_nb(task);
+    }
+
+    return UCC_OK;
+}
+
 #endif

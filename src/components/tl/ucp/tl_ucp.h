@@ -168,8 +168,6 @@ typedef struct ucc_tl_ucp_team {
     ucc_status_t               status;
     uint32_t                   seq_num;
     ucc_tl_ucp_task_t         *preconnect_task;
-    void *                     va_base[MAX_NR_SEGMENTS];
-    size_t                     base_length[MAX_NR_SEGMENTS];
     ucc_tl_ucp_worker_t *      worker;
     ucc_tl_ucp_team_config_t   cfg;
     const char *               tuning_str;
@@ -313,4 +311,19 @@ void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
 ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t *ctx,
                                             ucc_mem_map_params_t  map,
                                             ucc_team_oob_coll_t   oob);
+
+ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context,
+                                ucc_mem_map_mode_t        mode,
+                                ucc_mem_map_memh_t       *memh,
+                                ucc_mem_map_tl_t         *tl_h);
+
+ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
+                                  ucc_mem_map_mode_t        mode,
+                                  ucc_mem_map_tl_t         *tl_h,
+                                  void                    **pack_buffer);
+
+ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context,
+                                  ucc_mem_map_mode_t        mode,
+                                  ucc_mem_map_tl_t         *memh);
+
 #endif
