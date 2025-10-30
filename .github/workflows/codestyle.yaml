@@ -3,7 +3,7 @@ name: Codestyle
 on: [pull_request]
 
 env:
-  GIT_CF: https://raw.githubusercontent.com/llvm/llvm-project/release/11.x/clang/tools/clang-format/git-clang-format
+  GIT_CF: https://raw.githubusercontent.com/llvm/llvm-project/release/21.x/clang/tools/clang-format/git-clang-format
 jobs:
   check-codestyle:
     runs-on: ubuntu-22.04
@@ -14,8 +14,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends wget lsb-core software-properties-common
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| sudo apt-key add -
-        sudo apt-add-repository 'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-11 main'
-        sudo apt-get install -y --no-install-recommends clang-format-11
+        sudo apt-add-repository 'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-21 main'
+        sudo apt-get install -y --no-install-recommends clang-format-21
         curl -OL $GIT_CF && chmod +x ./git-clang-format && sudo mv ./git-clang-format /usr/bin/git-clang-format
     - name: Checking out repository
       uses: actions/checkout@v2
@@ -71,7 +71,7 @@ jobs:
       run: |
         set -eE
         echo "Commit ${{ github.event.pull_request.base.sha }}"
-        diff=`git clang-format --binary=clang-format-11 --style=file --diff ${{ github.event.pull_request.base.sha }}`
+        diff=`git clang-format --binary=clang-format-21 --style=file --diff ${{ github.event.pull_request.base.sha }}`
         if [ "$diff" = "no modified files to format" ] || [ "$diff" = "clang-format did not modify any files" ]
         then
           echo "Format check PASS"
