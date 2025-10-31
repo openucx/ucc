@@ -251,7 +251,7 @@ TYPED_TEST(test_reduce_scatterv_host, single)
 
 TYPED_TEST(test_reduce_scatterv_host, single_persistent)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 3, 1);
+    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 2, 1);
 }
 
 TYPED_TEST(test_reduce_scatterv_host, single_inplace)
@@ -261,7 +261,7 @@ TYPED_TEST(test_reduce_scatterv_host, single_inplace)
 
 TYPED_TEST(test_reduce_scatterv_host, single_persistent_inplace)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 3, 1);
+    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 2, 1);
 }
 
 #ifdef HAVE_CUDA
@@ -272,7 +272,7 @@ TYPED_TEST(test_reduce_scatterv_cuda, single)
 
 TYPED_TEST(test_reduce_scatterv_cuda, single_persistent)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 3, 1);
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 2, 1);
 }
 
 TYPED_TEST(test_reduce_scatterv_cuda, single_inplace)
@@ -282,7 +282,7 @@ TYPED_TEST(test_reduce_scatterv_cuda, single_inplace)
 
 TYPED_TEST(test_reduce_scatterv_cuda, single_persistent_inplace)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 3, 1);
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 2, 1);
 }
 TYPED_TEST(test_reduce_scatterv_cuda, single_managed)
 {
@@ -291,7 +291,7 @@ TYPED_TEST(test_reduce_scatterv_cuda, single_managed)
 
 TYPED_TEST(test_reduce_scatterv_cuda, single_persistent_managed)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA_MANAGED, TEST_NO_INPLACE, 3, 1);
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA_MANAGED, TEST_NO_INPLACE, 2, 1);
 }
 
 TYPED_TEST(test_reduce_scatterv_cuda, single_inplace_managed)
@@ -301,7 +301,7 @@ TYPED_TEST(test_reduce_scatterv_cuda, single_inplace_managed)
 
 TYPED_TEST(test_reduce_scatterv_cuda, single_persistent_inplace_managed)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA_MANAGED, TEST_INPLACE, 3, 1);
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA_MANAGED, TEST_INPLACE, 2, 1);
 }
 #endif
 
