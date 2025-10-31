@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# Git commit-msg hook to enforce commit message standards
+# This hook uses a shared validation script used by both local hooks and CI
+#
+# The validation checks:
+# - The commit title (first line) is not longer than 50 characters (except merge commits)
+# - The commit title starts with an approved prefix
+# - The commit title does NOT end with a period
+
+commit_msg_file=$1
+
+# Find the repository root
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+VALIDATION_SCRIPT="$REPO_ROOT/.github/scripts/check-commit-msg.sh"
+
+# Check if the validation script exists
+if [ ! -f "$VALIDATION_SCRIPT" ]; then
+    echo "Error: Validation script not found at $VALIDATION_SCRIPT"
+    echo "Please ensure the repository is properly set up."
+    exit 1
+fi
+
+# Run the shared validation script
+if ! "$VALIDATION_SCRIPT" --file "$commit_msg_file"; then
+    echo ""
+    echo "Commit message requirements:"
+    echo "  • Title must be ≤ 50 characters"
+    echo "  • Title must start with approved prefix (e.g., CI:, TEST:, BUILD:, TL/CUDA:)"
+    echo "  • Title must NOT end with a period"
+    echo ""
+    echo "See .githooks/README.md for more details and examples."
+    echo ""
+    exit 1
+fi
+
+exit 0
