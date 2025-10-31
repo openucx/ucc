@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -15,6 +15,9 @@ enum
     UCC_TL_CUDA_REDUCE_SCATTERV_ALG_AUTO,
     UCC_TL_CUDA_REDUCE_SCATTERV_ALG_RING,
     UCC_TL_CUDA_REDUCE_SCATTERV_ALG_LINEAR,
+#ifdef HAVE_NVLS
+    UCC_TL_CUDA_REDUCE_SCATTERV_ALG_NVLS,
+#endif /* HAVE_NVLS */
     UCC_TL_CUDA_REDUCE_SCATTERV_ALG_LAST
 };
 
@@ -55,6 +58,22 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_linear_start(ucc_coll_task_t *task);
 void ucc_tl_cuda_reduce_scatterv_linear_progress(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_cuda_reduce_scatterv_linear_finalize(ucc_coll_task_t *task);
+
+#ifdef HAVE_NVLS
+/* Reduce scatterv NVLS */
+ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_triggered_post(
+    ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task);
+
+ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init(
+    ucc_base_coll_args_t *coll_args, ucc_base_team_t *tl_team,
+    ucc_coll_task_t **task_p);
+
+ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_start(ucc_coll_task_t *task);
+
+void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *task);
+
+ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_finalize(ucc_coll_task_t *task);
+#endif /* HAVE_NVLS */
 
 static inline int ucc_tl_cuda_reduce_scatterv_alg_from_str(const char *str)
 {
