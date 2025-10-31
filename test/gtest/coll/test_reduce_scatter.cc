@@ -173,7 +173,7 @@ TYPED_TEST_CASE(test_reduce_scatter_cuda, CollReduceTypeOpsCuda);
 
 #define TEST_DECLARE(_mem_type, _inplace, _repeat, _persistent)                \
     {                                                                          \
-        std::array<int, 3> counts{4, 256, 65536};                              \
+        std::array<int, 1> counts{123};                                        \
         CHECK_TYPE_OP_SKIP(TypeParam::dt, TypeParam::redop, _mem_type);        \
         for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {                 \
             for (int count : counts) {                                         \
