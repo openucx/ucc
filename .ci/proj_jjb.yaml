@@ -148,7 +148,7 @@
     jjb_owner: 'artemry'
     jjb_jenkinsfile: '.ci/Jenkinsfile.shlib'
     jjb_gh_auth_id: 'b042dbee-a0cf-4e23-9efc-a6dc6586f49c'
-    jjb_ghprb_auth_id: '10988270-39ac-42e7-8e08-6591b20ca07a'
+    jjb_ghprb_auth_id: 'ghprb-auth-svcnbu-swx-hpcx'
     jobs:
       - "{jjb_proj}"
       - "{jjb_proj}-build-hpcsdk"
