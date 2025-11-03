@@ -30,15 +30,6 @@
 #define IS_SRC 1
 #define IS_DST 0
 
-enum {
-    DYN_SEG_EXCHANGE_STEP_INIT,
-    DYN_SEG_EXCHANGE_STEP_SIZE_TEST,
-    DYN_SEG_EXCHANGE_STEP_DATA_ALLOC,
-    DYN_SEG_EXCHANGE_STEP_DATA_START,
-    DYN_SEG_EXCHANGE_STEP_DATA_TEST,
-    DYN_SEG_EXCHANGE_STEP_COMPLETE
-};
-
 const ucc_tl_ucp_default_alg_desc_t
     ucc_tl_ucp_default_alg_descs[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
         {
@@ -133,7 +124,6 @@ static inline ucc_status_t dynamic_segment_map_memh(ucc_mem_map_memh_t **memh,
     void                     *buffer;
     ucc_count_t               total_count;
     ucc_datatype_t            datatype;
-    ucc_coll_buffer_info_v_t *info_v;
 
     lmemh = ucc_calloc(1, sizeof(ucc_mem_map_memh_t), "dyn_memh");
     if (lmemh == NULL) {
@@ -149,35 +139,14 @@ static inline ucc_status_t dynamic_segment_map_memh(ucc_mem_map_memh_t **memh,
         goto out;
     }
 
-    /* Check if this is one of the *v collectives */
-    if (coll_args->coll_type == UCC_COLL_TYPE_ALLGATHERV ||
-        coll_args->coll_type == UCC_COLL_TYPE_ALLTOALLV ||
-        coll_args->coll_type == UCC_COLL_TYPE_GATHERV ||
-        coll_args->coll_type == UCC_COLL_TYPE_REDUCE_SCATTERV ||
-        coll_args->coll_type == UCC_COLL_TYPE_SCATTERV) {
-
-        if (is_src) {
-            info_v = &coll_args->src.info_v;
-        } else {
-            info_v = &coll_args->dst.info_v;
-        }
-        buffer   = info_v->buffer;
-        datatype = info_v->datatype;
-        /* Calculate total buffer size considering both counts and displacements */
-        total_count = ucc_coll_args_get_v_buffer_size(coll_args, info_v->counts,
-                                                      info_v->displacements,
-                                                      UCC_TL_TEAM_SIZE(tl_team));
+    if (is_src) {
+        total_count = coll_args->src.info.count;
+        buffer      = coll_args->src.info.buffer;
+        datatype    = coll_args->src.info.datatype;
     } else {
-        /* Handle regular collectives - use info structure */
-        if (is_src) {
-            total_count = coll_args->src.info.count;
-            buffer      = coll_args->src.info.buffer;
-            datatype    = coll_args->src.info.datatype;
-        } else {
-            total_count = coll_args->dst.info.count;
-            buffer      = coll_args->dst.info.buffer;
-            datatype    = coll_args->dst.info.datatype;
-        }
+        total_count = coll_args->dst.info.count;
+        buffer      = coll_args->dst.info.buffer;
+        datatype    = coll_args->dst.info.datatype;
     }
 
     lmemh->address = buffer;
@@ -204,13 +173,24 @@ out:
  * These handles will be exchanged across ranks for remote memory access. */
 UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_init,
                         (coll_args, task), ucc_coll_args_t *coll_args,
-                        ucc_tl_ucp_alltoall_onesided_alg_t alg,
+                        ucc_tl_ucp_onesided_alg_type alg,
                         ucc_tl_ucp_task_t *task)
 {
-    ucc_status_t        status = UCC_OK;
-    ucc_mem_map_memh_t *src_memh;
-    ucc_mem_map_memh_t *dst_memh;
+    ucc_tl_ucp_team_t    *tl_team = UCC_TL_UCP_TASK_TEAM(task);
+    ucc_tl_ucp_context_t *ctx     = UCC_TL_UCP_TEAM_CTX(tl_team);
+    ucc_status_t          status  = UCC_OK;
+    ucc_mem_map_memh_t   *src_memh;
+    ucc_mem_map_memh_t   *dst_memh;
 
+    if ((coll_args->coll_type == UCC_COLL_TYPE_ALLTOALLV) ||
+        (coll_args->coll_type == UCC_COLL_TYPE_ALLGATHERV) ||
+        (coll_args->coll_type == UCC_COLL_TYPE_GATHERV) ||
+        (coll_args->coll_type == UCC_COLL_TYPE_REDUCE_SCATTERV) ||
+        (coll_args->coll_type == UCC_COLL_TYPE_SCATTERV)) {
+            tl_debug(UCC_TASK_LIB(task), "dynamic segments are not supported for %s",
+                     ucc_coll_type_str(coll_args->coll_type));
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     if ((coll_args->mask & UCC_COLL_ARGS_FIELD_FLAGS)) {
         if ((coll_args->flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS)) {
             return UCC_OK;
@@ -225,6 +205,11 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_init,
     }
     status = dynamic_segment_map_memh(&dst_memh, coll_args, IS_DST, task);
     if (UCC_OK != status) {
+        status = ucc_tl_ucp_mem_unmap(&ctx->super.super, UCC_MEM_MAP_MODE_EXPORT,
+                                      src_memh->tl_h);
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task), "failed to unmap src memory handle");
+        }
         ucc_free(src_memh->tl_h);
         ucc_free(src_memh);
         return status;
@@ -236,6 +221,7 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_init,
     task->dynamic_segments.dst_global = NULL;
     task->dynamic_segments.alg        = alg;
     task->flags                      |= UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG;
+    task->dynamic_segments.exchange_step = UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_INIT;
     return status;
 }
 
@@ -334,7 +320,6 @@ dynamic_segment_calculate_sizes_start(ucc_tl_ucp_dyn_seg_args_t *args,
 {
     ucc_tl_ucp_team_t *tl_team   = UCC_TL_UCP_TASK_TEAM(args->task);
     ucc_team_t        *core_team = UCC_TL_CORE_TEAM(tl_team);
-    ucc_coll_type_t    coll_type = TASK_ARGS(args->task).coll_type;
     ucc_subset_t       subset;
     size_t            *global_sizes;
     ucc_status_t       status;
@@ -349,8 +334,7 @@ dynamic_segment_calculate_sizes_start(ucc_tl_ucp_dyn_seg_args_t *args,
 
     /* Calculate total pack size for this rank - only destination handles
      * Use inner packed TL size; exchange_size will add outer TL header. */
-    if (coll_type == UCC_COLL_TYPE_ALLTOALL &&
-        args->task->dynamic_segments.alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET) {
+    if (args->task->dynamic_segments.alg == UCC_TL_UCP_ONESIDED_GET) {
         local_pack_size = args->src_pack_size;
     } else {
         local_pack_size = args->dst_pack_size;
@@ -407,7 +391,6 @@ dynamic_segment_calculate_sizes_test(ucc_tl_ucp_dyn_seg_args_t *args,
             args->max_individual_pack_size = args->global_sizes[i];
         }
     }
-    /* Only destination handles are exchanged for one-sided operations */
     /* max_individual_pack_size already includes sizeof(size_t) * 2 (inner packed TL header)
      * Add outer TL header (TL name + size) to compute the total exchange size per rank. */
     args->exchange_size = sizeof(ucc_mem_map_memh_t) + UCC_MEM_MAP_TL_NAME_LEN +
@@ -483,7 +466,6 @@ dynamic_segment_pack_and_exchange_data_start(ucc_tl_ucp_dyn_seg_args_t *args,
     ucc_tl_ucp_team_t    *tl_team   = UCC_TL_UCP_TASK_TEAM(args->task);
     ucc_tl_ucp_context_t *ctx       = UCC_TL_UCP_TEAM_CTX(tl_team);
     ucc_team_t           *core_team = UCC_TL_CORE_TEAM(tl_team);
-    ucc_coll_type_t       coll_type = TASK_ARGS(args->task).coll_type;
     ucc_subset_t          subset;
     ucc_status_t          status;
     size_t                copy_size;
@@ -495,17 +477,16 @@ dynamic_segment_pack_and_exchange_data_start(ucc_tl_ucp_dyn_seg_args_t *args,
     subset.map.strided.stride = 1;
     subset.myrank             = UCC_TL_TEAM_RANK(tl_team);
 
+    dynamic_segment_memh_pack((ucc_context_h)&ctx->super.super, args, IS_DST);
     /* Include outer TL header (name + size) in the copy size in addition to memh struct */
     copy_size = sizeof(ucc_mem_map_memh_t) + UCC_MEM_MAP_TL_NAME_LEN +
                 sizeof(size_t);
-    if (coll_type == UCC_COLL_TYPE_ALLTOALL &&
-        args->task->dynamic_segments.alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET) {
+    if (args->task->dynamic_segments.alg == UCC_TL_UCP_ONESIDED_GET) {
         /* Only pack destination handles for one-sided operations */
         dynamic_segment_memh_pack((ucc_context_h)&ctx->super.super, args, IS_SRC);
         copy_size += args->src_pack_size;
         memcpy(args->exchange_buffer, args->src_memh_pack, copy_size);
     } else {
-        dynamic_segment_memh_pack((ucc_context_h)&ctx->super.super, args, IS_DST);
         copy_size += args->dst_pack_size;
         memcpy(args->exchange_buffer, args->dst_memh_pack, copy_size);
     }
@@ -553,7 +534,6 @@ dynamic_segment_import_memory_handles(ucc_tl_ucp_dyn_seg_args_t *args)
     ucc_tl_ucp_team_t    *tl_team   = UCC_TL_UCP_TASK_TEAM(args->task);
     ucc_tl_ucp_context_t *ctx       = UCC_TL_UCP_TEAM_CTX(tl_team);
     ucc_team_t           *core_team = UCC_TL_CORE_TEAM(tl_team);
-    ucc_coll_type_t       coll_type = TASK_ARGS(args->task).coll_type;
     ucc_mem_map_memh_t  **global;
     size_t                offset;
     ucc_status_t          status;
@@ -606,8 +586,7 @@ dynamic_segment_import_memory_handles(ucc_tl_ucp_dyn_seg_args_t *args)
         }
     }
 
-    if (coll_type == UCC_COLL_TYPE_ALLTOALL &&
-        args->task->dynamic_segments.alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET) {
+    if (args->task->dynamic_segments.alg == UCC_TL_UCP_ONESIDED_GET) {
         args->task->dynamic_segments.src_global = global;
         args->task->dynamic_segments.dst_global = NULL;
     } else {
@@ -703,16 +682,16 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t,
         task->dynamic_segments.scoll_req_data  = NULL;
     }
     switch (task->dynamic_segments.exchange_step) {
-    case DYN_SEG_EXCHANGE_STEP_INIT:
+    case UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_INIT:
         status = dynamic_segment_pack_memory_handles(
             task->dynamic_segments.exchange_args);
         if (status != UCC_OK) {
             goto err_cleanup;
         }
-        task->dynamic_segments.exchange_step = DYN_SEG_EXCHANGE_STEP_SIZE_TEST;
+        task->dynamic_segments.exchange_step = UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_SIZE_TEST;
         return UCC_INPROGRESS;
 
-    case DYN_SEG_EXCHANGE_STEP_SIZE_TEST:
+    case UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_SIZE_TEST:
         if (task->dynamic_segments.exchange_args->global_sizes == NULL) {
 
             /* First call - start the allgather */
@@ -738,21 +717,21 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t,
                 goto err_cleanup;
             }
             task->dynamic_segments.exchange_step =
-                DYN_SEG_EXCHANGE_STEP_DATA_ALLOC;
+                UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_DATA_ALLOC;
             return UCC_INPROGRESS;
         }
 
-    case DYN_SEG_EXCHANGE_STEP_DATA_ALLOC:
+    case UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_DATA_ALLOC:
         status = dynamic_segment_allocate_buffers(
             task->dynamic_segments.exchange_args);
         if (status != UCC_OK) {
             tl_error(UCC_TASK_LIB(task), "failed to allocate buffers");
             goto err_cleanup;
         }
-        task->dynamic_segments.exchange_step = DYN_SEG_EXCHANGE_STEP_DATA_START;
+        task->dynamic_segments.exchange_step = UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_DATA_START;
         return UCC_INPROGRESS;
 
-    case DYN_SEG_EXCHANGE_STEP_DATA_START:
+    case UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_DATA_START:
         if (task->dynamic_segments.scoll_req_data == NULL) {
             /* First call - start the allgather */
             status = dynamic_segment_pack_and_exchange_data_start(
@@ -789,7 +768,7 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t,
     dynamic_segment_cleanup_buffers(task->dynamic_segments.exchange_args);
     ucc_free(task->dynamic_segments.exchange_args);
     task->dynamic_segments.exchange_args = NULL;
-    task->dynamic_segments.exchange_step = DYN_SEG_EXCHANGE_STEP_COMPLETE;
+    task->dynamic_segments.exchange_step = UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_COMPLETE;
     return UCC_OK;
 
 err_cleanup_global:

@@ -87,18 +87,19 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_task_t *task;
 
     ALLTOALLV_TASK_CHECK(coll_args->args, tl_team);
-    if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) ||
-        (coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS && !(coll_args->args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS))) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
-                     "non memory mapped buffers are not supported");
-            status = UCC_ERR_NOT_SUPPORTED;
-            goto out;
-    }
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER)) {
         tl_error(UCC_TL_TEAM_LIB(tl_team),
                  "global work buffer not provided nor associated with team");
         status = UCC_ERR_NOT_SUPPORTED;
         goto out;
+    }
+    if (coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) {
+        if (!(coll_args->args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS)) {
+            tl_error(UCC_TL_TEAM_LIB(tl_team),
+                     "non memory mapped buffers are not supported");
+            status = UCC_ERR_NOT_SUPPORTED;
+            goto out;
+        }
     }
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH)) {
         coll_args->args.src_memh.global_memh = NULL;

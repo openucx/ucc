@@ -823,12 +823,6 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
         ucc_error("Unknown mem map mode entered: %d", mode);
         return UCC_ERR_INVALID_PARAM;
     }
-
-    /* Free the TL data structure */
-    if (data) {
-        memh->tl_data = NULL;
-    }
-
     return UCC_OK;
 }
 

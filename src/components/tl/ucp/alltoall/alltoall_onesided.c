@@ -236,7 +236,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     };
     size_t                       perc_bw     =
         UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_percent_bw;
-    ucc_tl_ucp_alltoall_onesided_alg_t alg   =
+    ucc_tl_ucp_onesided_alg_type alg         =
         UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_alg;
     ucc_tl_ucp_schedule_t       *tl_schedule = NULL;
     ucc_coll_task_t             *barrier_task;
@@ -298,10 +298,10 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     a2a_task             = &task->super;
 
     /* initialize dynamic segments */
-    if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET ||
-       (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO &&
+    if (alg == UCC_TL_UCP_ONESIDED_GET ||
+       (alg == UCC_TL_UCP_ONESIDED_AUTO &&
                                     sbgp->group_size >= CONGESTION_THRESHOLD)) {
-        alg = UCC_TL_UCP_ALLTOALL_ONESIDED_GET;
+        alg = UCC_TL_UCP_ONESIDED_GET;
     }
     status = ucc_tl_ucp_coll_dynamic_segment_init(&coll_args->args, alg, task);
     if (UCC_OK != status) {
@@ -338,7 +338,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     }
     task->super.post = ucc_tl_ucp_alltoall_onesided_start;
     npolls           = task->n_polls;
-    if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET) {
+    if (alg == UCC_TL_UCP_ONESIDED_GET) {
         npolls = nelems * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
         if (npolls < task->n_polls) {
             npolls = task->n_polls;

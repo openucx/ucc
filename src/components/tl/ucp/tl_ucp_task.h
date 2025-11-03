@@ -253,7 +253,7 @@ typedef struct ucc_tl_ucp_task {
         ucc_service_coll_req_t            *scoll_req_data; /* For data ex allgather */
         int                                exchange_step;
         ucc_status_t                       exchange_status;
-        ucc_tl_ucp_alltoall_onesided_alg_t alg;
+        ucc_tl_ucp_onesided_alg_type alg;
     } dynamic_segments;
 } ucc_tl_ucp_task_t;
 

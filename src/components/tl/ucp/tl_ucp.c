@@ -25,10 +25,10 @@
 #include "scatterv/scatterv.h"
 
 const char *ucc_tl_ucp_alltoall_onesided_names[] = {
-    [UCC_TL_UCP_ALLTOALL_ONESIDED_PUT]   = "put",
-    [UCC_TL_UCP_ALLTOALL_ONESIDED_GET]   = "get",
-    [UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO]  = "auto",
-    [UCC_TL_UCP_ALLTOALL_ONESIDED_LAST]  = NULL
+    [UCC_TL_UCP_ONESIDED_PUT]   = "put",
+    [UCC_TL_UCP_ONESIDED_GET]   = "get",
+    [UCC_TL_UCP_ONESIDED_AUTO]  = "auto",
+    [UCC_TL_UCP_ONESIDED_LAST]  = NULL
 };
 
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib,

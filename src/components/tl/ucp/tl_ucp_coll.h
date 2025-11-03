@@ -15,6 +15,15 @@
 #define UCC_UUNITS_AUTO_RADIX 4
 #define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 9
 
+enum ucc_tl_ucp_dyn_seg_exchange_step {
+    UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_INIT,
+    UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_SIZE_TEST,
+    UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_DATA_ALLOC,
+    UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_DATA_START,
+    UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_DATA_TEST,
+    UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_COMPLETE
+};
+
 ucc_status_t ucc_tl_ucp_team_default_score_str_alloc(ucc_tl_ucp_team_t *team,
     char *default_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR]);
 
@@ -277,7 +286,7 @@ static inline unsigned ucc_tl_ucp_get_knomial_radix(ucc_tl_ucp_team_t *team,
 }
 
 ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t *coll_args,
-                                                  ucc_tl_ucp_alltoall_onesided_alg_t alg,
+                                                  ucc_tl_ucp_onesided_alg_type alg,
                                                   ucc_tl_ucp_task_t   *task);
 
 ucc_status_t ucc_tl_ucp_coll_dynamic_segment_exchange_nb(ucc_tl_ucp_task_t *task);
@@ -290,7 +299,7 @@ static inline ucc_status_t ucc_tl_ucp_test_dynamic_segment(ucc_tl_ucp_task_t *ta
         return UCC_OK;
     }
 
-    if (task->dynamic_segments.exchange_step < 5) {
+    if (task->dynamic_segments.exchange_step < UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_COMPLETE) {
         return ucc_tl_ucp_coll_dynamic_segment_exchange_nb(task);
     }
 

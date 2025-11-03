@@ -110,11 +110,8 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
         rbuf = rbuf_mc_header->addr;
     } else {
         /* Traditional onesided: use pre-mapped buffers */
-        sbuf = params.buffers[MEM_SEND_SEGMENT];
-        rbuf = params.buffers[MEM_RECV_SEGMENT];
-    }
-
-    if (is_onesided) {
+        sbuf                    = params.buffers[MEM_SEND_SEGMENT];
+        rbuf                    = params.buffers[MEM_RECV_SEGMENT];
         work_buf                = params.buffers[MEM_WORK_SEGMENT];
         args.global_work_buffer = work_buf;
     }
