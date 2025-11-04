@@ -3,7 +3,7 @@
     project-type: pipeline
     properties:
       - github:
-          url: "{jjb_git}"
+          url: "{jjb_git_web}"
       - build-discarder:
           days-to-keep: 30
           num-to-keep: 20
@@ -50,22 +50,23 @@
 #          allow-whitelist-orgs-as-admins: true
       - github-pull-request:
           cron: 'H/5 * * * *'
-          trigger-phrase: '.*\bbot:retest\b.*'
+          trigger-phrase: '.*\bbot:(?:ucc:)?retest\b.*'
           status-context: "ucc"
           success-status: "Test PASSed."
           failure-status: "Test FAILed."
           error-status:   "Test FAILed."
           status-add-test-results: true
+          cancel-builds-on-update: true
           # swx-jenkins2 from GitHub Pull Request Builder
-          auth-id: 'cb48aefb-4f90-4d52-a9bc-63d92382e0be'
+          auth-id: "{jjb_ghprb_auth_id}"
           org-list: ["Mellanox","openucx"]
-          white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mellanox-github"]
+          white-list: ["svcnbu-swx-hpcx", "swx-jenkins","swx-jenkins2","swx-jenkins3","mellanox-github"]
           allow-whitelist-orgs-as-admins: true
     pipeline-scm:
       scm:
         - git:
             url: "{jjb_git}"
-            credentials-id: '549927eb-7f38-4a8f-997a-81dd63605782'
+            credentials-id: "{jjb_gh_auth_id}"
             branches: [ '$sha1' ]
             shallow-clone: true
             depth: 10
@@ -74,12 +75,80 @@
             browser-url: "{jjb_git}"
       script-path: "$script"
 
+- job-template:
+    name: "{jjb_proj}-build-hpcsdk"
+    folder: "{jjb_folder}"
+    project-type: pipeline
+    properties:
+      - github:
+          url: "{jjb_git_web}"
+      - build-discarder:
+          days-to-keep: 30
+          num-to-keep: 20
+      - inject:
+          keep-system-variables: true
+          properties-content: |
+            jjb_proj="{jjb_proj}-build-hpcsdk"
+    description: Do NOT edit this job through the Web GUI !
+    concurrent: true
+    sandbox: true
+    parameters:
+      - string:
+          name: "sha1"
+          default: "master"
+          description: "Commit to be checked, set by PR"
+      - string:
+          name: "DEBUG"
+          default: 0
+          description: "Enable debug prints and traces, valid values are 0-9"
+      - bool:
+          name: "BUILD_DOCKERS"
+          default: false
+          description: "Rebuild docker containers"
+      - string:
+          name: "CONF_FILE"
+          default: ".ci/pipeline/build_hpcsdk_matrix.yaml"
+          description: "Regex to select job config file"
+    triggers:
+      - github-pull-request:
+          cron: 'H/5 * * * *'
+          trigger-phrase: '.*\bbot:(?:hpcsdk:)?retest\b.*'
+          status-context: "ucc-hpcsdk"
+          success-status: "Build PASSed."
+          failure-status: "Build FAILed."
+          error-status:   "Build FAILed."
+          status-url: "${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc-build-hpcsdk/detail/ucc-build-hpcsdk/${{BUILD_NUMBER}}/pipeline"
+          status-add-test-results: true
+          cancel-builds-on-update: true
+          # swx-jenkins2 from GitHub Pull Request Builder
+          auth-id: "{jjb_ghprb_auth_id}"
+          org-list: ["Mellanox","openucx"]
+          white-list: ["svcnbu-swx-hpcx"]
+          allow-whitelist-orgs-as-admins: true
+    pipeline-scm:
+      scm:
+        - git:
+            url: "{jjb_git}"
+            credentials-id: "{jjb_gh_auth_id}"
+            branches: [ '$sha1' ]
+            shallow-clone: true
+            depth: 10
+            refspec: "+refs/heads/*:refs/remotes/origin/* +refs/pull/*:refs/remotes/origin/pr/*"
+            browser: githubweb
+            browser-url: "{jjb_git}"
+      script-path: "{jjb_jenkinsfile}"
+
 - project:
-    name: proj_name
-    jjb_email: 'artemry@nvidia.com'
+    name: ucc-build
     jjb_proj: 'ucc'
     jjb_git: 'git@github.com:openucx/ucc.git'
+    jjb_git_web: 'https://github.com/openucx/ucc'
+    jjb_branch: 'master'
+    jjb_folder: "UCC"
     jjb_owner: 'artemry'
     jjb_jenkinsfile: '.ci/Jenkinsfile.shlib'
+    jjb_gh_auth_id: 'b042dbee-a0cf-4e23-9efc-a6dc6586f49c'
+    jjb_ghprb_auth_id: 'ghprb-auth-svcnbu-swx-hpcx'
     jobs:
       - "{jjb_proj}"
+      - "{jjb_proj}-build-hpcsdk"
