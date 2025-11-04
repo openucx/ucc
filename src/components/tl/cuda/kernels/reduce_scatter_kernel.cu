@@ -63,6 +63,10 @@ ucc_status_t post_reduce_scatter_kernel(
     assert(sm_count > 0 && sm_count <= UCC_TL_CUDA_MAX_NVLS_SM_COUNT);
     assert(threads > 0 && threads <= UCC_TL_CUDA_MAX_NVLS_THREADS);
 
+    assert(offset % 4 == 0 && "NVLS requires 16-byte alignment for the offset");
+    assert(count % 4 == 0 && "NVLS requires 16-byte alignment for the count");
+    assert(mc_base_addr % 8 == 0);
+
     uint32_t *base_u32 = reinterpret_cast<uint32_t *>(mc_base_addr);
     ucc_tl_cuda_nvls_control_t
         *mc_bar = reinterpret_cast<ucc_tl_cuda_nvls_control_t *>(
@@ -75,7 +79,6 @@ ucc_status_t post_reduce_scatter_kernel(
 
     switch (datatype) {
     case UCC_DT_FLOAT32:
-        assert(((uintptr_t)(mc_base_addr) % 8) == 0);
         reduce_scatter_kernel_vec32<NvlsFp32Ops>
             <<<sm_count, threads, 0, stream>>>(
                 mc_bar,
@@ -88,7 +91,6 @@ ucc_status_t post_reduce_scatter_kernel(
                 reinterpret_cast<uint32_t *>(dst_ptr));
         break;
     case UCC_DT_BFLOAT16:
-        assert(((uintptr_t)(mc_base_addr) % 8) == 0);
         reduce_scatter_kernel_vec32<NvlsBf16Ops>
             <<<sm_count, threads, 0, stream>>>(
                 mc_bar,

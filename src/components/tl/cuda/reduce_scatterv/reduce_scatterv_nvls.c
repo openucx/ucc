@@ -63,6 +63,7 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
     uint32_t       sm_count = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_sm_count;
     uint32_t       threads  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_threads;
     ucc_status_t   status;
+    cudaError_t    cuda_status;
 
     switch (task->reduce_scatterv_nvls.stage) {
     case STAGE_KERNEL:
@@ -105,7 +106,7 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
         task->reduce_scatterv_nvls.stage = STAGE_WAIT;
         // fallthrough
     case STAGE_WAIT:
-        cudaError_t cuda_status = cudaEventQuery(evt);
+        cuda_status = cudaEventQuery(evt);
         if (cuda_status == cudaErrorNotReady) {
             task->super.status = UCC_INPROGRESS;
             return;
@@ -226,7 +227,7 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init(
         task->reduce_scatterv_nvls.offset = offset_elements / 2;
         task->reduce_scatterv_nvls.count  = count_elements / 2;
     } else {
-        tl_error(
+        tl_debug(
             UCC_TL_TEAM_LIB(team),
             "Unsupported datatype for NVLS reduce_scatterv");
         return UCC_ERR_NOT_SUPPORTED;
@@ -234,17 +235,17 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init(
 
     // NVLS requires 16-byte alignment for the offset
     if (task->reduce_scatterv_nvls.offset % 4 != 0) {
-        tl_error(
+        tl_debug(
             UCC_TL_TEAM_LIB(team),
             "NVLS requires 16-byte alignment for the offset");
         return UCC_ERR_NOT_SUPPORTED;
     }
-
-    ucc_print(
-        "trank: %d, offset: %zu, count: %zu",
-        trank,
-        task->reduce_scatterv_nvls.offset,
-        task->reduce_scatterv_nvls.count);
+    if (task->reduce_scatterv_nvls.count % 4 != 0) {
+        tl_debug(
+            UCC_TL_TEAM_LIB(team),
+            "NVLS requires 16-byte alignment for the count");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     task->reduce_scatterv_nvls.mc_va   = (CUdeviceptr)TASK_SYMMETRIC_MC(task);
     task->reduce_scatterv_nvls.uc_va   = (CUdeviceptr)TASK_SYMMETRIC_UC(task);
