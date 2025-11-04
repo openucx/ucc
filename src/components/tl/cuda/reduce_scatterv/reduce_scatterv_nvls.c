@@ -74,7 +74,7 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
             task->reduce_scatterv_nvls.src_size_bytes,
             cudaMemcpyDeviceToDevice,
             stream));
-        if (status != UCC_OK) {
+        if (ucc_unlikely(status != UCC_OK)) {
             task->super.status = status;
             return;
         }
@@ -93,13 +93,13 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
             task->reduce_scatterv_nvls.count,
             dt,
             UCC_TL_TEAM_SIZE(team));
-        if (status != UCC_OK) {
+        if (ucc_unlikely(status != UCC_OK)) {
             ucc_error("failed to post reduce scatter kernel");
             task->super.status = status;
             return;
         }
         status = CUDA_FUNC(cudaEventRecord(evt, stream));
-        if (status != UCC_OK) {
+        if (ucc_unlikely(status != UCC_OK)) {
             task->super.status = status;
             return;
         }
@@ -110,7 +110,7 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
         if (cuda_status == cudaErrorNotReady) {
             task->super.status = UCC_INPROGRESS;
             return;
-        } else if (cuda_status != cudaSuccess) {
+        } else if (ucc_unlikely(cuda_status != cudaSuccess)) {
             tl_error(
                 UCC_TASK_LIB(task),
                 "error cudaEventQuery %s!",
@@ -204,16 +204,12 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init(
         return status;
     }
 
-    task->reduce_scatterv_nvls.dt     = dt;
+    task->reduce_scatterv_nvls.dt = dt;
 
-    task->reduce_scatterv_nvls.offset = ucc_tl_cuda_reduce_scatterv_get_offset(
-        task, trank);
-    task->reduce_scatterv_nvls.count = ucc_tl_cuda_reduce_scatterv_get_count(
-        task, trank);
     /* Get offset and count in datatype elements, then convert to uint32_t units.
      * Use aligned offset for NVLS to satisfy 16-byte alignment requirement
      * of multimem instructions (must be multiple of 4 uint32_t = 16 bytes). */
-    size_t offset_elements = ucc_tl_cuda_reduce_scatterv_get_offset(
+    size_t offset_elements        = ucc_tl_cuda_reduce_scatterv_get_offset(
         task, trank);
     size_t count_elements = ucc_tl_cuda_reduce_scatterv_get_count(task, trank);
 
@@ -224,6 +220,14 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init(
         task->reduce_scatterv_nvls.offset = offset_elements;
         task->reduce_scatterv_nvls.count  = count_elements;
     } else if (dt == UCC_DT_BFLOAT16) {
+        if (offset_elements % 2 != 0 || count_elements % 2 != 0) {
+            tl_debug(
+                UCC_TL_TEAM_LIB(team),
+                "BF16 offset and count must be even, got offset=%zu count=%zu",
+                offset_elements,
+                count_elements);
+            return UCC_ERR_NOT_SUPPORTED;
+        }
         task->reduce_scatterv_nvls.offset = offset_elements / 2;
         task->reduce_scatterv_nvls.count  = count_elements / 2;
     } else {
@@ -233,17 +237,21 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init(
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    // NVLS requires 16-byte alignment for the offset
+    /* NVLS requires 16-byte alignment (4 uint32_t elements) */
     if (task->reduce_scatterv_nvls.offset % 4 != 0) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
-            "NVLS requires 16-byte alignment for the offset");
+            "NVLS requires 16-byte alignment for offset, got offset=%zu "
+            "(uint32_t units)",
+            task->reduce_scatterv_nvls.offset);
         return UCC_ERR_NOT_SUPPORTED;
     }
     if (task->reduce_scatterv_nvls.count % 4 != 0) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
-            "NVLS requires 16-byte alignment for the count");
+            "NVLS requires 16-byte alignment for count, got count=%zu "
+            "(uint32_t units)",
+            task->reduce_scatterv_nvls.count);
         return UCC_ERR_NOT_SUPPORTED;
     }
 

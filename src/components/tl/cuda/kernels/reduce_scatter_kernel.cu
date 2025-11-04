@@ -65,7 +65,8 @@ ucc_status_t post_reduce_scatter_kernel(
 
     assert(offset % 4 == 0 && "NVLS requires 16-byte alignment for the offset");
     assert(count % 4 == 0 && "NVLS requires 16-byte alignment for the count");
-    assert(mc_base_addr % 8 == 0);
+    assert(mc_base_addr % 16 == 0 && "NVLS requires 16-byte alignment");
+    assert(mc_control_addr % 16 == 0 && "NVLS requires 16-byte alignment");
 
     uint32_t *base_u32 = reinterpret_cast<uint32_t *>(mc_base_addr);
     ucc_tl_cuda_nvls_control_t

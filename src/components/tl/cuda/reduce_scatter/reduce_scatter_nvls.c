@@ -50,11 +50,17 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_nvls_init(
     task->reduce_scatterv_nvls.count = ucc_tl_cuda_reduce_scatter_get_count(
         task, trank);
 
-    ucc_print(
-        "trank: %d, offset: %zu, count: %zu",
-        trank,
-        task->reduce_scatterv_nvls.offset,
-        task->reduce_scatterv_nvls.count);
+    if (task->reduce_scatterv_nvls.offset % 4 != 0) {
+        tl_debug(
+            UCC_TL_TEAM_LIB(team),
+            "NVLS requires 16-byte alignment for offset");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    if (task->reduce_scatterv_nvls.count % 4 != 0) {
+        tl_debug(
+            UCC_TL_TEAM_LIB(team), "NVLS requires 16-byte alignment for count");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     task->reduce_scatterv_nvls.mc_va   = (CUdeviceptr)TASK_SYMMETRIC_MC(task);
     task->reduce_scatterv_nvls.uc_va   = (CUdeviceptr)TASK_SYMMETRIC_UC(task);
@@ -65,7 +71,6 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_nvls_init(
         .triggered_post  = ucc_tl_cuda_reduce_scatterv_nvls_triggered_post;
     task->super.progress = ucc_tl_cuda_reduce_scatterv_nvls_progress;
     task->super.finalize = ucc_tl_cuda_reduce_scatterv_nvls_finalize;
-    task->bar            = TASK_BAR(task);
 
     *task_p              = &task->super;
     return UCC_OK;
