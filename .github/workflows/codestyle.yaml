@@ -86,7 +86,7 @@ jobs:
       run: |
         set -eEuo pipefail
         echo "Commit ${{ github.event.pull_request.base.sha }}"
-        diff=`git-clang-format --binary=clang-format-${LLVM_VERSION} --style=file --diff ${{ github.event.pull_request.base.sha }}`
+        diff=`git-clang-format --binary=clang-format-${LLVM_VERSION} --style=file --diff ${{ github.event.pull_request.base.sha }}` || true
         if [ "$diff" = "no modified files to format" ] || [ "$diff" = "clang-format did not modify any files" ]
         then
           echo "Format check PASS"
