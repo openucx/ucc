@@ -93,15 +93,16 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     /* To resolve remote virtual addresses, the dst_memh is the one that must
      * have the rkey information. For this algorithm, we need to swap the
      * src and dst handles to operate correctly */
-    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).dst_memh.global_memh;
+    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).dst_memh.local_memh;
     ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).src_memh.global_memh;
     uint32_t          *posted    = &task->onesided.get_posted;
     uint32_t          *completed = &task->onesided.get_completed;
     ucc_rank_t         peer      = (grank + *posted + 1) % gsize;
     size_t             nelems;
 
-    if (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL) {
-        src_memh = TASK_ARGS(task).src_memh.global_memh[grank];
+    if (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL) {
+        /* src and dst handles are swapped, see above */
+        src_memh = TASK_ARGS(task).dst_memh.global_memh[grank];
     }
     nelems = TASK_ARGS(task).src.info.count;
     nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
