@@ -90,7 +90,7 @@ steps:
       set -x
       echo "INFO: Run UCC tests"
       hostname
-      timeout -k 20 90m docker run -t --rm --name="ucc_tests_${BUILD_NUMBER}" $DOCKER_OPT "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}" bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
+      timeout -k 20 90m docker run -t --rm --name="ucc_tests_${BUILD_NUMBER}" -e DEBUG_UCC=1 $DOCKER_OPT "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}" bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
     always: |
       docker rm --force "ucc_tests_${BUILD_NUMBER}" || true
 
