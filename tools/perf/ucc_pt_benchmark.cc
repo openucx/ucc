@@ -143,9 +143,9 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
                           free_coll, st);
         }
 
-        comm->allreduce(&time, &time_min, 1, UCC_OP_MIN);
-        comm->allreduce(&time, &time_max, 1, UCC_OP_MAX);
-        comm->allreduce(&time, &time_avg, 1, UCC_OP_SUM);
+        comm->allreduce(&time, &time_min, 1, UCC_OP_MIN, UCC_DT_FLOAT64);
+        comm->allreduce(&time, &time_max, 1, UCC_OP_MAX, UCC_DT_FLOAT64);
+        comm->allreduce(&time, &time_avg, 1, UCC_OP_SUM, UCC_DT_FLOAT64);
         time_avg /= comm->get_size();
         total_time += time_max;
 

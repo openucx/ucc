@@ -38,8 +38,8 @@ public:
     ~ucc_pt_comm();
     ucc_status_t init();
     ucc_status_t barrier();
-    ucc_status_t allreduce(double* in, double *out, size_t size,
-                           ucc_reduction_op_t op);
+    ucc_status_t allreduce(void* in, void *out, size_t size,
+                           ucc_reduction_op_t op, ucc_datatype_t dt);
     ucc_status_t bcast(void *data, size_t size, int root);
     ucc_status_t finalize();
 };

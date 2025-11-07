@@ -74,9 +74,8 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
         ucc_context_h        ctx = comm->get_context();
         ucc_mem_map_t        segments[1];
         ucc_mem_map_params_t mem_map_params;
-        double               dst_memh_size_dbl, dst_memh_size_max_dbl;
-        double               src_memh_size_dbl, src_memh_size_max_dbl;
-        size_t               dst_memh_size, src_memh_size, dst_memh_size_max, src_memh_size_max;
+        uint64_t             dst_memh_size, src_memh_size;
+        uint64_t             dst_memh_size_max, src_memh_size_max;
 
         coll_args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
         coll_args.flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
@@ -90,9 +89,7 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
                       exit, st);
 
         // Synchronize memh size across all ranks to ensure consistent buffer allocation
-        dst_memh_size_dbl = (double)dst_memh_size;
-        comm->allreduce(&dst_memh_size_dbl, &dst_memh_size_max_dbl, 1, UCC_OP_MAX);
-        dst_memh_size_max = (size_t)dst_memh_size_max_dbl;
+        comm->allreduce(&dst_memh_size, &dst_memh_size_max, 1, UCC_OP_MAX, UCC_DT_UINT64);
 
         dst_memh_global = new ucc_mem_map_mem_h[comm->get_size()];
         for (int i = 0; i < comm->get_size(); i++) {
@@ -119,9 +116,7 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
                                       &mem_map_params, &src_memh_size, &src_memh),
                           exit, st);
             // Synchronize memh size across all ranks to ensure consistent buffer allocation
-            src_memh_size_dbl = (double)src_memh_size;
-            comm->allreduce(&src_memh_size_dbl, &src_memh_size_max_dbl, 1, UCC_OP_MAX);
-            src_memh_size_max = (size_t)src_memh_size_max_dbl;
+            comm->allreduce(&src_memh_size, &src_memh_size_max, 1, UCC_OP_MAX, UCC_DT_UINT64);
 
             src_memh_global = new ucc_mem_map_mem_h[comm->get_size()];
             for (int i = 0; i < comm->get_size(); i++) {
