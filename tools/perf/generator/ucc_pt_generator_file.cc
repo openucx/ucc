@@ -301,3 +301,37 @@ size_t ucc_pt_generator_file::get_count_max()
     }
     return max_count;
 }
+
+void print_pattern_counts(const std::vector<std::vector<uint32_t>>& pattern_counts) {
+    if (pattern_counts.empty()) {
+        std::cout << "The pattern_counts vector is empty." << std::endl;
+        return;
+    }
+
+    // Iterate through the outer vector (each element is a message's counts)
+    for (size_t i = 0; i < pattern_counts.size(); ++i) {
+        std::cout << "--- Message " << (i + 1) << " ---" << std::endl;
+
+        const auto& counts_for_message = pattern_counts[i];
+
+        if (counts_for_message.empty()) {
+            std::cout << "  (No counts recorded for this message)" << std::endl;
+            continue;
+        }
+
+        std::cout << "  Counts: ";
+        
+        // Iterate through the inner vector (the actual counts)
+        for (size_t j = 0; j < counts_for_message.size(); ++j) {
+            // Print the count value
+            std::cout << counts_for_message[j];
+
+            // Add a separator for readability, except after the last element
+            if (j < counts_for_message.size() - 1) {
+                std::cout << " | ";
+            }
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "--------------------" << std::endl;
+}

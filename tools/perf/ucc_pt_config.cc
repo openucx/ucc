@@ -187,8 +187,53 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                         bench.gen.file_name = gen_arg.substr(name_pos + 5);
                         bench.gen.nrep = 1; // Default value if nrep is not specified
                     }
+                } else if (gen_arg.rfind("matrix:", 0) == 0){
+                    bench.gen.type = UCC_PT_GEN_TYPE_MATRIX;
+                    auto kind_pos = gen_arg.find("kind=", 7);
+                    if (kind_pos == std::string::npos) {
+                        std::cerr << "Invalid format for --gen matrix:kind=N" << std::endl;
+                        return UCC_ERR_INVALID_PARAM;
+                    }
+                    auto kind_str = gen_arg.substr(kind_pos + 5);
+                    if (kind_str.find("0", kind_pos+5) != std::string::npos || kind_str.find("normal", kind_pos+5) != std::string::npos) {
+                        bench.gen.matrix.kind = 0;
+                    } else if (kind_str.find("1", kind_pos+5) != std::string::npos || kind_str.find("random_tgt_group", kind_pos+5) != std::string::npos) {
+                        bench.gen.matrix.kind = 1;
+                    } else if (kind_str.find("2", kind_pos+5) != std::string::npos || kind_str.find("random_tgt_group_random_msg_size", kind_pos+5) != std::string::npos) {
+                        bench.gen.matrix.kind = 2;
+                    } else {
+                        std::cerr << "Invalid kind value in --gen matrix:kind=N" << std::endl;
+                        return UCC_ERR_INVALID_PARAM;
+                    }
+                    auto at_pos = gen_arg.find("@", kind_pos+6);
+                    if (at_pos != std::string::npos) {
+                        auto nrep_pos = gen_arg.find("nrep=", at_pos);
+                        if (nrep_pos != std::string::npos) {
+                            auto nrep_str = gen_arg.substr(nrep_pos + 5);
+                            bench.gen.nrep = std::stoull(nrep_str);
+                        } else {
+                            bench.gen.nrep = 1;
+                        }
+                    } else {
+                        bench.gen.nrep = 1;
+                    }
+                    auto token_size_pos = gen_arg.find("token_size=", at_pos);
+                    if (token_size_pos != std::string::npos) {
+                        auto token_size_str = gen_arg.substr(token_size_pos + 11);
+                        bench.gen.matrix.token_size_KB_mean = std::stoull(token_size_str);
+                    } else {
+                        bench.gen.matrix.token_size_KB_mean = 16;
+                    }
+                    bench.gen.matrix.token_size_KB_std = bench.gen.matrix.token_size_KB_mean;
+                    auto num_tokens_pos = gen_arg.find("num_tokens=", at_pos);
+                    if (num_tokens_pos != std::string::npos) {
+                        auto num_tokens_str = gen_arg.substr(num_tokens_pos + 11);
+                        bench.gen.matrix.num_tokens = std::stoull(num_tokens_str);
+                    } else {
+                        bench.gen.matrix.num_tokens = 2048;
+                    }
                 } else {
-                    std::cerr << "Invalid value for --gen. Use exp:min=N[@max=M] or file:name=filename[@nrep=N]" << std::endl;
+                    std::cerr << "Invalid value for --gen. Use exp:min=N[@max=M] or file:name=filename[@nrep=N] or matrix:kind=mat_kind[@nrep=N@token_size=M@num_tokens=K]" << std::endl;
                     return UCC_ERR_INVALID_PARAM;
                 }
             }
