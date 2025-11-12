@@ -13,6 +13,7 @@
 #include "utils/ucc_math.h"
 
 #include <sys/syscall.h> // for pidfd_open and pidfd_getfd
+#include <sys/prctl.h>   // for prctl()
 #include <unistd.h>      // for close()
 
 ucc_status_t ucc_tl_cuda_nvls_check_support(
@@ -400,6 +401,24 @@ ucc_status_t ucc_tl_cuda_nvls_init(
             // Store PID for POSIX handles
             if (!nvls->is_multinode) {
                 nvls->local_handle.data.posix.pid = getpid();
+                // Allow peer processes to use pidfd_getfd on this process
+                // A more aggressive solution would be to modify Yama ptrace policy by
+                // running `echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope` or to run
+                // the docker container with `--cap-add=SYS_PTRACE` and `--sysctl
+                // kernel.yama.ptrace_scope=0`.
+                if (prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY) != 0) {
+                    tl_warn(
+                        UCC_TL_TEAM_LIB(team),
+                        "failed to set PR_SET_PTRACER: %s (errno=%d). "
+                        "This may cause pidfd_getfd to fail on peer processes. "
+                        "Consider adjusting Yama ptrace_scope settings: `echo "
+                        "0 | sudo tee /proc/sys/kernel/yama/ptrace_scope` or "
+                        "to run "
+                        "the docker container with `--cap-add=SYS_PTRACE` and "
+                        "`--sysctl kernel.yama.ptrace_scope=0`",
+                        strerror(errno),
+                        errno);
+                }
             }
             nvls->mc_handle = mc_handle;
         }
