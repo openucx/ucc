@@ -93,15 +93,18 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     /* To resolve remote virtual addresses, the dst_memh is the one that must
      * have the rkey information. For this algorithm, we need to swap the
      * src and dst handles to operate correctly */
-    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).dst_memh.local_memh;
     ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).src_memh.global_memh;
     uint32_t          *posted    = &task->onesided.get_posted;
     uint32_t          *completed = &task->onesided.get_completed;
     ucc_rank_t         peer      = (grank + *posted + 1) % gsize;
+    ucc_mem_map_mem_h  src_memh;
     size_t             nelems;
 
-    nelems = TASK_ARGS(task).src.info.count;
-    nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
+    nelems   = TASK_ARGS(task).src.info.count;
+    nelems   = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
+    src_memh = (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)
+                   ? TASK_ARGS(task).dst_memh.global_memh[grank]
+                   : TASK_ARGS(task).dst_memh.local_memh;
 
     for (; *posted < gsize; peer = (peer + 1) % gsize) {
         UCPCHECK_GOTO(ucc_tl_ucp_get_nb(PTR_OFFSET(dest, peer * nelems),
@@ -131,15 +134,18 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
     ucc_rank_t         gsize     = UCC_TL_TEAM_SIZE(team);
     uint32_t           ntokens   = task->alltoall_onesided.tokens;
     int64_t            npolls    = task->alltoall_onesided.npolls;
-    ucc_mem_map_mem_h  src_memh  = TASK_ARGS(task).src_memh.local_memh;
     ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).dst_memh.global_memh;
     uint32_t          *posted    = &task->onesided.put_posted;
     uint32_t          *completed = &task->onesided.put_completed;
     ucc_rank_t         peer      = (grank + *posted + 1) % gsize;
+    ucc_mem_map_mem_h  src_memh;
     size_t             nelems;
 
-    nelems = TASK_ARGS(task).src.info.count;
-    nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
+    nelems   = TASK_ARGS(task).src.info.count;
+    nelems   = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
+    src_memh = (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)
+                   ? TASK_ARGS(task).src_memh.global_memh[grank]
+                   : TASK_ARGS(task).src_memh.local_memh;
 
     for (; *posted < gsize; peer = (peer + 1) % gsize) {
         UCPCHECK_GOTO(

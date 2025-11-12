@@ -74,7 +74,8 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
         ucc_context_h        ctx = comm->get_context();
         ucc_mem_map_t        segments[1];
         ucc_mem_map_params_t mem_map_params;
-        size_t               dst_memh_size, src_memh_size;
+        uint64_t             dst_memh_size, src_memh_size;
+        uint64_t             dst_memh_size_max, src_memh_size_max;
 
         coll_args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
         coll_args.flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
@@ -87,17 +88,20 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
                                   &mem_map_params, &dst_memh_size, &dst_memh),
                       exit, st);
 
+        // Synchronize memh size across all ranks to ensure consistent buffer allocation
+        comm->allreduce(&dst_memh_size, &dst_memh_size_max, 1, UCC_OP_MAX, UCC_DT_UINT64);
+
         dst_memh_global = new ucc_mem_map_mem_h[comm->get_size()];
         for (int i = 0; i < comm->get_size(); i++) {
-            dst_memh_global[i] = new char[dst_memh_size];
+            dst_memh_global[i] = new char[dst_memh_size_max];
             if (i == comm->get_rank()) {
                 memcpy(dst_memh_global[i], dst_memh, dst_memh_size);
             }
 
-            comm->bcast(dst_memh_global[i], dst_memh_size, i);
+            comm->bcast(dst_memh_global[i], dst_memh_size_max, i);
         }
         for (int i = 0; i < comm->get_size(); i++) {
-            ucc_mem_map(ctx, UCC_MEM_MAP_MODE_IMPORT, &mem_map_params, &dst_memh_size,
+            ucc_mem_map(ctx, UCC_MEM_MAP_MODE_IMPORT, &mem_map_params, &dst_memh_size_max,
                         &dst_memh_global[i]);
         }
 
@@ -111,8 +115,25 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
             UCCCHECK_GOTO(ucc_mem_map(ctx, UCC_MEM_MAP_MODE_EXPORT,
                                       &mem_map_params, &src_memh_size, &src_memh),
                           exit, st);
-            coll_args.src_memh.local_memh = src_memh;
+            // Synchronize memh size across all ranks to ensure consistent buffer allocation
+            comm->allreduce(&src_memh_size, &src_memh_size_max, 1, UCC_OP_MAX, UCC_DT_UINT64);
+
+            src_memh_global = new ucc_mem_map_mem_h[comm->get_size()];
+            for (int i = 0; i < comm->get_size(); i++) {
+                src_memh_global[i] = new char[src_memh_size_max];
+                if (i == comm->get_rank()) {
+                    memcpy(src_memh_global[i], src_memh, src_memh_size);
+                }
+                comm->bcast(src_memh_global[i], src_memh_size_max, i);
+            }
+            for (int i = 0; i < comm->get_size(); i++) {
+                ucc_mem_map(ctx, UCC_MEM_MAP_MODE_IMPORT, &mem_map_params, &src_memh_size_max,
+                            &src_memh_global[i]);
+            }
+
+            coll_args.src_memh.global_memh = src_memh_global;
             coll_args.mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH;
+            coll_args.flags |= UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL;
         }
     } else if (map_type != UCC_PT_MAP_TYPE_NONE) {
         std::cerr << "unsupported map type for perftest alltoall" << std::endl;

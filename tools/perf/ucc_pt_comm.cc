@@ -278,8 +278,8 @@ ucc_status_t ucc_pt_comm::barrier()
     return UCC_OK;
 }
 
-ucc_status_t ucc_pt_comm::allreduce(double* in, double* out, size_t size,
-                                    ucc_reduction_op_t op)
+ucc_status_t ucc_pt_comm::allreduce(void* in, void* out, size_t size,
+                                    ucc_reduction_op_t op, ucc_datatype_t dt)
 {
     ucc_coll_args_t args;
     ucc_coll_req_h req;
@@ -289,11 +289,11 @@ ucc_status_t ucc_pt_comm::allreduce(double* in, double* out, size_t size,
     args.op                   = op;
     args.src.info.buffer      = in;
     args.src.info.count       = size;
-    args.src.info.datatype    = UCC_DT_FLOAT64;
+    args.src.info.datatype    = dt;
     args.src.info.mem_type    = UCC_MEMORY_TYPE_HOST;
     args.dst.info.buffer      = out;
     args.dst.info.count       = size;
-    args.dst.info.datatype    = UCC_DT_FLOAT64;
+    args.dst.info.datatype    = dt;
     args.dst.info.mem_type    = UCC_MEMORY_TYPE_HOST;
 
     ucc_collective_init(&args, &req, team);
