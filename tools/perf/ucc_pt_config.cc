@@ -197,12 +197,14 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                     auto kind_str = gen_arg.substr(kind_pos + 5);
                     if (kind_str.find("0", kind_pos+5) != std::string::npos || kind_str.find("normal", kind_pos+5) != std::string::npos) {
                         bench.gen.matrix.kind = 0;
-                    } else if (kind_str.find("1", kind_pos+5) != std::string::npos || kind_str.find("random_tgt_group", kind_pos+5) != std::string::npos) {
+                    } else if (kind_str.find("1", kind_pos+5) != std::string::npos || kind_str.find("biased", kind_pos+5) != std::string::npos) {
                         bench.gen.matrix.kind = 1;
-                    } else if (kind_str.find("2", kind_pos+5) != std::string::npos || kind_str.find("random_tgt_group_random_msg_size", kind_pos+5) != std::string::npos) {
+                    } else if (kind_str.find("2", kind_pos+5) != std::string::npos || kind_str.find("random_tgt_group", kind_pos+5) != std::string::npos) {
                         bench.gen.matrix.kind = 2;
+                    }else if (kind_str.find("3", kind_pos+5) != std::string::npos || kind_str.find("random_tgt_group_random_msg_size", kind_pos+5) != std::string::npos) {
+                        bench.gen.matrix.kind = 3;
                     } else {
-                        std::cerr << "Invalid kind value in --gen matrix:kind=N" << std::endl;
+                        std::cerr << "Invalid kind value in --gen matrix:kind=N only accepts 0, 1, 2, 3" << std::endl;
                         return UCC_ERR_INVALID_PARAM;
                     }
                     auto at_pos = gen_arg.find("@", kind_pos+6);
@@ -356,7 +358,7 @@ void ucc_pt_config::print_help()
     std::cout << "  -T: triggered collective"<<std::endl;
     std::cout << "  -F: enable full print"<<std::endl;
     std::cout << "  -S: <number>: root shift for rooted collectives"<<std::endl;
-    std::cout << "  --gen <exp:min=N[@max=M]|file:name=filename[@nrep=N]>: Pattern generator (exponential or file-based)" << std::endl;
+    std::cout << "  --gen <exp:min=N[@max=M]|file:name=filename[@nrep=N]|matrix:kind=mat_kind[@nrep=N@token_size=M@num_tokens=K]>: Pattern generator (exponential or file-based or matrix-based)" << std::endl;
     std::cout << "  -h: show this help message"<<std::endl;
     std::cout << std::endl;
 }

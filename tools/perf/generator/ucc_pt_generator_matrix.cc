@@ -209,10 +209,12 @@ ucc_pt_generator_matrix::ucc_pt_generator_matrix(
     token_size_KB_std = token_size_KB_mean; 
 
     if (kind == 0) {
-        traffic_matrix = create_a2aV_traffic_matrix(comm_size, token_size_KB_mean, tgt_group_size_mean, num_tokens, bias_factor, num_hl_ranks);
+        traffic_matrix = create_a2aV_traffic_matrix(comm_size, token_size_KB_mean, tgt_group_size_mean, num_tokens, add_bias=false, bias_factor, num_hl_ranks);
     } else if (kind == 1) {
-        traffic_matrix = create_random_tgt_group_a2aV_traffic_matrix(comm_size, token_size_KB_mean, tgt_group_size_mean, tgt_group_size_std, num_tokens);
+        traffic_matrix = create_a2aV_traffic_matrix(comm_size, token_size_KB_mean, tgt_group_size_mean, num_tokens, add_bias=true, bias_factor, num_hl_ranks);
     } else if (kind == 2) {
+        traffic_matrix = create_random_tgt_group_a2aV_traffic_matrix(comm_size, token_size_KB_mean, tgt_group_size_mean, tgt_group_size_std, num_tokens);
+    } else if (kind == 3) {
         traffic_matrix = create_random_tgt_group_random_msg_size_a2aV_traffic_matrix(comm_size, token_size_KB_mean, token_size_KB_std, tgt_group_size_mean, tgt_group_size_std, num_tokens);
     }
 
@@ -247,7 +249,6 @@ ucc_pt_generator_matrix::ucc_pt_generator_matrix(
 
  
     std::vector<uint32_t> pattern;
-    // Reserve memory based on expected size for optimization
     if (!traffic_matrix.empty()) {
         pattern.reserve(comm_size * comm_size);
     }
@@ -259,20 +260,12 @@ ucc_pt_generator_matrix::ucc_pt_generator_matrix(
                                     "Please check the traffic_matrix.");
     }
 
-    // Flatten the 2D matrix (row by row) into a 1D pattern vector
     for (const auto& row : traffic_matrix) {
-        // Append all elements from the current row vector to the pattern vector
         pattern.insert(pattern.end(), row.begin(), row.end());
     }
-    
-    // Store the final flattened pattern
     pattern_counts.push_back(pattern);
 
 
-
-
-
-    // Ensure patterns were provided
     if (pattern_counts.empty()) {
         throw std::runtime_error("No collective patterns provided in traffic_matrix.");
     }
