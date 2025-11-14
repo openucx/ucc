@@ -107,17 +107,80 @@ static ucc_mpool_ops_t ucc_ec_cuda_interruptible_task_mpool_ops = {
     .obj_cleanup   = ucc_ec_cuda_graph_cleanup,
 };
 
+ucc_status_t ucc_ec_cuda_executor_kernel_calc_max_threads(int *max);
+
+static void ucc_ec_cuda_set_threads_nbr(
+    ucc_ec_base_t *ec, int *nt, int maxThreadsPerBlock, int is_reduce)
+{
+    ucc_status_t status;
+
+    if (*nt != UCC_ULUNITS_AUTO) {
+        if (maxThreadsPerBlock < *nt) {
+            ec_warn(
+                ec,
+                "number of threads per block is too large, max supported is %d",
+                maxThreadsPerBlock);
+        } else if ((*nt % WARP_SIZE) != 0) {
+            ec_warn(
+                ec,
+                "number of threads per block must be divisible by "
+                "WARP_SIZE(=%d)",
+                WARP_SIZE);
+        }
+    } else {
+        *nt = (maxThreadsPerBlock / WARP_SIZE) * WARP_SIZE;
+
+        if (!is_reduce) {
+            // Pass max threads per block, lowering it if necessary
+            // based on kernel occupancy requirements
+            status = ucc_ec_cuda_executor_kernel_calc_max_threads(nt);
+            if (status != UCC_OK) {
+                ec_error(
+                    ec,
+                    "Error while calculating max threads: %s",
+                    ucc_status_string(status));
+            }
+        }
+    }
+}
+
 ucc_status_t ucc_ec_cuda_resources_init(ucc_ec_base_t *ec,
                                         ucc_ec_cuda_resources_t *resources)
 {
     ucc_status_t status;
     int num_streams;
+    int max_threads_per_block;
+    CUdevice device;
 
     CUDADRV_CHECK(cuCtxGetCurrent(&resources->cu_ctx));
-    status = ucc_mpool_init(&resources->events, 0, sizeof(ucc_ec_cuda_event_t),
-                            0, UCC_CACHE_LINE_SIZE, 16, UINT_MAX,
-                            &ucc_ec_cuda_event_mpool_ops, UCC_THREAD_MULTIPLE,
-                            "CUDA Event Objects");
+    resources->num_threads_reduce = ucc_ec_cuda_config->reduce_num_threads;
+    resources->num_blocks_reduce  = ucc_ec_cuda_config->reduce_num_blocks;
+    resources->num_threads_exec   = ucc_ec_cuda_config->exec_num_threads;
+    resources->num_blocks_exec    = ucc_ec_cuda_config->exec_num_workers;
+
+    CUDADRV_CHECK(cuCtxGetDevice(&device));
+    CUDADRV_CHECK(cuDeviceGetAttribute(
+        &max_threads_per_block,
+        CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
+        device));
+
+    ucc_ec_cuda_set_threads_nbr(
+        ec, &resources->num_threads_reduce, max_threads_per_block, 1);
+
+    ucc_ec_cuda_set_threads_nbr(
+        ec, &resources->num_threads_exec, max_threads_per_block, 0);
+
+    status = ucc_mpool_init(
+        &resources->events,
+        0,
+        sizeof(ucc_ec_cuda_event_t),
+        0,
+        UCC_CACHE_LINE_SIZE,
+        16,
+        UINT_MAX,
+        &ucc_ec_cuda_event_mpool_ops,
+        UCC_THREAD_MULTIPLE,
+        "CUDA Event Objects");
     if (status != UCC_OK) {
         ec_error(ec, "failed to create CUDA events pool");
         goto exit_err;
@@ -161,6 +224,16 @@ ucc_status_t ucc_ec_cuda_resources_init(ucc_ec_base_t *ec,
         status = UCC_ERR_NO_MEMORY;
         goto free_persistent_tasks_mpool;
     }
+
+    ec_debug(
+        ec,
+        "initialized cuda resources: cuCtx=%p, num_threads_reduce=%d, "
+        "num_blocks_reduce=%d, num_threads_exec=%d, num_blocks_exec=%d",
+        resources->cu_ctx,
+        resources->num_threads_reduce,
+        resources->num_blocks_reduce,
+        resources->num_threads_exec,
+        resources->num_blocks_exec);
 
     return UCC_OK;
 

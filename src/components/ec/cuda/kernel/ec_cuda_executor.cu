@@ -6,6 +6,7 @@
 
 #ifndef UINT32_MAX
 #define __STDC_LIMIT_MACROS
+#include "utils/arch/cuda_def.h"
 #include <stdint.h>
 #endif
 
@@ -268,70 +269,40 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
 
 
 extern "C" {
-
-#define GET_BLOCKS(num_threads, coop) \
-    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&nblocks, \
-        reinterpret_cast<const void*>(&executor_kernel<coop>), \
-        num_threads, 0)
-
-// Take the maximum number of threads per block, lower as necessary
-// according to executor_kernel resource requirements while maintaining
-// num threads is divisible by WARP_SIZE
-//     max: IN/OUT parameter
 ucc_status_t ucc_ec_cuda_executor_kernel_calc_max_threads(int *max)
 {
-    int useCoopLaunch = EC_CUDA_CONFIG->use_cooperative_launch;
-    int low, high, nblocks;
+    int use_coop_launch = EC_CUDA_CONFIG->use_cooperative_launch;
+    cudaFuncAttributes attr;
 
-    ucc_assert(*max % WARP_SIZE == 0);
-
-    low = 0;
-    high = *max / WARP_SIZE;
-
-    while (low < high - 1) {
-        int mid = low + (high - low) / 2;
-        useCoopLaunch ?
-            GET_BLOCKS(mid * WARP_SIZE, true) :
-            GET_BLOCKS(mid * WARP_SIZE, false);
-        if (nblocks > 0) {
-            // It fits with this many threads
-            low = mid;
-        } else {
-            // Does not fit
-            high = mid - 1;
-        }
-    }
-
-    if (high == 0) {
-        ec_error(&ucc_ec_cuda.super,
-	         "no amount of threads per block can fit the kernel");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
-    *max = high * WARP_SIZE;
-    ec_trace(&ucc_ec_cuda.super,
-	     "max threads per block that can fit the kernel found to be %d",
-	     *max);
+    CUDA_CHECK(cudaFuncGetAttributes(
+        &attr,
+        (use_coop_launch ? executor_kernel<true> : executor_kernel<false>)));
+    *max = (attr.maxThreadsPerBlock / WARP_SIZE) * WARP_SIZE;
     return UCC_OK;
 }
 
-ucc_status_t ucc_ec_cuda_persistent_kernel_start(ucc_ec_cuda_executor_t *eee)
+ucc_status_t ucc_ec_cuda_persistent_kernel_start(
+    ucc_ec_cuda_executor_t *eee, unsigned num_threads, unsigned num_blocks)
 {
-    cudaStream_t stream = (cudaStream_t)eee->super.ee_context;
-    int          nb     = EC_CUDA_CONFIG->exec_num_workers;
-    int          nt     = EC_CUDA_CONFIG->exec_num_threads;
-    int          q_size = EC_CUDA_CONFIG->exec_max_tasks;
+    cudaStream_t stream        = (cudaStream_t)eee->super.ee_context;
+    int          q_size        = EC_CUDA_CONFIG->exec_max_tasks;
     int          useCoopLaunch = EC_CUDA_CONFIG->use_cooperative_launch;
 
     if (useCoopLaunch) {
         void *kernelArgs[] = {&eee, &q_size};
-        dim3  dimBlock(nt, 1, 1);
-        dim3  dimGrid(nb, 1, 1);
-        cudaLaunchCooperativeKernel((void *)executor_kernel<true>, dimGrid, dimBlock,
-                                    kernelArgs, 0, stream);
+        dim3  dimBlock(num_threads, 1, 1);
+        dim3  dimGrid(num_blocks, 1, 1);
+        cudaLaunchCooperativeKernel(
+            (void *)executor_kernel<true>,
+            dimGrid,
+            dimBlock,
+            kernelArgs,
+            0,
+            stream);
     } else {
         executor_start<<<1, 1, 0, stream>>>(eee->dev_state, eee->dev_cidx);
-        executor_kernel<false><<<nb, nt, 0, stream>>>(eee, q_size);
+        executor_kernel<false>
+            <<<num_blocks, num_threads, 0, stream>>>(eee, q_size);
         executor_shutdown_ack<<<1, 1, 0, stream>>>(eee->dev_state);
     }
     CUDA_CHECK(cudaGetLastError());

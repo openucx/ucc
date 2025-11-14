@@ -14,8 +14,6 @@
 #include "ec_cuda_resources.h"
 #include <cuda_runtime.h>
 
-#define WARP_SIZE 32
-
 typedef ucc_status_t (*ucc_ec_cuda_task_post_fn) (uint32_t *dev_status,
                                                   int blocking_wait,
                                                   cudaStream_t stream);

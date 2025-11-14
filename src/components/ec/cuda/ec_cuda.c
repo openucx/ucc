@@ -75,40 +75,6 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
 
 };
 
-static inline void ucc_ec_cuda_set_threads_nbr(int *nt,
-                                               int maxThreadsPerBlock,
-                                               int is_reduce)
-{
-    ucc_status_t status;
-
-    if (*nt != UCC_ULUNITS_AUTO) {
-        if (maxThreadsPerBlock < *nt) {
-            ec_warn(
-                &ucc_ec_cuda.super,
-                "number of threads per block is too large, max supported is %d",
-                maxThreadsPerBlock);
-        } else if ((*nt % WARP_SIZE) != 0) {
-            ec_warn(&ucc_ec_cuda.super,
-                    "number of threads per block must be divisible by "
-                    "WARP_SIZE(=%d)",
-                    WARP_SIZE);
-        }
-    } else {
-        *nt = (maxThreadsPerBlock / WARP_SIZE) * WARP_SIZE;
-
-        if (!is_reduce) {
-            // Pass max threads per block, lowering it if necessary
-            // based on kernel occupancy requirements
-            status = ucc_ec_cuda_executor_kernel_calc_max_threads(nt);
-            if (status != UCC_OK) {
-                ec_error(&ucc_ec_cuda.super,
-                         "Error while calculating max threads: %s",
-                         ucc_status_string(status));
-            }
-        }
-    }
-}
-
 static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
 {
     ucc_ec_cuda_config_t *cfg                  = EC_CUDA_CONFIG;
@@ -131,11 +97,6 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     }
     CUDA_CHECK(cudaGetDevice(&device));
     CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
-
-    ucc_ec_cuda_set_threads_nbr((int *)&cfg->exec_num_threads,
-                                prop.maxThreadsPerBlock, 0/*is_reduce*/);
-    ucc_ec_cuda_set_threads_nbr(&cfg->reduce_num_threads,
-                                prop.maxThreadsPerBlock, 1/*is_reduce*/);
 
     if (cfg->reduce_num_blocks != UCC_ULUNITS_AUTO) {
         if (prop.maxGridSize[0] < cfg->reduce_num_blocks) {
