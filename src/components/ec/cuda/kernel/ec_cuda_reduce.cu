@@ -87,11 +87,12 @@ UCC_REDUCE_CUDA_MULTI_DST_SUM<float, false>(ucc_eee_task_reduce_multi_dst_t arg)
     LAUNCH_REDUCE_A(NAME, type, type, _task, s, b, t)
 
 extern "C" {
-ucc_status_t ucc_ec_cuda_reduce(ucc_ee_executor_task_args_t *task,
-                                cudaStream_t                 stream)
+ucc_status_t ucc_ec_cuda_reduce(
+    ucc_ee_executor_task_args_t *task, unsigned num_threads,
+    unsigned num_blocks, cudaStream_t stream)
 {
-    int                th = EC_CUDA_CONFIG->reduce_num_threads;
-    unsigned long      bk = EC_CUDA_CONFIG->reduce_num_blocks;
+    int                th = num_threads;
+    unsigned long      bk = num_blocks;
     ucc_reduction_op_t op;
     ucc_datatype_t     dt;
     size_t             count;
@@ -192,5 +193,4 @@ ucc_status_t ucc_ec_cuda_reduce(ucc_ee_executor_task_args_t *task,
     CUDA_CHECK(cudaGetLastError());
     return UCC_OK;
 }
-
 }

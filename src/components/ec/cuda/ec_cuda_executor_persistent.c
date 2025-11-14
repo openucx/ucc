@@ -123,6 +123,7 @@ ucc_status_t ucc_cuda_executor_persistent_start(ucc_ee_executor_t *executor,
 {
     ucc_ec_cuda_executor_t *eee = ucc_derived_of(executor,
                                                  ucc_ec_cuda_executor_t);
+    ucc_ec_cuda_resources_t *resources;
     ucc_status_t status;
 
     ucc_assert(eee->state == UCC_EC_CUDA_EXECUTOR_INITIALIZED);
@@ -132,7 +133,13 @@ ucc_status_t ucc_cuda_executor_persistent_start(ucc_ee_executor_t *executor,
     eee->pidx             = 0;
     eee->mode             = UCC_EC_CUDA_EXECUTOR_MODE_PERSISTENT;
 
-    status = ucc_ec_cuda_persistent_kernel_start(eee);
+    status = ucc_ec_cuda_get_resources(&resources);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
+
+    status = ucc_ec_cuda_persistent_kernel_start(
+        eee, resources->num_threads_exec, resources->num_blocks_exec);
     if (status != UCC_OK) {
         ec_error(&ucc_ec_cuda.super, "failed to launch executor kernel");
         return status;
