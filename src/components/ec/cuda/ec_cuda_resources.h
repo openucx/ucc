@@ -12,6 +12,7 @@
 #include "utils/ucc_mpool.h"
 
 #define MAX_SUBTASKS 12
+#define WARP_SIZE 32
 
 typedef enum ucc_ec_cuda_executor_state {
     UCC_EC_CUDA_EXECUTOR_INITIALIZED,
@@ -75,6 +76,10 @@ typedef struct ucc_ec_cuda_resources {
     int           streams_initialized;
     int           num_streams;
     cudaStream_t *exec_streams;
+    int           num_threads_reduce;
+    int           num_blocks_reduce;
+    int           num_threads_exec;
+    int           num_blocks_exec;
 } ucc_ec_cuda_resources_t;
 
 typedef enum ucc_ec_cuda_strm_task_mode {
