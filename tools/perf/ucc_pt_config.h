@@ -62,7 +62,8 @@ typedef enum {
 
 typedef enum {
     UCC_PT_GEN_TYPE_EXP,
-    UCC_PT_GEN_TYPE_FILE
+    UCC_PT_GEN_TYPE_FILE,
+    UCC_PT_GEN_TYPE_MATRIX
 } ucc_pt_gen_type_t;
 
 static inline const char* ucc_pt_op_type_str(ucc_pt_op_type_t op)
@@ -82,13 +83,23 @@ static inline const char* ucc_pt_op_type_str(ucc_pt_op_type_t op)
     }
     return NULL;
 }
-
+struct ucc_pt_gen_matrix_config {
+    int kind;
+    int token_size_KB_mean;
+    int token_size_KB_std;
+    int tgt_group_size_mean;
+    int tgt_group_size_std;
+    int num_tokens;
+    int num_hl_ranks;
+    double bias_factor;
+};
 struct ucc_pt_gen_config {
     ucc_pt_gen_type_t type;
     size_t exp_min;
     size_t exp_max;
     std::string file_name;
-    size_t nrep;  // Number of repetitions for file-based generation
+    size_t nrep;  // Number of repetitions for file/matrix-based generation
+    ucc_pt_gen_matrix_config matrix;
 };
 
 struct ucc_pt_benchmark_config {
