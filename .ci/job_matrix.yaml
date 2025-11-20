@@ -18,6 +18,9 @@ env:
   SRC_DIR: "${NVIDIA_ROOT_DIR}/src"
   BIN_DIR: "${NVIDIA_ROOT_DIR}/bin"
   DOCKER_OPT: "--pull always --network=host --uts=host --ipc=host --ulimit stack=67108864 --ulimit memlock=-1 --security-opt seccomp=unconfined --cap-add=SYS_ADMIN --device=/dev/infiniband/ --gpus all"
+  UCC_TIMEOUT_MINUTES: 90
+  DLRM_TIMEOUT_MINUTES: 45
+  MPI_TIMEOUT_MINUTES: 20
 
 kubernetes:
   cloud: il-ipp-blossom-prod
@@ -90,7 +93,7 @@ steps:
       set -x
       echo "INFO: Run UCC tests"
       hostname
-      timeout -k 20 90m docker run -t --rm --name="ucc_tests_${BUILD_NUMBER}" $DOCKER_OPT "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}" bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
+      timeout -k 20 ${UCC_TIMEOUT_MINUTES}m docker run -t --rm --name="ucc_tests_${BUILD_NUMBER}" $DOCKER_OPT "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}" bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
     always: |
       docker rm --force "ucc_tests_${BUILD_NUMBER}" || true
 
@@ -106,6 +109,7 @@ steps:
   #============================================================================
   - name: Run UCC MPI tests
     agentSelector: "{nodeLabel: 'swx-clx01'}"
+    timeout: ${MPI_TIMEOUT_MINUTES}
     run: |
       [ "$UCC_MPI_TESTS" = "false" ] && { echo "MPI tests were skipped !!!";exit 0; }
       echo "INFO: Run UCC MPI tests"
@@ -116,6 +120,7 @@ steps:
   #============================================================================
   - name: Run DLRM tests (UCC/GPU)
     agentSelector: "{nodeLabel: 'swx-clx01'}"
+    timeout: ${DLRM_TIMEOUT_MINUTES}
     run: |
       echo "INFO: Run DLRM tests (UCC/GPU)"
       ${WORKSPACE}/.ci/scripts/run_dlrm_docker.sh
