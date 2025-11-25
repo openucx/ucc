@@ -65,7 +65,7 @@ ucc_status_t ucc_tl_ucp_reduce_init(ucc_tl_ucp_task_t *task)
     task->reduce_kn.scratch_mc_header = NULL;
 
     if (!isleaf || self_avg) {
-    	/* scratch of size radix to fit up to radix - 1 recieved vectors
+    	/* scratch of size radix to fit up to radix - 1 received vectors
     	from its children at each step,
     	and an additional 1 for previous step reduce multi result */
         status = ucc_mc_alloc(&task->reduce_kn.scratch_mc_header,

@@ -23,7 +23,7 @@ ucc_base_coll_alg_info_t
         [UCC_TL_UCP_ALLREDUCE_ALG_DBT] =
             {.id   = UCC_TL_UCP_ALLREDUCE_ALG_DBT,
              .name = "dbt",
-             .desc = "alreduce over double binary tree where a leaf in one tree "
+             .desc = "allreduce over double binary tree where a leaf in one tree "
                      "will be intermediate in other (optimized for BW)"},
         [UCC_TL_UCP_ALLREDUCE_ALG_SLIDING_WINDOW] =
             {.id   = UCC_TL_UCP_ALLREDUCE_ALG_SLIDING_WINDOW,

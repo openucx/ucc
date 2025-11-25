@@ -65,7 +65,7 @@ void ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
         block_count = ucc_sra_kn_compute_block_count(count, rank, p);
         local_seg_index = ucc_kn_compute_seg_index(rank, p->radix_pow, p);
         /*
-         Each rank's recieve (beside's root) must only happen once,
+         Each rank's receive (beside's root) must only happen once,
          and at its correct distance which is previously calclulated and saved
          in task->scatter_kn.recv_dist.
          Receive will only occur in the following iteration to that of
@@ -100,7 +100,7 @@ void ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
          Each non leaf rank will send per iteration to up to radix - 1
          "children" who are within it's current distance.
          Distance is initialized to 1 and each iteration is multiplied by radix.
-         Each rank's send (besides leaf ranks) happens only after it's recieve
+         Each rank's send (besides leaf ranks) happens only after it's receive
          from previous iteration has completed.
         */
         if ((root == rank) || (task->tagged.recv_posted > 0)) {
