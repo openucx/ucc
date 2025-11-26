@@ -25,7 +25,7 @@
           description: "Rebuild docker containers"
       - string:
           name: "conf_file"
-          default: ".ci/job_matrix.yaml"
+          default: ".ci/slurm_tests/job_matrix.yaml"
           description: "Regex to select job config file"
       - string:
           name: "script"
@@ -39,33 +39,25 @@
           name: "UCC_VERSION"
           default: "1.0.0"
           description: "UCC version"
-    triggers:
+#    triggers:
 #      - github-pull-request:
 #          cron: 'H/5 * * * *'
 #          trigger-phrase: '.*\bbot:retest\b.*'
+#          status-context: "ucc"
+#          success-status: "Test PASSed."
+#          failure-status: "Test FAILed."
+#          error-status:   "Test FAILed."
 #          status-add-test-results: true
-#          auth-id: '549927eb-7f38-4a8f-997a-81dd63605782'
+#          # swx-jenkins2 from GitHub Pull Request Builder
+#          auth-id: 'cb48aefb-4f90-4d52-a9bc-63d92382e0be'
 #          org-list: ["Mellanox","openucx"]
 #          white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mellanox-github"]
 #          allow-whitelist-orgs-as-admins: true
-      - github-pull-request:
-          cron: 'H/5 * * * *'
-          trigger-phrase: '.*\bbot:retest\b.*'
-          status-context: "ucc"
-          success-status: "Test PASSed."
-          failure-status: "Test FAILed."
-          error-status:   "Test FAILed."
-          status-add-test-results: true
-          # swx-jenkins2 from GitHub Pull Request Builder
-          auth-id: 'cb48aefb-4f90-4d52-a9bc-63d92382e0be'
-          org-list: ["Mellanox","openucx"]
-          white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mellanox-github"]
-          allow-whitelist-orgs-as-admins: true
     pipeline-scm:
       scm:
         - git:
             url: "{jjb_git}"
-            credentials-id: '549927eb-7f38-4a8f-997a-81dd63605782'
+            credentials-id: 'b042dbee-a0cf-4e23-9efc-a6dc6586f49c'
             branches: [ '$sha1' ]
             shallow-clone: true
             depth: 10
@@ -76,10 +68,10 @@
 
 - project:
     name: proj_name
-    jjb_email: 'artemry@nvidia.com'
-    jjb_proj: 'ucc'
+    jjb_email: 'michaelbr@nvidia.com'
+    jjb_proj: 'UCC/ucc_slurm_tests'
     jjb_git: 'git@github.com:openucx/ucc.git'
-    jjb_owner: 'artemry'
+    jjb_owner: 'michaelbr'
     jjb_jenkinsfile: '.ci/Jenkinsfile.shlib'
     jobs:
       - "{jjb_proj}"
