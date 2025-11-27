@@ -27,7 +27,7 @@
    4. If number of ranks in the team can not form a full radix subtree
       (for radix=2 this means the team size is not power of 2) then there will be
       "extra" ranks which don't participate in the main exchange loop. They
-      will wait to recieve the final data from their "proxy" ranks at the end of
+      will wait to receive the final data from their "proxy" ranks at the end of
       exchange loop of all other ranks.
    5. The knomial scatter and allgather primitives can be used separately.
       However, if they are used together as part of SAG bcast one has to

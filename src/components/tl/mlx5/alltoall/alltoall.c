@@ -380,7 +380,7 @@ ucc_status_t ucc_tl_mlx5_team_test_alltoall_progress(ucc_tl_mlx5_team_t *team)
             goto err_mkeys;
         }
         // for each ASR - qp num, in addition to port lid,
-        // ctrl segment rkey and address, recieve mkey rkey
+        // ctrl segment rkey and address, receive mkey rkey
         local_data_size = sizeof(net_exchange_t);
         if (!a2a->is_dc) {
             /* need more space for net_size - 1 qpns */

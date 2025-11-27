@@ -182,9 +182,9 @@ cl/hier algorithms:
     0 :              rab : intra-node reduce, followed by inter-node allreduce, followed by innode broadcast
     1 :       split_rail : intra-node reduce_scatter, followed by PPN concurrent  inter-node allreduces, followed by intra-node allgather
   Alltoall
-    0 :       node_split : splitting alltoall into two concurrent a2av calls withing the node and outside of it
+    0 :       node_split : splitting alltoall into two concurrent a2av calls within the node and outside of it
   Alltoallv
-    0 :       node_split : splitting alltoallv into two concurrent a2av calls withing the node and outside of it
+    0 :       node_split : splitting alltoallv into two concurrent a2av calls within the node and outside of it
 [...] snip
 ```
 

@@ -15,7 +15,7 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_CL_HIER_ALLTOALLV_ALG_NODE_SPLIT,
              .name = "node_split",
              .desc = "splitting alltoallv into two concurrent a2av calls"
-                     " withing the node and outside of it"},
+                     " within the node and outside of it"},
         [UCC_CL_HIER_ALLTOALLV_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 

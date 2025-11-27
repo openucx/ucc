@@ -509,7 +509,7 @@ ucc_status_t post_recv(ucc_rank_t recvfrom, ucc_rank_t tsize, size_t dt_size,
         return UCC_OK;
     }
 
-    /* check if we have space for maximum recieve. If not, recycle */
+    /* check if we have space for maximum receive. If not, recycle */
     if (meta->offset * dt_size + step_buf_size > tmp_buf_size) {
         new_offset = receive_buffer_recycler(tsize, (unsigned int *)op_metadata,
                                              (int *)op_metadata + tsize,
@@ -583,7 +583,7 @@ static ucc_status_t complete_current_step_receives(ucc_rank_t tsize, int step,
             recv_count = 0;
             recv_size = calculate_head_size(n, dt_size);
             temp_offset = PTR_OFFSET(dst_buf, recv_size * dt_size);
-            /* this is where we parse the recieved bruck-like packet and
+            /* this is where we parse the received bruck-like packet and
              * set the pointers to point on the important data segments.
              */
             while (i < tsize) {
@@ -883,7 +883,7 @@ static void ucc_tl_ucp_alltoallv_hybrid_progress(ucc_coll_task_t *coll_task)
         task->alltoallv_hybrid.iteration++;
     }
     /* The brucks iterations are done. Now we send and recv all the
-     * pairwise we didn't already send and recieve
+     * pairwise we didn't already send and receive
      */
     while ((task->alltoallv_hybrid.num2recv > 0) ||
            (task->alltoallv_hybrid.num2send > 0)) {
