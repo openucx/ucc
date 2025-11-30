@@ -1,0 +1,132 @@
+---
+job: "ucc"
+
+step_allow_single_selector: true
+
+registry_host: "harbor.mellanox.com"
+registry_path: "/torch-ucc"
+registry_auth: "05d98651-e11c-4a57-9cc6-52df79014b89"
+
+volumes:
+  - { mountPath: "/home/swx-jenkins", hostPath: "/labhome/swx-jenkins" }
+
+env:
+  CUDA_VER: 12.9
+  UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}"
+  UCC_DOCKER_IMAGE_NAME: "${registry_host}${registry_path}/${UCC_URI_SUFFIX}"
+  NVIDIA_ROOT_DIR: "/opt/nvidia"
+  SRC_DIR: "${NVIDIA_ROOT_DIR}/src"
+  BIN_DIR: "${NVIDIA_ROOT_DIR}/bin"
+  DOCKER_OPT: "--pull always --network=host --uts=host --ipc=host --ulimit stack=67108864 --ulimit memlock=-1 --security-opt seccomp=unconfined --cap-add=SYS_ADMIN --device=/dev/infiniband/ --gpus all"
+
+kubernetes:
+  cloud: il-ipp-blossom-prod
+  namespace: hpcx
+  limits: "{memory: 16Gi, cpu: 16000m}"
+  requests: "{memory: 16Gi, cpu: 16000m}"
+
+credentials:
+  - {
+      credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0",
+      usernameVariable: "UCC_USERNAME",
+      passwordVariable: "UCC_PASSWORD",
+    }
+
+# cloud pod to build the shared docker image
+runs_on_dockers:
+  - {
+      file: ".ci/Dockerfile.ngc_pytorch",
+      name: "ngc_pytorch",
+      tag: "${BUILD_NUMBER}",
+      arch: "x86_64",
+      uri: "${UCC_URI_SUFFIX}",
+      build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER}",
+    }
+  - {
+      file: ".ci/dockerfiles/Dockerfile.build_helper",
+      name: "build_helper",
+      tag: "latest",
+      arch: "x86_64",
+      uri: "$arch/$name",
+      build_args: "--no-cache",
+    }
+
+# bare metal
+runs_on_agents:
+  - nodeLabel: "swx-clx01"
+  - nodeLabel: "swx-clx02"
+  - nodeLabel: "ml-test-node-gpu"
+
+timeout_minutes: 360
+
+steps:
+  #============================================================================
+  - name: Init docker
+    agentSelector:
+      - "{nodeLabel: 'swx-clx01'}"
+      - "{nodeLabel: 'swx-clx02'}"
+    run: |
+      set -x
+      # make sure we always have base image for faster pull of CI image
+      docker pull "${UCC_DOCKER_IMAGE_NAME}:base"
+      # pull the CI image
+      docker pull "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+
+  #============================================================================
+  - name: Run Coverity
+    credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0"
+    agentSelector: "{nodeLabel: 'ml-test-node-gpu'}"
+    run: |
+      export UCC_PASSWORD=$UCC_PASSWORD
+      export UCC_USERNAME=$UCC_USERNAME
+      echo "Running coverity"
+      ${WORKSPACE}/.ci/scripts/coverity.sh
+    archiveArtifacts: .ci/scripts/cov-build/*
+
+  #============================================================================
+  - name: Run UCC / Torch-UCC tests
+    agentSelector: "{nodeLabel: 'swx-clx02'}"
+    run: |
+      set -x
+      echo "INFO: Run UCC tests"
+      hostname
+      timeout -k 20 90m docker run -t --rm --name="ucc_tests_${BUILD_NUMBER}" $DOCKER_OPT "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}" bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
+    always: |
+      docker rm --force "ucc_tests_${BUILD_NUMBER}" || true
+
+  #============================================================================
+  - name: Run docker containers
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    run: |
+      echo "INFO: Run docker containers"
+      ${WORKSPACE}/.ci/scripts/run_docker.sh
+    onfail: |
+      ${WORKSPACE}/.ci/scripts/stop_docker.sh
+
+  #============================================================================
+  - name: Run UCC MPI tests
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    run: |
+      [ "$UCC_MPI_TESTS" = "false" ] && { echo "MPI tests were skipped !!!";exit 0; }
+      echo "INFO: Run UCC MPI tests"
+      ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh
+    onfail: |
+      ${WORKSPACE}/.ci/scripts/stop_docker.sh
+
+  #============================================================================
+  - name: Run DLRM tests (UCC/GPU)
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    run: |
+      echo "INFO: Run DLRM tests (UCC/GPU)"
+      ${WORKSPACE}/.ci/scripts/run_dlrm_docker.sh
+    always: |
+      ${WORKSPACE}/.ci/scripts/stop_docker.sh
+
+pipeline_stop:
+  containerSelector: "{name:'build_helper'}"
+  run: |
+    set -x
+    export HOSTFILE=${WORKSPACE}/.ci/configs/swx-clx01/hostfile.txt
+    export BUILD_NUMBER=${BUILD_NUMBER}
+    export UCC_DOCKER_IMAGE_NAME=${UCC_DOCKER_IMAGE_NAME}
+    sudo -E -u swx-jenkins ${WORKSPACE}/.ci/scripts/clean_docker.sh
