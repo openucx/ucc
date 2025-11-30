@@ -6,7 +6,6 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
     branches:
-      - 'release/*'
       - master
   workflow_dispatch:
       inputs:
