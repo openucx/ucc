@@ -138,6 +138,74 @@
             browser-url: "{jjb_git}"
       script-path: "{jjb_jenkinsfile}"
 
+- job-template:
+    name: "{jjb_proj}-ci-dispatcher"
+    project-type: pipeline
+    folder: "{jjb_folder}"
+    properties:
+      - github:
+          url: "{jjb_git_web}"
+      - build-discarder:
+          days-to-keep: 14
+          num-to-keep: 1000
+      - inject:
+          keep-system-variables: true
+          properties-content: |
+            jjb_proj={jjb_proj}-ci-dispatcher
+    triggers:
+      - generic-webhook-trigger:
+          token: "{jjb_proj}-ci-dispatcher"
+          print-contributors: true
+          print-posted-content: true
+          silent-response: false
+          cause: "Generic Cause"
+          post-content-params:
+            - type: JSONPath
+              key: githubData
+              value: $
+            - type: JSONPath
+              key: VARIABLE_FROM_POST
+              value: $
+    description: Do NOT edit this job through the Web GUI !
+    concurrent: true
+    sandbox: true
+    parameters:
+      - string:
+          name: "VARIABLE_FROM_POST"
+          default: ""
+          description: ""
+    dsl: |
+        @Library('blossom-github-lib@master')
+        import ipp.blossom.*
+
+        withCredentials([usernamePassword(credentialsId: 'svcnbu-swx-hpcx-github-token', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {{
+          githubHelper = GithubHelper.getInstance("${{GIT_PASSWORD}}", VARIABLE_FROM_POST)
+        }}
+
+        def blueOceanUrl = "${{JENKINS_URL}}blue/organizations/jenkins/{jjb_proj}-ci-dispatcher/detail/{jjb_proj}-ci-dispatcher/${{BUILD_NUMBER}}/pipeline/"
+        githubHelper.updateCommitStatus(blueOceanUrl, "Blossom CI started", GitHubCommitState.PENDING)
+        currentBuild.description = githubHelper.getBuildDescription()
+
+        try {{
+            parallel build: {{
+                build job: 'ucc', parameters: [
+                    string(name: 'sha1', value: githubHelper.getMergedSHA()),
+                    string(name: 'githubData', value: VARIABLE_FROM_POST)
+                ], wait: true
+            }}, hpcsdk: {{
+                build job: 'ucc-build-hpcsdk', parameters: [
+                    string(name: 'sha1', value: githubHelper.getMergedSHA()),
+                    string(name: 'githubData', value: VARIABLE_FROM_POST)
+                ], wait: true
+            }}
+
+            githubHelper.updateCommitStatus(blueOceanUrl, "Blossom CI succeeded", GitHubCommitState.SUCCESS)
+        }} catch(Exception ex) {{
+            println ex
+            githubHelper.updateCommitStatus(blueOceanUrl, "Blossom CI failed", GitHubCommitState.FAILURE)
+            error("failed")
+        }}
+
 - project:
     name: ucc-build
     jjb_proj: 'ucc'
@@ -152,3 +220,4 @@
     jobs:
       - "{jjb_proj}"
       - "{jjb_proj}-build-hpcsdk"
+      - "{jjb_proj}-ci-dispatcher"
