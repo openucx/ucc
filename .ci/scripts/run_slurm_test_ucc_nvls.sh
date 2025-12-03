@@ -5,7 +5,9 @@ set -xvEe -o pipefail
 # ensure all variables to be set are in stand alone and simple format
 # complex bash string operations are not supported in envsubst
 
-srun --job-name=${SLM_JOB_NAME} \
+srun \
+    --jobid=${SLM_JOB_ID} \
+    --nodes=${SLM_NODES} \
     --ntasks-per-node=1 \
     --gpus-per-node=1 \
     --mpi=pmix \

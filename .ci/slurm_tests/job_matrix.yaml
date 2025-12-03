@@ -6,7 +6,7 @@ registry_path: "/torch-ucc"
 registry_auth: "05d98651-e11c-4a57-9cc6-52df79014b89"
 
 volumes:
-  - { mountPath: "/home/swx-jenkins", hostPath: "/labhome/swx-jenkins" }
+  - { mountPath: "/home/svcnbu-swx-hpcx", hostPath: "/labhome/svcnbu-swx-hpcx" }
 
 env:
   CUDA_VER: 12.9
@@ -46,15 +46,17 @@ runs_on_dockers:
     }
   - {
       name: 'slurm_executor_1',
-      url: 'nbu-harbor.gtm.nvidia.com/swx-lab-platform/scctl:latest',
+      file: ".ci/Dockerfile.slurm_executor",
       arch: 'x86_64',
+      tag: '${BUILD_NUMBER}',
       SLM_HEAD_NODE: 'scctl',
       SLM_PARTITION: 'funk'
     }
   - {
       name: 'slurm_executor_2',
-      url: 'nbu-harbor.gtm.nvidia.com/swx-lab-platform/scctl:latest',
+      file: ".ci/Dockerfile.slurm_executor",
       arch: 'x86_64',
+      tag: '${BUILD_NUMBER}',
       SLM_HEAD_NODE: 'hpchead',
       SLM_PARTITION: 'soul'
     }

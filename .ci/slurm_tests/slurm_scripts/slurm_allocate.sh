@@ -2,6 +2,7 @@
 set -xvEe -o pipefail
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+source "${SCRIPT_DIR}/common.sh"
 
 : "${SLM_JOB_NAME:?SLM_JOB_NAME is not set}"
 : "${SLM_PARTITION:?SLM_PARTITION is not set}"
@@ -23,7 +24,8 @@ if [ "${SLM_HEAD_NODE}" == "scctl" ]; then
     scctl --raw-errors client connect -s "${SCRIPT_DIR}/fix_enroot.sh"
     scctl --raw-errors client connect "${slurm_cmd}"
 else
-    : # TODO: implement ssh allocation, run fix_enroot.sh
+    "${SCRIPT_DIR}/fix_ssh_key.sh"
+    ${ssh_cmd} "${SLM_HEAD_NODE}" "${slurm_cmd}"
 fi
 
 echo "INFO: Allocate Slurm resources"

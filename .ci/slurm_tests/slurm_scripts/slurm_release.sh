@@ -1,6 +1,9 @@
 #!/bin/bash
 set -xvEe -o pipefail
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+source "${SCRIPT_DIR}/common.sh"
+
 : "${SLM_JOB_NAME:?SLM_JOB_NAME is not set}"
 
 slurm_headnode_list="scctl hpchead"
@@ -18,6 +21,6 @@ for slurm_headnode in ${slurm_headnode_list}; do
         fi
         scctl --raw-errors client connect "${slurm_cmd}"
     else
-        ssh "${slurm_headnode}" "${slurm_cmd}"
+        ${ssh_cmd} "${slurm_headnode}" "${slurm_cmd}"
     fi
 done
