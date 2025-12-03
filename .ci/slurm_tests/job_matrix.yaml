@@ -1,8 +1,6 @@
 ---
 job: "ucc"
 
-step_allow_single_selector: true
-
 registry_host: "harbor.mellanox.com"
 registry_path: "/torch-ucc"
 registry_auth: "05d98651-e11c-4a57-9cc6-52df79014b89"
@@ -13,13 +11,12 @@ volumes:
 env:
   CUDA_VER: 12.9
   UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}"
-  UCC_DOCKER_IMAGE_NAME: "${registry_host}${registry_path}/${UCC_URI_SUFFIX}"
   NVIDIA_ROOT_DIR: "/opt/nvidia"
   SRC_DIR: "${NVIDIA_ROOT_DIR}/src"
   BIN_DIR: "${NVIDIA_ROOT_DIR}/bin"
-  DOCKER_OPT: "--pull always --network=host --uts=host --ipc=host --ulimit stack=67108864 --ulimit memlock=-1 --security-opt seccomp=unconfined --cap-add=SYS_ADMIN --device=/dev/infiniband/ --gpus all"
+  # Enroot requires # in the image name after the registry host
+  UCC_ENROOT_IMAGE_NAME: "${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${BUILD_NUMBER}"
   SLM_JOB_NAME: "ucc_tests_${BUILD_NUMBER}"
-  SLM_PARTITION: "funk"
   SLM_NODES: "2"
 
 
@@ -45,42 +42,42 @@ runs_on_dockers:
       arch: "x86_64",
       uri: "${UCC_URI_SUFFIX}",
       build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER}",
+      category: 'tool' # tool category makes this container not to participate in standard execution flow, one has to explicitly specify it in the job matrix
     }
   - {
-      name: 'slurm_executor',
+      name: 'slurm_executor_1',
       url: 'nbu-harbor.gtm.nvidia.com/swx-lab-platform/scctl:latest',
-      arch: 'x86_64'
+      arch: 'x86_64',
+      SLM_HEAD_NODE: 'scctl',
+      SLM_PARTITION: 'funk'
     }
+  - {
+      name: 'slurm_executor_2',
+      url: 'nbu-harbor.gtm.nvidia.com/swx-lab-platform/scctl:latest',
+      arch: 'x86_64',
+      SLM_HEAD_NODE: 'hpchead',
+      SLM_PARTITION: 'soul'
+    }
+
+
 
 timeout_minutes: 60
 
 steps:
   - name: Allocate Slurm resources
     credentialsId: "svcnbu-swx-hpcx-corporate-user-pass"
-    containerSelector: "{name: 'slurm_executor'}"
     run: |
-      export SLURM_VIA="scctl"
-      export SLURM_CMD="salloc -N ${SLM_NODES} -p ${SLM_PARTITION} --job-name=${SLM_JOB_NAME} --immediate=120 --time=00:30:00 --no-shell"
-      ${WORKSPACE}/.ci/slurm_tests/slurm_cmd.sh init
-      ${WORKSPACE}/.ci/slurm_tests/slurm_cmd.sh exec
+      ${WORKSPACE}/.ci/slurm_tests/slurm_scripts/slurm_allocate.sh
+
 
   - name: Run UCC tests on slurm cluster
-    containerSelector: "{name: 'slurm_executor'}"
     run: |
-      set -xv
-      echo "INFO: Run UCC tests on Slurm cluster"
-      envsubst < ${WORKSPACE}/.ci/scripts/run_slurm_tests_ucc.sh > ${WORKSPACE}/slurm_test.sh
-      cat  ${WORKSPACE}/slurm_test.sh
-      export SLURM_VIA="scctl"
-      export SLURM_CMD="${WORKSPACE}/slurm_test.sh"
-      ${WORKSPACE}/.ci/slurm_tests/slurm_cmd.sh exec_file
+      ${WORKSPACE}/.ci/slurm_tests/slurm_scripts/slurm_run_test_script.sh ${WORKSPACE}/.ci/scripts/run_slurm_test_ucc_nvls.sh
+
 
 pipeline_stop:
-  containerSelector: "{name:'slurm_executor'}"
   credentialsId: "svcnbu-swx-hpcx-corporate-user-pass"
+  containerSelector: "{name: 'slurm_executor_1'}"
   run: |
-    set -xv
-    export SLURM_VIA="scctl"
-    export SLURM_CMD="scancel --jobname=${SLM_JOB_NAME}"
-    ${WORKSPACE}/.ci/slurm_tests/slurm_cmd.sh init
-    ${WORKSPACE}/.ci/slurm_tests/slurm_cmd.sh exec
+    ${WORKSPACE}/.ci/slurm_tests/slurm_scripts/slurm_release.sh
+
