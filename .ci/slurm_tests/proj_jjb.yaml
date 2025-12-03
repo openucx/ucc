@@ -68,10 +68,8 @@
 
 - project:
     name: proj_name
-    jjb_email: 'michaelbr@nvidia.com'
-    jjb_proj: 'UCC/ucc_slurm_tests'
+    jjb_proj: 'UCC/ucc-ci-nvls-tests'
     jjb_git: 'git@github.com:openucx/ucc.git'
-    jjb_owner: 'michaelbr'
     jjb_jenkinsfile: '.ci/Jenkinsfile.shlib'
     jobs:
       - "{jjb_proj}"
