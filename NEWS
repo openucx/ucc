@@ -6,7 +6,7 @@
 
 ## Current
 
-## 1.6.0 (October 13, 2025)
+## 1.6.0 (November 14th, 2025)
 
 ## New Features and Enhancements
 
@@ -29,14 +29,20 @@
 - Enable knomial allgatherv {PR #1188}
 - Added congestion avoidant onesided Alltoall {PR #1096}
 
+### EC/CUDA
+- Fixed cuctx creation in EC CUDA {PR #1219}
+
 ### Build and Test
 - Added check to see if target exists in CMAKE {PR #1173}
 - Fixed build with GCC 14 {PR #1190}
 - Added gtest and mpi test for ucc_mem_map and ucc_mem_unmap {PR #1165}
+- Check for CX7 in wait_on_data gtest {PR #1127}
 
 ### Tools
 - Updated perftest to print BusBW {PR #1186}
 - Added support for onesided alltoall in perftest {PR #1194}
+- Added CUDA managed memory type to ucc_perftest {PR #1199}
+- Fixes for onesided alltoall in perftest {PR #1216}
 
 ## 1.5.0 (July 31st, 2025)
 
