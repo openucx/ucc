@@ -157,15 +157,25 @@
 
         try {{
             parallel UCC: {{
-                build job: 'ucc', parameters: [
+                def run = build job: 'ucc', parameters: [
                     string(name: 'sha1', value: githubHelper.getMergedSHA()),
                     string(name: 'githubData', value: VARIABLE_FROM_POST)
-                ], wait: true
+                ], propagate: false
+                if (run.resultIsBetterOrEqualTo('SUCCESS')) {{
+                    echo "UCC Job SUCCESS: ${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc/detail/ucc/${{run.number}}/pipeline"
+                }} else {{
+                    error("UCC Job FAILED: ${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc/detail/ucc/${{run.number}}/pipeline")
+                }}
             }}, 'ucc-build-hpcsdk': {{
-                build job: 'ucc-build-hpcsdk', parameters: [
+                def run = build job: 'ucc-build-hpcsdk', parameters: [
                     string(name: 'sha1', value: githubHelper.getMergedSHA()),
                     string(name: 'githubData', value: VARIABLE_FROM_POST)
-                ], wait: true
+                ], propagate: false
+                if (run.resultIsBetterOrEqualTo('SUCCESS')) {{
+                    echo "HPC-SDK Job SUCCESS: ${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc-build-hpcsdk/detail/ucc-build-hpcsdk/${{run.number}}/pipeline"
+                }} else {{
+                    error("HPC-SDK Job FAILED: ${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc-build-hpcsdk/detail/ucc-build-hpcsdk/${{run.number}}/pipeline")
+                }}
             }}
 
             githubHelper.updateCommitStatus(blueOceanUrl, "Blossom CI succeeded", GitHubCommitState.SUCCESS)
