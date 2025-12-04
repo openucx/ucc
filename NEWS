@@ -41,7 +41,7 @@
 ### Tools
 - Updated perftest to print BusBW {PR #1186}
 - Added support for onesided alltoall in perftest {PR #1194}
-- Added CUDA managed memory type to ucc_perftest {PR #1199} 
+- Added CUDA managed memory type to ucc_perftest {PR #1199}
 - Fixes for onesided alltoall in perftest {PR #1216}
 
 ## 1.5.0 (July 31st, 2025)
