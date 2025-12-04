@@ -39,7 +39,11 @@
           name: "UCC_VERSION"
           default: "1.0.0"
           description: "UCC version"
-    triggers:
+      - string:
+          name: "githubData"
+          default: ""
+          description: "Variables from post"
+#    triggers:
 #      - github-pull-request:
 #          cron: 'H/5 * * * *'
 #          trigger-phrase: '.*\bbot:retest\b.*'
@@ -48,20 +52,6 @@
 #          org-list: ["Mellanox","openucx"]
 #          white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mellanox-github"]
 #          allow-whitelist-orgs-as-admins: true
-      - github-pull-request:
-          cron: 'H/5 * * * *'
-          trigger-phrase: '.*\bbot:(?:ucc:)?retest\b.*'
-          status-context: "ucc"
-          success-status: "Test PASSed."
-          failure-status: "Test FAILed."
-          error-status:   "Test FAILed."
-          status-add-test-results: true
-          cancel-builds-on-update: true
-          # swx-jenkins2 from GitHub Pull Request Builder
-          auth-id: "{jjb_ghprb_auth_id}"
-          org-list: ["Mellanox","openucx"]
-          white-list: ["svcnbu-swx-hpcx", "swx-jenkins","swx-jenkins2","swx-jenkins3","mellanox-github"]
-          allow-whitelist-orgs-as-admins: true
     pipeline-scm:
       scm:
         - git:
@@ -109,22 +99,26 @@
           name: "CONF_FILE"
           default: ".ci/pipeline/build_hpcsdk_matrix.yaml"
           description: "Regex to select job config file"
-    triggers:
-      - github-pull-request:
-          cron: 'H/5 * * * *'
-          trigger-phrase: '.*\bbot:(?:hpcsdk:)?retest\b.*'
-          status-context: "ucc-hpcsdk"
-          success-status: "Build PASSed."
-          failure-status: "Build FAILed."
-          error-status:   "Build FAILed."
-          status-url: "${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc-build-hpcsdk/detail/ucc-build-hpcsdk/${{BUILD_NUMBER}}/pipeline"
-          status-add-test-results: true
-          cancel-builds-on-update: true
-          # swx-jenkins2 from GitHub Pull Request Builder
-          auth-id: "{jjb_ghprb_auth_id}"
-          org-list: ["Mellanox","openucx"]
-          white-list: ["svcnbu-swx-hpcx"]
-          allow-whitelist-orgs-as-admins: true
+      - string:
+          name: "githubData"
+          default: ""
+          description: "Variables from post"
+#    triggers:
+#      - github-pull-request:
+#          cron: 'H/5 * * * *'
+#          trigger-phrase: '.*\bbot:(?:hpcsdk:)?retest\b.*'
+#          status-context: "ucc-hpcsdk"
+#          success-status: "Build PASSed."
+#          failure-status: "Build FAILed."
+#          error-status:   "Build FAILed."
+#          status-url: "${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc-build-hpcsdk/detail/ucc-build-hpcsdk/${{BUILD_NUMBER}}/pipeline"
+#          status-add-test-results: true
+#          cancel-builds-on-update: true
+#          # swx-jenkins2 from GitHub Pull Request Builder
+#          auth-id: "{jjb_ghprb_auth_id}"
+#          org-list: ["Mellanox","openucx"]
+#          white-list: ["svcnbu-swx-hpcx"]
+#          allow-whitelist-orgs-as-admins: true
     pipeline-scm:
       scm:
         - git:
@@ -188,23 +182,15 @@
 
         try {{
             parallel UCC: {{
-                def run = build job: 'ucc', parameters: [
+                build job: 'ucc', parameters: [
                     string(name: 'sha1', value: githubHelper.getMergedSHA()),
                     string(name: 'githubData', value: VARIABLE_FROM_POST)
-                ], wait: true, propagate: false
-                echo "See UCC Job status: ${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc/detail/ucc/${{run.number}}/pipeline"
-                if (run.getResult() != 'SUCCESS') {{
-                    error("Job ucc failed")
-                }}
+                ], wait: true
             }}, 'ucc-build-hpcsdk': {{
-                def run = build job: 'ucc-build-hpcsdk', parameters: [
+                build job: 'ucc-build-hpcsdk', parameters: [
                     string(name: 'sha1', value: githubHelper.getMergedSHA()),
                     string(name: 'githubData', value: VARIABLE_FROM_POST)
-                ], wait: true, propagate: false
-                echo "See HPC-SDK Job status: ${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc-build-hpcsdk/detail/ucc-build-hpcsdk/${{run.number}}/pipeline"
-                if (run.getResult() != 'SUCCESS') {{
-                    error("Job ucc-build-hpcsdk failed")
-                }}
+                ], wait: true
             }}
 
             githubHelper.updateCommitStatus(blueOceanUrl, "Blossom CI succeeded", GitHubCommitState.SUCCESS)
