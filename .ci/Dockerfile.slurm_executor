@@ -8,6 +8,6 @@ RUN apk update && \
 
 
 RUN groupadd -g 30 hardware
-RUN useradd --no-create-home --uid 149917 --gid 30 --shell /bin/bash svcnbu-swx-hpcx
+RUN useradd --no-create-home --uid 149917 --gid 30 -d /custom_home/svcnbu-swx-hpcx --no-create-home --shell /bin/bash svcnbu-swx-hpcx
 
 USER svcnbu-swx-hpcx

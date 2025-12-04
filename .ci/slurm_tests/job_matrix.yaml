@@ -6,7 +6,7 @@ registry_path: "/torch-ucc"
 registry_auth: "05d98651-e11c-4a57-9cc6-52df79014b89"
 
 volumes:
-  - { mountPath: "/home/svcnbu-swx-hpcx", hostPath: "/labhome/svcnbu-swx-hpcx" }
+  - { mountPath: "/custom_home/svcnbu-swx-hpcx", hostPath: "/labhome/svcnbu-swx-hpcx" }
 
 env:
   CUDA_VER: 12.9
@@ -74,7 +74,7 @@ steps:
 
   - name: Run UCC tests on slurm cluster
     run: |
-      ${WORKSPACE}/.ci/slurm_tests/slurm_scripts/slurm_run_test_script.sh ${WORKSPACE}/.ci/scripts/run_slurm_test_ucc_nvls.sh
+      ${WORKSPACE}/.ci/slurm_tests/slurm_scripts/slurm_run_test_script.sh ${WORKSPACE}/.ci/scripts/run_test_nvls_slurm.sh
 
 
 pipeline_stop:
