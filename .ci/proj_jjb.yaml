@@ -43,15 +43,6 @@
           name: "githubData"
           default: ""
           description: "Variables from post"
-#    triggers:
-#      - github-pull-request:
-#          cron: 'H/5 * * * *'
-#          trigger-phrase: '.*\bbot:retest\b.*'
-#          status-add-test-results: true
-#          auth-id: '549927eb-7f38-4a8f-997a-81dd63605782'
-#          org-list: ["Mellanox","openucx"]
-#          white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mellanox-github"]
-#          allow-whitelist-orgs-as-admins: true
     pipeline-scm:
       scm:
         - git:
@@ -103,22 +94,6 @@
           name: "githubData"
           default: ""
           description: "Variables from post"
-#    triggers:
-#      - github-pull-request:
-#          cron: 'H/5 * * * *'
-#          trigger-phrase: '.*\bbot:(?:hpcsdk:)?retest\b.*'
-#          status-context: "ucc-hpcsdk"
-#          success-status: "Build PASSed."
-#          failure-status: "Build FAILed."
-#          error-status:   "Build FAILed."
-#          status-url: "${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc-build-hpcsdk/detail/ucc-build-hpcsdk/${{BUILD_NUMBER}}/pipeline"
-#          status-add-test-results: true
-#          cancel-builds-on-update: true
-#          # swx-jenkins2 from GitHub Pull Request Builder
-#          auth-id: "{jjb_ghprb_auth_id}"
-#          org-list: ["Mellanox","openucx"]
-#          white-list: ["svcnbu-swx-hpcx"]
-#          allow-whitelist-orgs-as-admins: true
     pipeline-scm:
       scm:
         - git:
