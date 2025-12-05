@@ -61,7 +61,7 @@ function mpi_params {
     fi
     echo "-np $((nnodes*ppn)) --oversubscribe --hostfile ${HOSTFILE} \
 --map-by ppr:$ppn:node --bind-to socket  \
--x PATH -x LD_LIBRARY_PATH --mca opal_common_ucx_opal_mem_hooks 1 --mca plm_rsh_args -p12345 \
+-x PATH -x LD_LIBRARY_PATH --mca opal_common_ucx_opal_mem_hooks 1 --mca plm_rsh_args -p${DOCKER_SSH_PORT} \
 --mca coll ^ucc,hcoll \
 -x UCX_NET_DEVICES=$DEV:1"
 }
