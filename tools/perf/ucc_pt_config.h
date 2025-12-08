@@ -7,13 +7,14 @@
 #ifndef UCC_PT_CONFIG_H
 #define UCC_PT_CONFIG_H
 
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <map>
-#include <getopt.h>
-#include <ucc/api/ucc.h>
 #include "utils/ucc_log.h"
+#include <getopt.h>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <stdint.h>
+#include <string>
+#include <ucc/api/ucc.h>
 
 #define UCC_PT_DEFAULT_N_BUFS 0
 
@@ -62,7 +63,8 @@ typedef enum {
 
 typedef enum {
     UCC_PT_GEN_TYPE_EXP,
-    UCC_PT_GEN_TYPE_FILE
+    UCC_PT_GEN_TYPE_FILE,
+    UCC_PT_GEN_TYPE_TRAFFIC_MATRIX
 } ucc_pt_gen_type_t;
 
 static inline const char* ucc_pt_op_type_str(ucc_pt_op_type_t op)
@@ -82,13 +84,27 @@ static inline const char* ucc_pt_op_type_str(ucc_pt_op_type_t op)
     }
     return NULL;
 }
-
+struct ucc_pt_gen_traffic_matrix_config {
+    int    kind;
+    int    token_size_KB_mean;
+    int    token_size_KB_std;
+    int    tgt_group_size_mean;
+    int    tgt_group_size_std;
+    int    num_tokens;
+    int    num_hl_ranks;
+    double bias_factor;
+};
 struct ucc_pt_gen_config {
     ucc_pt_gen_type_t type;
-    size_t exp_min;
-    size_t exp_max;
+    size_t      nrep; // Number of repetitions for file/matrix-based generation
     std::string file_name;
-    size_t nrep;  // Number of repetitions for file-based generation
+    union {
+        struct {
+            size_t min;
+            size_t max;
+        } exp;
+        ucc_pt_gen_traffic_matrix_config matrix;
+    };
 };
 
 struct ucc_pt_benchmark_config {
@@ -112,6 +128,7 @@ struct ucc_pt_benchmark_config {
     int                root;
     int                root_shift;
     int                mult_factor;
+    uint64_t           seed;
     ucc_pt_gen_config  gen;
 };
 
