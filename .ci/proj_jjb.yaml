@@ -157,24 +157,28 @@
 
         try {{
             parallel UCC: {{
-                def run = build job: 'ucc', parameters: [
+                def jobName = 'ucc'
+                def run = build job: jobName, parameters: [
                     string(name: 'sha1', value: githubHelper.getMergedSHA()),
                     string(name: 'githubData', value: VARIABLE_FROM_POST)
                 ], propagate: false
+                def jobUrl = "${{JENKINS_URL}}blue/organizations/jenkins/{jjb_folder}%2F${{jobName}}/detail/${{jobName}}/${{run.number}}/pipeline"
                 if (run.resultIsBetterOrEqualTo('SUCCESS')) {{
-                    echo "UCC Job SUCCESS: ${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc/detail/ucc/${{run.number}}/pipeline"
+                    echo "${{jobName}} SUCCESS: ${{jobUrl}}"
                 }} else {{
-                    error("UCC Job FAILED: ${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc/detail/ucc/${{run.number}}/pipeline")
+                    error("${{jobName}} FAILED: ${{jobUrl}}")
                 }}
             }}, 'ucc-build-hpcsdk': {{
-                def run = build job: 'ucc-build-hpcsdk', parameters: [
+                def jobName = 'ucc-build-hpcsdk'
+                def run = build job: jobName, parameters: [
                     string(name: 'sha1', value: githubHelper.getMergedSHA()),
                     string(name: 'githubData', value: VARIABLE_FROM_POST)
                 ], propagate: false
+                def jobUrl = "${{JENKINS_URL}}blue/organizations/jenkins/{jjb_folder}%2F${{jobName}}/detail/${{jobName}}/${{run.number}}/pipeline"
                 if (run.resultIsBetterOrEqualTo('SUCCESS')) {{
-                    echo "HPC-SDK Job SUCCESS: ${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc-build-hpcsdk/detail/ucc-build-hpcsdk/${{run.number}}/pipeline"
+                    echo "${{jobName}} SUCCESS: ${{jobUrl}}"
                 }} else {{
-                    error("HPC-SDK Job FAILED: ${{JENKINS_URL}}blue/organizations/jenkins/UCC%2Fucc-build-hpcsdk/detail/ucc-build-hpcsdk/${{run.number}}/pipeline")
+                    error("${{jobName}} FAILED: ${{jobUrl}}")
                 }}
             }}
 
