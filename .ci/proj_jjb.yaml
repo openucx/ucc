@@ -147,7 +147,7 @@
     jjb_folder: "UCC"
     jjb_owner: 'artemry'
     jjb_jenkinsfile: '.ci/Jenkinsfile.shlib'
-    jjb_gh_auth_id: 'b042dbee-a0cf-4e23-9efc-a6dc6586f49c'
+    jjb_gh_auth_id: 'svcnbu-swx-hpcx_ssh_with_key'
     jjb_ghprb_auth_id: 'ghprb-auth-svcnbu-swx-hpcx'
     jobs:
       - "{jjb_proj}"
