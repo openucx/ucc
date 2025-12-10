@@ -1,0 +1,85 @@
+---
+job: "ucc"
+
+registry_host: "harbor.mellanox.com"
+registry_path: "/torch-ucc"
+registry_auth: "05d98651-e11c-4a57-9cc6-52df79014b89"
+
+volumes:
+  - { mountPath: "/custom_home/svcnbu-swx-hpcx", hostPath: "/labhome/svcnbu-swx-hpcx" }
+
+env:
+  CUDA_VER: 12.9
+  UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}"
+  NVIDIA_ROOT_DIR: "/opt/nvidia"
+  SRC_DIR: "${NVIDIA_ROOT_DIR}/src"
+  BIN_DIR: "${NVIDIA_ROOT_DIR}/bin"
+  # Enroot requires # in the image name after the registry host
+  UCC_ENROOT_IMAGE_NAME: "${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${BUILD_NUMBER}"
+  SLM_JOB_NAME: "ucc_tests_${BUILD_NUMBER}"
+  SLM_NODES: "2"
+
+
+kubernetes:
+  cloud: il-ipp-blossom-prod
+  namespace: hpcx
+  limits: "{memory: 16Gi, cpu: 16000m}"
+  requests: "{memory: 16Gi, cpu: 16000m}"
+
+credentials:
+  - {
+      credentialsId: "svcnbu-swx-hpcx-corporate-user-pass",
+      usernameVariable: "SERVICE_USER_USERNAME",
+      passwordVariable: "SERVICE_USER_PASSWORD",
+    }
+
+runs_on_dockers:
+  # cloud pod to build the shared docker image
+  - {
+      file: ".ci/Dockerfile.ngc_pytorch",
+      name: "ngc_pytorch",
+      tag: "${BUILD_NUMBER}",
+      arch: "x86_64",
+      uri: "${UCC_URI_SUFFIX}",
+      build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER}",
+      category: 'tool' # tool category makes this container not to participate in standard execution flow, one has to explicitly specify it in the job matrix
+    }
+  - {
+      name: 'slurm_executor_1',
+      file: ".ci/Dockerfile.slurm_executor",
+      arch: 'x86_64',
+      tag: '${BUILD_NUMBER}',
+      SLM_HEAD_NODE: 'scctl',
+      SLM_PARTITION: 'funk'
+    }
+  - {
+      name: 'slurm_executor_2',
+      file: ".ci/Dockerfile.slurm_executor",
+      arch: 'x86_64',
+      tag: '${BUILD_NUMBER}',
+      SLM_HEAD_NODE: 'hpchead',
+      SLM_PARTITION: 'soul'
+    }
+
+
+
+timeout_minutes: 60
+
+steps:
+  - name: Allocate Slurm resources
+    credentialsId: "svcnbu-swx-hpcx-corporate-user-pass"
+    run: |
+      ${WORKSPACE}/.ci/slurm_tests/slurm_scripts/slurm_allocate.sh
+
+
+  - name: Run UCC tests on slurm cluster
+    run: |
+      ${WORKSPACE}/.ci/slurm_tests/slurm_scripts/slurm_run_test_script.sh ${WORKSPACE}/.ci/scripts/run_test_nvls_slurm.sh
+
+
+pipeline_stop:
+  credentialsId: "svcnbu-swx-hpcx-corporate-user-pass"
+  containerSelector: "{name: 'slurm_executor_1'}"
+  run: |
+    ${WORKSPACE}/.ci/slurm_tests/slurm_scripts/slurm_release.sh
+
