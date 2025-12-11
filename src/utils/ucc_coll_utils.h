@@ -379,6 +379,7 @@ static inline ucc_rank_t ucc_ep_map_local_rank(ucc_ep_map_t map,
                 break;
             }
         }
+        break;
     default:
         break;
     }
