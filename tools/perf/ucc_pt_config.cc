@@ -9,6 +9,7 @@ BEGIN_C_DECLS
 #include "utils/ucc_string.h"
 #include <getopt.h>
 END_C_DECLS
+#include <algorithm>
 
 ucc_pt_config::ucc_pt_config() {
     bootstrap.bootstrap  = UCC_PT_BOOTSTRAP_MPI;
@@ -32,6 +33,7 @@ ucc_pt_config::ucc_pt_config() {
     bench.root           = 0;
     bench.root_shift     = 0;
     bench.mult_factor    = 2;
+    bench.seed           = 0;
     comm.mt              = bench.mt;
 }
 
@@ -101,8 +103,8 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
     int option_index = 0;
     static struct option long_options[] = {
         {"gen", required_argument, 0, 0},
-        {0, 0, 0, 0}
-    };
+        {"seed", required_argument, 0, 0},
+        {0, 0, 0, 0}};
 
     // Reset getopt state
     optind = 1;
@@ -129,14 +131,18 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                             return UCC_ERR_INVALID_PARAM;
                         }
                         try {
-                            ucc_status_t st = ucc_str_to_memunits(gen_arg.substr(min_pos + 4, at_pos - (min_pos + 4)).c_str(),
-                                                                (void*)&bench.gen.exp_min);
+                            ucc_status_t st = ucc_str_to_memunits(
+                                gen_arg
+                                    .substr(min_pos + 4, at_pos - (min_pos + 4))
+                                    .c_str(),
+                                (void *)&bench.gen.exp.min);
                             if (st != UCC_OK) {
                                 std::cerr << "Failed to parse min value" << std::endl;
                                 return st;
                             }
-                            st = ucc_str_to_memunits(gen_arg.substr(max_pos + 4).c_str(),
-                                                   (void*)&bench.gen.exp_max);
+                            st = ucc_str_to_memunits(
+                                gen_arg.substr(max_pos + 4).c_str(),
+                                (void *)&bench.gen.exp.max);
                             if (st != UCC_OK) {
                                 std::cerr << "Failed to parse max value" << std::endl;
                                 return st;
@@ -147,20 +153,21 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                         }
                     } else {
                         try {
-                            ucc_status_t st = ucc_str_to_memunits(gen_arg.substr(min_pos + 4).c_str(),
-                                                                (void*)&bench.gen.exp_min);
+                            ucc_status_t st = ucc_str_to_memunits(
+                                gen_arg.substr(min_pos + 4).c_str(),
+                                (void *)&bench.gen.exp.min);
                             if (st != UCC_OK) {
                                 std::cerr << "Failed to parse min value" << std::endl;
                                 return st;
                             }
-                            bench.gen.exp_max = bench.gen.exp_min;
+                            bench.gen.exp.max = bench.gen.exp.min;
                         } catch (const std::exception& e) {
                             std::cerr << "Invalid value in --gen exp:min=N" << std::endl;
                             return UCC_ERR_INVALID_PARAM;
                         }
                     }
-                    bench.min_count = bench.gen.exp_min;
-                    bench.max_count = bench.gen.exp_max;
+                    bench.min_count = bench.gen.exp.min;
+                    bench.max_count = bench.gen.exp.max;
                 } else if (gen_arg.rfind("file:", 0) == 0) {
                     bench.gen.type = UCC_PT_GEN_TYPE_FILE;
                     auto name_pos = gen_arg.find("name=", 5);
@@ -187,10 +194,136 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                         bench.gen.file_name = gen_arg.substr(name_pos + 5);
                         bench.gen.nrep = 1; // Default value if nrep is not specified
                     }
+                } else if (gen_arg.rfind("matrix:", 0) == 0) {
+                    bench.gen.type        = UCC_PT_GEN_TYPE_TRAFFIC_MATRIX;
+                    /* Defaults (all parameters optional) */
+                    bench.gen.nrep        = 1;
+                    bench.gen.matrix.kind = 0;
+                    bench.gen.matrix.token_size_KB_mean = 16;
+                    bench.gen.matrix
+                        .token_size_KB_std = bench.gen.matrix
+                                                 .token_size_KB_mean;
+                    bench.gen.matrix.num_tokens          = 2048;
+                    bench.gen.matrix.tgt_group_size_mean = 8;
+
+                    auto find_param = [&](const std::string &key,
+                                          std::string       &out) -> bool {
+                        auto pos = gen_arg.find(key + "=");
+                        if (pos == std::string::npos) {
+                            return false;
+                        }
+                        pos += key.size() + 1;
+                        auto end = gen_arg.find("@", pos);
+                        if (end == std::string::npos) {
+                            end = gen_arg.size();
+                        }
+                        out = gen_arg.substr(pos, end - pos);
+                        return true;
+                    };
+
+                    std::string kind_str;
+                    if (find_param("kind", kind_str)) {
+                        std::string ks = kind_str;
+                        std::transform(
+                            ks.begin(), ks.end(), ks.begin(), ::tolower);
+                        if (ks == "0" ||
+                            ks.find("normal") != std::string::npos) {
+                            bench.gen.matrix.kind = 0;
+                        } else if (
+                            ks == "1" ||
+                            ks.find("biased") != std::string::npos) {
+                            bench.gen.matrix.kind = 1;
+                        } else if (
+                            ks == "2" ||
+                            ks.find("random_tgt_group") != std::string::npos) {
+                            bench.gen.matrix.kind = 2;
+                        } else if (
+                            ks == "3" ||
+                            ks.find("random_tgt_group_random_msg_size") !=
+                                std::string::npos) {
+                            bench.gen.matrix.kind = 3;
+                        } else {
+                            std::cerr << "Invalid kind value in --gen matrix: "
+                                         "accepts 0,1,2,3 or names {normal, "
+                                         "biased, random_tgt_group, "
+                                         "random_tgt_group_random_msg_size}"
+                                      << std::endl;
+                            return UCC_ERR_INVALID_PARAM;
+                        }
+                    }
+
+                    std::string nrep_str;
+                    if (find_param("nrep", nrep_str)) {
+                        try {
+                            bench.gen.nrep = std::stoull(nrep_str);
+                        } catch (const std::exception &) {
+                            std::cerr << "Invalid nrep value in --gen matrix"
+                                      << std::endl;
+                            return UCC_ERR_INVALID_PARAM;
+                        }
+                    }
+
+                    std::string token_size_str;
+                    if (find_param("token_size", token_size_str)) {
+                        try {
+                            bench.gen.matrix.token_size_KB_mean = std::stoull(
+                                token_size_str);
+                        } catch (const std::exception &) {
+                            std::cerr
+                                << "Invalid token_size value in --gen matrix"
+                                << std::endl;
+                            return UCC_ERR_INVALID_PARAM;
+                        }
+                        bench.gen.matrix
+                            .token_size_KB_std = bench.gen.matrix
+                                                     .token_size_KB_mean;
+                    }
+
+                    std::string num_tokens_str;
+                    if (find_param("num_tokens", num_tokens_str)) {
+                        try {
+                            bench.gen.matrix.num_tokens = std::stoull(
+                                num_tokens_str);
+                        } catch (const std::exception &) {
+                            std::cerr
+                                << "Invalid num_tokens value in --gen matrix"
+                                << std::endl;
+                            return UCC_ERR_INVALID_PARAM;
+                        }
+                    }
+
+                    std::string tgt_group_size_str;
+                    if (find_param("tgt_group_size", tgt_group_size_str)) {
+                        try {
+                            bench.gen.matrix.tgt_group_size_mean = std::stoull(
+                                tgt_group_size_str);
+                        } catch (const std::exception &) {
+                            std::cerr << "Invalid tgt_group_size value in "
+                                         "--gen matrix"
+                                      << std::endl;
+                            return UCC_ERR_INVALID_PARAM;
+                        }
+                    }
                 } else {
-                    std::cerr << "Invalid value for --gen. Use exp:min=N[@max=M] or file:name=filename[@nrep=N]" << std::endl;
+                    std::cerr
+                        << "Invalid value for --gen. Use exp:min=N[@max=M] or "
+                           "file:name=filename[@nrep=N] or "
+                           "matrix:kind=mat_kind[@nrep=N@token_size=M@num_"
+                           "tokens=K]"
+                        << std::endl;
                     return UCC_ERR_INVALID_PARAM;
                 }
+            } else if (strcmp(long_options[option_index].name, "seed") == 0) {
+                std::string seed_str(optarg);
+                try {
+                    bench.seed = std::stoull(seed_str);
+                } catch (const std::exception &) {
+                    std::cerr << "Invalid seed value in --seed" << std::endl;
+                    return UCC_ERR_INVALID_PARAM;
+                }
+            } else {
+                std::cerr << "Unknown long option" << std::endl;
+                return UCC_ERR_INVALID_PARAM;
             }
             continue;
         }
@@ -311,7 +444,11 @@ void ucc_pt_config::print_help()
     std::cout << "  -T: triggered collective"<<std::endl;
     std::cout << "  -F: enable full print"<<std::endl;
     std::cout << "  -S: <number>: root shift for rooted collectives"<<std::endl;
-    std::cout << "  --gen <exp:min=N[@max=M]|file:name=filename[@nrep=N]>: Pattern generator (exponential or file-based)" << std::endl;
+    std::cout << "  --gen "
+                 "<exp:min=N[@max=M]|file:name=filename[@nrep=N]|matrix:[kind=K][@nrep=N][@token_size=M][@num_tokens=K]"
+                 "[@tgt_group_size=G]>: Pattern generator (exponential or file-based or matrix-based)"
+              << std::endl;
+    std::cout << " --seed <number>: seed for the random distributions" << std::endl;
     std::cout << "  -h: show this help message"<<std::endl;
     std::cout << std::endl;
 }

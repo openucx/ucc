@@ -276,7 +276,7 @@ size_t ucc_pt_generator_file::get_dst_count_max()
 
 size_t ucc_pt_generator_file::get_count_max()
 {
-    auto matrix = pattern_counts[current_pattern];
+    const auto &matrix    = pattern_counts[current_pattern];
     size_t max_count = 0;
     size_t cur_row_col;
 
