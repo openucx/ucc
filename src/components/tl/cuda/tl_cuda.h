@@ -301,19 +301,17 @@ struct ucc_tl_cuda_task {
         } reduce_scatterv_linear;
 #ifdef HAVE_NVLS
         struct {
-            int                     stage;
-            int                     num_frags;
-            ucc_datatype_t          dt;
-            void *                  sbuf;
-            void *                  rbuf;
-            size_t                  src_size_bytes;
-            size_t                  dst_size_bytes;
-            size_t (*get_count)(const ucc_tl_cuda_task_t *task,
-                                ucc_rank_t                block);
-            size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
-                                 ucc_rank_t                block);
-            cudaEvent_t             evt_copy;
-            cudaEvent_t             evt_completion;
+            int            stage;
+            ucc_datatype_t dt;
+            void          *sbuf;
+            void          *rbuf;
+            size_t      offset; // Offset of the current rank in the src buffer
+            size_t      count;  // Count of the current rank in the src buffer
+            size_t      src_size_bytes;
+            void       *evt_completion;
+            CUdeviceptr mc_va;   // Memory handle for MC symmetric memory
+            CUdeviceptr uc_va;   // Memory handle for UC symmetric memory
+            size_t      coll_id; // Coll id for the NVLS task in flight slot
         } reduce_scatterv_nvls;
         struct {
             int            stage;
