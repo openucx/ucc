@@ -111,8 +111,6 @@ typedef ucc_log_func_rc_t (*ucc_log_func_t)(const char *file, unsigned line,
 
 
 extern const char *ucc_log_level_names[];
-extern const char *ucc_log_category_names[];
-
 
 /**
  * Dispatch a logging message.
@@ -172,7 +170,6 @@ void ucc_log_fatal_error(const char *format, ...) UCC_F_PRINTF(1, 2);
  */
 void ucc_log_early_init(void);
 void ucc_log_init(void);
-void ucc_component_log_init(void);
 void ucc_log_cleanup(void);
 
 
