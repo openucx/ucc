@@ -11,7 +11,6 @@
 #include "utils/ucc_component.h"
 
 #include "utils/ucc_parser.h"
-//#include "utils/ucc_log.h"
 #include "utils/debug/types.h"
 
 typedef struct ucc_global_config {

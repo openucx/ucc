@@ -28,8 +28,28 @@ BEGIN_C_DECLS
 #define ucc_assert_always(_expression)                                         \
     do {                                                                       \
         if (!ucc_likely(_expression)) {                                        \
-            ucc_fatal_error_format(__FILE__, __LINE__, __FUNCTION__,           \
-                                   "Assertion `%s' failed", #_expression);     \
+            ucc_fatal_error_format(                                            \
+                __FILE__,                                                      \
+                __LINE__,                                                      \
+                __FUNCTION__,                                                  \
+                "Assertion `%s' failed",                                       \
+                #_expression);                                                 \
+        }                                                                      \
+    } while (0)
+
+/**
+ * Fail if _expression evaluates to 0 and print a formatted error message
+ */
+#define ucc_assertv_always(_expression, _fmt, ...)                             \
+    do {                                                                       \
+        if (!ucc_likely(_expression)) {                                        \
+            ucc_fatal_error_format(                                            \
+                __FILE__,                                                      \
+                __LINE__,                                                      \
+                __func__,                                                      \
+                "Assertion `%s' failed: " _fmt,                                \
+                #_expression,                                                  \
+                ##__VA_ARGS__);                                                \
         }                                                                      \
     } while (0)
 

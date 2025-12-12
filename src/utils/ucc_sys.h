@@ -80,9 +80,4 @@ int ucc_get_first_cpu();
  */
 pid_t ucc_get_tid(void);
 
-/**
- * @return Path to the main executable.
- */
-const char *ucc_get_exe();
-
 #endif

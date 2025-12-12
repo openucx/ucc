@@ -303,7 +303,7 @@ void ucc_fill_filename_template(const char *tmpl, char *buf, size_t max)
             snprintf(p, end - p, "%d", getpid());
             break;
         case 'h':
-            snprintf(p, end - p, "%s", ucc_hostname());
+            snprintf(p, end - p, "%s", ucc_get_host_name());
             break;
         case 'c':
             snprintf(p, end - p, "%02d", ucc_get_first_cpu());
