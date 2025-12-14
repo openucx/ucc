@@ -15,7 +15,7 @@ credentials:
     }
 
 volumes:
-  - { mountPath: "/home/swx-jenkins", hostPath: "/labhome/swx-jenkins" }
+  - { mountPath: "/home/svcnbu-swx-hpcx", hostPath: "/labhome/svcnbu-swx-hpcx" }
 
 env:
   CUDA_VER: 12.9
@@ -42,7 +42,7 @@ runs_on_dockers:
       tag: "${DOCKER_IMAGE_TAG}",
       arch: "x86_64",
       uri: "${UCC_URI_SUFFIX}",
-      build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER}",
+      build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg _UID=149917 --build-arg _GID=30 --build-arg _LOGIN=svcnbu-swx-hpcx --build-arg _GROUP=svcnbu-swx-hpcx",
     }
   - {
       file: ".ci/dockerfiles/Dockerfile.build_helper",
@@ -50,7 +50,7 @@ runs_on_dockers:
       tag: "nvls",
       arch: "x86_64",
       uri: "$arch/$name",
-      build_args: "",
+      build_args: "--build-arg _UID=149917 --build-arg _GID=30 --build-arg _LOGIN=svcnbu-swx-hpcx --build-arg _GROUP=svcnbu-swx-hpcx",
     }
 
 timeout_minutes: 180
@@ -61,8 +61,8 @@ steps:
     credentialsId: "svcnbu-swx-hpcx-corporate-user-pass"
     run: |
       set -x
-      touch job_id.txt && chown swx-jenkins:swx-jenkins job_id.txt
-      sudo -E -u swx-jenkins ${WORKSPACE}/.ci/scripts/run_slurm_allocation.sh
+      touch job_id.txt && chown svcnbu-swx-hpcx job_id.txt
+      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_slurm_allocation.sh
 
   - name: Run UCC NVLS tests
     containerSelector: "{name: 'build_helper'}"
@@ -71,7 +71,7 @@ steps:
       set -x
       export DOCKER_IMAGE_NAME="${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
       export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
-      sudo -E -u swx-jenkins ${WORKSPACE}/.ci/scripts/run_tests_ucc_nvls_slurm.sh
+      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_tests_ucc_nvls_slurm.sh
     always: |
-      sudo -E -u swx-jenkins ${WORKSPACE}/.ci/scripts/stop_slurm_allocation.sh
+      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/stop_slurm_allocation.sh
 

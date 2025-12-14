@@ -1,20 +1,29 @@
 ARG CUDA_VER='12.9'
 FROM harbor.mellanox.com/torch-ucc/ucc/1.0.0/x86_64/centos8/cuda${CUDA_VER}:base
+
+ARG _UID=6213
+ARG _GID=11429
+ARG _LOGIN=swx-jenkins
+ARG _GROUP=swx-jenkins
+ARG _HOME=/labhome
+
 RUN rm -rf  ${SRC_DIR}/ucc
 COPY . ${SRC_DIR}/ucc
 
 RUN apt update && apt install -y sudo && \
-    echo "swx-jenkins ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+    echo "${_LOGIN} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 RUN pip install 'protobuf'
 #==============================================================================
 # Build UCC
 RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucc.sh
 #==============================================================================
 # Install torch_ucc (UCC version) python module and build a wheel package
-RUN chown -R 6213:11429 /opt/nvidia
+RUN chown -R ${_UID}:${_GID} /opt/nvidia
 #==============================================================================
-RUN groupadd -g 11429 swx-jenkins
-RUN useradd --no-create-home --uid 6213 --gid 11429 --home /labhome/swx-jenkins swx-jenkins
+RUN if ! getent group "${_GID}" > /dev/null 2>&1; then \
+        groupadd -g "${_GID}" "${_GROUP}"; \
+    fi && \
+    useradd --no-create-home --uid ${_UID} --gid ${_GID} --home ${_HOME}/${_LOGIN} ${_LOGIN}
 #==============================================================================
-USER swx-jenkins
+USER ${_LOGIN}
 
