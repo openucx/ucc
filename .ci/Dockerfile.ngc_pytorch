@@ -1,11 +1,15 @@
 ARG CUDA_VER='12.9'
-FROM harbor.mellanox.com/torch-ucc/ucc/1.0.0/x86_64/centos8/cuda${CUDA_VER}:base
-
+ARG UCC_VERSION='1.0.0'
+ARG ARCH='x86_64'
+ARG OS='centos8'
+FROM harbor.mellanox.com/torch-ucc/ucc/${UCC_VERSION}/${ARCH}/${OS}/cuda${CUDA_VER}:base
 ARG _UID=6213
 ARG _GID=11429
 ARG _LOGIN=swx-jenkins
 ARG _GROUP=swx-jenkins
 ARG _HOME=/labhome
+ARG UCC_ENABLE_NVLS=no
+ARG UCC_ENABLE_GTEST=yes
 
 RUN rm -rf  ${SRC_DIR}/ucc
 COPY . ${SRC_DIR}/ucc
@@ -15,6 +19,10 @@ RUN apt update && apt install -y sudo && \
 RUN pip install 'protobuf'
 #==============================================================================
 # Build UCC
+RUN echo "INFO: UCC_ENABLE_NVLS: ${UCC_ENABLE_NVLS}"
+ENV UCC_ENABLE_NVLS=${UCC_ENABLE_NVLS}
+RUN echo "INFO: UCC_ENABLE_GTEST: ${UCC_ENABLE_GTEST}"
+ENV UCC_ENABLE_GTEST=${UCC_ENABLE_GTEST}
 RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucc.sh
 #==============================================================================
 # Install torch_ucc (UCC version) python module and build a wheel package

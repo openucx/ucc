@@ -1,7 +1,9 @@
 ARG CUDA_VER='12.9'
-FROM nvcr.io/nvidia/pytorch:25.05-py3
+ARG IMAGE_TAG='25.05-py3'
+FROM nvcr.io/nvidia/pytorch:${IMAGE_TAG}
 #==============================================================================
 ARG NVIDIA_ROOT_DIR=/opt/nvidia
+ARG ARCH='x86_64'
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 ENV SRC_DIR=${NVIDIA_ROOT_DIR}/src
@@ -15,19 +17,27 @@ ENV UCX_BUILD_TYPE=release-mt
 ENV UCX_INSTALL_DIR=${BIN_DIR}/ucx/build-${UCX_BUILD_TYPE}
 ENV UCC_INSTALL_DIR=${BIN_DIR}/ucc/build
 ENV OFED_PKG='lsof kmod udev swig libelf1 libfuse2 pciutils tk gfortran libpci3 libusb-1.0-0 libltdl-dev libmnl0 bison tcl flex chrpath debhelper ethtool graphviz'
-ENV PACKAGES='numactl  openssh-server protobuf-compiler rdma-core vim libevent-dev build-essential git make autoconf libtool'
+ENV PACKAGES='numactl openssh-server protobuf-compiler rdma-core vim libevent-dev build-essential git make autoconf libtool'
 ENV OS_VERSION=ubuntu22.04
-ENV PLATFORM=x86_64
+ENV PLATFORM=${ARCH}
 ENV MOFED_VERSION=23.10-0.5.5.0
 ENV MOFED_URL="https://content.mellanox.com/ofed/MLNX_OFED-${MOFED_VERSION}/MLNX_OFED_LINUX-${MOFED_VERSION}-${OS_VERSION}-${PLATFORM}.tgz"
 ENV OMPI_PATH="/opt/hpcx/ompi"
 #==============================================================================
 # RUN apt update && apt install -y ${OFED_PKG} && \
 RUN apt update && \
+    if [ "${ARCH}" = "x86_64" ]; then \
         wget http://nbu-nfs.mellanox.com/auto/sw/release/doca/doca-host-repo/doca-repo-3.0.0/doca-repo-3.0.0-0.0.0/doca-host_3.0.0-000000-25.04-ubuntu2404_amd64.deb && \
         dpkg -i doca-host_3.0.0-000000-25.04-ubuntu2404_amd64.deb && apt update && \
-        apt install -y doca-ofed-userspace
-RUN     apt install -y ${PACKAGES}
+        apt install -y doca-ofed-userspace; \
+    else \
+        wget http://nbu-nfs.mellanox.com/auto/sw/release/doca/doca-host-repo/doca-repo-3.0.0/doca-repo-3.0.0-0.0.0/doca-host_3.0.0-000000-25.04-ubuntu2404_arm64.deb && \
+        dpkg -i doca-host_3.0.0-000000-25.04-ubuntu2404_arm64.deb && apt update && \
+        apt install -y doca-ofed-userspace; \
+    fi \ && \
+    apt install -y ${PACKAGES} && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Remove old UCX
 RUN rm -rf /opt/hpcx/ucx

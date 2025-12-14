@@ -9,21 +9,22 @@ registry_auth: "ucc-harbor-credentials"
 
 credentials:
   - {
-      credentialsId: "svcnbu-swx-hpcx-corporate-user-pass",
-      usernameVariable: "SERVICE_USER_USERNAME",
-      passwordVariable: "SERVICE_USER_PASSWORD",
+      credentialsId: "ucc-harbor-credentials",
+      usernameVariable: "REGISTRY_USERNAME",
+      passwordVariable: "REGISTRY_PASSWORD",
     }
 
 volumes:
   - { mountPath: "/home/svcnbu-swx-hpcx", hostPath: "/labhome/svcnbu-swx-hpcx" }
 
 env:
-  CUDA_VER: 12.9
-  UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}"
+  CUDA_VER: 13.0
+  UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/aarch64/ubuntu24.04/cuda${CUDA_VER}"
   DOCKER_IMAGE_TAG: "${BUILD_NUMBER}"
   SLURM_NODES: 2
-  SLURM_PARTITION: 'funk'
-  SLURM_HEAD_NODE: 'scctl'
+  SLURM_PARTITION: 'gb300nvl72_ci'
+  SLURM_HEAD_NODE: 'dlcluster.nvidia.com'
+  SLURM_ACCOUNT: 'blackwell-ci'
   SLURM_JOB_NAME: 'ucc-ci-test-nvls-${BUILD_NUMBER}'
   SLURM_JOB_TIMEOUT: '00:30:00'
   TEST_TIMEOUT_MINUTES: 35
@@ -31,8 +32,8 @@ env:
 kubernetes:
   cloud: il-ipp-blossom-prod
   namespace: hpcx
-  limits: "{memory: 10Gi, cpu: 10000m}"
-  requests: "{memory: 10Gi, cpu: 10000m}"
+  limits: "{memory: 16Gi, cpu: 16000m}"
+  requests: "{memory: 8Gi, cpu: 8000m}"
 
 # cloud pod to build the shared docker image
 runs_on_dockers:
@@ -40,9 +41,9 @@ runs_on_dockers:
       file: ".ci/Dockerfile.ngc_pytorch",
       name: "ngc_pytorch",
       tag: "${DOCKER_IMAGE_TAG}",
-      arch: "x86_64",
+      arch: "aarch64",
       uri: "${UCC_URI_SUFFIX}",
-      build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg _UID=149917 --build-arg _GID=30 --build-arg _LOGIN=svcnbu-swx-hpcx --build-arg _GROUP=svcnbu-swx-hpcx",
+      build_args: "--no-cache --build-arg ARCH=aarch64 --build-arg OS=ubuntu24.04 --build-arg CUDA_VER=${CUDA_VER} --build-arg _UID=149917 --build-arg _GID=30 --build-arg _LOGIN=svcnbu-swx-hpcx --build-arg _GROUP=svcnbu-swx-hpcx --build-arg UCC_ENABLE_NVLS=yes --build-arg UCC_ENABLE_GTEST=no",
     }
   - {
       file: ".ci/dockerfiles/Dockerfile.build_helper",
@@ -58,8 +59,11 @@ timeout_minutes: 180
 steps:
   - name: Allocate Environment
     containerSelector: "{name: 'build_helper'}"
-    credentialsId: "svcnbu-swx-hpcx-corporate-user-pass"
+    credentialsId: "ucc-harbor-credentials"
     run: |
+      export ENROOT_USERNAME=${REGISTRY_USERNAME}
+      export ENROOT_PASSWORD=${REGISTRY_PASSWORD}
+      export ENROOT_REGISTRY=${registry_host}
       set -x
       touch job_id.txt && chown svcnbu-swx-hpcx job_id.txt
       sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_slurm_allocation.sh
@@ -74,4 +78,3 @@ steps:
       sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_tests_ucc_nvls_slurm.sh
     always: |
       sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/stop_slurm_allocation.sh
-

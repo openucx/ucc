@@ -11,7 +11,8 @@ source "${SCRIPT_DIR}/env.sh"
 [[ -z ${SLURM_JOB_TIMEOUT} ]] && { echo "ERROR: SLURM_JOB_TIMEOUT is not set"; exit 1; }
 
 readonly SLURM_IMMEDIATE_TIMEOUT=${SLURM_IMMEDIATE_TIMEOUT:-600} # time to wait for resource allocation to be granted
-readonly SLURM_ALLOCATION_CMD="salloc -N ${SLURM_NODES} -p ${SLURM_PARTITION} --job-name=${SLURM_JOB_NAME} --immediate=${SLURM_IMMEDIATE_TIMEOUT} --time=${SLURM_JOB_TIMEOUT} --no-shell"
+readonly SLURM_ACCOUNT=${SLURM_ACCOUNT:+"--account=${SLURM_ACCOUNT}"}
+readonly SLURM_ALLOCATION_CMD="salloc ${SLURM_ACCOUNT} -N ${SLURM_NODES} -p ${SLURM_PARTITION} --job-name=${SLURM_JOB_NAME} --immediate=${SLURM_IMMEDIATE_TIMEOUT} --time=${SLURM_JOB_TIMEOUT} --no-shell"
 readonly SLURM_GET_JOB_ID_CMD="squeue --noheader --name=${SLURM_JOB_NAME} --format=%i"
 
 case "${SLURM_HEAD_NODE}" in
@@ -27,15 +28,30 @@ case "${SLURM_HEAD_NODE}" in
             echo "INFO: Creating scctl client"
             scctl --raw-errors client create
         fi
+        echo "INFO: Setting enroot credentials"
+        "${SCRIPT_DIR}/enroot_setup.sh"
         echo "INFO: Allocating Slurm resources via scctl"
         scctl --raw-errors client connect -- "${SLURM_ALLOCATION_CMD}"
         JOB_ID=$(scctl --raw-errors client connect -- "${SLURM_GET_JOB_ID_CMD}")
+        ;;
+    dlcluster*)
+        echo "INFO: Connecting to SLURM head node via SSH: ${SLURM_HEAD_NODE}"
+        echo "INFO: Setting enroot credentials"
+        eval "${SSH_CMD} ${SLURM_HEAD_NODE} 'env ENROOT_USERNAME=${ENROOT_USERNAME} ENROOT_PASSWORD=${ENROOT_PASSWORD} ENROOT_REGISTRY=${ENROOT_REGISTRY} bash -s' < $SCRIPT_DIR/enroot_setup.sh"
+        echo "INFO: Allocating Slurm resources via SSH"
+        SALLOC_OUTPUT=$(eval "${SSH_CMD} ${SLURM_HEAD_NODE} ${SLURM_ALLOCATION_CMD}" 2>&1)
+        echo "${SALLOC_OUTPUT}"
+        # Extract job ID from salloc output (looks for "Granted job allocation XXXXXX")
+        # seems like on dlcluster the squeue method does not return the job ID, so we need to extract it from the output
+        JOB_ID=$(echo "${SALLOC_OUTPUT}" | grep -oP "Granted job allocation \K[0-9]+")
         ;;
     "")
         echo "ERROR: Invalid SLURM_HEAD_NODE value: ${SLURM_HEAD_NODE}"
         exit 1
         ;;
     *)
+        echo "INFO: Setting enroot credentials"
+        "${SCRIPT_DIR}/enroot_setup.sh"
         echo "INFO: Connecting to SLURM head node via SSH: ${SLURM_HEAD_NODE}"
         echo "INFO: Allocating Slurm resources via SSH"
         eval "${SSH_CMD} ${SLURM_HEAD_NODE} ${SLURM_ALLOCATION_CMD}"
