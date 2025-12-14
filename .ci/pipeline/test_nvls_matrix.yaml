@@ -1,0 +1,77 @@
+---
+job: "ucc-test-nvls"
+
+step_allow_single_selector: true
+
+registry_host: "harbor.mellanox.com"
+registry_path: "/torch-ucc"
+registry_auth: "ucc-harbor-credentials"
+
+credentials:
+  - {
+      credentialsId: "svcnbu-swx-hpcx-corporate-user-pass",
+      usernameVariable: "SERVICE_USER_USERNAME",
+      passwordVariable: "SERVICE_USER_PASSWORD",
+    }
+
+volumes:
+  - { mountPath: "/home/swx-jenkins", hostPath: "/labhome/swx-jenkins" }
+
+env:
+  CUDA_VER: 12.9
+  UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}"
+  DOCKER_IMAGE_TAG: "${BUILD_NUMBER}"
+  SLURM_NODES: 2
+  SLURM_PARTITION: 'funk'
+  SLURM_HEAD_NODE: 'scctl'
+  SLURM_JOB_NAME: 'ucc-ci-test-nvls-${BUILD_NUMBER}'
+  SLURM_JOB_TIMEOUT: '00:30:00'
+  TEST_TIMEOUT_MINUTES: 35
+
+kubernetes:
+  cloud: il-ipp-blossom-prod
+  namespace: hpcx
+  limits: "{memory: 10Gi, cpu: 10000m}"
+  requests: "{memory: 10Gi, cpu: 10000m}"
+
+# cloud pod to build the shared docker image
+runs_on_dockers:
+  - {
+      file: ".ci/Dockerfile.ngc_pytorch",
+      name: "ngc_pytorch",
+      tag: "${DOCKER_IMAGE_TAG}",
+      arch: "x86_64",
+      uri: "${UCC_URI_SUFFIX}",
+      build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER}",
+    }
+  - {
+      file: ".ci/dockerfiles/Dockerfile.build_helper",
+      name: "build_helper",
+      tag: "nvls",
+      arch: "x86_64",
+      uri: "$arch/$name",
+      build_args: "",
+    }
+
+timeout_minutes: 180
+
+steps:
+  - name: Allocate Environment
+    containerSelector: "{name: 'build_helper'}"
+    credentialsId: "svcnbu-swx-hpcx-corporate-user-pass"
+    run: |
+      set -x
+      touch job_id.txt && chown swx-jenkins:swx-jenkins job_id.txt
+      sudo -E -u swx-jenkins ${WORKSPACE}/.ci/scripts/run_slurm_allocation.sh
+
+  - name: Run UCC NVLS tests
+    containerSelector: "{name: 'build_helper'}"
+    timeout: "${TEST_TIMEOUT_MINUTES}"
+    run: |
+      set -x
+      export DOCKER_IMAGE_NAME="${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
+      export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
+      sudo -E -u swx-jenkins ${WORKSPACE}/.ci/scripts/run_tests_ucc_nvls_slurm.sh
+    always: |
+      sudo -E -u swx-jenkins ${WORKSPACE}/.ci/scripts/stop_slurm_allocation.sh
+

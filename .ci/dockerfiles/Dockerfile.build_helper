@@ -19,6 +19,9 @@ LABEL version="1.0.0"
 
 RUN apt update && apt install -y sudo pdsh && rm -rf /var/lib/apt/lists/*
 
+# Install scctl for slurm client management
+RUN curl -s https://urm.nvidia.com/artifactory/sw-swx-lab-infra-generic/scctl/get-app.sh | bash -s -- --output-dir /usr/local/bin
+
 # Create group and user in one RUN command to reduce layers
 RUN if ! getent group "${_GID}" > /dev/null 2>&1; then \
         groupadd -g "${_GID}" "${_GROUP}"; \
