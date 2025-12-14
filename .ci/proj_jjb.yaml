@@ -1,5 +1,6 @@
 - job-template:
     name: "{jjb_proj}"
+    folder: "{jjb_folder}"
     project-type: pipeline
     properties:
       - github:
