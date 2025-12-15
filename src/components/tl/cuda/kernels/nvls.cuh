@@ -16,6 +16,11 @@
                  "r"(val.x), "r"(val.y), "r"(val.z), "r"(val.w)                \
                  : "memory");
 
+#define MULTIMEM_ST_U32(val, ptr)                                              \
+    asm volatile("multimem.st.global.v4.f32 [%0], {%1,%2,%3,%4};" ::"l"(ptr),  \
+                 "r"(val.x), "r"(val.y), "r"(val.z), "r"(val.w)                \
+                 : "memory");
+
 #define MULTIMEM_LD(val, ptr)                                                  \
     asm("multimem.ld_reduce.global.add.v4.f32 {%0,%1,%2,%3}, [%4];"            \
         : "=r"(val.x), "=r"(val.y), "=r"(val.z), "=r"(val.w)                   \
