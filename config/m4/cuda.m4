@@ -73,20 +73,16 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                [AC_CHECK_LIB([cudart], [cudaGetDeviceCount],
                              [CUDA_LIBS="$CUDA_LIBS -lcudart"], [cuda_happy="no"])])
 
-        # Check nvml header files
+        # Early check for NVML - required for TL CUDA
         AC_CHECK_HEADERS([nvml.h],
                          [nvml_happy="yes"],
-                         [AS_IF([test "x$with_cuda" != "xguess"],
-                                [AC_MSG_WARN([nvml header not found. Install appropriate cuda-nvml-devel package])])
-                          nvml_happy="no"])
+                         [nvml_happy="no"])
 
-        # Check nvml library
+        # Check nvml library if header found
         AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
               [AC_CHECK_LIB([nvidia-ml], [nvmlInit_v2],
                             [NVML_LIBS="-lnvidia-ml"],
-                            [AS_IF([test "x$with_cuda" != "xguess"],
-                                   [AC_MSG_WARN([libnvidia-ml not found. Install appropriate nvidia-driver package])])
-                             nvml_happy="no"])])
+                            [nvml_happy="no"])])
         AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
               [AC_CHECK_DECL([nvmlDeviceGetNvLinkRemoteDeviceType],
                              [AC_CHECK_LIB([nvidia-ml], [nvmlDeviceGetNvLinkRemoteDeviceType],
@@ -96,49 +92,81 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                                            [])],
                              [],
                              [[#include <nvml.h>]])])
+
+        # Determine TL CUDA availability early
+        tl_cuda_will_be_available="no"
+        AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
+              [tl_cuda_will_be_available="yes"])
+
+        # Provide early feedback about TL CUDA status
+        AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xno"],
+              [AC_MSG_WARN([NVML headers/library not found - TL CUDA will be disabled])
+               AS_IF([test "x$with_cuda" != "xguess"],
+                     [AC_MSG_WARN([Install cuda-nvml-devel or nvidia-cuda-dev package to enable TL CUDA])])])
         AC_CHECK_SIZEOF(cuFloatComplex,,[#include <cuComplex.h>])
         AC_CHECK_SIZEOF(cuDoubleComplex,,[#include <cuComplex.h>])
 
-         # Check for NVCC
-         AC_ARG_VAR(NVCC, [NVCC compiler command])
-         AS_IF([test "x$cuda_happy" = "xyes"],
-               [AC_PATH_PROG([NVCC], [nvcc], [notfound], [$PATH:$check_cuda_dir/bin])])
-         AS_IF([test "$NVCC" = "notfound"], [cuda_happy="no"])
-         AS_IF([test "x$cuda_happy" = "xyes"],
-               [CUDA_MAJOR_VERSION=`$NVCC --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 1`
-                CUDA_MINOR_VERSION=`$NVCC --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 2`
-                AC_MSG_RESULT([Detected CUDA version: $CUDA_MAJOR_VERSION.$CUDA_MINOR_VERSION])
-                AS_IF([test $CUDA_MAJOR_VERSION -lt $CUDA_MIN_REQUIRED_MAJOR],
-                      [AC_MSG_WARN([Minimum required CUDA version: $CUDA_MIN_REQUIRED_MAJOR.$CUDA_MIN_REQUIRED_MINOR])
-                       cuda_happy=no])])
+         # Only proceed with detailed CUDA configuration if TL CUDA will be available
+         AS_IF([test "x$tl_cuda_will_be_available" = "xyes"],
+         [
+             AC_MSG_RESULT([Proceeding with detailed CUDA configuration (TL CUDA will be enabled)])
 
-# Check if CUDA version is 13 or higher, which requires C++17 support.
-# If the compiler supports C++17, add the flag to NVCC_CFLAGS. If not, warn the user but still add the flag (build may fail).
+             # Check for NVCC
+             AC_ARG_VAR(NVCC, [NVCC compiler command])
+             AS_IF([test "x$cuda_happy" = "xyes"],
+                   [AC_PATH_PROG([NVCC], [nvcc], [notfound], [$PATH:$check_cuda_dir/bin])])
+             AS_IF([test "$NVCC" = "notfound"], [cuda_happy="no"])
+             AS_IF([test "x$cuda_happy" = "xyes"],
+                   [CUDA_MAJOR_VERSION=`$NVCC --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 1`
+                    CUDA_MINOR_VERSION=`$NVCC --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 2`
+                    AC_MSG_RESULT([Detected CUDA version: $CUDA_MAJOR_VERSION.$CUDA_MINOR_VERSION])
+                    AS_IF([test $CUDA_MAJOR_VERSION -lt $CUDA_MIN_REQUIRED_MAJOR],
+                          [AC_MSG_WARN([Minimum required CUDA version: $CUDA_MIN_REQUIRED_MAJOR.$CUDA_MIN_REQUIRED_MINOR])
+                           cuda_happy=no])])
+         ],
+         [
+             AS_IF([test "x$cuda_happy" = "xyes"],
+             [
+                 AC_MSG_RESULT([Skipping detailed CUDA configuration (TL CUDA disabled - NVML missing)])
+                 # Set minimal CUDA version for basic support (MC/EC)
+                 AC_ARG_VAR(NVCC, [NVCC compiler command])
+                 AC_PATH_PROG([NVCC], [nvcc], [notfound], [$PATH:$check_cuda_dir/bin])
+                 AS_IF([test "$NVCC" != "notfound"],
+                       [CUDA_MAJOR_VERSION=`$NVCC --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 1`
+                        CUDA_MINOR_VERSION=`$NVCC --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 2`])
+             ])
+         ])
 
-         AS_IF([test "x$cuda_happy" = "xyes"],
-               [AS_IF([test $CUDA_MAJOR_VERSION -ge 13],
-                      [AS_IF([test "x$cxx17_happy" = "xyes"],
-                             [NVCC_CFLAGS="$NVCC_CFLAGS -std=c++17"],
-                             [AC_MSG_WARN([CUDA $CUDA_MAJOR_VERSION.$CUDA_MINOR_VERSION requires C++17 but compiler does not support it. Build may fail.])
-                              NVCC_CFLAGS="$NVCC_CFLAGS -std=c++17"])])])
+         # Advanced CUDA configuration only for TL CUDA builds
+         AS_IF([test "x$tl_cuda_will_be_available" = "xyes" -a "x$cuda_happy" = "xyes"],
+         [
+             # Check if CUDA version is 13 or higher, which requires C++17 support.
+             # If the compiler supports C++17, add the flag to NVCC_CFLAGS. If not, warn the user but still add the flag (build may fail).
+             AS_IF([test $CUDA_MAJOR_VERSION -ge 13],
+                   [AS_IF([test "x$cxx17_happy" = "xyes"],
+                          [NVCC_CFLAGS="$NVCC_CFLAGS -std=c++17"],
+                          [AC_MSG_WARN([CUDA $CUDA_MAJOR_VERSION.$CUDA_MINOR_VERSION requires C++17 but compiler does not support it. Build may fail.])
+                           NVCC_CFLAGS="$NVCC_CFLAGS -std=c++17"])])
 
-         AS_IF([test "x$cuda_happy" = "xyes"],
-               [AS_IF([test "x$with_nvcc_gencode" = "xdefault"],
-                      [AS_IF([test $CUDA_MAJOR_VERSION -eq 13],
-                             # offline compilation support for architectures before '<compute/sm/lto>_75' is discontinued
-                             [NVCC_ARCH="${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH124_CODE} ${ARCH128_CODE} ${ARCH130_CODE} ${ARCH130_PTX}"],
-                      [AS_IF([test $CUDA_MAJOR_VERSION -eq 12],
-                              [AS_IF([test $CUDA_MINOR_VERSION -ge 8],
-                                    [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH124_CODE} ${ARCH128_CODE} ${ARCH128_PTX}"],
-                              [AS_IF([test $CUDA_MINOR_VERSION -ge 4],
-                                    [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH124_CODE} ${ARCH124_PTX}"],
-                                    [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH120_PTX}"])])],
-                      [AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
-                              [AS_IF([test $CUDA_MINOR_VERSION -lt 1],
-                                    [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH110_PTX}"],
-                                    [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH111_PTX}"])])])])],
-                      [NVCC_ARCH="$with_nvcc_gencode"])
-                AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])])
+             # Generate appropriate CUDA architecture codes
+             AS_IF([test "x$with_nvcc_gencode" = "xdefault"],
+                   [AS_IF([test $CUDA_MAJOR_VERSION -eq 13],
+                          # offline compilation support for architectures before '<compute/sm/lto>_75' is discontinued
+                          [NVCC_ARCH="${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH124_CODE} ${ARCH128_CODE} ${ARCH130_CODE} ${ARCH130_PTX}"],
+                   [AS_IF([test $CUDA_MAJOR_VERSION -eq 12],
+                           [AS_IF([test $CUDA_MINOR_VERSION -ge 8],
+                                 [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH124_CODE} ${ARCH128_CODE} ${ARCH128_PTX}"],
+                           [AS_IF([test $CUDA_MINOR_VERSION -ge 4],
+                                 [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH124_CODE} ${ARCH124_PTX}"],
+                                 [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH120_CODE} ${ARCH120_PTX}"])])],
+                   [AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
+                           [AS_IF([test $CUDA_MINOR_VERSION -lt 1],
+                                 [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH110_PTX}"],
+                                 [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH111_PTX}"])])])])],
+                   [NVCC_ARCH="$with_nvcc_gencode"])
+             AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])
+             AC_MSG_RESULT([NVCC gencodes: $NVCC_ARCH])
+         ])
 
 
          LDFLAGS="$save_LDFLAGS"
@@ -150,10 +178,16 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                 AC_SUBST([CUDA_LDFLAGS], ["$CUDA_LDFLAGS"])
                 AC_SUBST([CUDA_LIBS], ["$CUDA_LIBS"])
                 AC_SUBST([NVCC_CFLAGS], ["$NVCC_CFLAGS"])
-                AC_DEFINE([HAVE_CUDA], 1, [Enable CUDA support])],
+                AC_DEFINE([HAVE_CUDA], 1, [Enable CUDA support])
+
+                # Report CUDA status with TL CUDA context
+                AS_IF([test "x$tl_cuda_will_be_available" = "xyes"],
+                      [AC_MSG_RESULT([CUDA support: yes (TL CUDA will be enabled)])],
+                      [AC_MSG_RESULT([CUDA support: yes (TL CUDA disabled - NVML missing)]])]
+
                 AS_IF([test "x$nvml_happy" = "xyes"],
-                        [AC_SUBST([NVML_LIBS], ["$NVML_LIBS"])
-                         AC_DEFINE([HAVE_NVML], 1, [Enable NVML support])],[])
+                      [AC_SUBST([NVML_LIBS], ["$NVML_LIBS"])
+                       AC_DEFINE([HAVE_NVML], 1, [Enable NVML support])],[])],
                [AS_IF([test "x$with_cuda" != "xguess"],
                       [AC_MSG_ERROR([CUDA support is requested but cuda packages cannot be found])],
                       [AC_MSG_WARN([CUDA not found])])])
@@ -161,5 +195,6 @@ AS_IF([test "x$cuda_checked" != "xyes"],
         cuda_checked=yes
         AM_CONDITIONAL([HAVE_CUDA], [test "x$cuda_happy" != xno])
         AM_CONDITIONAL([HAVE_NVML], [test "x$nvml_happy" != xno])
+        AM_CONDITIONAL([TL_CUDA_AVAILABLE], [test "x$tl_cuda_will_be_available" = "xyes"])
    ]) # "x$cuda_checked" != "xyes"
 ]) # CHECK_CUDA
