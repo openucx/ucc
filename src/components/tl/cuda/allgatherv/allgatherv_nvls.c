@@ -220,6 +220,19 @@ ucc_status_t ucc_tl_cuda_allgatherv_nvls_init(
                              dt_size;
     }
 
+    /* Validate total size fits within NVLS symmetric buffer */
+    if (ucc_unlikely(
+            total_count_bytes >
+            UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_symmetric_size)) {
+        tl_debug(
+            UCC_TL_TEAM_LIB(team),
+            "NVLS allgatherv total size %zu bytes exceeds symmetric buffer "
+            "size %zu bytes",
+            total_count_bytes,
+            UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_symmetric_size);
+        goto err_cleanup;
+    }
+
     /* Convert bytes to uint32_t units for the kernel */
     task->allgatherv_nvls.offset      = offset_bytes / sizeof(uint32_t);
     task->allgatherv_nvls.count       = count_bytes / sizeof(uint32_t);
