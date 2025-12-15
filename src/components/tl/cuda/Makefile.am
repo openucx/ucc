@@ -52,7 +52,7 @@ allreduce =                    \
 
 if TL_CUDA_NVLS_ENABLED
 reduce_scatter += reduce_scatter/reduce_scatter_nvls.c
-
+reduce_scatterv += reduce_scatterv/reduce_scatterv_nvls.c
 allreduce += allreduce/allreduce_nvls.c
 endif
 
