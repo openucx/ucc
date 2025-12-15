@@ -328,6 +328,19 @@ struct ucc_tl_cuda_task {
             /* Coll id for the NVLS task in flight slot */
             size_t         coll_id;
         } allreduce_nvls;
+        struct {
+            int            stage;
+            ucc_datatype_t dt;
+            void          *sbuf;
+            void          *rbuf;
+            size_t offset;      // Offset of the current rank in the dst buffer
+            size_t count;       // Count of the current rank's data
+            size_t total_count; // Total count of all data (sum of all ranks)
+            void  *evt_completion;
+            CUdeviceptr mc_va;   // Memory handle for MC symmetric memory
+            CUdeviceptr uc_va;   // Memory handle for UC symmetric memory
+            size_t      coll_id; // Coll id for the NVLS task in flight slot
+        } allgatherv_nvls;
 #endif
     };
 };
