@@ -195,6 +195,5 @@ AS_IF([test "x$cuda_checked" != "xyes"],
         cuda_checked=yes
         AM_CONDITIONAL([HAVE_CUDA], [test "x$cuda_happy" != xno])
         AM_CONDITIONAL([HAVE_NVML], [test "x$nvml_happy" != xno])
-        AM_CONDITIONAL([TL_CUDA_AVAILABLE], [test "x$tl_cuda_will_be_available" = "xyes"])
    ]) # "x$cuda_checked" != "xyes"
 ]) # CHECK_CUDA
