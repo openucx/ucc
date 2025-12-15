@@ -64,6 +64,10 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_linear_finalize(ucc_coll_task_t *task);
 ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_triggered_post(
     ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task);
 
+ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
+    ucc_tl_cuda_task_t *task, ucc_datatype_t dt, size_t offset_elements,
+    size_t count_elements);
+
 ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *tl_team,
     ucc_coll_task_t **task_p);
