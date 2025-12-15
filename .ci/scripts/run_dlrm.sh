@@ -32,7 +32,7 @@ mpirun \
     -np $NP \
     --hostfile ${HOSTFILE} \
     --map-by node \
-    --mca plm_rsh_args '-p 12345' \
+    --mca plm_rsh_args "-p ${DOCKER_SSH_PORT}" \
     -x PATH \
     -x LD_LIBRARY_PATH \
     hostname
@@ -42,7 +42,7 @@ mpirun \
     -np $NP \
     --hostfile ${HOSTFILE} \
     --map-by node \
-    --mca plm_rsh_args '-p 12345' \
+    --mca plm_rsh_args "-p ${DOCKER_SSH_PORT}" \
     -x PATH \
     -x LD_LIBRARY_PATH \
     cat /proc/1/cgroup
@@ -52,7 +52,7 @@ mpirun \
     -np $NP \
     --hostfile ${HOSTFILE} \
     --map-by node \
-    --mca plm_rsh_args '-p 12345' \
+    --mca plm_rsh_args "-p ${DOCKER_SSH_PORT}" \
     -x PATH \
     -x LD_LIBRARY_PATH \
     -x MASTER_ADDR \
