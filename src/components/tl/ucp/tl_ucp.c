@@ -112,6 +112,11 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_alg),
      UCC_CONFIG_TYPE_ENUM(ucc_tl_ucp_alltoall_onesided_names)},
 
+    {"ALLTOALL_ONESIDED_RTT_THRESHOLD", "16k",
+     "Threshold to switch CA from tokens to RTT-based method",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_rtt_threshold),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
     {"KN_RADIX", "0",
      "Radix of all algorithms based on knomial pattern. When set to a "
      "positive value it is used as a convenience parameter to set all "
