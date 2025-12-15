@@ -183,7 +183,7 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                 # Report CUDA status with TL CUDA context
                 AS_IF([test "x$tl_cuda_will_be_available" = "xyes"],
                       [AC_MSG_RESULT([CUDA support: yes (TL CUDA will be enabled)])],
-                      [AC_MSG_RESULT([CUDA support: yes (TL CUDA disabled - NVML missing)]])]
+                      [AC_MSG_RESULT([CUDA support: yes (TL CUDA disabled - NVML missing)])])
 
                 AS_IF([test "x$nvml_happy" = "xyes"],
                       [AC_SUBST([NVML_LIBS], ["$NVML_LIBS"])
