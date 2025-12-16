@@ -74,6 +74,7 @@ ucc_config_field_t ucc_global_config_table[] = {
      "empty string \"\" - disable use of config file",
      ucc_offsetof(ucc_global_config_t, cfg_filename), UCC_CONFIG_TYPE_STRING},
 
+<<<<<<< HEAD
     {"LOG_FILE", "",
      "If not empty, UCC will print log messages to the specified file instead of stdout.\n"
      "The following substitutions are performed on this string:\n"
@@ -107,6 +108,15 @@ ucc_config_field_t ucc_global_config_table[] = {
     {"LOG_LEVEL_TRIGGER", "fatal",
      "Log level to trigger error handling.",
      ucc_offsetof(ucc_global_config_t, log_level_trigger), UCC_CONFIG_TYPE_ENUM(ucc_log_level_names)},
+
+    {"CHECK_ASYMMETRIC_DT", "n",
+     "Enable asymmetric datatype checking for rooted collectives\n"
+     "(gather, gatherv, scatter, scatterv). Uses allgather to verify\n"
+     "all ranks use the same datatype. Disabled by default for performance.\n"
+     "Enable for debugging or when OMPI needs UCC to detect asymmetric\n"
+     "datatypes for proper fallback behavior.",
+     ucc_offsetof(ucc_global_config_t, check_asymmetric_dt),
+     UCC_CONFIG_TYPE_BOOL},
 
     {NULL}
 };
