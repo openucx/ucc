@@ -62,6 +62,40 @@ typedef struct ucc_event_manager {
     ucc_em_listener_t listeners[MAX_LISTENERS];
 } ucc_event_manager_t;
 
+/* Forward declaration for service collective request */
+typedef struct ucc_service_coll_req ucc_service_coll_req_t;
+
+/**
+ * @brief Datatype validation state for rooted collectives
+ *
+ * This structure implements a state machine for transparent datatype validation
+ * before posting the actual collective operation. The validation uses a service
+ * allgather to ensure all ranks have compatible datatypes.
+ *
+ * State Machine:
+ *   1. VALIDATING (IN_PROGRESS set): Service allgather in flight
+ *   2. VALIDATED: Validation complete, datatypes are compatible
+ *   3. POSTED: Actual collective has been posted
+ *
+ * The saved function pointers store the TL/CL's actual post/progress/finalize,
+ * while the task's function pointers are replaced with wrapper functions that
+ * implement this state machine transparently.
+ */
+typedef struct ucc_dt_check_state {
+    ucc_service_coll_req_t *check_req;        /* Service allgather request */
+    int64_t                *gathered_values;  /* Buffer for gathered values */
+    int64_t                 local_values[2];  /* Local DT and mem type */
+    uint32_t                flags;            /* State machine flags */
+    /* Saved original task functions */
+    ucc_coll_post_fn_t      saved_post;       /* TL/CL's actual post function */
+    ucc_coll_progress_fn_t  saved_progress;   /* TL/CL's actual progress function */
+    ucc_coll_finalize_fn_t  saved_finalize;   /* TL/CL's actual finalize function */
+#define UCC_DT_CHECK_IN_PROGRESS      UCC_BIT(0)  /* State: VALIDATING */
+#define UCC_DT_CHECK_VALIDATED        UCC_BIT(1)  /* State: VALIDATED */
+#define UCC_DT_CHECK_POST_REQUESTED   UCC_BIT(2)  /* User called post */
+#define UCC_DT_CHECK_ACTUAL_POSTED    UCC_BIT(3)  /* State: POSTED */
+} ucc_dt_check_state_t;
+
 enum {
     UCC_COLL_TASK_FLAG_CB                    = UCC_BIT(0),
     /* executor is required for collective*/
@@ -114,6 +148,7 @@ typedef struct ucc_coll_task {
     /* timestamp of the start time: either post or triggered_post */
     double                             start_time;
     uint32_t                           seq_num;
+    ucc_dt_check_state_t              *dt_check;  /* DT validation state */
 } ucc_coll_task_t;
 
 extern struct ucc_mpool_ops ucc_coll_task_mpool_ops;

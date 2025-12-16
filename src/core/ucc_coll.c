@@ -18,6 +18,8 @@
 #include "schedule/ucc_schedule.h"
 #include "coll_score/ucc_coll_score.h"
 #include "ucc_ee.h"
+#include "ucc_global_opts.h"
+#include "ucc_service_coll.h"
 
 #define UCC_BUFFER_INFO_CHECK_MEM_TYPE(_info) do {                             \
     if ((_info).mem_type == UCC_MEMORY_TYPE_UNKNOWN) {                         \
@@ -38,6 +40,350 @@
         return UCC_ERR_INVALID_PARAM;                                          \
     }                                                                          \
 } while(0)
+
+/**
+ * @brief Start non-blocking datatype validation for rooted collective
+ *
+ * This function extracts datatypes, allocates buffers, and starts the
+ * service allgather for validation. Called during collective init.
+ */
+static ucc_status_t ucc_dt_check_start_validation(ucc_coll_task_t *task)
+{
+    ucc_dt_check_state_t  *dt_check = NULL;
+    ucc_status_t           status   = UCC_OK;
+    ucc_datatype_t         local_dt = UCC_DT_INT8;
+    ucc_memory_type_t      local_mem_type = UCC_MEMORY_TYPE_UNKNOWN;
+    const ucc_coll_args_t *args      = &task->bargs.args;
+    ucc_team_t            *team      = task->bargs.team;
+    ucc_rank_t             rank      = team->rank;
+    int                    root      = (int)args->root;
+    ucc_coll_type_t        coll_type = args->coll_type;
+    int                    is_contig;
+    ucc_subset_t           subset;
+
+    /* Determine which datatype and memory type to check based on operation and rank
+     *
+     * Key insight: IN_PLACE position differs between gather and scatter at root:
+     *   GATHER: sendbuf is IN_PLACE → data in recvbuf (dst)
+     *   SCATTER: recvbuf is IN_PLACE → data in sendbuf (src)
+     */
+    if (rank == root) {
+        switch (coll_type) {
+        case UCC_COLL_TYPE_GATHER:
+        case UCC_COLL_TYPE_GATHERV:
+            /* GATHER at root: use src for non-inplace, dst for inplace */
+            if (UCC_IS_INPLACE(*args)) {
+                local_dt = args->dst.info.datatype;
+                local_mem_type = args->dst.info.mem_type;
+            } else {
+                local_dt = args->src.info.datatype;
+                local_mem_type = args->src.info.mem_type;
+            }
+            break;
+        case UCC_COLL_TYPE_SCATTER:
+        case UCC_COLL_TYPE_SCATTERV:
+            /* SCATTER at root: use dst for non-inplace, src for inplace */
+            if (UCC_IS_INPLACE(*args)) {
+                local_dt = args->src.info.datatype;
+                local_mem_type = args->src.info.mem_type;
+            } else {
+                local_dt = args->dst.info.datatype;
+                local_mem_type = args->dst.info.mem_type;
+            }
+            break;
+        default:
+            goto out;
+        }
+    } else {
+        switch (coll_type) {
+        case UCC_COLL_TYPE_GATHER:
+        case UCC_COLL_TYPE_GATHERV:
+            /* Non-root sends data */
+            local_dt = args->src.info.datatype;
+            local_mem_type = args->src.info.mem_type;
+            break;
+        case UCC_COLL_TYPE_SCATTER:
+        case UCC_COLL_TYPE_SCATTERV:
+            /* Non-root receives data */
+            local_dt = args->dst.info.datatype;
+            local_mem_type = args->dst.info.mem_type;
+            break;
+        default:
+            goto out;
+        }
+    }
+
+    /* Determine if local datatype is contiguous */
+    if (UCC_DT_IS_PREDEFINED(local_dt)) {
+        is_contig = 1;
+    } else if (UCC_DT_IS_GENERIC(local_dt)) {
+        is_contig = UCC_DT_IS_CONTIG(local_dt);
+    } else {
+        is_contig = 0;  /* Unknown type */
+    }
+
+    /* If check is disabled (default), skip all validation and assume symmetric datatypes
+     * This ensures all processes get synchronized status (all succeed) */
+    if (!ucc_global_config.check_asymmetric_dt) {
+        task->dt_check = NULL;
+        return UCC_OK;
+    }
+
+    /* Global check is ENABLED - allocate dt_check state */
+    dt_check = (ucc_dt_check_state_t *)
+                ucc_malloc(sizeof(ucc_dt_check_state_t),
+                           "dt_check_state");
+    if (!dt_check) {
+        ucc_error("Failed to allocate dt_check state");
+        return UCC_ERR_NO_MEMORY;
+    }
+    memset(dt_check, 0, sizeof(ucc_dt_check_state_t));
+    task->dt_check = dt_check;
+
+    /* Setup local values: [0] = datatype, [1] = memory type */
+    if (is_contig) {
+        dt_check->local_values[0] = (int64_t) local_dt;
+    } else {
+        dt_check->local_values[0] = (int64_t) UCC_ERR_NOT_SUPPORTED;
+    }
+    dt_check->local_values[1] = (int64_t) local_mem_type;
+
+    /* Allocate buffer to gather values from all ranks */
+    dt_check->gathered_values = (int64_t *)ucc_malloc(team->size * 2 *
+                                                      sizeof(int64_t),
+                                                      "gathered_values");
+    if (!dt_check->gathered_values) {
+        ucc_error("Failed to allocate gathered_values buffer");
+        status = UCC_ERR_NO_MEMORY;
+        goto out;
+    }
+
+    /* Setup subset for full team */
+    subset.myrank = team->rank;
+    subset.map.type = UCC_EP_MAP_FULL;
+    subset.map.ep_num = team->size;
+
+    /* Start service allgather (non-blocking) */
+    status = ucc_service_allgather(team, dt_check->local_values,
+                                   dt_check->gathered_values,
+                                   2 * sizeof(int64_t), subset,
+                                   &dt_check->check_req);
+    if (status != UCC_OK) {
+        ucc_error("Failed to start service allgather for datatype check");
+        goto out;
+    }
+
+    /* Mark validation as in progress */
+    dt_check->flags |= UCC_DT_CHECK_IN_PROGRESS;
+    return UCC_OK;
+
+out:
+    if (dt_check) {
+        /* Only free gathered_values if allgather was NOT started
+         * If check_req is set, allgather is in flight and still using the buffer */
+        if (dt_check->gathered_values && !dt_check->check_req) {
+            ucc_free(dt_check->gathered_values);
+        }
+        if (dt_check->check_req) {
+            ucc_service_coll_finalize(dt_check->check_req);
+        }
+        ucc_free(dt_check);
+        task->dt_check = NULL;
+    }
+    return status;
+}
+
+/**
+ * @brief Validate gathered datatype values from all ranks
+ *
+ * This function checks the results of the service allgather to ensure
+ * all ranks have contiguous and matching datatypes.
+ */
+static ucc_status_t ucc_dt_validate_results(ucc_coll_task_t *task)
+{
+    ucc_dt_check_state_t *dt_check        = task->dt_check;
+    int64_t              *gathered_values = dt_check->gathered_values;
+    ucc_team_t           *team            = task->bargs.team;
+    ucc_rank_t            i;
+
+    /* Check if any rank has non-contiguous datatype */
+    for (i = 0; i < team->size; i++) {
+        if (gathered_values[i * 2] == (int64_t) UCC_ERR_NOT_SUPPORTED) {
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+
+    /* Check if all ranks have the same datatype and memory type */
+    for (i = 1; i < team->size; i++) {
+        if (gathered_values[i * 2] != gathered_values[0] ||
+            gathered_values[i * 2 + 1] != gathered_values[1]) {
+            return UCC_ERR_INVALID_PARAM;
+        }
+    }
+
+    return UCC_OK;
+}
+
+/**
+ * @brief Validate and cleanup datatype check state
+ *
+ * This helper function validates the gathered datatypes and cleans up
+ * the validation resources. Called once validation allgather completes.
+ */
+static ucc_status_t ucc_dt_check_validate_and_cleanup(ucc_coll_task_t *task)
+{
+    ucc_dt_check_state_t *dt_check = task->dt_check;
+    ucc_status_t          status;
+
+    /* Validate the gathered datatype values */
+    status = ucc_dt_validate_results(task);
+    if (status != UCC_OK) {
+        return status;
+    }
+
+    /* Validation passed - clean up validation resources */
+    ucc_service_coll_finalize(dt_check->check_req);
+    dt_check->check_req = NULL;
+    ucc_free(dt_check->gathered_values);
+    dt_check->gathered_values = NULL;
+    dt_check->flags &= ~UCC_DT_CHECK_IN_PROGRESS;
+    dt_check->flags |= UCC_DT_CHECK_VALIDATED;
+
+    return UCC_OK;
+}
+
+/**
+ * @brief Progress wrapper for datatype validation
+ *
+ * This function validates datatypes, then posts and progresses the actual
+ * TL/CL collective operation using the saved function pointers.
+ *
+ * Flow:
+ *   1. Progress datatype validation until complete
+ *   2. Once validated, post the actual task using saved_post
+ *   3. Progress the actual task using saved_progress (non-blocking)
+ *
+ * This ensures validation happens transparently before the real collective.
+ * This function is non-blocking - it will be called repeatedly by the
+ * progress queue until the task completes.
+ */
+static void ucc_dt_check_progress_wrapper(ucc_coll_task_t *task)
+{
+    ucc_dt_check_state_t *dt_check = task->dt_check;
+    ucc_status_t          status;
+
+    /* Step 1: Progress the datatype validation until complete */
+    if (dt_check->flags & UCC_DT_CHECK_IN_PROGRESS) {
+        status = ucc_service_coll_test(dt_check->check_req);
+        if (status == UCC_INPROGRESS) {
+            /* Still validating - will be called again by progress queue */
+            return;
+        }
+
+        if (status != UCC_OK) {
+            /* Service collective failed */
+            task->super.status = status;
+            return;
+        }
+
+        /* Validation allgather complete - validate and cleanup */
+        status = ucc_dt_check_validate_and_cleanup(task);
+        if (status != UCC_OK) {
+            /* Invalid datatypes detected */
+            task->super.status = status;
+            return;
+        }
+        /* Validation complete */
+    }
+
+    /* Step 2: Post actual task if not already posted */
+    if ((dt_check->flags & UCC_DT_CHECK_VALIDATED) &&
+        !(dt_check->flags & UCC_DT_CHECK_ACTUAL_POSTED)) {
+
+        dt_check->flags |= UCC_DT_CHECK_ACTUAL_POSTED;
+
+        /* Restore the progress pointer before calling saved_post
+         * since saved_post may call task->progress */
+        task->progress = dt_check->saved_progress;
+
+        /* Post the actual task using the saved function */
+        status = dt_check->saved_post(task);
+        if (status != UCC_OK) {
+            task->super.status = status;
+            return;
+        }
+    }
+
+    /* Step 3: Progress actual task (non-blocking) */
+    dt_check->saved_progress(task);
+    /* Status updated by saved_progress - if still INPROGRESS,
+     * progress queue will call us again */
+}
+
+/**
+ * @brief Post wrapper for datatype validation
+ *
+ * This function marks that posting is requested. The actual task
+ * posting happens in the progress wrapper after validation completes.
+ *
+ * Returns: UCC_OK (post accepted), or error status
+ */
+static ucc_status_t ucc_dt_check_post_wrapper(ucc_coll_task_t *task)
+{
+    ucc_dt_check_state_t *dt_check = task->dt_check;
+    ucc_status_t          status;
+
+    /* Try to complete validation synchronously at post time */
+    if (dt_check->flags & UCC_DT_CHECK_IN_PROGRESS) {
+        status = ucc_service_coll_test(dt_check->check_req);
+        if (status == UCC_OK) {
+            /* Validation allgather completed - validate and cleanup */
+            status = ucc_dt_check_validate_and_cleanup(task);
+            if (status != UCC_OK) {
+                task->super.status = status;
+                return status;
+            }
+        }
+    }
+
+    /* Mark posting as requested - progress wrapper will handle the actual post */
+    dt_check->flags |= UCC_DT_CHECK_POST_REQUESTED;
+    task->status = UCC_INPROGRESS;
+
+    /* Add task to progress queue - this will call progress wrapper */
+    return ucc_progress_queue_enqueue(task->bargs.team->contexts[0]->pq, task);
+}
+
+/**
+ * @brief Finalize wrapper for datatype validation
+ *
+ * Cleans up dt_check state and calls the saved finalize function.
+ */
+static ucc_status_t ucc_dt_check_finalize_wrapper(ucc_coll_task_t *task)
+{
+    ucc_dt_check_state_t *dt_check = task->dt_check;
+    ucc_coll_finalize_fn_t saved_finalize = dt_check->saved_finalize;
+    ucc_status_t status;
+
+    /* Free dt_check state */
+    if (dt_check->check_req) {
+        ucc_service_coll_finalize(dt_check->check_req);
+    }
+    if (dt_check->gathered_values) {
+        ucc_free(dt_check->gathered_values);
+    }
+
+    ucc_free(dt_check);
+    task->dt_check = NULL;
+
+    /* Call the saved finalize function */
+    status = saved_finalize(task);
+    if (status != UCC_OK) {
+        ucc_error("failed to finalize task: %s", ucc_status_string(status));
+    }
+
+    return status;
+}
 
 #if ENABLE_DEBUG == 1
 static ucc_status_t ucc_check_coll_args(const ucc_coll_args_t *coll_args,
@@ -253,6 +599,40 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
         ucc_error("failed to init collective: %s, err: (%d) %s", coll_args_str,
                   status, ucc_status_string(status));
         goto free_scratch;
+    }
+
+    /* Setup non-blocking datatype check for rooted collectives
+     *
+     * This implements a transparent validation:
+     * 1. Start service allgather to validate datatypes across all ranks
+     * 2. Save the task's original post/progress/finalize functions
+     * 3. Replace them with wrapper functions that handle validation
+     * 4. Once validated, wrapper functions call the saved functions
+     */
+    if (coll_args->coll_type == UCC_COLL_TYPE_GATHER ||
+        coll_args->coll_type == UCC_COLL_TYPE_GATHERV ||
+        coll_args->coll_type == UCC_COLL_TYPE_SCATTER ||
+        coll_args->coll_type == UCC_COLL_TYPE_SCATTERV) {
+        
+        /* First check if validation is needed */
+        status = ucc_dt_check_start_validation(task);
+        if (ucc_unlikely(status != UCC_OK)) {
+            ucc_error("datatype check initialization failed");
+            goto coll_finalize;
+        }
+
+        /* If validation is enabled, save and replace task functions */
+        if (task->dt_check) {
+            /* Save the original task functions */
+            task->dt_check->saved_post = task->post;
+            task->dt_check->saved_progress = task->progress;
+            task->dt_check->saved_finalize = task->finalize;
+            
+            /* Replace with wrapper functions */
+            task->post = ucc_dt_check_post_wrapper;
+            task->progress = ucc_dt_check_progress_wrapper;
+            task->finalize = ucc_dt_check_finalize_wrapper;
+        }
     }
 
     task->flags |= UCC_COLL_TASK_FLAG_TOP_LEVEL;

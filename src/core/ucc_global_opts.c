@@ -65,4 +65,13 @@ ucc_config_field_t ucc_global_config_table[] = {
      "empty string \"\" - disable use of config file",
      ucc_offsetof(ucc_global_config_t, cfg_filename), UCC_CONFIG_TYPE_STRING},
 
+    {"CHECK_ASYMMETRIC_DT", "n",
+     "Enable asymmetric datatype checking for rooted collectives\n"
+     "(gather, gatherv, scatter, scatterv). Uses allgather to verify\n"
+     "all ranks use the same datatype. Disabled by default for performance.\n"
+     "Enable for debugging or when OMPI needs UCC to detect asymmetric\n"
+     "datatypes for proper fallback behavior.",
+     ucc_offsetof(ucc_global_config_t, check_asymmetric_dt),
+     UCC_CONFIG_TYPE_BOOL},
+
     {NULL}};
