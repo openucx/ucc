@@ -55,9 +55,8 @@ void ucc_tl_ucp_send_completion_cb_st(void *request, ucs_status_t status,
 void ucc_tl_ucp_send_completion_cb_mt(void *request, ucs_status_t status,
                                       void *user_data);
 
-
 void ucc_tl_ucp_put_completion_cb(void *request, ucs_status_t status,
-                                  void *user_data);
+                                      void *user_data);
 
 void ucc_tl_ucp_get_completion_cb(void *request, ucs_status_t status,
                                   void *user_data);
