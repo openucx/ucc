@@ -301,15 +301,11 @@ struct ucc_tl_cuda_task {
         } reduce_scatterv_linear;
 #ifdef HAVE_NVLS
         struct {
-            int            stage;
             ucc_datatype_t dt;
-            void          *sbuf;
-            void          *rbuf;
             /* Offset of the current rank in the src buffer */
             size_t         offset;
             /* Count of the current rank in the src buffer */
             size_t         count;
-            size_t         src_size_bytes;
             void          *evt_completion;
             /* Memory handle for MC symmetric memory */
             CUdeviceptr    mc_va;

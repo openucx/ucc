@@ -31,29 +31,26 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_start(ucc_coll_task_t *coll_task)
     CUdeviceptr  mc_va    = task->reduce_scatterv_nvls.mc_va;
     CUdeviceptr  uc_va    = task->reduce_scatterv_nvls.uc_va;
     ucc_status_t status;
+    size_t       src_size_bytes;
+    void        *sbuf;
+    void        *rbuf;
 
-    task->reduce_scatterv_nvls.src_size_bytes = args->src.info.count *
-                                                ucc_dt_size(dt);
+    src_size_bytes = args->src.info.count * ucc_dt_size(dt);
 
     if (args->coll_type == UCC_COLL_TYPE_REDUCE_SCATTER) {
-        task->reduce_scatterv_nvls.rbuf = args->dst.info.buffer;
-        task->reduce_scatterv_nvls.sbuf = UCC_IS_INPLACE(*args)
-                                              ? args->dst.info.buffer
-                                              : args->src.info.buffer;
+        rbuf = args->dst.info.buffer;
+        sbuf = UCC_IS_INPLACE(*args) ? args->dst.info.buffer
+                                     : args->src.info.buffer;
     } else {
-        task->reduce_scatterv_nvls.rbuf = args->dst.info_v.buffer;
-        task->reduce_scatterv_nvls.sbuf = UCC_IS_INPLACE(*args)
-                                              ? args->dst.info_v.buffer
-                                              : args->src.info_v.buffer;
+        /* RSV non inplace: source buffer is in args->src.info.buffer */
+        rbuf = args->dst.info_v.buffer;
+        sbuf = UCC_IS_INPLACE(*args) ? args->dst.info_v.buffer
+                                     : args->src.info.buffer;
     }
 
     /* copy src buffer to symmetric memory first */
     status = CUDA_FUNC(cudaMemcpyAsync(
-        (void *)uc_va,
-        task->reduce_scatterv_nvls.sbuf,
-        task->reduce_scatterv_nvls.src_size_bytes,
-        cudaMemcpyDeviceToDevice,
-        stream));
+        (void *)uc_va, sbuf, src_size_bytes, cudaMemcpyDeviceToDevice, stream));
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
     }
@@ -62,9 +59,9 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_start(ucc_coll_task_t *coll_task)
         stream,
         sm_count,
         threads,
-        (CUdeviceptr)task->reduce_scatterv_nvls.rbuf,
+        (CUdeviceptr)rbuf,
         mc_va,
-        task->reduce_scatterv_nvls.src_size_bytes,
+        src_size_bytes,
         TASK_NVLS_CONTROL_MC(task),
         TASK_NVLS_CONTROL_UC(task),
         task->reduce_scatterv_nvls.coll_id,
@@ -89,22 +86,9 @@ void ucc_tl_cuda_reduce_scatterv_nvls_progress(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_task_t  *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_ec_cuda_event_t *ec_event = (ucc_ec_cuda_event_t *)task
                                         ->reduce_scatterv_nvls.evt_completion;
-    cudaEvent_t evt = ec_event->event;
-    cudaError_t cuda_status;
+    cudaEvent_t evt    = ec_event->event;
 
-    cuda_status = cudaEventQuery(evt);
-    if (cuda_status == cudaErrorNotReady) {
-        task->super.status = UCC_INPROGRESS;
-        return;
-    } else if (ucc_unlikely(cuda_status != cudaSuccess)) {
-        tl_error(
-            UCC_TASK_LIB(task),
-            "error cudaEventQuery %s!",
-            cudaGetErrorString(cuda_status));
-        task->super.status = UCC_ERR_NO_MESSAGE;
-        return;
-    }
-    task->super.status = UCC_OK;
+    task->super.status = cuda_error_to_ucc_status(cudaEventQuery(evt));
 }
 
 ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_triggered_post(

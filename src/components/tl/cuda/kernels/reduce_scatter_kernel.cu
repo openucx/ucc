@@ -60,13 +60,14 @@ ucc_status_t post_reduce_scatter_kernel(
     uint64_t launch_counter, size_t offset, size_t count,
     ucc_datatype_t datatype, uint32_t tsize)
 {
-    assert(sm_count > 0 && sm_count <= UCC_TL_CUDA_MAX_NVLS_SM_COUNT);
-    assert(threads > 0 && threads <= UCC_TL_CUDA_MAX_NVLS_THREADS);
+    ucc_assert(sm_count > 0 && sm_count <= UCC_TL_CUDA_MAX_NVLS_SM_COUNT);
+    ucc_assert(threads > 0 && threads <= UCC_TL_CUDA_MAX_NVLS_THREADS);
 
-    assert(offset % 4 == 0 && "NVLS requires 16-byte alignment for the offset");
-    assert(count % 4 == 0 && "NVLS requires 16-byte alignment for the count");
-    assert(mc_base_addr % 16 == 0 && "NVLS requires 16-byte alignment");
-    assert(mc_control_addr % 16 == 0 && "NVLS requires 16-byte alignment");
+    /* NVLS requires 16-byte alignment */
+    ucc_assert(offset % 4 == 0);
+    ucc_assert(count % 4 == 0);
+    ucc_assert(mc_base_addr % 16 == 0);
+    ucc_assert(mc_control_addr % 16 == 0);
 
     uint32_t *base_u32 = reinterpret_cast<uint32_t *>(mc_base_addr);
     ucc_tl_cuda_nvls_control_t
