@@ -68,7 +68,6 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_start(ucc_coll_task_t *coll_task)
         threads,
         (CUdeviceptr)rbuf,
         mc_va,
-        src_size_bytes,
         TASK_NVLS_CONTROL_MC(task),
         TASK_NVLS_CONTROL_UC(task),
         task->reduce_scatterv_nvls.coll_id,
