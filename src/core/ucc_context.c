@@ -611,7 +611,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                                           ucc_context_h              *context,
                                           ucc_proc_info_t            *proc_info)
 {
-    uint32_t                   topo_required       = 0;
+    // uint32_t                   topo_required       = 0;
     uint64_t                   created_ctx_counter = 0;
     ucc_base_context_params_t  b_params;
     ucc_base_context_t        *b_ctx;
@@ -663,17 +663,21 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         goto error_ctx_create;
     }
 
-    if (config->node_local_id == UCC_ULUNITS_AUTO){
-        ucc_subset_t     subset;
-        subset.map    = ctx->ctx_map; // TODO: is it the right map?
-        subset.myrank = ctx->rank; // TODO: is it the right rank?
-        ucc_topo_t topo;
-        status        = ucc_topo_init(subset, ctx->topo, &topo);
+    if (config->node_local_id == UCC_ULUNITS_AUTO) {
+        ucc_subset_t subset;
+        ucc_topo_t  *topo = NULL;
+        
+        subset.map = ctx->service_team->super.params.map;
+        subset.myrank     = ctx->rank;
+        
+        status = ucc_topo_init(subset, ctx->topo, &topo);
         if (UCC_OK != status) {
-            ucc_warn("failed to init topo");
+            ucc_warn("failed to init topo for computing local rank");
+        } else {
+            b_params.node_local_id = ucc_topo_node_local_rank(topo);
+            // TODO: cleanup?
+            ucc_topo_cleanup(topo);
         }
-        b_params.node_local_id = ucc_topo_node_local_rank(topo);
-        // TODO: cleanup topo?
     }
     
     status = ucc_create_tl_contexts(ctx, config, b_params);
@@ -724,9 +728,9 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                       cl_lib->iface->super.name);
             goto error_ctx_create;
         }
-        if (c_attr.topo_required) {
-            topo_required = 1;
-        }
+        // if (c_attr.topo_required) {
+        //     topo_required = 1;
+        // }
 
         memset(&l_attr, 0, sizeof(l_attr));
         status = cl_lib->iface->lib.get_attr(&cl_lib->super, &l_attr.super);
@@ -772,15 +776,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
             }
         } while (status == UCC_INPROGRESS);
 
-        if (topo_required) {
-            /* At least one available CL context reported it needs topo info */
-            status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
-            if (UCC_OK != status) {
-                ucc_free(ctx->addr_storage.storage);
-                ucc_error("failed to init ctx topo");
-                goto error_ctx_create;
-            }
-        }
         ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
     }
     if (config->internal_oob) {
