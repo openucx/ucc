@@ -35,17 +35,24 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_start(ucc_coll_task_t *coll_task)
     void        *sbuf;
     void        *rbuf;
 
-    src_size_bytes = args->src.info.count * ucc_dt_size(dt);
-
     if (args->coll_type == UCC_COLL_TYPE_REDUCE_SCATTER) {
-        rbuf = args->dst.info.buffer;
-        sbuf = UCC_IS_INPLACE(*args) ? args->dst.info.buffer
-                                     : args->src.info.buffer;
+        rbuf           = args->dst.info.buffer;
+        sbuf           = UCC_IS_INPLACE(*args) ? args->dst.info.buffer
+                                               : args->src.info.buffer;
+        src_size_bytes = (UCC_IS_INPLACE(*args) ? args->dst.info.count
+                                                : args->src.info.count) *
+                         ucc_dt_size(dt);
     } else {
         /* RSV non inplace: source buffer is in args->src.info.buffer */
-        rbuf = args->dst.info_v.buffer;
-        sbuf = UCC_IS_INPLACE(*args) ? args->dst.info_v.buffer
-                                     : args->src.info.buffer;
+        rbuf           = args->dst.info_v.buffer;
+        sbuf           = UCC_IS_INPLACE(*args) ? args->dst.info_v.buffer
+                                               : args->src.info.buffer;
+        src_size_bytes = (UCC_IS_INPLACE(*args) ? ucc_coll_args_get_total_count(
+                                                      args,
+                                                      args->dst.info_v.counts,
+                                                      UCC_TL_TEAM_SIZE(team))
+                                                : args->src.info.count) *
+                         ucc_dt_size(dt);
     }
 
     /* copy src buffer to symmetric memory first */
