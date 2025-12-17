@@ -142,17 +142,25 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_finalize(ucc_coll_task_t *task)
 }
 
 ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
-    ucc_tl_cuda_task_t *task, ucc_datatype_t dt, size_t offset_elements,
-    size_t count_elements)
+    ucc_base_coll_args_t *coll_args, ucc_base_team_t *tl_team,
+    ucc_coll_task_t **task_p, nvls_get_count_fn_t get_offset,
+    nvls_get_count_fn_t get_count)
 {
-    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    ucc_reduction_op_t  op   = TASK_ARGS(task).op;
+    ucc_tl_cuda_team_t *team  = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
+    ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
+    ucc_datatype_t      dt    = (coll_args->args.coll_type ==
+                         UCC_COLL_TYPE_REDUCE_SCATTER)
+                                    ? coll_args->args.dst.info.datatype
+                                    : coll_args->args.dst.info_v.datatype;
+    ucc_tl_cuda_task_t *task;
     ucc_status_t        status;
+    size_t              offset_elements;
+    size_t              count_elements;
     size_t              offset_u32;
     size_t              count_u32;
 
-    /* Validate op and datatype */
-    if (op != UCC_OP_SUM) {
+    /* Validate op and datatype before allocating task */
+    if (coll_args->args.op != UCC_OP_SUM) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
             "NVLS reduce scatter(v) supported only with SUM operation");
@@ -165,8 +173,15 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    /* Validate alignment before allocating any resources.
-     * Convert from datatype elements to uint32_t indices for the kernel.
+    status = ucc_tl_cuda_task_init(coll_args, team, &task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
+
+    offset_elements = get_offset(task, trank);
+    count_elements  = get_count(task, trank);
+
+    /* Convert from datatype elements to uint32_t indices for the kernel.
      * For float32: 1 element = 1 uint32_t
      * For bfloat16: 2 elements = 1 uint32_t */
     if (dt == UCC_DT_FLOAT32) {
@@ -176,10 +191,11 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
         if (offset_elements % 2 != 0 || count_elements % 2 != 0) {
             tl_debug(
                 UCC_TL_TEAM_LIB(team),
-                "BF16 offset and count must be even, got offset=%zu count=%zu",
+                "BF16 offset and count must be even, got offset=%zu "
+                "count=%zu",
                 offset_elements,
                 count_elements);
-            return UCC_ERR_NOT_SUPPORTED;
+            goto err_task_put;
         }
         offset_u32 = offset_elements / 2;
         count_u32  = count_elements / 2;
@@ -189,26 +205,23 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
     if (ucc_unlikely(offset_u32 % 4 != 0)) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
-            "NVLS requires 16-byte alignment for offset, got offset=%zu "
-            "(uint32_t units)",
+            "NVLS requires 16-byte alignment for offset, got offset=%zu",
             offset_u32);
-        return UCC_ERR_NOT_SUPPORTED;
+        goto err_task_put;
     }
     if (ucc_unlikely(count_u32 % 4 != 0)) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
-            "NVLS requires 16-byte alignment for count, got count=%zu "
-            "(uint32_t units)",
+            "NVLS requires 16-byte alignment for count, got count=%zu",
             count_u32);
-        return UCC_ERR_NOT_SUPPORTED;
+        goto err_task_put;
     }
 
-    /* All validation passed, now allocate resources */
     status = ucc_ec_create_event(
         &task->reduce_scatterv_nvls.evt_completion, UCC_EE_CUDA_STREAM);
     if (ucc_unlikely(status != UCC_OK)) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to create CUDA event");
-        return status;
+        goto err_task_put;
     }
 
     task->reduce_scatterv_nvls.dt      = dt;
@@ -224,36 +237,22 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
     task->super.progress = ucc_tl_cuda_reduce_scatterv_nvls_progress;
     task->super.finalize = ucc_tl_cuda_reduce_scatterv_nvls_finalize;
 
+    *task_p              = &task->super;
     return UCC_OK;
+
+err_task_put:
+    ucc_tl_cuda_task_put(task);
+    return UCC_ERR_NOT_SUPPORTED;
 }
 
 ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *tl_team,
     ucc_coll_task_t **task_p)
 {
-    ucc_tl_cuda_team_t *team  = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
-    ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
-    ucc_datatype_t      dt    = coll_args->args.dst.info_v.datatype;
-    ucc_tl_cuda_task_t *task;
-    ucc_status_t        status;
-    size_t              offset_elements;
-    size_t              count_elements;
-
-    status = ucc_tl_cuda_task_init(coll_args, team, &task);
-    if (ucc_unlikely(status != UCC_OK)) {
-        return status;
-    }
-
-    offset_elements = ucc_tl_cuda_reduce_scatterv_get_offset(task, trank);
-    count_elements  = ucc_tl_cuda_reduce_scatterv_get_count(task, trank);
-
-    status          = ucc_tl_cuda_reduce_scatterv_nvls_init_common(
-        task, dt, offset_elements, count_elements);
-    if (ucc_unlikely(status != UCC_OK)) {
-        ucc_tl_cuda_task_put(task);
-        return status;
-    }
-
-    *task_p = &task->super;
-    return UCC_OK;
+    return ucc_tl_cuda_reduce_scatterv_nvls_init_common(
+        coll_args,
+        tl_team,
+        task_p,
+        ucc_tl_cuda_reduce_scatterv_get_offset,
+        ucc_tl_cuda_reduce_scatterv_get_count);
 }
