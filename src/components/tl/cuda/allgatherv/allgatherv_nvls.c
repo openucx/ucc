@@ -15,41 +15,81 @@
 #include "components/ec/ucc_ec.h"
 #include "components/ec/cuda/ec_cuda_resources.h"
 
-enum {
-    STAGE_KERNEL, /*< Post memcpy to symmetric buffer, wait for completion */
-    STAGE_WAIT,   /*< Wait for the kernel to complete */
-};
-
 ucc_status_t ucc_tl_cuda_allgatherv_nvls_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task    = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team    = TASK_TEAM(task);
     ucc_coll_args_t    *args    = &TASK_ARGS(task);
     ucc_rank_t          trank   = UCC_TL_TEAM_RANK(team);
-    ucc_datatype_t      dt      = task->allgatherv_nvls.dt;
+    ucc_datatype_t      dt      = (args->coll_type == UCC_COLL_TYPE_ALLGATHERV)
+                                      ? args->dst.info_v.datatype
+                                      : args->dst.info.datatype;
     size_t              dt_size = ucc_dt_size(dt);
+    ucc_ee_h            ee      = coll_task->ee;
+    cudaStream_t stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
+    ucc_ec_cuda_event_t *ec_event = (ucc_ec_cuda_event_t *)
+                                        task->allgatherv_nvls.evt_completion;
+    cudaEvent_t  evt      = ec_event->event;
+    CUdeviceptr  mc_va    = task->allgatherv_nvls.mc_va;
+    CUdeviceptr  uc_va    = task->allgatherv_nvls.uc_va;
+    uint32_t     sm_count = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_sm_count;
+    uint32_t     threads  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_threads;
+    ucc_status_t status;
+    void        *sbuf;
+    void        *rbuf;
 
     if (args->coll_type == UCC_COLL_TYPE_ALLGATHERV) {
-        task->allgatherv_nvls.rbuf = args->dst.info_v.buffer;
-        task->allgatherv_nvls
-            .sbuf = UCC_IS_INPLACE(*args)
-                        ? PTR_OFFSET(
-                              args->dst.info_v.buffer,
-                              ucc_tl_cuda_allgatherv_get_offset(task, trank) *
-                                  dt_size)
-                        : args->src.info.buffer;
+        rbuf = args->dst.info_v.buffer;
+        sbuf = UCC_IS_INPLACE(*args)
+                   ? PTR_OFFSET(
+                         args->dst.info_v.buffer,
+                         ucc_tl_cuda_allgatherv_get_offset(task, trank) *
+                             dt_size)
+                   : args->src.info.buffer;
     } else {
-        task->allgatherv_nvls.rbuf = args->dst.info.buffer;
-        task->allgatherv_nvls
-            .sbuf = UCC_IS_INPLACE(*args)
-                        ? PTR_OFFSET(
-                              args->dst.info.buffer,
-                              ucc_tl_cuda_allgatherv_get_offset(task, trank) *
-                                  dt_size)
-                        : args->src.info.buffer;
+        rbuf = args->dst.info.buffer;
+        sbuf = UCC_IS_INPLACE(*args)
+                   ? PTR_OFFSET(
+                         args->dst.info.buffer,
+                         ucc_tl_cuda_allgatherv_get_offset(task, trank) *
+                             dt_size)
+                   : args->src.info.buffer;
     }
 
-    task->allgatherv_nvls.stage = STAGE_KERNEL;
+    /* Each rank copies its data to the NVLS buffer at its specific offset */
+    status = post_allgatherv_kernel(
+        stream,
+        sm_count,
+        threads,
+        (CUdeviceptr)sbuf,
+        mc_va,
+        task->allgatherv_nvls.offset,
+        task->allgatherv_nvls.count,
+        TASK_NVLS_CONTROL_MC(task),
+        TASK_NVLS_CONTROL_UC(task),
+        task->allgatherv_nvls.coll_id,
+        UCC_TL_TEAM_SIZE(team));
+    if (ucc_unlikely(status != UCC_OK)) {
+        tl_error(UCC_TASK_LIB(task), "failed to post allgatherv kernel");
+        return status;
+    }
+
+    /* Copy gathered data from uc ptr to destination buffer
+     * total_count is in uint32_t units, convert to bytes */
+    status = CUDA_FUNC(cudaMemcpyAsync(
+        rbuf,
+        (void *)uc_va,
+        task->allgatherv_nvls.total_count * sizeof(uint32_t),
+        cudaMemcpyDeviceToDevice,
+        stream));
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
+
+    status = CUDA_FUNC(cudaEventRecord(evt, stream));
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
@@ -57,81 +97,15 @@ ucc_status_t ucc_tl_cuda_allgatherv_nvls_start(ucc_coll_task_t *coll_task)
 void ucc_tl_cuda_allgatherv_nvls_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t  *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t  *team = TASK_TEAM(task);
     ucc_ec_cuda_event_t *ec_event = (ucc_ec_cuda_event_t *)
                                         task->allgatherv_nvls.evt_completion;
-    cudaEvent_t  evt      = ec_event->event;
-    CUdeviceptr  mc_va    = task->allgatherv_nvls.mc_va;
-    CUdeviceptr  uc_va    = task->allgatherv_nvls.uc_va;
-    ucc_ee_h     ee       = task->super.ee;
-    cudaStream_t stream   = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
-    uint32_t     sm_count = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_sm_count;
-    uint32_t     threads  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_threads;
-    ucc_status_t status;
-    cudaError_t  cuda_status;
+    cudaEvent_t evt    = ec_event->event;
 
-    switch (task->allgatherv_nvls.stage) {
-    case STAGE_KERNEL:
-        /* Each rank copies its data to the NVLS buffer at its specific offset
-         * using CUDA memcpy to mc ptr */
-        status = post_allgatherv_kernel(
-            stream,
-            sm_count,
-            threads,
-            (CUdeviceptr)task->allgatherv_nvls.sbuf,
-            mc_va,
-            task->allgatherv_nvls.offset,
-            task->allgatherv_nvls.count,
-            TASK_NVLS_CONTROL_MC(task),
-            TASK_NVLS_CONTROL_UC(task),
-            task->allgatherv_nvls.coll_id,
-            UCC_TL_TEAM_SIZE(team));
-        if (ucc_unlikely(status != UCC_OK)) {
-            tl_error(UCC_TASK_LIB(task), "failed to post allgatherv kernel");
-            task->super.status = status;
-            return;
-        }
-
-        /* Copy gathered data from uc ptr (batched wait) to destination buffer
-         * total_count is in uint32_t units, convert to bytes */
-        status = CUDA_FUNC(cudaMemcpyAsync(
-            task->allgatherv_nvls.rbuf,
-            (void *)uc_va,
-            task->allgatherv_nvls.total_count * sizeof(uint32_t),
-            cudaMemcpyDeviceToDevice,
-            stream));
-        if (ucc_unlikely(status != UCC_OK)) {
-            task->super.status = status;
-            return;
-        }
-
-        status = CUDA_FUNC(cudaEventRecord(evt, stream));
-        if (ucc_unlikely(status != UCC_OK)) {
-            task->super.status = status;
-            return;
-        }
-        task->allgatherv_nvls.stage = STAGE_WAIT;
-        /* fallthrough */
-    case STAGE_WAIT:
-        cuda_status = cudaEventQuery(evt);
-        if (cuda_status == cudaErrorNotReady) {
-            task->super.status = UCC_INPROGRESS;
-            return;
-        } else if (ucc_unlikely(cuda_status != cudaSuccess)) {
-            tl_error(
-                UCC_TASK_LIB(task),
-                "error cudaEventQuery %s!",
-                cudaGetErrorString(cuda_status));
-            task->super.status = UCC_ERR_NO_MESSAGE;
-            return;
-        }
-        task->super.status = UCC_OK;
-        break;
-    }
+    task->super.status = cuda_error_to_ucc_status(cudaEventQuery(evt));
 }
 
 ucc_status_t ucc_tl_cuda_allgatherv_nvls_triggered_post(
-    ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task) // NOLINT
+    ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task) /* NOLINT */
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_status_t        status;
@@ -203,18 +177,16 @@ ucc_status_t ucc_tl_cuda_allgatherv_nvls_init(
         return status;
     }
 
-    task->allgatherv_nvls.dt = dt;
-
     /* Get offset and count in datatype elements, then convert to bytes and
      * then uint32_t units. Datatype agnostic - we just copy raw bytes.
      * NVLS requires 16-byte alignment (4 uint32_t = 16 bytes). */
-    offset_elements          = ucc_tl_cuda_allgatherv_get_offset(task, trank);
-    count_elements           = ucc_tl_cuda_allgatherv_get_count(task, trank);
-    offset_bytes             = offset_elements * dt_size;
-    count_bytes              = count_elements * dt_size;
+    offset_elements   = ucc_tl_cuda_allgatherv_get_offset(task, trank);
+    count_elements    = ucc_tl_cuda_allgatherv_get_count(task, trank);
+    offset_bytes      = offset_elements * dt_size;
+    count_bytes       = count_elements * dt_size;
 
     /* Calculate total count in bytes */
-    total_count_bytes        = 0;
+    total_count_bytes = 0;
     for (i = 0; i < tsize; i++) {
         total_count_bytes += ucc_tl_cuda_allgatherv_get_count(task, i) *
                              dt_size;
