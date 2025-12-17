@@ -614,6 +614,7 @@ poll:
     return UCC_OK;
 }
 
+
 ucc_status_t ucc_core_addr_exchange_after_ctx_id(
     ucc_context_t *context, ucc_oob_coll_t *oob, ucc_addr_storage_t *addr_storage)
 {
@@ -764,6 +765,7 @@ poll:
 
         addr_storage->flags = UCC_ADDR_STORAGE_FLAG_CTX_ID_PREFIX;
         addr_storage->rank  = r;
+
     }
     return UCC_OK;
 }
@@ -1003,9 +1005,18 @@ ucc_status_t ucc_context_create_proc_info(
                 ucc_topo_cleanup(topo);
             }
 
-            /* Keep addr_storage prefix rows and ctx->topo for
-             * ucc_core_addr_exchange_after_ctx_id after TL contexts exist. */
-            ctx_prefix_for_addr_exchange = 1;
+            /* clean up addr_storage */
+            ucc_free(ctx->addr_storage.storage);
+            ctx->addr_storage.storage = NULL;
+            ctx->addr_storage.addr_len = 0;
+            ctx->addr_storage.size = 0;
+            ctx->addr_storage.rank = UCC_RANK_MAX;
+            ctx->addr_storage.flags = 0;
+            ctx->addr_storage.oob_req = NULL;
+
+            /* clean up topo */
+            ucc_context_topo_cleanup(ctx->topo);
+            ctx->topo = NULL;
         } else if (!(params->mask & UCC_CONTEXT_PARAM_FIELD_OOB)) {
             /* No OOB: cannot run topo exchange; sole implicit rank on the node. */
             b_params.node_local_id = 0;
