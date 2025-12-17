@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "ucc_context.h"
+#include "components/topo/ucc_topo.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
 #include "utils/ucc_malloc.h"
@@ -654,6 +655,27 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         ucc_check_wait_for_debugger(ctx->rank);
 #endif
     }
+
+    status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
+    if (UCC_OK != status) {
+        ucc_free(ctx->addr_storage.storage);
+        ucc_error("failed to init ctx topo");
+        goto error_ctx_create;
+    }
+
+    if (config->node_local_id == UCC_ULUNITS_AUTO){
+        ucc_subset_t     subset;
+        subset.map    = ctx->ctx_map; // TODO: is it the right map?
+        subset.myrank = ctx->rank; // TODO: is it the right rank?
+        ucc_topo_t topo;
+        status        = ucc_topo_init(subset, ctx->topo, &topo);
+        if (UCC_OK != status) {
+            ucc_warn("failed to init topo");
+        }
+        b_params.node_local_id = ucc_topo_node_local_rank(topo);
+        // TODO: cleanup topo?
+    }
+    
     status = ucc_create_tl_contexts(ctx, config, b_params);
     if (UCC_OK != status) {
         /* only critical error could have happened - bail */
