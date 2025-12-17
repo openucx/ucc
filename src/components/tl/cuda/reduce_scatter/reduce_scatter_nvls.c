@@ -19,28 +19,11 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_nvls_init(
     size_t              offset_elements;
     size_t              count_elements;
 
-    if (coll_args->args.op != UCC_OP_SUM) {
-        tl_debug(
-            UCC_TL_TEAM_LIB(team),
-            "NVLS reduce scatter is supported only with SUM operation");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-    if (dt != UCC_DT_FLOAT32 && dt != UCC_DT_BFLOAT16) {
-        tl_debug(
-            UCC_TL_TEAM_LIB(team),
-            "NVLS reduce scatter is supported only with float32 or bfloat16 "
-            "datatype");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
     status = ucc_tl_cuda_task_init(coll_args, team, &task);
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
     }
 
-    /* Get offset and count in datatype elements, then convert to uint32_t units.
-     * For float32: 1 element = 1 uint32_t
-     * For bfloat16: 2 elements = 1 uint32_t */
     offset_elements = ucc_tl_cuda_reduce_scatter_get_offset(task, trank);
     count_elements  = ucc_tl_cuda_reduce_scatter_get_count(task, trank);
 

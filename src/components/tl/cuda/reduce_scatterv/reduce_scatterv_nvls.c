@@ -146,23 +146,32 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
     size_t count_elements)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_reduction_op_t  op   = TASK_ARGS(task).op;
     ucc_status_t        status;
+    size_t              offset_u32;
+    size_t              count_u32;
 
-    status = ucc_ec_create_event(
-        &task->reduce_scatterv_nvls.evt_completion, UCC_EE_CUDA_STREAM);
-    if (ucc_unlikely(status != UCC_OK)) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to create CUDA event");
-        return status;
+    /* Validate op and datatype */
+    if (op != UCC_OP_SUM) {
+        tl_debug(
+            UCC_TL_TEAM_LIB(team),
+            "NVLS reduce scatter(v) supported only with SUM operation");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    if (dt != UCC_DT_FLOAT32 && dt != UCC_DT_BFLOAT16) {
+        tl_debug(
+            UCC_TL_TEAM_LIB(team),
+            "NVLS reduce scatter(v) supported only with float32/bfloat16");
+        return UCC_ERR_NOT_SUPPORTED;
     }
 
-    task->reduce_scatterv_nvls.dt = dt;
-
-    /* Convert from datatype elements to uint32_t indices for the kernel.
+    /* Validate alignment before allocating any resources.
+     * Convert from datatype elements to uint32_t indices for the kernel.
      * For float32: 1 element = 1 uint32_t
      * For bfloat16: 2 elements = 1 uint32_t */
     if (dt == UCC_DT_FLOAT32) {
-        task->reduce_scatterv_nvls.offset = offset_elements;
-        task->reduce_scatterv_nvls.count  = count_elements;
+        offset_u32 = offset_elements;
+        count_u32  = count_elements;
     } else { /* UCC_DT_BFLOAT16 */
         if (offset_elements % 2 != 0 || count_elements % 2 != 0) {
             tl_debug(
@@ -170,30 +179,41 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
                 "BF16 offset and count must be even, got offset=%zu count=%zu",
                 offset_elements,
                 count_elements);
-            goto err_cleanup;
+            return UCC_ERR_NOT_SUPPORTED;
         }
-        task->reduce_scatterv_nvls.offset = offset_elements / 2;
-        task->reduce_scatterv_nvls.count  = count_elements / 2;
+        offset_u32 = offset_elements / 2;
+        count_u32  = count_elements / 2;
     }
 
     /* NVLS requires 16-byte alignment (4 uint32_t elements) */
-    if (ucc_unlikely(task->reduce_scatterv_nvls.offset % 4 != 0)) {
+    if (ucc_unlikely(offset_u32 % 4 != 0)) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
             "NVLS requires 16-byte alignment for offset, got offset=%zu "
             "(uint32_t units)",
-            task->reduce_scatterv_nvls.offset);
-        goto err_cleanup;
+            offset_u32);
+        return UCC_ERR_NOT_SUPPORTED;
     }
-    if (ucc_unlikely(task->reduce_scatterv_nvls.count % 4 != 0)) {
+    if (ucc_unlikely(count_u32 % 4 != 0)) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
             "NVLS requires 16-byte alignment for count, got count=%zu "
             "(uint32_t units)",
-            task->reduce_scatterv_nvls.count);
-        goto err_cleanup;
+            count_u32);
+        return UCC_ERR_NOT_SUPPORTED;
     }
 
+    /* All validation passed, now allocate resources */
+    status = ucc_ec_create_event(
+        &task->reduce_scatterv_nvls.evt_completion, UCC_EE_CUDA_STREAM);
+    if (ucc_unlikely(status != UCC_OK)) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to create CUDA event");
+        return status;
+    }
+
+    task->reduce_scatterv_nvls.dt      = dt;
+    task->reduce_scatterv_nvls.offset  = offset_u32;
+    task->reduce_scatterv_nvls.count   = count_u32;
     task->reduce_scatterv_nvls.mc_va   = (CUdeviceptr)TASK_SYMMETRIC_MC(task);
     task->reduce_scatterv_nvls.uc_va   = (CUdeviceptr)TASK_SYMMETRIC_UC(task);
     task->reduce_scatterv_nvls.coll_id = team->nvls.coll_ids[task->coll_id]++;
@@ -205,11 +225,6 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
     task->super.finalize = ucc_tl_cuda_reduce_scatterv_nvls_finalize;
 
     return UCC_OK;
-
-err_cleanup:
-    ucc_ec_destroy_event(
-        task->reduce_scatterv_nvls.evt_completion, UCC_EE_CUDA_STREAM);
-    return UCC_ERR_NOT_SUPPORTED;
 }
 
 ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init(
@@ -224,29 +239,11 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init(
     size_t              offset_elements;
     size_t              count_elements;
 
-    if (coll_args->args.op != UCC_OP_SUM) {
-        tl_debug(
-            UCC_TL_TEAM_LIB(team),
-            "NVLS reduce scatter v is supported only with SUM operation");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-    if (dt != UCC_DT_FLOAT32 && dt != UCC_DT_BFLOAT16) {
-        tl_debug(
-            UCC_TL_TEAM_LIB(team),
-            "NVLS reduce scatter v is supported only with float32 or bfloat16 "
-            "datatype");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
     status = ucc_tl_cuda_task_init(coll_args, team, &task);
     if (ucc_unlikely(status != UCC_OK)) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to initialize CUDA task");
         return status;
     }
 
-    /* Get offset and count in datatype elements, then convert to uint32_t units.
-     * Use aligned offset for NVLS to satisfy 16-byte alignment requirement
-     * of multimem instructions (must be multiple of 4 uint32_t = 16 bytes). */
     offset_elements = ucc_tl_cuda_reduce_scatterv_get_offset(task, trank);
     count_elements  = ucc_tl_cuda_reduce_scatterv_get_count(task, trank);
 
