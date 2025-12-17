@@ -19,8 +19,8 @@ extern "C" {
 __global__ void __launch_bounds__(UCC_TL_CUDA_MAX_NVLS_THREADS)
     allgatherv_kernel_vec32(
         ucc_tl_cuda_nvls_control_t *mc_bar, ucc_tl_cuda_nvls_control_t *uc_bar,
-        const uint32_t
-            total_blocks, // block count per gpu * num gpus in Multicast group
+        /* block count per gpu * num gpus in Multicast group */
+        const uint32_t total_blocks,
         uint64_t launch_counter, uint32_t *src_u32, uint32_t *base_u32,
         size_t my_offset, size_t my_count)
 {
@@ -60,15 +60,14 @@ ucc_status_t post_allgatherv_kernel(
     size_t my_count, CUdeviceptr mc_control_addr, CUdeviceptr uc_control_addr,
     uint64_t launch_counter, uint32_t tsize)
 {
-    assert(sm_count > 0 && sm_count <= UCC_TL_CUDA_MAX_NVLS_SM_COUNT);
-    assert(threads > 0 && threads <= UCC_TL_CUDA_MAX_NVLS_THREADS);
+    ucc_assert(sm_count > 0 && sm_count <= UCC_TL_CUDA_MAX_NVLS_SM_COUNT);
+    ucc_assert(threads > 0 && threads <= UCC_TL_CUDA_MAX_NVLS_THREADS);
 
-    assert(
-        my_offset % 4 == 0 && "NVLS requires 16-byte alignment for the offset");
-    assert(
-        my_count % 4 == 0 && "NVLS requires 16-byte alignment for the count");
-    assert(mc_base_addr % 16 == 0 && "NVLS requires 16-byte alignment");
-    assert(mc_control_addr % 16 == 0 && "NVLS requires 16-byte alignment");
+    /* NVLS requires 16-byte alignment */
+    ucc_assert(my_offset % 4 == 0);
+    ucc_assert(my_count % 4 == 0);
+    ucc_assert(mc_base_addr % 16 == 0);
+    ucc_assert(mc_control_addr % 16 == 0);
 
     uint32_t *src_u32  = reinterpret_cast<uint32_t *>(src_ptr);
     uint32_t *base_u32 = reinterpret_cast<uint32_t *>(mc_base_addr);
@@ -78,10 +77,9 @@ ucc_status_t post_allgatherv_kernel(
     ucc_tl_cuda_nvls_control_t
         *uc_bar = reinterpret_cast<ucc_tl_cuda_nvls_control_t *>(
             uc_control_addr);
-    // total num of blocks in the multicast group, num gpus * num blocks per gpu, used for barrier synchronization
+    /* total num of blocks in the multicast group, used for barrier sync */
     uint32_t expected_blocks = sm_count * tsize;
 
-    /* Datatype agnostic - just copy raw data */
     allgatherv_kernel_vec32<<<sm_count, threads, 0, stream>>>(
         mc_bar,
         uc_bar,
