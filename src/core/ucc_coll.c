@@ -18,6 +18,8 @@
 #include "schedule/ucc_schedule.h"
 #include "coll_score/ucc_coll_score.h"
 #include "ucc_ee.h"
+#include "ucc_global_opts.h"
+#include "ucc_service_coll.h"
 
 #define UCC_BUFFER_INFO_CHECK_MEM_TYPE(_info) do {                             \
     if ((_info).mem_type == UCC_MEMORY_TYPE_UNKNOWN) {                         \
@@ -38,6 +40,183 @@
         return UCC_ERR_INVALID_PARAM;                                          \
     }                                                                          \
 } while(0)
+
+/**
+ * @brief Internal check for asymmetric datatypes in rooted collectives
+ *
+ * This function is called automatically during collective initialization for
+ * gather, gatherv, scatter, and scatterv operations. The init will fail
+ * if asymmetric datatypes are detected across all processes.
+ *
+ */
+static ucc_status_t ucc_dt_check_rooted_collective(ucc_team_h team,
+                                                     const ucc_coll_args_t *args,
+                                                     int rank)
+{
+    ucc_status_t            status          = UCC_OK;
+    ucc_datatype_t          local_dt;
+    ucc_memory_type_t       local_mem_type;
+    int                     root            = (int)args->root;
+    ucc_coll_type_t         coll_type       = args->coll_type;
+    int                     is_contig;
+    int64_t                 local_values[2];
+    int64_t                *gathered_values = NULL;
+    ucc_service_coll_req_t *check_req       = NULL;
+    ucc_subset_t            subset;
+    ucc_rank_t              i;
+
+    /* Determine which datatype and memory type to check based on operation and rank
+     *
+     * Key insight: IN_PLACE position differs between gather and scatter at root:
+     *   GATHER: sendbuf is IN_PLACE → data in recvbuf (dst)
+     *   SCATTER: recvbuf is IN_PLACE → data in sendbuf (src)
+     */
+    if (rank == root) {
+        switch (coll_type) {
+        case UCC_COLL_TYPE_GATHER:
+        case UCC_COLL_TYPE_GATHERV:
+            /* GATHER at root: use src for non-inplace, dst for inplace */
+            if (UCC_IS_INPLACE(*args)) {
+                local_dt = args->dst.info.datatype;
+                local_mem_type = args->dst.info.mem_type;
+            } else {
+                local_dt = args->src.info.datatype;
+                local_mem_type = args->src.info.mem_type;
+            }
+            break;
+        case UCC_COLL_TYPE_SCATTER:
+        case UCC_COLL_TYPE_SCATTERV:
+            /* SCATTER at root: use dst for non-inplace, src for inplace */
+            if (UCC_IS_INPLACE(*args)) {
+                local_dt = args->src.info.datatype;
+                local_mem_type = args->src.info.mem_type;
+            } else {
+                local_dt = args->dst.info.datatype;
+                local_mem_type = args->dst.info.mem_type;
+            }
+            break;
+        default:
+            /* Unexpected collective type - should not reach here */
+            goto out;
+        }
+    } else {
+        switch (coll_type) {
+        case UCC_COLL_TYPE_GATHER:
+        case UCC_COLL_TYPE_GATHERV:
+            /* Non-root sends data */
+            local_dt = args->src.info.datatype;
+            local_mem_type = args->src.info.mem_type;
+            break;
+        case UCC_COLL_TYPE_SCATTER:
+        case UCC_COLL_TYPE_SCATTERV:
+            /* Non-root receives data */
+            local_dt = args->dst.info.datatype;
+            local_mem_type = args->dst.info.mem_type;
+            break;
+        default:
+            /* Unexpected collective type - should not reach here */
+            goto out;
+        }
+    }
+
+    /* Combined check for contiguity, datatype, and memory type using allgather
+     *
+     * Strategy: Use a 2-element int64_t array with allgather:
+     * - Element [0]: datatype value (predefined ID or generic pointer)
+     * - Element [1]: memory type
+     *
+     * Allgather is safer than allreduce because each rank can directly compare
+     * exact values instead of relying on arithmetic properties.
+     * Uses service collective API for internal use.
+     */
+
+    /* Determine if local datatype is contiguous */
+    if (UCC_DT_IS_PREDEFINED(local_dt)) {
+        is_contig = 1;
+    } else if (UCC_DT_IS_GENERIC(local_dt)) {
+        is_contig = UCC_DT_IS_CONTIG(local_dt) ? 1 : 0;
+    } else {
+        is_contig = 0;  /* Unknown type */
+    }
+
+    /* Setup local datatype value:
+     * [0] = datatype value (use datatype directly - no hash!) */
+    if (is_contig) {
+        local_values[0] = (int64_t) local_dt;  /* Direct datatype value */
+    } else {
+        local_values[0] = (int64_t) UCC_ERR_NOT_SUPPORTED;  /* Non-contiguous */
+    }
+
+    /* If check is disabled, perform local-only validation
+     * This allows fast path when disabled but still catches non-contiguous types */
+    if (!ucc_global_config.check_asymmetric_dt) {
+        if (local_values[0] == (int64_t) UCC_ERR_NOT_SUPPORTED) {
+            status = UCC_ERR_NOT_SUPPORTED;
+        }
+        goto out;
+    }
+
+    /* Setup local memory type value:
+     * [1] = memory type */
+    local_values[1] = (int64_t) local_mem_type;
+
+    /* Allocate buffer to gather values from all ranks */
+    gathered_values = ucc_malloc(team->size * 2 * sizeof(int64_t),
+                                 "gathered_values");
+    if (!gathered_values) {
+        ucc_error("Failed to allocate gathered_values buffer");
+        status = UCC_ERR_NO_MEMORY;
+        goto out;
+    }
+
+    /* Setup subset for full team */
+    subset.myrank = team->rank;
+    subset.map.type = UCC_EP_MAP_FULL;
+    subset.map.ep_num = team->size;
+
+    /* Use service allgather to collect values from all ranks */
+    status = ucc_service_allgather(team, local_values, gathered_values,
+                                   2 * sizeof(int64_t), subset, &check_req);
+    if (status != UCC_OK) {
+        ucc_error("Failed to initialize service allgather for datatype check");
+        goto out;
+    }
+
+    /* Progress the allgather until completion */
+    while ((status = ucc_service_coll_test(check_req)) == UCC_INPROGRESS) {
+        ucc_context_progress(team->contexts[0]);
+    }
+
+    if (status != UCC_OK) {
+        ucc_error("Service allgather failed during datatype check");
+        goto out_finalize;
+    }
+
+    /* Check if any rank has non-contiguous datatype */
+    for (i = 0; i < team->size; i++) {
+        if (gathered_values[i * 2] == (int64_t) UCC_ERR_NOT_SUPPORTED) {
+            status = UCC_ERR_NOT_SUPPORTED;
+            goto out_finalize;
+        }
+    }
+
+    /* Check if all ranks have the same datatype and memory type */
+    for (i = 1; i < team->size; i++) {
+        if (gathered_values[i * 2] != gathered_values[0] ||
+            gathered_values[i * 2 + 1] != gathered_values[1]) {
+            status = UCC_ERR_INVALID_PARAM;
+            goto out_finalize;
+        }
+    }
+
+out_finalize:
+    ucc_service_coll_finalize(check_req);
+out:
+    if (gathered_values) {
+        ucc_free(gathered_values);
+    }
+    return status;
+}
 
 #if ENABLE_DEBUG == 1
 static ucc_status_t ucc_check_coll_args(const ucc_coll_args_t *coll_args,
@@ -220,6 +399,26 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     if (ucc_unlikely(status != UCC_OK)) {
         ucc_error("collective arguments check failed");
         return status;
+    }
+
+    /* Check for asymmetric datatypes in rooted collectives */
+    if (coll_args->coll_type == UCC_COLL_TYPE_GATHER ||
+        coll_args->coll_type == UCC_COLL_TYPE_GATHERV ||
+        coll_args->coll_type == UCC_COLL_TYPE_SCATTER ||
+        coll_args->coll_type == UCC_COLL_TYPE_SCATTERV) {
+        status = ucc_dt_check_rooted_collective(team, coll_args, team->rank);
+        if (ucc_unlikely(status != UCC_OK)) {
+            if (team->rank == (int) coll_args->root) {
+                if (status == UCC_ERR_NOT_SUPPORTED) {
+                    ucc_error("non-contiguous datatype detected in rooted collective");
+                } else if (status == UCC_ERR_INVALID_PARAM) {
+                    ucc_error("asymmetric datatype or memory type detected in rooted collective");
+                } else {
+                    ucc_error("datatype check failed in rooted collective");
+                }
+            }
+            return status;
+        }
     }
 
     /* TO discuss: maybe we want to pass around user pointer ? */
