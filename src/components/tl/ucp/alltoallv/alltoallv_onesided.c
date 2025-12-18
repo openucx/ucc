@@ -32,8 +32,11 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_start(ucc_coll_task_t *ctask)
     size_t              sd_disp, dd_disp, data_size;
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-    if (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL) {
-        src_memh = TASK_ARGS(task).src_memh.global_memh[grank];
+
+    if (TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH) {
+        if (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL) {
+            src_memh = TASK_ARGS(task).src_memh.global_memh[grank];
+        }
     }
 
     /* perform a put to each member peer using the peer's index in the
