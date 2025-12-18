@@ -55,7 +55,7 @@ ucc_status_t ucc_str_to_memunits_range(const char *str, size_t *start,
 ssize_t ucc_string_find_in_list(const char *str, const char **string_list,
                                 int case_sensitive);
 
-                                /**
+/**
  * Same as strncpy(), but guarantee that the last char in the buffer is '\0'.
  */
 void ucc_strncpy_zero(char *dest, const char *src, size_t max);
@@ -106,7 +106,7 @@ void ucc_fill_filename_template(const char *tmpl, char *buf, size_t max);
  *
  * @return file name
  */
- const char* ucc_basename(const char *path);
+const char* ucc_basename(const char *path);
 
 char *ucc_strdup(const char *src, const char *name);
 

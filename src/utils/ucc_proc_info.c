@@ -279,7 +279,6 @@ error:
 
 ucc_status_t ucc_local_proc_info_init()
 {
-    ucc_local_proc.host_hash = gethostid();
     ucc_local_proc.host_hash = ucc_get_system_id();
     ucc_local_proc.pid       = getpid();
     ucc_local_proc.socket_id = UCC_SOCKET_ID_INVALID;
