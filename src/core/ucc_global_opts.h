@@ -52,7 +52,7 @@ typedef struct ucc_global_config {
     /* Maximal amount of packet data to print per packet */
     size_t                     log_data_size;
 
-    /* Enable ucs_print() output */
+    /* Enable ucc_print() output */
     int                        log_print_enable;
 
     /* Log level to trigger error handling */

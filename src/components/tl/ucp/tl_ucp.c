@@ -212,7 +212,7 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
     {"SCATTER_KN_ENABLE_RECV_ZCOPY", "auto",
      "Receive scatter data to user buffer with correct offset using zcopy",
      ucs_offsetof(ucc_tl_ucp_lib_config_t, scatter_kn_enable_recv_zcopy),
-     UCS_CONFIG_TYPE_ON_OFF_AUTO},
+     UCC_CONFIG_TYPE_ON_OFF_AUTO},
 
     {"SCATTERV_LINEAR_NUM_POSTS", "16",
      "Maximum number of outstanding send and receive messages in scatterv "

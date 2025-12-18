@@ -101,11 +101,12 @@ ucc_config_field_t ucc_global_config_table[] = {
      ucc_offsetof(ucc_global_config_t, log_data_size), UCC_CONFIG_TYPE_ULONG},
 
     {"LOG_PRINT_ENABLE", "n",
-     "Enable output of ucs_print(). This option is intended for use by the library developers.",
+     "Enable output of ucc_print(). This option is intended for use by the library developers.",
      ucc_offsetof(ucc_global_config_t, log_print_enable), UCC_CONFIG_TYPE_BOOL},
 
-     {"LOG_LEVEL_TRIGGER", "fatal",
-      "Log level to trigger error handling.",
-      ucc_offsetof(ucc_global_config_t, log_level_trigger), UCC_CONFIG_TYPE_ENUM(ucc_log_level_names)},
+    {"LOG_LEVEL_TRIGGER", "fatal",
+     "Log level to trigger error handling.",
+     ucc_offsetof(ucc_global_config_t, log_level_trigger), UCC_CONFIG_TYPE_ENUM(ucc_log_level_names)},
 
-    {NULL}};
+    {NULL}
+};
