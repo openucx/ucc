@@ -251,8 +251,10 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
 
     sbgp = ucc_topo_get_sbgp(tl_team->topo, UCC_SBGP_NODE);
     if (sbgp->status == UCC_SBGP_NOT_EXISTS) {
-        status = UCC_ERR_NOT_SUPPORTED;
-        goto out;
+        /* 1 PPN, use put */
+        if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO) {
+            alg = UCC_TL_UCP_ALLTOALL_ONESIDED_PUT;
+        }
     }
     task                 = ucc_tl_ucp_init_task(coll_args, team);
     task->super.finalize = ucc_tl_ucp_alltoall_onesided_finalize;
