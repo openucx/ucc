@@ -278,6 +278,7 @@ UCC_TEST_P(test_alltoall_0, single_onesided_dynamic_segment)
     team = job.create_team(reference_ranks, true, is_contig, true);
     this->set_inplace(inplace);
     SET_MEM_TYPE(mem_type);
+    /* for dynamic segments, setup as onesided and override the mask/flags */
     data_init(size, dtype, count, ctxs, team, false);
     for (auto i = 0; i < ctxs.size(); i++) {
         ctxs[i]->args->mask = UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
