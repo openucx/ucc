@@ -301,19 +301,18 @@ struct ucc_tl_cuda_task {
         } reduce_scatterv_linear;
 #ifdef HAVE_NVLS
         struct {
-            int                     stage;
-            int                     num_frags;
-            ucc_datatype_t          dt;
-            void *                  sbuf;
-            void *                  rbuf;
-            size_t                  src_size_bytes;
-            size_t                  dst_size_bytes;
-            size_t (*get_count)(const ucc_tl_cuda_task_t *task,
-                                ucc_rank_t                block);
-            size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
-                                 ucc_rank_t                block);
-            cudaEvent_t             evt_copy;
-            cudaEvent_t             evt_completion;
+            ucc_datatype_t dt;
+            /* Offset of the current rank in the src buffer */
+            size_t         offset;
+            /* Count of the current rank in the src buffer */
+            size_t         count;
+            void          *evt_completion;
+            /* Memory handle for MC symmetric memory */
+            CUdeviceptr    mc_va;
+            /* Memory handle for UC symmetric memory */
+            CUdeviceptr    uc_va;
+            /* Coll id for the NVLS task in flight slot */
+            size_t         coll_id;
         } reduce_scatterv_nvls;
         struct {
             int            stage;
@@ -321,10 +320,13 @@ struct ucc_tl_cuda_task {
             void          *sbuf;
             void          *rbuf;
             size_t         buf_size_bytes;
-            CUdeviceptr    mc_va; // Memory handle for MC symmetric memory
-            CUdeviceptr    uc_va; // Memory handle for UC symmetric memory
+            /* Memory handle for MC symmetric memory */
+            CUdeviceptr    mc_va;
+            /* Memory handle for UC symmetric memory */
+            CUdeviceptr    uc_va;
             void          *evt_completion;
-            size_t         coll_id; // Coll id for the NVLS task in flight slot
+            /* Coll id for the NVLS task in flight slot */
+            size_t         coll_id;
         } allreduce_nvls;
 #endif
     };
