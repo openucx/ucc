@@ -675,7 +675,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
             ucc_warn("failed to init topo for computing local rank");
         } else {
             b_params.node_local_id = ucc_topo_node_local_rank(topo);
-            // TODO: cleanup?
             ucc_topo_cleanup(topo);
         }
     }
@@ -728,9 +727,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                       cl_lib->iface->super.name);
             goto error_ctx_create;
         }
-        // if (c_attr.topo_required) {
-        //     topo_required = 1;
-        // }
 
         memset(&l_attr, 0, sizeof(l_attr));
         status = cl_lib->iface->lib.get_attr(&cl_lib->super, &l_attr.super);
