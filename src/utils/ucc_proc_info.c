@@ -1,37 +1,31 @@
 /**
-* Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+* Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 * See file LICENSE for terms.
 */
+#include "config.h"
 
-#include "ucc_proc_info.h"
-#include "ucc_log.h"
-#include "utils/ucc_malloc.h"
-#include "utils/ucc_math.h"
+#include <dlfcn.h>
 #include <errno.h>
 #include <sched.h>
 #include <limits.h>
 #include <stdint.h>
-#include "config.h"
+#include "ucc_proc_info.h"
+#include "utils/ucc_malloc.h"
+#include "utils/ucc_math.h"
+#include "utils/ucc_sys.h"
 #ifdef HAVE_UCS_GET_SYSTEM_ID
 #include <ucs/sys/uid.h>
 #endif
-#include <dlfcn.h>
 
 ucc_proc_info_t ucc_local_proc;
-static char ucc_local_hostname[HOST_NAME_MAX];
-
-const char*  ucc_hostname()
-{
-    return ucc_local_hostname;
-}
 
 uint64_t ucc_get_system_id()
 {
 #ifdef HAVE_UCS_GET_SYSTEM_ID
     return ucs_get_system_id();
 #else
-    return ucc_str_hash_djb2(ucc_local_hostname);
+    return ucc_str_hash_djb2(ucc_get_host_name());
 #endif
 }
 
@@ -285,15 +279,7 @@ error:
 
 ucc_status_t ucc_local_proc_info_init()
 {
-    ucc_local_proc.host_hash = gethostid();
-    if (gethostname(ucc_local_hostname, sizeof(ucc_local_hostname))) {
-        ucc_warn("couldn't get local hostname");
-        ucc_local_hostname[0] = '\0';
-    } else {
-        strtok(ucc_local_hostname, ".");
-        ucc_assert(sizeof(ucc_host_id_t) >= sizeof(unsigned long));
-        ucc_local_proc.host_hash = ucc_get_system_id();
-    }
+    ucc_local_proc.host_hash = ucc_get_system_id();
     ucc_local_proc.pid       = getpid();
     ucc_local_proc.socket_id = UCC_SOCKET_ID_INVALID;
     ucc_local_proc.numa_id   = UCC_NUMA_ID_INVALID;
@@ -306,9 +292,13 @@ ucc_status_t ucc_local_proc_info_init()
         ucc_debug("failed to get bound numa id");
     }
 
-    ucc_debug("proc pid %d, host %s, host_hash %lu, sockid %d, numaid %d",
-              ucc_local_proc.pid, ucc_local_hostname, ucc_local_proc.host_hash,
-              (int)ucc_local_proc.socket_id, (int)ucc_local_proc.numa_id);
+    ucc_debug(
+        "proc pid %d, host %s, host_hash %lu, sockid %d, numaid %d",
+        ucc_local_proc.pid,
+        ucc_get_host_name(),
+        ucc_local_proc.host_hash,
+        (int)ucc_local_proc.socket_id,
+        (int)ucc_local_proc.numa_id);
 
     return UCC_OK;
 }
