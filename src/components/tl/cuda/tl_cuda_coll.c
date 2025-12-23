@@ -198,15 +198,20 @@ ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
         break;
     case UCC_COLL_TYPE_ALLGATHERV:
         switch (alg_id) {
-        case UCC_TL_CUDA_ALLGATHER_ALG_AUTO:
+        case UCC_TL_CUDA_ALLGATHERV_ALG_AUTO:
             *init = ucc_tl_cuda_allgatherv_init;
             break;
-        case UCC_TL_CUDA_ALLGATHER_ALG_RING:
+        case UCC_TL_CUDA_ALLGATHERV_ALG_RING:
             *init = ucc_tl_cuda_allgatherv_ring_init;
             break;
-        case UCC_TL_CUDA_ALLGATHER_ALG_LINEAR:
+        case UCC_TL_CUDA_ALLGATHERV_ALG_LINEAR:
             *init = ucc_tl_cuda_allgatherv_linear_init;
             break;
+#ifdef HAVE_NVLS
+        case UCC_TL_CUDA_ALLGATHERV_ALG_NVLS:
+            *init = ucc_tl_cuda_allgatherv_nvls_init;
+            break;
+#endif /* HAVE_NVLS */
         default:
             status = UCC_ERR_INVALID_PARAM;
             break;

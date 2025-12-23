@@ -195,6 +195,16 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(
             "bytes");
         return UCC_ERR_NOT_SUPPORTED;
     }
+    if (ucc_unlikely(
+            buf_size > UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_symmetric_size)) {
+        tl_debug(
+            UCC_TL_TEAM_LIB(team),
+            "NVLS allreduce buffer size %zu bytes exceeds symmetric buffer "
+            "size %zu bytes",
+            buf_size,
+            UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_symmetric_size);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     status = ucc_tl_cuda_task_init(coll_args, team, &task);
     if (ucc_unlikely(status != UCC_OK)) {
@@ -206,6 +216,7 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(
         &task->allreduce_nvls.evt_completion, UCC_EE_CUDA_STREAM);
     if (ucc_unlikely(status != UCC_OK)) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to create CUDA event");
+        ucc_tl_cuda_task_put(task);
         return status;
     }
 
