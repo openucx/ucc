@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "ucc_context.h"
+#include "components/topo/ucc_topo.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
 #include "utils/ucc_malloc.h"
@@ -610,7 +611,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                                           ucc_context_h              *context,
                                           ucc_proc_info_t            *proc_info)
 {
-    uint32_t                   topo_required       = 0;
+    // uint32_t                   topo_required       = 0;
     uint64_t                   created_ctx_counter = 0;
     ucc_base_context_params_t  b_params;
     ucc_base_context_t        *b_ctx;
@@ -654,6 +655,51 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         ucc_check_wait_for_debugger(ctx->rank);
 #endif
     }
+
+    ctx->id.pi      = *proc_info;
+    ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
+    
+    if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
+        params->oob.n_oob_eps > 1) {
+        do {
+            /* UCC context create is blocking fn, so we can wait here for the
+               completion of addr exchange */
+            status = ucc_core_addr_exchange(ctx, &ctx->params.oob,
+                                            &ctx->addr_storage);
+            if (status < 0) {
+                ucc_error("failed to exchange addresses during context "
+                          "creation with status: %s",
+                          ucc_status_string(status));
+                goto error_ctx_create;
+            }
+        } while (status == UCC_INPROGRESS);
+
+        status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
+        if (UCC_OK != status) {
+            ucc_free(ctx->addr_storage.storage);
+            ucc_error("failed to init ctx topo");
+            goto error_ctx_create;
+        }
+        
+        ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
+    }
+
+    if (config->node_local_id == UCC_ULUNITS_AUTO) {
+        ucc_subset_t subset;
+        ucc_topo_t  *topo = NULL;
+        
+        subset.map = ctx->service_team->super.params.map;
+        subset.myrank     = ctx->rank;
+        
+        status = ucc_topo_init(subset, ctx->topo, &topo);
+        if (UCC_OK != status) {
+            ucc_warn("failed to init topo for computing local rank");
+        } else {
+            b_params.node_local_id = ucc_topo_node_local_rank(topo);
+            ucc_topo_cleanup(topo);
+        }
+    }
+    
     status = ucc_create_tl_contexts(ctx, config, b_params);
     if (UCC_OK != status) {
         /* only critical error could have happened - bail */
@@ -702,9 +748,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                       cl_lib->iface->super.name);
             goto error_ctx_create;
         }
-        if (c_attr.topo_required) {
-            topo_required = 1;
-        }
 
         memset(&l_attr, 0, sizeof(l_attr));
         status = cl_lib->iface->lib.get_attr(&cl_lib->super, &l_attr.super);
@@ -733,34 +776,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         ucc_error("failed to init progress queue for context %p", ctx);
         goto error_ctx_create;
     }
-    ctx->id.pi      = *proc_info;
-    ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
-    if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
-        params->oob.n_oob_eps > 1) {
-        do {
-            /* UCC context create is blocking fn, so we can wait here for the
-               completion of addr exchange */
-            status = ucc_core_addr_exchange(ctx, &ctx->params.oob,
-                                            &ctx->addr_storage);
-            if (status < 0) {
-                ucc_error("failed to exchange addresses during context "
-                          "creation with status: %s",
-                          ucc_status_string(status));
-                goto error_ctx_create;
-            }
-        } while (status == UCC_INPROGRESS);
 
-        if (topo_required) {
-            /* At least one available CL context reported it needs topo info */
-            status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
-            if (UCC_OK != status) {
-                ucc_free(ctx->addr_storage.storage);
-                ucc_error("failed to init ctx topo");
-                goto error_ctx_create;
-            }
-        }
-        ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
-    }
     if (config->internal_oob) {
         if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
             params->oob.n_oob_eps > 1) {
