@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
@@ -8,7 +8,6 @@
 #include <ucc/api/ucc.h>
 BEGIN_C_DECLS
 #include "components/mc/ucc_mc.h"
-#include "utils/ucc_math.h"
 END_C_DECLS
 #include "test_mpi.h"
 #include <complex.h>

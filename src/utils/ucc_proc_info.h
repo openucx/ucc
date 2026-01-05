@@ -7,8 +7,8 @@
 #define UCC_PROC_INFO_H_
 
 #include "config.h"
-#include "ucc/api/ucc.h"
 #include <unistd.h>
+#include <ucc/api/ucc_def.h>
 
 typedef uint64_t ucc_host_id_t;
 typedef uint8_t  ucc_socket_id_t;
@@ -37,7 +37,5 @@ extern ucc_proc_info_t ucc_local_proc;
 ucc_status_t ucc_local_proc_info_init();
 
 uint64_t ucc_get_system_id();
-
-const char*  ucc_hostname();
 
 #endif
