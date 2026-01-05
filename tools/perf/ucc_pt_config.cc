@@ -199,6 +199,7 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                     /* Defaults (all parameters optional) */
                     bench.gen.nrep        = 1;
                     bench.gen.matrix.kind = 0;
+                    bench.gen.matrix.shuffle = 0;
                     bench.gen.matrix.token_size_KB_mean = 16;
                     bench.gen.matrix
                         .token_size_KB_std = bench.gen.matrix
@@ -300,6 +301,17 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                         } catch (const std::exception &) {
                             std::cerr << "Invalid tgt_group_size value in "
                                          "--gen matrix"
+                                      << std::endl;
+                            return UCC_ERR_INVALID_PARAM;
+                        }
+                    }
+
+                    std::string shuffle_str;
+                    if (find_param("shuffle", shuffle_str)) {
+                        try {
+                            bench.gen.matrix.shuffle = std::stoi(shuffle_str);
+                        } catch (const std::exception &) {
+                            std::cerr << "Invalid shuffle value in --gen matrix"
                                       << std::endl;
                             return UCC_ERR_INVALID_PARAM;
                         }
@@ -446,7 +458,7 @@ void ucc_pt_config::print_help()
     std::cout << "  -S: <number>: root shift for rooted collectives"<<std::endl;
     std::cout << "  --gen "
                  "<exp:min=N[@max=M]|file:name=filename[@nrep=N]|matrix:[kind=K][@nrep=N][@token_size=M][@num_tokens=K]"
-                 "[@tgt_group_size=G]>: Pattern generator (exponential or file-based or matrix-based)"
+                 "[@tgt_group_size=G][@shuffle=S]>: Pattern generator (exponential or file-based or matrix-based)"
               << std::endl;
     std::cout << " --seed <number>: seed for the random distributions" << std::endl;
     std::cout << "  -h: show this help message"<<std::endl;
