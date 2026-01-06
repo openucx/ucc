@@ -193,6 +193,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_alltoall_onesided_alg_t alg   =
         UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_alg;
     ucc_tl_ucp_schedule_t       *tl_schedule = NULL;
+    ucc_rank_t                   group_size  = 1;
     ucc_coll_task_t             *barrier_task;
     ucc_coll_task_t             *a2a_task;
     ucc_tl_ucp_task_t           *task;
@@ -255,7 +256,10 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
         if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO) {
             alg = UCC_TL_UCP_ALLTOALL_ONESIDED_PUT;
         }
+    } else {
+        group_size = sbgp->group_size;
     }
+
     task                 = ucc_tl_ucp_init_task(coll_args, team);
     task->super.finalize = ucc_tl_ucp_alltoall_onesided_finalize;
     a2a_task             = &task->super;
@@ -281,7 +285,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     ucp_ep_evaluate_perf(ep, &param, &attr);
 
     rate  = (1 / attr.estimated_time) * (double)(perc_bw / 100.0);
-    ratio = (nelems > 0) ? nelems * sbgp->group_size : 1;
+    ratio = (nelems > 0) ? nelems * group_size : 1;
     task->alltoall_onesided.tokens = rate / ratio;
     if (task->alltoall_onesided.tokens < 1) {
         task->alltoall_onesided.tokens = 1;
@@ -290,7 +294,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     npolls           = task->n_polls;
     if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET ||
        (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO &&
-                                    sbgp->group_size >= CONGESTION_THRESHOLD)) {
+                                    group_size >= CONGESTION_THRESHOLD)) {
         npolls = nelems * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
         if (npolls < task->n_polls) {
             npolls = task->n_polls;
