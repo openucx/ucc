@@ -18,11 +18,11 @@ AS_IF([test "$CHECKED_TL_REQUIRED" = "y"],
               ], [])
     else
         # Provide specific reasons for TL CUDA being disabled
-        AS_IF([test $cuda_happy != "yes"],
+        AS_IF([test "x$cuda_happy" != "xyes"],
               [AC_MSG_RESULT([TL CUDA: disabled (CUDA not available)])],
-              [test $nvml_happy != "yes"],
-              [AC_MSG_RESULT([TL CUDA: disabled (NVML headers/library missing - install cuda-nvml-devel package)])],
-              [AC_MSG_RESULT([TL CUDA: disabled (unknown reason)])])
+              [AS_IF([test "x$nvml_happy" != "xyes"],
+                     [AC_MSG_RESULT([TL CUDA: disabled (NVML headers/library missing - install cuda-nvml-devel package)])],
+                     [AC_MSG_RESULT([TL CUDA: disabled (unknown reason)])])])
     fi
 ], [AC_MSG_RESULT([TL CUDA: not required])])
 
