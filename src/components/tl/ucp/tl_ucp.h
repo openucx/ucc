@@ -89,6 +89,7 @@ typedef struct ucc_tl_ucp_lib_config {
     int                                use_reordering;
     uint32_t                           alltoall_onesided_percent_bw;
     ucc_tl_ucp_alltoall_onesided_alg_t alltoall_onesided_alg;
+    size_t                             alltoall_onesided_rtt_threshold;
 } ucc_tl_ucp_lib_config_t;
 
 typedef enum ucc_tl_ucp_local_copy_type {
