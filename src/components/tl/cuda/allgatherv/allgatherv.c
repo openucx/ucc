@@ -21,6 +21,12 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_CUDA_ALLGATHERV_ALG_LINEAR,
              .name = "linear",
              .desc = "linear allgatherv algorithm"},
+#ifdef HAVE_NVLS
+        [UCC_TL_CUDA_ALLGATHERV_ALG_NVLS] =
+            {.id   = UCC_TL_CUDA_ALLGATHERV_ALG_NVLS,
+             .name = "nvls",
+             .desc = "NVLS allgatherv algorithm"},
+#endif /* HAVE_NVLS */
         [UCC_TL_CUDA_ALLGATHERV_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
