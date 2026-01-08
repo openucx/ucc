@@ -68,6 +68,7 @@ ucc_status_t post_allgatherv_kernel(
     ucc_assert(my_count % 4 == 0);
     ucc_assert(mc_base_addr % 16 == 0);
     ucc_assert(mc_control_addr % 16 == 0);
+    ucc_assert(src_ptr % 16 == 0);
 
     uint32_t *src_u32  = reinterpret_cast<uint32_t *>(src_ptr);
     uint32_t *base_u32 = reinterpret_cast<uint32_t *>(mc_base_addr);
