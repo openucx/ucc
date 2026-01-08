@@ -18,3 +18,5 @@ export CONFIGS_DIR="${SRC_ROOT_DIR}/.ci/configs"
 # DLRM MASTER_PORT
 export MASTER_PORT="12346"
 export DOCKER_SSH_PORT="12345"
+
+export SSH_CMD="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
