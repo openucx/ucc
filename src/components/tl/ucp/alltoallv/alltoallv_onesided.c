@@ -17,6 +17,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_start(ucc_coll_task_t *ctask)
     ucc_tl_ucp_team_t *team     = TASK_TEAM(task);
     ptrdiff_t          src      = (ptrdiff_t)TASK_ARGS(task).src.info_v.buffer;
     ptrdiff_t          dest     = (ptrdiff_t)TASK_ARGS(task).dst.info_v.buffer;
+    ucc_memory_type_t  mtype    = TASK_ARGS(task).src.info_v.mem_type;
     ucc_rank_t         grank    = UCC_TL_TEAM_RANK(team);
     ucc_rank_t         gsize    = UCC_TL_TEAM_SIZE(team);
     long              *pSync    = TASK_ARGS(task).global_work_buffer;
@@ -48,7 +49,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_start(ucc_coll_task_t *ctask)
 
         UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, sd_disp),
                                         PTR_OFFSET(dest, dd_disp),
-                                        data_size, peer, src_memh,
+                                        data_size, mtype, peer, src_memh,
                                         dst_memh, team, task),
                       task, out);
         UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer,
