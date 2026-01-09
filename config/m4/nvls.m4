@@ -29,8 +29,27 @@ AS_IF([test "x$nvls_checked" != "xyes"],[
             # Check for CUDA 12.0+ which supports NVLS
             AS_IF([test $CUDA_MAJOR_VERSION -ge 12],
             [
-                nvls_happy="yes"
-                AC_DEFINE([HAVE_NVLS], [1], [Enable NVLS support])
+                # NVLS kernels use multimem PTX instructions which require sm_90+
+                # Check if NVCC_ARCH includes sm_90 or higher (90, 100, 110, 120)
+                nvls_arch_supported="no"
+                AS_IF([echo "$NVCC_ARCH" | grep -E "sm_(9[[0-9]]|1[[0-9]][[0-9]])" >/dev/null 2>&1],
+                      [nvls_arch_supported="yes"])
+
+                AS_IF([test "x$nvls_arch_supported" = "xyes"],
+                [
+                    nvls_happy="yes"
+                    AC_DEFINE([HAVE_NVLS], [1], [Enable NVLS support])
+                ],
+                [
+                    nvls_happy="no"
+                    AS_IF([test "x$with_nvls" = "xyes"],
+                    [
+                        AC_MSG_ERROR([NVLS support is requested but target architecture does not support it. NVLS requires sm_90 (Hopper) or later. Current NVCC_ARCH: $NVCC_ARCH])
+                    ],
+                    [
+                        AC_MSG_WARN([NVLS requires sm_90 (Hopper) or later architecture, but NVCC_ARCH does not include it: $NVCC_ARCH])
+                    ])
+                ])
             ],
             [
                 nvls_happy="no"
