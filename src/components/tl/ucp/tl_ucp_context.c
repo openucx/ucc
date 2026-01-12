@@ -218,11 +218,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         ucp_params.estimated_num_eps = params->estimated_num_eps;
     }
 
-#ifdef HAVE_UCX_NODE_LOCAL_ID
-    if (params->node_local_id != UCC_ULUNITS_AUTO) {
-        ucp_params.field_mask |= UCP_PARAM_FIELD_NODE_LOCAL_ID;
-        ucp_params.node_local_id = params->node_local_id;
-    }
+#ifdef HAVE_UCX_NODE_LOCAL_ID 
+    ucp_params.field_mask |= UCP_PARAM_FIELD_NODE_LOCAL_ID;
+    ucp_params.node_local_id = params->node_local_id;
 #endif
 
     UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context),
