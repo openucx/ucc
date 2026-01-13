@@ -86,6 +86,7 @@ public:
                            ucc_pt_comm *communicator,
                            ucc_pt_generator_base *generator);
     ucc_status_t init_args(ucc_pt_test_args_t &args) override;
+    float get_bw(float time_ms, int grsize, ucc_pt_test_args_t args) override;
     void free_args(ucc_pt_test_args_t &args) override;
 };
 

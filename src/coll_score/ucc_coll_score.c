@@ -8,6 +8,7 @@
 #include "utils/ucc_string.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_coll_utils.h"
+#include "utils/ucc_mem_type.h"
 
 char *ucc_score_to_str(ucc_score_t score, char *buf, size_t max) {
     if (score == UCC_SCORE_MAX) {

@@ -15,8 +15,6 @@
 #include "utils/ucc_list.h"
 #include "utils/arch/cpu.h"
 #include "khash.h"
-#include "components/topo/ucc_topo.h"
-
 #include <ucs/config/parser.h>
 #include <ucs/sys/preprocessor.h>
 #include <ucs/sys/compiler_def.h>
@@ -28,6 +26,7 @@ typedef ucs_config_names_array_t       ucc_config_names_array_t;
 typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 typedef ucs_config_allow_list_t        ucc_config_allow_list_t;
 
+typedef struct ucc_topo ucc_topo_t;
 typedef struct ucc_file_config ucc_file_config_t;
 
 #if UCS_HAVE_CONFIG_GLOBAL_LIST_ENTRY_FLAGS

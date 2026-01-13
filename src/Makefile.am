@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # See file LICENSE for terms.
 
@@ -8,10 +8,12 @@ cl_dirs = components/cl/basic \
 
 mc_dirs = components/mc/cpu
 ec_dirs = components/ec/cpu
+topo_dirs =
 
 if HAVE_CUDA
 mc_dirs += components/mc/cuda
 ec_dirs += components/ec/cuda
+topo_dirs += components/topo/cuda
 endif
 
 if HAVE_DOCA_UROM
@@ -23,7 +25,11 @@ mc_dirs += components/mc/rocm
 ec_dirs += components/ec/rocm
 endif
 
-SUBDIRS = . $(cl_dirs) $(mc_dirs) $(ec_dirs)
+if HAVE_IBVERBS
+topo_dirs += components/topo/ib
+endif
+
+SUBDIRS = . $(cl_dirs) $(mc_dirs) $(ec_dirs) $(topo_dirs)
 
 include components/tl/makefile.am
 
@@ -98,7 +104,9 @@ noinst_HEADERS =                       \
 	coll_patterns/bruck_alltoall.h     \
 	coll_patterns/double_binary_tree.h \
 	components/topo/ucc_topo.h         \
-	components/topo/ucc_sbgp.h
+	components/topo/ucc_sbgp.h         \
+	components/topo/ucc_sysinfo.h      \
+	components/topo/base/ucc_sysinfo_base.h
 
 libucc_la_SOURCES =                   \
 	core/ucc_lib.c                    \
@@ -114,6 +122,7 @@ libucc_la_SOURCES =                   \
 	core/ucc_progress_queue_mt.c      \
 	core/ucc_service_coll.c           \
 	core/ucc_dt.c                     \
+	coll_patterns/ring.c              \
 	schedule/ucc_schedule.c           \
 	schedule/ucc_schedule_pipelined.c \
 	coll_score/ucc_coll_score.c       \
@@ -142,6 +151,7 @@ libucc_la_SOURCES =                   \
 	components/ec/ucc_ec.c            \
 	components/ec/base/ucc_ec_base.c  \
 	components/topo/ucc_topo.c        \
+	components/topo/ucc_sysinfo.c     \
 	components/topo/ucc_sbgp.c
 
 libucc_ladir = $(includedir)

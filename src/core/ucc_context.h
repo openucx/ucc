@@ -154,12 +154,14 @@ ucc_status_t ucc_core_addr_exchange(ucc_context_t *context, ucc_oob_coll_t *oob,
 
 /* UCC context packed address layout:
    --------------------------------------------------------------------------
-   |n_components|id0|offset0|id1|offset1|..|idN|offsetN|data0|data1|..|dataN|
+   |ctx_id|host_info|n_components|id0|offset0|id1|offset1|..|
+   |idN|offsetN|data0|data1|..|dataN|
    --------------------------------------------------------------------------
    each component can extract its own addressing using offset into data.
    Offset is found by id. */
 typedef struct ucc_context_addr_header {
     ucc_context_id_t ctx_id;
+    ucc_host_info_t  host_info;
     int n_components; // Number of CL/TL components whose address is packed
     struct {
         unsigned long id;     // id of component computed during framework load

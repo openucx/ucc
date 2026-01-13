@@ -17,6 +17,7 @@
 #include <utils/ucc_assert.h>
 #include <utils/ucc_malloc.h>
 #include <fnmatch.h>
+#include <sys/time.h>
 
 
 #define UCC_MAX_LOG_HANDLERS    32
