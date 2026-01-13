@@ -43,9 +43,6 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
 
     coll_args.mask                = UCC_COLL_ARGS_FIELD_FLAGS;
     coll_args.coll_type           = UCC_COLL_TYPE_ALLTOALLV;
-    coll_args.src.info_v.datatype = dt;
-    coll_args.src.info_v.mem_type = mt;
-    coll_args.src.info_v.buffer   = src_header->addr;
     coll_args.dst.info_v.datatype = dt;
     coll_args.dst.info_v.mem_type = mt;
     coll_args.dst.info_v.buffer   = dst_header->addr;
@@ -53,6 +50,11 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
                                     UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
     if (is_inplace) {
         coll_args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+    } else {
+        coll_args.src.info_v.buffer   = src_header->addr;
+        coll_args.src.info_v.datatype = dt;
+        coll_args.src.info_v.mem_type = mt;
+
     }
 
     if (is_persistent) {
