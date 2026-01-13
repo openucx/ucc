@@ -6,15 +6,16 @@
 
 #include "ucc_sbgp.h"
 #include "ucc_topo.h"
-#include "utils/ucc_log.h"
+#include "utils/debug/log_def.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_compiler_def.h"
 #include <limits.h>
 
 static char *ucc_sbgp_type_str[UCC_SBGP_LAST] = {
-    "numa", "socket",         "node",         "node_leaders",
-    "net",  "socket_leaders", "numa_leaders", "flat"};
+    "numa", "socket",         "node",         "node_nvlink",
+    "node_leaders",           "net",          "socket_leaders",
+    "numa_leaders",           "flat",         "flat_host_ordered"};
 
 const char* ucc_sbgp_str(ucc_sbgp_type_t type)
 {
@@ -41,6 +42,143 @@ static inline int ucc_ranks_on_local_sn(ucc_rank_t rank1, ucc_rank_t rank2,
     return proc1->host_hash == proc2->host_hash &&
            ((UCC_SBGP_SOCKET == type) ? proc1->socket_id == proc2->socket_id
                                       : proc1->numa_id == proc2->numa_id);
+}
+
+static int ucc_topo_rank_device_info(ucc_topo_t *topo, ucc_rank_t rank,
+                                     const ucc_host_info_t **host,
+                                     ucc_device_id_t *device_id)
+{
+    ucc_rank_t ctx_rank;
+
+    ctx_rank = ucc_ep_map_eval(topo->set.map, rank);
+    if (ctx_rank >= topo->topo->n_procs) {
+        return 0;
+    }
+
+    *host = &topo->topo->hosts[ctx_rank];
+    if (!(*host)->visible_gpus) {
+        return 0;
+    }
+    *device_id = ucc_ilog2((*host)->visible_gpus);
+    return 1;
+}
+
+static int ucc_sbgp_has_device_info(ucc_topo_t *topo)
+{
+    ucc_rank_t             size = ucc_subset_size(&topo->set);
+    ucc_rank_t             i;
+    const ucc_host_info_t *host;
+    ucc_device_id_t        dev;
+
+    for (i = 0; i < size; i++) {
+        if (ucc_topo_rank_device_info(topo, i, &host, &dev)) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int ucc_topo_ranks_on_node_nvlink(ucc_rank_t rank1, ucc_rank_t rank2,
+                                         ucc_topo_t *topo)
+{
+    ucc_rank_t          ctx_rank1;
+    ucc_rank_t          ctx_rank2;
+    ucc_device_id_t     dev1;
+    ucc_device_id_t     dev2;
+    const ucc_host_info_t *host1;
+    const ucc_host_info_t *host2;
+    const ucc_gpu_info_t  *gpu1;
+    const ucc_gpu_info_t  *gpu2;
+
+    if (!ucc_topo_rank_device_info(topo, rank1, &host1, &dev1) ||
+        !ucc_topo_rank_device_info(topo, rank2, &host2, &dev2)) {
+        return 0;
+    }
+
+    ctx_rank1 = ucc_ep_map_eval(topo->set.map, rank1);
+    ctx_rank2 = ucc_ep_map_eval(topo->set.map, rank2);
+    if (topo->topo->procs[ctx_rank1].host_hash !=
+        topo->topo->procs[ctx_rank2].host_hash) {
+        return 0;
+    }
+
+    if (dev1 == dev2) {
+        return 1;
+    }
+
+    gpu1 = &host1->gpus[dev1];
+    gpu2 = &host2->gpus[dev2];
+
+    if (gpu1->fabric_clique_id != 0 &&
+        gpu1->fabric_clique_id == gpu2->fabric_clique_id) {
+        return 1;
+    }
+
+    if (gpu1->nvswitch_connected && gpu2->nvswitch_connected) {
+        return 1;
+    }
+
+    if (host1->nvlink_matrix[dev1][dev2] > 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static ucc_status_t sbgp_create_node_nvlink(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
+{
+    ucc_sbgp_t *node_sbgp = &topo->sbgps[UCC_SBGP_NODE];
+    ucc_rank_t  group_rank = topo->set.myrank;
+    ucc_rank_t  nv_rank = 0, nv_size = 0;
+    ucc_rank_t *local_ranks;
+    const ucc_host_info_t *host;
+    ucc_device_id_t dev;
+    int         i;
+
+    if (node_sbgp->status == UCC_SBGP_NOT_INIT) {
+        ucc_sbgp_create(topo, UCC_SBGP_NODE);
+    }
+    if (node_sbgp->status != UCC_SBGP_ENABLED) {
+        sbgp->status = UCC_SBGP_NOT_EXISTS;
+        return UCC_OK;
+    }
+
+    if (!ucc_topo_rank_device_info(topo, group_rank, &host, &dev)) {
+        sbgp->status = UCC_SBGP_NOT_EXISTS;
+        return UCC_OK;
+    }
+
+    local_ranks =
+        ucc_malloc(node_sbgp->group_size * sizeof(ucc_rank_t), "local_ranks");
+    if (!local_ranks) {
+        ucc_error("failed to allocate %zd bytes for local_ranks array",
+                  node_sbgp->group_size * sizeof(ucc_rank_t));
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    for (i = 0; i < node_sbgp->group_size; i++) {
+        ucc_rank_t r = ucc_ep_map_eval(node_sbgp->map, i);
+        if (ucc_topo_ranks_on_node_nvlink(r, group_rank, topo)) {
+            local_ranks[nv_size] = r;
+            if (r == group_rank) {
+                nv_rank = nv_size;
+            }
+            nv_size++;
+        }
+    }
+
+    sbgp->group_size = nv_size;
+    sbgp->group_rank = nv_rank;
+    if (nv_size > 1) {
+        sbgp->status   = UCC_SBGP_ENABLED;
+        sbgp->rank_map = local_ranks;
+    } else {
+        sbgp->status = UCC_SBGP_NOT_EXISTS;
+        ucc_free(local_ranks);
+    }
+
+    return UCC_OK;
 }
 
 static inline ucc_status_t sbgp_create_sn(ucc_topo_t *topo, ucc_sbgp_t *sbgp,
@@ -476,11 +614,18 @@ static int ucc_compare_proc_info_id(const void *a, const void *b)
 static ucc_status_t sbgp_create_full_ordered(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
 {
     ucc_rank_t       gsize = ucc_subset_size(&topo->set);
-    ucc_proc_info_t *pinfo = topo->topo->procs;
+    ucc_proc_info_t *pinfo;
     ucc_host_id_t   *visited;
     proc_info_id_t  *sorted;
     ucc_rank_t       i, j, num_visited;
     int              is_sorted, d;
+
+    if (!topo->topo || !topo->topo->procs) {
+        ucc_error("sbgp_create_full_ordered: invalid topo, topo->topo=%p, procs=%p",
+                  topo->topo, topo->topo ? topo->topo->procs : NULL);
+        return UCC_ERR_INVALID_PARAM;
+    }
+    pinfo = topo->topo->procs;
 
     ucc_assert(gsize > 0);
     sbgp->status     = UCC_SBGP_ENABLED;
@@ -507,7 +652,7 @@ static ucc_status_t sbgp_create_full_ordered(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
     visited[0] = pinfo[0].host_hash;
     for (i = 1; i < gsize; i++) {
         if (pinfo[i].host_hash != pinfo[i-1].host_hash) {
-            /* check if we saw that host_has before*/
+            /* check if we saw that host_hash before */
             for (j = 0; j < num_visited; j++) {
                 if (visited[j] == pinfo[i].host_hash) {
                     break;
@@ -521,9 +666,7 @@ static ucc_status_t sbgp_create_full_ordered(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
             /* add new host to the list of visited */
             visited[num_visited++] = pinfo[i].host_hash;
         } else {
-            d = ucc_compare_proc_info_id(&pinfo[i - 1].host_hash,
-                                         &pinfo[i].host_hash);
-
+            d = ucc_compare_proc_info_id(&pinfo[i - 1], &pinfo[i]);
             if (d > 0) {
                 is_sorted = 0;
                 break;
@@ -581,6 +724,9 @@ ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type)
     switch (type) {
     case UCC_SBGP_NODE:
         status = ucc_sbgp_create_node(topo, sbgp);
+        break;
+    case UCC_SBGP_NODE_NVLINK:
+        status = sbgp_create_node_nvlink(topo, sbgp);
         break;
     case UCC_SBGP_FULL:
         status = sbgp_create_full(topo, sbgp);
@@ -728,4 +874,131 @@ ucc_status_t ucc_sbgp_create_all_numas(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
                                        int *n_sbgps)
 {
     return ucc_sbgp_create_all_sns(topo, sbgps, n_sbgps, UCC_SBGP_NUMA);
+}
+
+ucc_status_t ucc_sbgp_create_all_node_nvlinks(ucc_topo_t *topo,
+                                              ucc_sbgp_t **_sbgps,
+                                              int *n_sbgps)
+{
+    ucc_sbgp_t *node_sbgp = &topo->sbgps[UCC_SBGP_NODE];
+    ucc_sbgp_t *sbgps;
+    ucc_rank_t  local_size;
+    ucc_rank_t *local_ranks;
+    int        *comp_id;
+    int         i, j;
+    int         n_comps = 0;
+    ucc_status_t status = UCC_OK;
+
+    if (node_sbgp->status == UCC_SBGP_NOT_INIT) {
+        ucc_sbgp_create(topo, UCC_SBGP_NODE);
+    }
+    if (node_sbgp->status != UCC_SBGP_ENABLED ||
+        node_sbgp->group_size < 1 ||
+        !ucc_sbgp_has_device_info(topo)) {
+        return UCC_ERR_NOT_FOUND;
+    }
+
+    local_size  = node_sbgp->group_size;
+    local_ranks = node_sbgp->rank_map;
+
+    comp_id = ucc_malloc(local_size * sizeof(*comp_id), "nvlink_comp_id");
+    if (!comp_id) {
+        return UCC_ERR_NO_MEMORY;
+    }
+    for (i = 0; i < (int)local_size; i++) {
+        comp_id[i] = -1;
+    }
+
+    for (i = 0; i < (int)local_size; i++) {
+        int queue_len = 0;
+        int qidx      = 0;
+        int *queue;
+
+        if (comp_id[i] != -1) {
+            continue;
+        }
+
+        queue = ucc_malloc(local_size * sizeof(*queue), "nvlink_queue");
+        if (!queue) {
+            status = UCC_ERR_NO_MEMORY;
+            goto error;
+        }
+
+        comp_id[i]     = n_comps;
+        queue[queue_len++] = i;
+        while (qidx < queue_len) {
+            int cur = queue[qidx++];
+            for (j = 0; j < (int)local_size; j++) {
+                if (comp_id[j] != -1) {
+                    continue;
+                }
+                if (ucc_topo_ranks_on_node_nvlink(local_ranks[cur],
+                                                  local_ranks[j], topo)) {
+                    comp_id[j] = n_comps;
+                    queue[queue_len++] = j;
+                }
+            }
+        }
+        ucc_free(queue);
+        n_comps++;
+    }
+
+    sbgps = ucc_calloc(n_comps, sizeof(*sbgps), "nvlink_sbgps");
+    if (!sbgps) {
+        status = UCC_ERR_NO_MEMORY;
+        goto error;
+    }
+
+    for (i = 0; i < n_comps; i++) {
+        ucc_rank_t count = 0;
+        ucc_rank_t myrank = topo->set.myrank;
+        int        myrank_pos = -1;
+
+        for (j = 0; j < (int)local_size; j++) {
+            if (comp_id[j] == i) {
+                count++;
+            }
+        }
+
+        sbgps[i].type       = UCC_SBGP_NODE_NVLINK;
+        sbgps[i].status     = UCC_SBGP_ENABLED;
+        sbgps[i].group_size = count;
+        sbgps[i].rank_map =
+            ucc_malloc(count * sizeof(ucc_rank_t), "nvlink_rank_map");
+        if (!sbgps[i].rank_map) {
+            status = UCC_ERR_NO_MEMORY;
+            goto error_alloc;
+        }
+
+        count = 0;
+        for (j = 0; j < (int)local_size; j++) {
+            if (comp_id[j] == i) {
+                sbgps[i].rank_map[count] = local_ranks[j];
+                if (local_ranks[j] == myrank) {
+                    myrank_pos = count;
+                }
+                count++;
+            }
+        }
+        sbgps[i].group_rank = (myrank_pos >= 0) ? myrank_pos : 0;
+        sbgps[i].map = ucc_ep_map_from_array(&sbgps[i].rank_map,
+                                             sbgps[i].group_size,
+                                             ucc_subset_size(&topo->set), 1);
+    }
+
+    ucc_free(comp_id);
+    *_sbgps  = sbgps;
+    *n_sbgps = n_comps;
+    return UCC_OK;
+
+error_alloc:
+    for (i = 0; i < n_comps; i++) {
+        if (sbgps[i].rank_map) {
+            ucc_free(sbgps[i].rank_map);
+        }
+    }
+    ucc_free(sbgps);
+error:
+    ucc_free(comp_id);
+    return status;
 }

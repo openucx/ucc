@@ -11,54 +11,75 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 #include "tl_ucp_sendrecv.h"
+#include "coll_patterns/ring.h"
+
+
+#define MAX_RINGS 8
 
 void ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task     = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t   *args     = &TASK_ARGS(task);
-    ucc_tl_ucp_team_t *team     = TASK_TEAM(task);
-    ucc_rank_t         trank    = task->subset.myrank;
-    ucc_rank_t         tsize    = (ucc_rank_t)task->subset.map.ep_num;
-    ptrdiff_t          rbuf     = (ptrdiff_t)args->dst.info_v.buffer;
-    ucc_memory_type_t  rmem     = args->dst.info_v.mem_type;
-    size_t             rdt_size = ucc_dt_size(args->dst.info_v.datatype);
-    ucc_rank_t         send_idx, recv_idx, sendto, recvfrom;
-    size_t             data_size, data_displ;
+    ucc_tl_ucp_task_t  *task     = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_coll_args_t    *args     = &TASK_ARGS(task);
+    ucc_tl_ucp_team_t  *team     = TASK_TEAM(task);
+    ucc_ring_pattern_t *ring     = team->cuda_ring;
+    ucc_rank_t          ring_id;
+    ucc_rank_t          nrings;
+    ucc_rank_t          rrank;
+    ptrdiff_t           rbuf     = (ptrdiff_t)args->dst.info_v.buffer;
+    ucc_memory_type_t   rmem     = args->dst.info_v.mem_type;
+    size_t              rdt_size = ucc_dt_size(args->dst.info_v.datatype);
+    ucc_rank_t          send_idx, recv_idx, sendto, recvfrom, step, tsize;
+    size_t              data_size, data_displ;
+    size_t              block_count, ring_count, ring_offset, base_displ;
 
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         return;
     }
 
-    sendto   = ucc_ep_map_eval(task->subset.map, (trank + 1) % tsize);
-    recvfrom = ucc_ep_map_eval(task->subset.map, (trank - 1 + tsize) % tsize);
+    nrings = ucc_min(MAX_RINGS, ring->num_rings);
+    tsize  = ucc_ring_pattern_size(ring, 0);
 
-    while (task->tagged.send_posted < tsize) {
-        send_idx   =
-            ucc_ep_map_eval(task->subset.map, (trank -
-                                               task->tagged.send_posted + 1 +
-                                               tsize) % tsize);
-        data_displ = ucc_coll_args_get_displacement(
-                         args, args->dst.info_v.displacements, send_idx) *
-                     rdt_size;
-        data_size =
-            ucc_coll_args_get_count(args, args->dst.info_v.counts, send_idx) *
-            rdt_size;
-        UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)(rbuf + data_displ), data_size,
-                                         rmem, sendto, team, task),
-                      task, out);
-        recv_idx   =
-            ucc_ep_map_eval(task->subset.map, (trank -
-                                               task->tagged.recv_posted +
-                                               tsize) % tsize);
-        data_displ = ucc_coll_args_get_displacement(
-                         args, args->dst.info_v.displacements, recv_idx) *
-                     rdt_size;
-        data_size =
-            ucc_coll_args_get_count(args, args->dst.info_v.counts, recv_idx) *
-            rdt_size;
-        UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)(rbuf + data_displ), data_size,
-                                         rmem, recvfrom, team, task),
-                      task, out);
+    while (task->tagged.send_posted < 1 + nrings * (tsize - 1)) {
+        ucc_assert(task->tagged.send_posted > 0);
+        ucc_assert(task->tagged.recv_posted > 0);
+        ucc_assert(task->tagged.send_posted == task->tagged.recv_posted);
+        step = (ucc_rank_t)((task->tagged.send_posted - 1) / nrings);
+        for (ring_id = 0; ring_id < nrings; ring_id++) {
+
+            rrank    = ucc_ring_pattern_rank(ring, ring_id);
+            sendto   = ucc_ring_pattern_get_send_peer(ring, ring_id, rrank);
+            recvfrom = ucc_ring_pattern_get_recv_peer(ring, ring_id, rrank);
+
+            send_idx = ucc_ring_pattern_get_send_block(ring, ring_id, rrank,
+                                                       step);
+            block_count = ucc_coll_args_get_count(
+                args, args->dst.info_v.counts, send_idx);
+            ring_offset = ucc_buffer_block_offset(block_count, nrings, ring_id);
+            ring_count  = ucc_buffer_block_count(block_count, nrings, ring_id);
+            base_displ = ucc_coll_args_get_displacement(
+                args, args->dst.info_v.displacements, send_idx);
+            data_displ = (base_displ + ring_offset) * rdt_size;
+            data_size  = ring_count * rdt_size;
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)(rbuf + data_displ),
+                                             data_size, rmem, sendto, team,
+                                             task),
+                          task, out);
+
+            recv_idx = ucc_ring_pattern_get_recv_block(ring, ring_id, rrank,
+                                                       step);
+            block_count = ucc_coll_args_get_count(
+                args, args->dst.info_v.counts, recv_idx);
+            ring_offset = ucc_buffer_block_offset(block_count, nrings, ring_id);
+            ring_count  = ucc_buffer_block_count(block_count, nrings, ring_id);
+            base_displ = ucc_coll_args_get_displacement(
+                args, args->dst.info_v.displacements, recv_idx);
+            data_displ = (base_displ + ring_offset) * rdt_size;
+            data_size  = ring_count * rdt_size;
+            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)(rbuf + data_displ),
+                                             data_size, rmem, recvfrom, team,
+                                             task),
+                          task, out);
+        }
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             return;
         }

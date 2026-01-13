@@ -7,8 +7,10 @@
 #include "ucc_parser.h"
 #include "ucc_malloc.h"
 #include "ucc_log.h"
+#include "ucc_mem_type.h"
 #include "ucc_string.h"
 #include "ini.h"
+#include "components/topo/ucc_topo.h"
 #include "schedule/ucc_schedule.h"
 #include "schedule/ucc_schedule_pipelined.h"
 

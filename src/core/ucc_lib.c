@@ -8,10 +8,9 @@
 
 #include "ucc_global_opts.h"
 #include "ucc_lib.h"
-#include "utils/ucc_log.h"
+#include "components/topo/ucc_sysinfo.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_parser.h"
-#include "utils/ucc_math.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
 #include "components/mc/ucc_mc.h"
@@ -309,10 +308,20 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
     if (UCC_OK != (status = ucc_constructor())) {
         return status;
     }
+
     if (UCC_OK != (status = ucc_mc_init(&mc_params))) {
         return status;
     }
+
     if (UCC_OK != (status = ucc_ec_init(&ec_params))) {
+        return status;
+    }
+
+    if (UCC_OK != (status = ucc_sysinfo_init())) {
+        return status;
+    }
+
+    if (UCC_OK != (status = ucc_sysinfo_get_host_info(&ucc_local_host))) {
         return status;
     }
 
