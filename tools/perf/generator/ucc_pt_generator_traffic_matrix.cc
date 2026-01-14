@@ -9,6 +9,7 @@
 #include <ucc/api/ucc.h>
 #include <utils/ucc_math.h>
 #include <vector>
+#include <unordered_map>
 
 template <typename T>
 void random_choice(
@@ -401,10 +402,23 @@ void ucc_pt_generator_traffic_matrix::setup_counts_displs()
         src_counts[i] = counts[rank_id * comm_size + i];
     }
 
-    size_t displ = 0;
+    size_t                              displ = 0;
+    std::unordered_map<uint32_t, size_t> size_to_displ;
     for (int i = 0; i < comm_size; i++) {
-        src_displs[i] = displ;
-        displ += src_counts[i];
+        const uint32_t msg_size = src_counts[i];
+        if (msg_size == 0) {
+            src_displs[i] = 0;
+            continue;
+        }
+        auto current_displ = size_to_displ.find(msg_size);
+        if (current_displ != size_to_displ.end()) {
+            // Reuse the same buffer region for equal-sized messages
+            src_displs[i]  = current_displ->second;
+        } else {
+            src_displs[i]           = displ;
+            size_to_displ[msg_size] = displ;
+            displ += msg_size;
+        }
     }
 
     for (int i = 0; i < comm_size; i++) {
