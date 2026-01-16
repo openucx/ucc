@@ -37,7 +37,6 @@ ucc_pt_coll_allgather::ucc_pt_coll_allgather(ucc_datatype_t dt,
     coll_args.mask              = 0;
     coll_args.flags             = 0;
     coll_args.coll_type         = UCC_COLL_TYPE_ALLGATHER;
-    coll_args.src.info.buffer   = src_header->addr;
     coll_args.src.info.datatype = dt;
     coll_args.src.info.mem_type = mt;
     coll_args.dst.info.buffer   = dst_header->addr;
@@ -45,8 +44,10 @@ ucc_pt_coll_allgather::ucc_pt_coll_allgather(ucc_datatype_t dt,
     coll_args.dst.info.mem_type = mt;
 
     if (is_inplace) {
-        coll_args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
-        coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+        coll_args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+    } else {
+        coll_args.src.info.buffer = src_header->addr;
     }
 
     if (is_persistent) {

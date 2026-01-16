@@ -61,6 +61,60 @@ jobs:
         --with-ucc=/tmp/ucc/install
 
         make -j install
+    - name: Build ucc_perftest (with OMPI)
+      run: |
+        set -e
+        CC=/tmp/ompi/install/bin/mpicc CXX=/tmp/ompi/install/bin/mpicxx \
+          ./configure --prefix=/tmp/ucc/install --enable-gtest --with-ucx=/tmp/ucx/install --with-mpi=/tmp/ompi/install
+        make -C tools/perf -j`nproc`
+        make -C tools/perf install
+    - name: Run ucc_perftest
+      run: |
+        set -e
+        test -x /tmp/ucc/install/bin/ucc_perftest
+        export LD_LIBRARY_PATH=/tmp/ucc/install/lib:/tmp/ucx/install/lib:/tmp/ompi/install/lib:$LD_LIBRARY_PATH
+        COLLS=(
+          allgather allgatherv allreduce alltoall alltoallv
+          barrier bcast gather gatherv
+          reduce reduce_scatter reduce_scatterv scatterv
+        )
+        for c in "${COLLS[@]}"; do
+          echo "Running ucc_perftest -c ${c}"
+          /tmp/ompi/install/bin/mpirun \
+            -np 4 -H localhost:4 \
+            --bind-to none \
+            --mca pml ucx \
+            --mca pml_ucx_tls any \
+            --mca pml_ucx_devices any \
+            --mca coll_ucc_enable 0 \
+            -x LD_LIBRARY_PATH \
+            -x UCC_LOG_LEVEL=info \
+            -x UCC_TLS=ucp \
+            -x UCC_CONFIG_FILE= \
+            /tmp/ucc/install/bin/ucc_perftest \
+              -c "${c}" -m host -d float32 -b 1024 -e 1024 -n 10 -w 2
+        done
+        INPLACE_COLLS=(
+          allgather allgatherv allreduce
+          gather gatherv
+          reduce reduce_scatter reduce_scatterv
+        )
+        for c in "${INPLACE_COLLS[@]}"; do
+          echo "Running ucc_perftest (inplace) -c ${c}"
+          /tmp/ompi/install/bin/mpirun \
+            -np 4 -H localhost:4 \
+            --bind-to none \
+            --mca pml ucx \
+            --mca pml_ucx_tls any \
+            --mca pml_ucx_devices any \
+            --mca coll_ucc_enable 0 \
+            -x LD_LIBRARY_PATH \
+            -x UCC_LOG_LEVEL=info \
+            -x UCC_TLS=ucp \
+            -x UCC_CONFIG_FILE= \
+            /tmp/ucc/install/bin/ucc_perftest \
+              -c "${c}" -m host -d float32 -b 1024 -e 1024 -n 10 -w 2 -i
+        done
     - name: Get IMB
       run: git clone ${IMB_LINK} /tmp/imb
     - name: Build IMB
