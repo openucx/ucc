@@ -62,6 +62,32 @@ typedef struct ucc_event_manager {
     ucc_em_listener_t listeners[MAX_LISTENERS];
 } ucc_event_manager_t;
 
+/* Forward declaration for service collective request */
+typedef struct ucc_service_coll_req ucc_service_coll_req_t;
+
+/**
+ * @brief Datatype validation state for rooted collectives
+ *
+ * This structure holds the state for transparent datatype validation
+ * before executing the actual collective operation. The validation uses a service
+ * allgather to ensure all ranks have compatible datatypes.
+ *
+ * Design: Uses a schedule with two tasks:
+ *   1. Validation task: performs service allgather and validates results
+ *   2. Actual collective task: depends on validation completing successfully
+ *
+ * If validation fails, the dependency mechanism prevents the actual task from posting.
+ */
+typedef struct ucc_dt_check_state {
+    ucc_service_coll_req_t *check_req;        /* Service allgather request */
+    int64_t                *gathered_values;  /* Buffer for gathered values */
+    int64_t                 local_values[2];  /* Local DT and mem type */
+    ucc_subset_t            subset;           /* Subset for service allgather */
+    uint32_t                flags;            /* State machine flags */
+#define UCC_DT_CHECK_IN_PROGRESS      UCC_BIT(0)  /* State: VALIDATING */
+#define UCC_DT_CHECK_VALIDATED        UCC_BIT(1)  /* State: VALIDATED */
+} ucc_dt_check_state_t;
+
 enum {
     UCC_COLL_TASK_FLAG_CB                    = UCC_BIT(0),
     /* executor is required for collective*/
@@ -114,6 +140,7 @@ typedef struct ucc_coll_task {
     /* timestamp of the start time: either post or triggered_post */
     double                             start_time;
     uint32_t                           seq_num;
+    ucc_dt_check_state_t              *dt_check;  /* DT validation state */
 } ucc_coll_task_t;
 
 extern struct ucc_mpool_ops ucc_coll_task_mpool_ops;
@@ -265,3 +292,4 @@ static inline int ucc_coll_task_is_cl_hier(const ucc_coll_task_t *task)
 }
 
 #endif
+
