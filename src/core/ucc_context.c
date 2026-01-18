@@ -656,6 +656,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
 #endif
     }
 
+    // TOPO init
     ctx->id.pi      = *proc_info;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
     
@@ -673,7 +674,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                 goto error_ctx_create;
             }
         } while (status == UCC_INPROGRESS);
-
         status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
         if (UCC_OK != status) {
             ucc_free(ctx->addr_storage.storage);
@@ -683,23 +683,29 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         
         ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
     }
-
+    printf("config->node_local_id: %ld, UCC_ULUNITS_AUTO: %ld\n", config->node_local_id, UCC_ULUNITS_AUTO);
+    // local rank computation
     if (config->node_local_id == UCC_ULUNITS_AUTO) {
-        ucc_subset_t subset;
+        ucc_subset_t set;
         ucc_topo_t  *topo = NULL;
         
-        subset.map = ctx->service_team->super.params.map;
-        subset.myrank     = ctx->rank;
+        memset(&set.map, 0, sizeof(ucc_ep_map_t));
+        set.map.type   = UCC_EP_MAP_FULL;
+        set.myrank     = params->oob.oob_ep;
+        set.map.ep_num = params->oob.n_oob_eps; // change to ctx->rank?
         
-        status = ucc_topo_init(subset, ctx->topo, &topo);
+        // here we do topo->set = subnet
+        status = ucc_topo_init(set, ctx->topo, &topo);
         if (UCC_OK != status) {
             ucc_warn("failed to init topo for computing local rank");
         } else {
             b_params.node_local_id = ucc_topo_node_local_rank(topo);
             ucc_topo_cleanup(topo);
+            printf("b_params.node_local_id: %d\n", b_params.node_local_id);
         }
     }
     
+    // TL contexts create
     status = ucc_create_tl_contexts(ctx, config, b_params);
     if (UCC_OK != status) {
         /* only critical error could have happened - bail */
@@ -762,7 +768,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         status = UCC_ERR_NO_MESSAGE;
         goto error_ctx;
     }
-
+    printf("line 770\n");
     /* Initialize ctx thread mode:
        if context is EXCLUSIVE then thread_mode is always SINGLE,
        otherwise it is  inherited from lib */
@@ -776,7 +782,32 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         ucc_error("failed to init progress queue for context %p", ctx);
         goto error_ctx_create;
     }
-
+    // ctx->id.pi      = *proc_info;
+    // ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
+    
+    // if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
+    //     params->oob.n_oob_eps > 1) {
+    //     do {
+    //         /* UCC context create is blocking fn, so we can wait here for the
+    //            completion of addr exchange */
+    //         status = ucc_core_addr_exchange(ctx, &ctx->params.oob,
+    //                                         &ctx->addr_storage);
+    //         if (status < 0) {
+    //             ucc_error("failed to exchange addresses during context "
+    //                       "creation with status: %s",
+    //                       ucc_status_string(status));
+    //             goto error_ctx_create;
+    //         }
+    //     } while (status == UCC_INPROGRESS);
+    //     status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
+    //     if (UCC_OK != status) {
+    //         ucc_free(ctx->addr_storage.storage);
+    //         ucc_error("failed to init ctx topo");
+    //         goto error_ctx_create;
+    //     }
+        
+    //     ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
+    // }
     if (config->internal_oob) {
         if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
             params->oob.n_oob_eps > 1) {
@@ -839,7 +870,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
             goto error_ctx_create;
         }
     }
-
     n_tl_ctx = ctx->n_tl_ctx;
     for (i = 0; i < n_tl_ctx; i++) {
         tl_ctx = ctx->tl_ctx[i];
