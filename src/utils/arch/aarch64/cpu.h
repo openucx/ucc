@@ -1,11 +1,11 @@
 /**
-* Copyright (c) 2001-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-* Copyright (C) ARM Ltd. 2016-2020.  ALL RIGHTS RESERVED.
-* Copyright (C) Stony Brook University. 2016-2020.  ALL RIGHTS RESERVED.
-* Copyright (C) 2026,      Fujitsu Limited. ALL RIGHTS RESERVED.
-*
-* See file LICENSE for terms.
-*/
+ * Copyright (c) 2001-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (C) ARM Ltd. 2016-2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Stony Brook University. 2016-2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) 2026,      Fujitsu Limited. ALL RIGHTS RESERVED.
+ *
+ * See file LICENSE for terms.
+ */
 
 #ifndef UCC_AARCH64_CPU_H_
 #define UCC_AARCH64_CPU_H_
