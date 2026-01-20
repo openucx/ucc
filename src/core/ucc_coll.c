@@ -56,8 +56,72 @@
  */
 static ucc_status_t ucc_dt_check_start_validation(ucc_coll_task_t *task)
 {
-    ucc_dt_check_state_t *dt_check;
+    ucc_dt_check_state_t  *dt_check = NULL;
+    ucc_status_t           status   = UCC_OK;
+    ucc_datatype_t         local_dt = UCC_DT_INT8;
+    ucc_memory_type_t      local_mem_type = UCC_MEMORY_TYPE_UNKNOWN;
+    const ucc_coll_args_t *args      = &task->bargs.args;
+    ucc_team_t            *team      = task->bargs.team;
+    ucc_rank_t             rank      = team->rank;
+    int                    root      = (int)args->root;
+    ucc_coll_type_t        coll_type = args->coll_type;
+    int                    is_contig;
 
+    /* If check is disabled, skip validation */
+    if (!ucc_global_config.check_asymmetric_dt) {
+        task->dt_check = NULL;
+        return UCC_OK;
+    }
+    /* Determine which datatype and memory type to check based on operation and rank */
+    if (rank == root) {
+        switch (coll_type) {
+        case UCC_COLL_TYPE_GATHER:
+        case UCC_COLL_TYPE_GATHERV:
+            if (UCC_IS_INPLACE(*args)) {
+                local_dt = args->dst.info.datatype;
+                local_mem_type = args->dst.info.mem_type;
+            } else {
+                local_dt = args->src.info.datatype;
+                local_mem_type = args->src.info.mem_type;
+            }
+            break;
+        case UCC_COLL_TYPE_SCATTER:
+        case UCC_COLL_TYPE_SCATTERV:
+            if (UCC_IS_INPLACE(*args)) {
+                local_dt = args->src.info.datatype;
+                local_mem_type = args->src.info.mem_type;
+            } else {
+                local_dt = args->dst.info.datatype;
+                local_mem_type = args->dst.info.mem_type;
+            }
+            break;
+        default:
+            goto out;
+        }
+    } else {
+        switch (coll_type) {
+        case UCC_COLL_TYPE_GATHER:
+        case UCC_COLL_TYPE_GATHERV:
+            local_dt = args->src.info.datatype;
+            local_mem_type = args->src.info.mem_type;
+            break;
+        case UCC_COLL_TYPE_SCATTER:
+        case UCC_COLL_TYPE_SCATTERV:
+            local_dt = args->dst.info.datatype;
+            local_mem_type = args->dst.info.mem_type;
+            break;
+        default:
+            goto out;
+        }
+    }
+    /* Determine if local datatype is contiguous */
+    if (UCC_DT_IS_PREDEFINED(local_dt)) {
+        is_contig = 1;
+    } else if (UCC_DT_IS_GENERIC(local_dt)) {
+        is_contig = UCC_DT_IS_CONTIG(local_dt);
+    } else {
+        is_contig = 0;
+    }
     /* Allocate dt_check state */
     dt_check = (ucc_dt_check_state_t *)ucc_malloc(sizeof(ucc_dt_check_state_t),
                                                    "dt_check_state");
@@ -67,6 +131,71 @@ static ucc_status_t ucc_dt_check_start_validation(ucc_coll_task_t *task)
     }
     memset(dt_check, 0, sizeof(ucc_dt_check_state_t));
     task->dt_check = dt_check;
+    /* Setup local values: [0] = datatype, [1] = memory type */
+    if (is_contig) {
+        dt_check->local_values[0] = (int64_t) local_dt;
+    } else {
+        dt_check->local_values[0] = (int64_t) UCC_ERR_NOT_SUPPORTED;
+    }
+    dt_check->local_values[1] = (int64_t) local_mem_type;
+    /* Allocate buffer to gather values from all ranks */
+    dt_check->gathered_values = (int64_t *)ucc_malloc(team->size * 2 * sizeof(int64_t),
+                                                       "gathered_values");
+    if (!dt_check->gathered_values) {
+        ucc_error("Failed to allocate gathered_values buffer");
+        status = UCC_ERR_NO_MEMORY;
+        goto out;
+    }
+    /* Setup subset for full team - will be used when service allgather is posted */
+    dt_check->subset.myrank = team->rank;
+    dt_check->subset.map.type = UCC_EP_MAP_FULL;
+    dt_check->subset.map.ep_num = team->size;
+    /* Initialize check_req to NULL - will be created in allgather_post */
+    dt_check->check_req = NULL;
+    dt_check->validated = 0;
+    return UCC_OK;
+
+out:
+    if (dt_check) {
+        if (dt_check->gathered_values) {
+            ucc_free(dt_check->gathered_values);
+        }
+        ucc_free(dt_check);
+        task->dt_check = NULL;
+    }
+    return status;
+}
+
+/**
+ * Validate gathered datatype values from all ranks
+ *
+ * This function checks if all ranks have contiguous and matching datatypes.
+ */
+static ucc_status_t ucc_dt_validate_results(ucc_coll_task_t *task)
+{
+    ucc_dt_check_state_t *dt_check        = task->dt_check;
+    int64_t              *gathered_values;
+    ucc_team_t           *team            = task->bargs.team;
+    ucc_rank_t            i;
+
+    /* Safety checks */
+    if (!dt_check || !dt_check->gathered_values) {
+        return UCC_ERR_INVALID_PARAM;
+    }
+    gathered_values = dt_check->gathered_values;
+    /* Check if any rank has non-contiguous datatype */
+    for (i = 0; i < team->size; i++) {
+        if (gathered_values[i * 2] == (int64_t) UCC_ERR_NOT_SUPPORTED) {
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+    /* Check if all ranks have the same datatype and memory type */
+    for (i = 1; i < team->size; i++) {
+        if (gathered_values[i * 2] != gathered_values[0] ||
+            gathered_values[i * 2 + 1] != gathered_values[1]) {
+            return UCC_ERR_INVALID_PARAM;
+        }
+    }
     return UCC_OK;
 }
 
@@ -77,8 +206,26 @@ static ucc_status_t ucc_dt_check_start_validation(ucc_coll_task_t *task)
  */
 static ucc_status_t ucc_dt_check_allgather_post(ucc_coll_task_t *allgather_wrapper)
 {
-    ucc_team_t *team = allgather_wrapper->bargs.team;
+    ucc_dt_check_state_t *dt_check = allgather_wrapper->dt_check;
+    ucc_team_t           *team = allgather_wrapper->bargs.team;
+    ucc_status_t          status;
 
+    /* Safety check */
+    if (!dt_check || !dt_check->gathered_values) {
+        allgather_wrapper->status = UCC_ERR_INVALID_PARAM;
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    /* Start service allgather */
+    status = ucc_service_allgather(team, dt_check->local_values,
+                                   dt_check->gathered_values,
+                                   2 * sizeof(int64_t), dt_check->subset,
+                                   &dt_check->check_req);
+    if (status != UCC_OK) {
+        allgather_wrapper->status = status;
+        return status;
+    }
+    allgather_wrapper->status = UCC_INPROGRESS;
     /* Enqueue wrapper task for progress */
     return ucc_progress_queue_enqueue(team->contexts[0]->pq, allgather_wrapper);
 }
@@ -90,6 +237,51 @@ static ucc_status_t ucc_dt_check_allgather_post(ucc_coll_task_t *allgather_wrapp
  */
 static void ucc_dt_check_allgather_progress(ucc_coll_task_t *allgather_wrapper)
 {
+    ucc_dt_check_state_t *dt_check = allgather_wrapper->dt_check;
+    ucc_coll_task_t      *ag_task;
+    ucc_status_t          status;
+
+    /* Safety check */
+    if (!dt_check || !dt_check->check_req) {
+        allgather_wrapper->status = UCC_ERR_INVALID_PARAM;
+        return;
+    }
+
+    /* Manually progress the service allgather task
+     * We call its progress function directly since it might not be in
+     * the same progress queue as the main team */
+    ag_task = dt_check->check_req->task;
+    if (ag_task->progress && ag_task->super.status == UCC_INPROGRESS) {
+        ag_task->progress(ag_task);
+    }
+
+    /* Check status */
+    status = ag_task->super.status;
+    if (status == UCC_INPROGRESS) {
+        allgather_wrapper->status = UCC_INPROGRESS;
+        return;
+    }
+
+    /* Service allgather completed (or failed) - finalize it */
+    ucc_service_coll_finalize(dt_check->check_req);
+    dt_check->check_req = NULL;
+
+    /* If service allgather failed, mark validation as failed */
+    if (status != UCC_OK) {
+        dt_check->validated = 0;
+        allgather_wrapper->status = status;
+        return;
+    }
+
+    /* Service allgather succeeded - validate the gathered datatypes */
+    status = ucc_dt_validate_results(allgather_wrapper);
+    dt_check->validated = (status == UCC_OK);
+    /* Free gathered_values buffer - no longer needed */
+    if (dt_check->gathered_values) {
+        ucc_free(dt_check->gathered_values);
+        dt_check->gathered_values = NULL;
+    }
+    /* Allgather wrapper always completes with UCC_OK so schedule continues to actual wrapper */
     allgather_wrapper->status = UCC_OK;
 }
 
@@ -98,6 +290,18 @@ static void ucc_dt_check_allgather_progress(ucc_coll_task_t *allgather_wrapper)
  */
 static ucc_status_t ucc_dt_check_allgather_finalize(ucc_coll_task_t *allgather_wrapper)
 {
+    ucc_dt_check_state_t *dt_check = allgather_wrapper->dt_check;
+
+    /* Clean up check_req if it wasn't finalized in progress */
+    if (dt_check && dt_check->check_req) {
+        ucc_service_coll_finalize(dt_check->check_req);
+        dt_check->check_req = NULL;
+    }
+    /* Also free gathered_values if not freed in progress */
+    if (dt_check && dt_check->gathered_values) {
+        ucc_free(dt_check->gathered_values);
+        dt_check->gathered_values = NULL;
+    }
     /* dt_check is shared with actual wrapper, so don't free it here */
     allgather_wrapper->dt_check = NULL;
     /* Return wrapper task to memory pool */
@@ -114,12 +318,27 @@ static ucc_status_t ucc_dt_check_actual_wrapper_post(ucc_coll_task_t *wrapper)
 {
     ucc_dt_check_state_t *dt_check = wrapper->dt_check;
     ucc_coll_task_t      *actual_task = dt_check->actual_task;
+    ucc_schedule_t       *schedule = wrapper->schedule;
     ucc_status_t          status;
 
-    /* Post the actual task */
+    /* Check if validation succeeded */
+    if (!dt_check->validated) {
+        /* Validation failed - propagate error to schedule and complete wrapper */
+        wrapper->status = UCC_ERR_NOT_SUPPORTED;
+        if (schedule) {
+            schedule->super.status = UCC_ERR_NOT_SUPPORTED;
+            schedule->super.super.status = UCC_ERR_NOT_SUPPORTED;
+        }
+        return UCC_OK;
+    }
+    /* Validation succeeded - post the actual task */
     status = actual_task->post(actual_task);
     if (status < 0) {
         wrapper->status = status;
+        if (schedule) {
+            schedule->super.status = status;
+            schedule->super.super.status = status;
+        }
         return status;
     }
     wrapper->status = UCC_INPROGRESS;
@@ -554,6 +773,14 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
             schedule = ucc_dt_check_create_schedule(task);
             if (!schedule) {
                 ucc_error("failed to create dt_check schedule");
+                /* Clean up dt_check state before going to coll_finalize */
+                if (task->dt_check) {
+                    if (task->dt_check->gathered_values) {
+                        ucc_free(task->dt_check->gathered_values);
+                    }
+                    ucc_free(task->dt_check);
+                    task->dt_check = NULL;
+                }
                 status = UCC_ERR_NO_MEMORY;
                 goto coll_finalize;
             }
