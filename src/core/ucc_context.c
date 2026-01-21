@@ -615,7 +615,6 @@ poll:
                     addr_storage->size * sizeof(ucc_context_id_t));
                 return UCC_ERR_NO_MEMORY;
             }
-            // single allgather for ctx_ids, no need to allgather the addresses?
             addr_storage->addr_len = sizeof(ucc_context_id_t);
 
             status = oob->allgather(&context->id, addr_storage->storage,
@@ -636,7 +635,6 @@ poll:
     }
 
     {
-        //replace UCC_ADDR_STORAGE_RANK_HEADER 
         ucc_context_id_t *ctx_ids = (ucc_context_id_t *)addr_storage->storage;
         ucc_rank_t r = UCC_RANK_MAX;
 
@@ -648,13 +646,6 @@ poll:
                 }
                 r = i;
             }
-        }
-
-        if (r == UCC_RANK_MAX) {
-            //TODO: check if needed
-            printf("failed to find local rank in ctx_id exchange\n");
-            ucc_error("failed to find local rank in ctx_id exchange");
-            return UCC_ERR_NO_MESSAGE;
         }
 
         addr_storage->flags = 0;
@@ -690,7 +681,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                                           ucc_context_h              *context,
                                           ucc_proc_info_t            *proc_info)
 {
-    // uint32_t                   topo_required       = 0;
     uint64_t                   created_ctx_counter = 0;
     ucc_base_context_params_t  b_params;
     ucc_base_context_t        *b_ctx;
@@ -735,7 +725,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
 #endif
     }
 
-    // TOPO init
     ctx->id.pi      = *proc_info;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
     
@@ -760,7 +749,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                 goto error_ctx_create;
             }
             ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
-            // TODO: change the function so no need to clean up
+
             // clean up addr_storage
             ucc_free(ctx->addr_storage.storage);
             ctx->addr_storage.storage = NULL;
@@ -769,16 +758,14 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
             ctx->addr_storage.rank = UCC_RANK_MAX;
             ctx->addr_storage.flags = 0;
         }
-    // local rank computation
         ucc_subset_t set;
         ucc_topo_t  *topo = NULL;
         
         memset(&set.map, 0, sizeof(ucc_ep_map_t));
         set.map.type   = UCC_EP_MAP_FULL;
         set.myrank     = params->oob.oob_ep;
-        set.map.ep_num = params->oob.n_oob_eps; // change to ctx->rank?
+        set.map.ep_num = params->oob.n_oob_eps;
         
-        // here we do topo->set = subnet
         status = ucc_topo_init(set, ctx->topo, &topo);
         if (UCC_OK != status) {
             ucc_warn("failed to init topo for computing local rank");
@@ -851,6 +838,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         status = UCC_ERR_NO_MESSAGE;
         goto error_ctx;
     }
+
     /* Initialize ctx thread mode:
        if context is EXCLUSIVE then thread_mode is always SINGLE,
        otherwise it is  inherited from lib */
@@ -887,7 +875,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
             ucc_error("failed to init ctx topo");
             goto error_ctx_create;
         }
-        
         ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
     }
     if (config->internal_oob) {
