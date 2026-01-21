@@ -110,7 +110,7 @@ ucc_config_field_t ucc_global_config_table[] = {
 
     {"CHECK_ASYMMETRIC_DT", "n",
      "Enable asymmetric datatype checking for rooted collectives\n"
-     "(gather, gatherv, scatter, scatterv). Uses allgather to verify\n"
+     "(gather, gatherv, scatter, scatterv). Uses allreduce to verify\n"
      "all ranks use the same datatype. Disabled by default for performance.\n"
      "Enable for debugging or when OMPI needs UCC to detect asymmetric\n"
      "datatypes for proper fallback behavior.",

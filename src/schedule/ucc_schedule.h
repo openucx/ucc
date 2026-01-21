@@ -70,19 +70,25 @@ typedef struct ucc_service_coll_req ucc_service_coll_req_t;
  *
  * This structure holds the state for transparent datatype validation
  * before executing the actual collective operation. The validation uses a service
- * allgather to ensure all ranks have compatible datatypes.
+ * allreduce with MIN operation to efficiently detect mismatches.
  *
  * Design: Uses a schedule with two tasks:
- *   1. Validation task: performs service allgather and validates results
+ *   1. Validation task: performs service allreduce (MIN) and validates results
  *   2. Actual collective task: depends on validation completing successfully
+ *
+ * Validation algorithm uses min/max trick with single allreduce:
+ *   - Send [dt, -dt, mem, -mem] with MIN reduction
+ *   - After reduction: if min(dt) == -min(-dt), all ranks have same dt
+ *   - Same principle for memory type
+ *   - Message size: constant 4 integers (doesn't scale with number of ranks)
  *
  * If validation fails, the dependency mechanism prevents the actual task from posting.
  */
 typedef struct ucc_dt_check_state {
-    ucc_service_coll_req_t *check_req;        /* Service allgather request */
-    int64_t                *gathered_values;  /* Buffer for gathered values */
-    int64_t                 local_values[2];  /* Local DT and mem type */
-    ucc_subset_t            subset;           /* Subset for service allgather */
+    ucc_service_coll_req_t *check_req;        /* Service allreduce request */
+    int64_t                 reduced_values[4];/* Result: [min(dt), min(-dt), min(mem), min(-mem)] */
+    int64_t                 local_values[4];  /* Local: [dt, -dt, mem, -mem] */
+    ucc_subset_t            subset;           /* Subset for service allreduce */
     int                     validated;        /* 1 if validation passed, 0 if failed */
     struct ucc_coll_task   *actual_task;      /* Pointer to actual collective task */
 } ucc_dt_check_state_t;
