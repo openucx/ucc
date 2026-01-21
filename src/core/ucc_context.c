@@ -880,6 +880,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                 ucc_error("failed to init ctx topo");
                 goto error_ctx_create;
             }
+        }
         ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
     }
     if (config->internal_oob) {
