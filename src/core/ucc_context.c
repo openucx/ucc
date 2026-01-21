@@ -584,6 +584,85 @@ poll:
     return UCC_OK;
 }
 
+ucc_status_t ucc_core_ctx_id_exchange(ucc_context_t *context, ucc_oob_coll_t *oob,
+                                      ucc_addr_storage_t *addr_storage)
+{
+    ucc_status_t      status;
+    ucc_rank_t        i;
+
+poll:
+    if (addr_storage->oob_req) {
+        status = oob->req_test(addr_storage->oob_req);
+        if (status < 0) {
+            oob->req_free(addr_storage->oob_req);
+            ucc_error("oob req test failed during topo addr exchange");
+            return status;
+        } else if (UCC_INPROGRESS == status) {
+            return status;
+        }
+        oob->req_free(addr_storage->oob_req);
+        addr_storage->oob_req = NULL;
+    }
+    if (0 == addr_storage->addr_len) {
+        if (NULL == addr_storage->storage) {
+            addr_storage->size = oob->n_oob_eps;
+
+            addr_storage->storage = (ucc_context_id_t *)ucc_malloc(
+                addr_storage->size * sizeof(ucc_context_id_t), "ctx_ids_storage");
+            if (!addr_storage->storage) {
+                ucc_error(
+                    "failed to allocate %zd bytes for ctx_ids storage",
+                    addr_storage->size * sizeof(ucc_context_id_t));
+                return UCC_ERR_NO_MEMORY;
+            }
+            // single allgather for ctx_ids, no need to allgather the addresses?
+            addr_storage->addr_len = sizeof(ucc_context_id_t);
+
+            status = oob->allgather(&context->id, addr_storage->storage,
+                                    sizeof(ucc_context_id_t), oob->coll_info,
+                                    &addr_storage->oob_req);
+            if (UCC_OK != status) {
+                ucc_error("failed to start oob allgather for ctx_ids");
+                return status;
+            }
+            goto poll;
+        }
+    }
+    ucc_assert(addr_storage->storage != NULL);
+    if (addr_storage->addr_len == 0 ) {
+        ucc_free(addr_storage->storage);
+        addr_storage->storage = NULL;
+        return UCC_OK;
+    }
+
+    {
+        //replace UCC_ADDR_STORAGE_RANK_HEADER 
+        ucc_context_id_t *ctx_ids = (ucc_context_id_t *)addr_storage->storage;
+        ucc_rank_t r = UCC_RANK_MAX;
+
+        for (i = 0; i < addr_storage->size; i++) {
+            if (UCC_CTX_ID_EQUAL(context->id, ctx_ids[i])) {
+                if (r != UCC_RANK_MAX) {
+                    ucc_error("ctx_id collision: %d %d", r, i);
+                    return UCC_ERR_NO_MESSAGE;
+                }
+                r = i;
+            }
+        }
+
+        if (r == UCC_RANK_MAX) {
+            //TODO: check if needed
+            printf("failed to find local rank in ctx_id exchange\n");
+            ucc_error("failed to find local rank in ctx_id exchange");
+            return UCC_ERR_NO_MESSAGE;
+        }
+
+        addr_storage->flags = 0;
+        addr_storage->rank = r;
+    }
+    return UCC_OK;
+}
+
 static void remove_tl_ctx_from_array(ucc_tl_context_t **array, unsigned *size,
                                      ucc_tl_context_t *tl_ctx)
 {
@@ -665,7 +744,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         do {
             /* UCC context create is blocking fn, so we can wait here for the
                completion of addr exchange */
-            status = ucc_core_addr_exchange(ctx, &ctx->params.oob,
+            status = ucc_core_ctx_id_exchange(ctx, &ctx->params.oob,
                                             &ctx->addr_storage);
             if (status < 0) {
                 ucc_error("failed to exchange addresses during context "
@@ -680,10 +759,16 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
             ucc_error("failed to init ctx topo");
             goto error_ctx_create;
         }
-        
         ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
+        // TODO: change the function so no need to clean up
+        // clean up addr_storage
+        ucc_free(ctx->addr_storage.storage);
+        ctx->addr_storage.storage = NULL;
+        ctx->addr_storage.addr_len = 0;
+        ctx->addr_storage.size = 0;
+        ctx->addr_storage.rank = UCC_RANK_MAX;
+        ctx->addr_storage.flags = 0;
     }
-    printf("config->node_local_id: %ld, UCC_ULUNITS_AUTO: %ld\n", config->node_local_id, UCC_ULUNITS_AUTO);
     // local rank computation
     if (config->node_local_id == UCC_ULUNITS_AUTO) {
         ucc_subset_t set;
@@ -701,7 +786,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         } else {
             b_params.node_local_id = ucc_topo_node_local_rank(topo);
             ucc_topo_cleanup(topo);
-            printf("b_params.node_local_id: %d\n", b_params.node_local_id);
         }
     }
     
@@ -768,7 +852,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         status = UCC_ERR_NO_MESSAGE;
         goto error_ctx;
     }
-    printf("line 770\n");
     /* Initialize ctx thread mode:
        if context is EXCLUSIVE then thread_mode is always SINGLE,
        otherwise it is  inherited from lib */
@@ -782,32 +865,32 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         ucc_error("failed to init progress queue for context %p", ctx);
         goto error_ctx_create;
     }
-    // ctx->id.pi      = *proc_info;
-    // ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
+    ctx->id.pi      = *proc_info;
+    ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
     
-    // if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
-    //     params->oob.n_oob_eps > 1) {
-    //     do {
-    //         /* UCC context create is blocking fn, so we can wait here for the
-    //            completion of addr exchange */
-    //         status = ucc_core_addr_exchange(ctx, &ctx->params.oob,
-    //                                         &ctx->addr_storage);
-    //         if (status < 0) {
-    //             ucc_error("failed to exchange addresses during context "
-    //                       "creation with status: %s",
-    //                       ucc_status_string(status));
-    //             goto error_ctx_create;
-    //         }
-    //     } while (status == UCC_INPROGRESS);
-    //     status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
-    //     if (UCC_OK != status) {
-    //         ucc_free(ctx->addr_storage.storage);
-    //         ucc_error("failed to init ctx topo");
-    //         goto error_ctx_create;
-    //     }
+    if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
+        params->oob.n_oob_eps > 1) {
+        do {
+            /* UCC context create is blocking fn, so we can wait here for the
+               completion of addr exchange */
+            status = ucc_core_addr_exchange(ctx, &ctx->params.oob,
+                                            &ctx->addr_storage);
+            if (status < 0) {
+                ucc_error("failed to exchange addresses during context "
+                          "creation with status: %s",
+                          ucc_status_string(status));
+                goto error_ctx_create;
+            }
+        } while (status == UCC_INPROGRESS);
+        status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
+        if (UCC_OK != status) {
+            ucc_free(ctx->addr_storage.storage);
+            ucc_error("failed to init ctx topo");
+            goto error_ctx_create;
+        }
         
-    //     ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
-    // }
+        ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
+    }
     if (config->internal_oob) {
         if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
             params->oob.n_oob_eps > 1) {
