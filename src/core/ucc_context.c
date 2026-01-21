@@ -681,6 +681,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                                           ucc_context_h              *context,
                                           ucc_proc_info_t            *proc_info)
 {
+    uint32_t                   topo_required       = 0;
     uint64_t                   created_ctx_counter = 0;
     ucc_base_context_params_t  b_params;
     ucc_base_context_t        *b_ctx;
@@ -823,6 +824,9 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                       cl_lib->iface->super.name);
             goto error_ctx_create;
         }
+        if (c_attr.topo_required) {
+            topo_required = 1;
+        }
 
         memset(&l_attr, 0, sizeof(l_attr));
         status = cl_lib->iface->lib.get_attr(&cl_lib->super, &l_attr.super);
@@ -853,7 +857,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
     }
     ctx->id.pi      = *proc_info;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
-    
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
         params->oob.n_oob_eps > 1) {
         do {
@@ -868,12 +871,15 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                 goto error_ctx_create;
             }
         } while (status == UCC_INPROGRESS);
-        status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
-        if (UCC_OK != status) {
-            ucc_free(ctx->addr_storage.storage);
-            ucc_error("failed to init ctx topo");
-            goto error_ctx_create;
-        }
+
+        if (topo_required) {
+            /* At least one available CL context reported it needs topo info */
+            status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
+            if (UCC_OK != status) {
+                ucc_free(ctx->addr_storage.storage);
+                ucc_error("failed to init ctx topo");
+                goto error_ctx_create;
+            }
         ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
     }
     if (config->internal_oob) {
