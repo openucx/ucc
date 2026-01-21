@@ -26,7 +26,7 @@ AC_DEFUN([CHECK_TLCP_REQUIRED], [
           [CHECKED_TLCP_REQUIRED=y],
     [
         for t in $(echo ${TLCP_REQUIRED} | tr "," " "); do
-            AS_IF([ test "$t" == "$tlcp_name" ], [CHECKED_TLCP_REQUIRED=y], [])
+            AS_IF([ test "$t" = "$tlcp_name" ], [CHECKED_TLCP_REQUIRED=y], [])
         done
     ])
 ])
