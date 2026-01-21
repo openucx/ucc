@@ -775,7 +775,6 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         }
     }
     
-    // TL contexts create
     status = ucc_create_tl_contexts(ctx, config, b_params);
     if (UCC_OK != status) {
         /* only critical error could have happened - bail */
