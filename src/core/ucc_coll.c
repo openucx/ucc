@@ -49,10 +49,13 @@
  * dt_check state for validation. Called during collective init.
  */
 /**
- * Start asymmetric datatype validation using service allgather
+ * Start asymmetric datatype validation using service allreduce
  *
- * Prepares dt_check state for validation but doesn't start allgather yet.
- * The allgather will be started by the allgather wrapper task's post function.
+ * Prepares dt_check state for validation but doesn't start allreduce yet.
+ * The allreduce will be started by the allreduce wrapper task's post function.
+ *
+ * Uses min/max trick: send [dt, -dt, mem, -mem] with MIN reduction.
+ * After reduction: if min(dt) == -min(-dt), all ranks have same datatype.
  */
 static ucc_status_t ucc_dt_check_start_validation(ucc_coll_task_t *task)
 {
@@ -131,35 +134,27 @@ static ucc_status_t ucc_dt_check_start_validation(ucc_coll_task_t *task)
     }
     memset(dt_check, 0, sizeof(ucc_dt_check_state_t));
     task->dt_check = dt_check;
-    /* Setup local values: [0] = datatype, [1] = memory type */
+    /* Setup local values for min/max trick: [dt, -dt, mem, -mem] */
     if (is_contig) {
         dt_check->local_values[0] = (int64_t) local_dt;
+        dt_check->local_values[1] = -(int64_t) local_dt;
     } else {
         dt_check->local_values[0] = (int64_t) UCC_ERR_NOT_SUPPORTED;
+        dt_check->local_values[1] = -(int64_t) UCC_ERR_NOT_SUPPORTED;
     }
-    dt_check->local_values[1] = (int64_t) local_mem_type;
-    /* Allocate buffer to gather values from all ranks */
-    dt_check->gathered_values = (int64_t *)ucc_malloc(team->size * 2 * sizeof(int64_t),
-                                                       "gathered_values");
-    if (!dt_check->gathered_values) {
-        ucc_error("Failed to allocate gathered_values buffer");
-        status = UCC_ERR_NO_MEMORY;
-        goto out;
-    }
-    /* Setup subset for full team - will be used when service allgather is posted */
+    dt_check->local_values[2] = (int64_t) local_mem_type;
+    dt_check->local_values[3] = -(int64_t) local_mem_type;
+    /* Setup subset for full team - will be used when service allreduce is posted */
     dt_check->subset.myrank = team->rank;
     dt_check->subset.map.type = UCC_EP_MAP_FULL;
     dt_check->subset.map.ep_num = team->size;
-    /* Initialize check_req to NULL - will be created in allgather_post */
+    /* Initialize check_req to NULL - will be created in allreduce_post */
     dt_check->check_req = NULL;
     dt_check->validated = 0;
     return UCC_OK;
 
 out:
     if (dt_check) {
-        if (dt_check->gathered_values) {
-            ucc_free(dt_check->gathered_values);
-        }
         ucc_free(dt_check);
         task->dt_check = NULL;
     }
@@ -167,145 +162,129 @@ out:
 }
 
 /**
- * Validate gathered datatype values from all ranks
+ * Validate allreduced datatype values using min/max trick
  *
- * This function checks if all ranks have contiguous and matching datatypes.
+ * After MIN allreduce on [dt, -dt, mem, -mem]:
+ *   - reduced[0] contains min(dt) across all ranks
+ *   - reduced[1] contains min(-dt) = -max(dt) across all ranks
+ *   - If reduced[0] == -reduced[1], all ranks have identical dt
+ *   - Same logic applies to memory type with reduced[2] and reduced[3]
  */
 static ucc_status_t ucc_dt_validate_results(ucc_coll_task_t *task)
 {
-    ucc_dt_check_state_t *dt_check        = task->dt_check;
-    int64_t              *gathered_values;
-    ucc_team_t           *team            = task->bargs.team;
-    ucc_rank_t            i;
+    ucc_dt_check_state_t *dt_check = task->dt_check;
+    int64_t              *reduced;
 
     /* Safety checks */
-    if (!dt_check || !dt_check->gathered_values) {
+    if (!dt_check) {
         return UCC_ERR_INVALID_PARAM;
     }
-    gathered_values = dt_check->gathered_values;
+    reduced = dt_check->reduced_values;
     /* Check if any rank has non-contiguous datatype */
-    for (i = 0; i < team->size; i++) {
-        if (gathered_values[i * 2] == (int64_t) UCC_ERR_NOT_SUPPORTED) {
-            return UCC_ERR_NOT_SUPPORTED;
-        }
+    if (reduced[0] == (int64_t) UCC_ERR_NOT_SUPPORTED) {
+        return UCC_ERR_NOT_SUPPORTED;
     }
-    /* Check if all ranks have the same datatype and memory type */
-    for (i = 1; i < team->size; i++) {
-        if (gathered_values[i * 2] != gathered_values[0] ||
-            gathered_values[i * 2 + 1] != gathered_values[1]) {
-            return UCC_ERR_INVALID_PARAM;
-        }
+    /* Check if all ranks have the same datatype using min/max trick */
+    if (reduced[0] != -reduced[1]) {
+        return UCC_ERR_INVALID_PARAM;
+    }
+    /* Check if all ranks have the same memory type */
+    if (reduced[2] != -reduced[3]) {
+        return UCC_ERR_INVALID_PARAM;
     }
     return UCC_OK;
 }
 
 /**
- * Post function for allgather wrapper task using service allgather
+ * Post function for allreduce wrapper task using service allreduce
  *
- * Starts the service allgather to gather datatype info from all ranks.
+ * Starts the service allreduce (MIN) to detect datatype mismatches across all ranks.
  */
-static ucc_status_t ucc_dt_check_allgather_post(ucc_coll_task_t *allgather_wrapper)
+static ucc_status_t ucc_dt_check_allreduce_post(ucc_coll_task_t *allreduce_wrapper)
 {
-    ucc_dt_check_state_t *dt_check = allgather_wrapper->dt_check;
-    ucc_team_t           *team = allgather_wrapper->bargs.team;
+    ucc_dt_check_state_t *dt_check = allreduce_wrapper->dt_check;
+    ucc_team_t           *team = allreduce_wrapper->bargs.team;
     ucc_status_t          status;
 
     /* Safety check */
-    if (!dt_check || !dt_check->gathered_values) {
-        allgather_wrapper->status = UCC_ERR_INVALID_PARAM;
+    if (!dt_check) {
+        allreduce_wrapper->status = UCC_ERR_INVALID_PARAM;
         return UCC_ERR_INVALID_PARAM;
     }
 
-    /* Start service allgather */
-    status = ucc_service_allgather(team, dt_check->local_values,
-                                   dt_check->gathered_values,
-                                   2 * sizeof(int64_t), dt_check->subset,
-                                   &dt_check->check_req);
+    /* Start service allreduce with MIN operation on 4 int64_t values */
+    status = ucc_service_allreduce(team, dt_check->local_values,
+                                   dt_check->reduced_values,
+                                   UCC_DT_INT64, 4, UCC_OP_MIN,
+                                   dt_check->subset, &dt_check->check_req);
     if (status != UCC_OK) {
-        allgather_wrapper->status = status;
+        allreduce_wrapper->status = status;
         return status;
     }
-    allgather_wrapper->status = UCC_INPROGRESS;
+    allreduce_wrapper->status = UCC_INPROGRESS;
     /* Enqueue wrapper task for progress */
-    return ucc_progress_queue_enqueue(team->contexts[0]->pq, allgather_wrapper);
+    return ucc_progress_queue_enqueue(team->contexts[0]->pq, allreduce_wrapper);
 }
 
 /**
- * Progress function for allgather wrapper task using service allgather
+ * Progress function for allreduce wrapper task using service allreduce
  *
- * Progresses service allgather, and when complete, validates the gathered datatypes.
+ * Progresses service allreduce, and when complete, validates the reduced datatypes.
  */
-static void ucc_dt_check_allgather_progress(ucc_coll_task_t *allgather_wrapper)
+static void ucc_dt_check_allreduce_progress(ucc_coll_task_t *allreduce_wrapper)
 {
-    ucc_dt_check_state_t *dt_check = allgather_wrapper->dt_check;
-    ucc_coll_task_t      *ag_task;
+    ucc_dt_check_state_t *dt_check = allreduce_wrapper->dt_check;
+    ucc_coll_task_t      *ar_task;
     ucc_status_t          status;
 
     /* Safety check */
     if (!dt_check || !dt_check->check_req) {
-        allgather_wrapper->status = UCC_ERR_INVALID_PARAM;
+        allreduce_wrapper->status = UCC_ERR_INVALID_PARAM;
         return;
     }
 
-    /* Manually progress the service allgather task
-     * We call its progress function directly since it might not be in
-     * the same progress queue as the main team */
-    ag_task = dt_check->check_req->task;
-    if (ag_task->progress && ag_task->super.status == UCC_INPROGRESS) {
-        ag_task->progress(ag_task);
-    }
-
-    /* Check status */
-    status = ag_task->super.status;
+    /* Check status of the service allreduce */
+    ar_task = dt_check->check_req->task;
+    status  = ar_task->super.status;
     if (status == UCC_INPROGRESS) {
-        allgather_wrapper->status = UCC_INPROGRESS;
+        allreduce_wrapper->status = UCC_INPROGRESS;
         return;
     }
 
-    /* Service allgather completed (or failed) - finalize it */
+    /* Service allreduce completed (or failed) - finalize it */
     ucc_service_coll_finalize(dt_check->check_req);
     dt_check->check_req = NULL;
 
-    /* If service allgather failed, mark validation as failed */
+    /* If service allreduce failed, mark validation as failed */
     if (status != UCC_OK) {
         dt_check->validated = 0;
-        allgather_wrapper->status = status;
+        allreduce_wrapper->status = status;
         return;
     }
 
-    /* Service allgather succeeded - validate the gathered datatypes */
-    status = ucc_dt_validate_results(allgather_wrapper);
+    /* Service allreduce succeeded - validate using min/max check */
+    status = ucc_dt_validate_results(allreduce_wrapper);
     dt_check->validated = (status == UCC_OK);
-    /* Free gathered_values buffer - no longer needed */
-    if (dt_check->gathered_values) {
-        ucc_free(dt_check->gathered_values);
-        dt_check->gathered_values = NULL;
-    }
-    /* Allgather wrapper always completes with UCC_OK so schedule continues to actual wrapper */
-    allgather_wrapper->status = UCC_OK;
+    /* Completes with UCC_OK so schedule continues to actual wrapper */
+    allreduce_wrapper->status = UCC_OK;
 }
 
 /**
- * Finalize function for allgather wrapper task
+ * Finalize function for allreduce wrapper task
  */
-static ucc_status_t ucc_dt_check_allgather_finalize(ucc_coll_task_t *allgather_wrapper)
+static ucc_status_t ucc_dt_check_allreduce_finalize(ucc_coll_task_t *allreduce_wrapper)
 {
-    ucc_dt_check_state_t *dt_check = allgather_wrapper->dt_check;
+    ucc_dt_check_state_t *dt_check = allreduce_wrapper->dt_check;
 
     /* Clean up check_req if it wasn't finalized in progress */
     if (dt_check && dt_check->check_req) {
         ucc_service_coll_finalize(dt_check->check_req);
         dt_check->check_req = NULL;
     }
-    /* Also free gathered_values if not freed in progress */
-    if (dt_check && dt_check->gathered_values) {
-        ucc_free(dt_check->gathered_values);
-        dt_check->gathered_values = NULL;
-    }
     /* dt_check is shared with actual wrapper, so don't free it here */
-    allgather_wrapper->dt_check = NULL;
+    allreduce_wrapper->dt_check = NULL;
     /* Return wrapper task to memory pool */
-    ucc_mpool_put(allgather_wrapper);
+    ucc_mpool_put(allreduce_wrapper);
     return UCC_OK;
 }
 
@@ -403,17 +382,18 @@ static ucc_status_t ucc_dt_check_schedule_finalize(ucc_coll_task_t *task)
 }
 
 /**
- * Create a schedule with service allgather and actual collective
+ * Create a schedule with service allreduce and actual collective
  *
  * Creates a schedule containing two tasks:
- *   1. Allgather wrapper task - gathers and validates datatype info from all ranks
+ *   1. Allreduce wrapper task - validates datatype consistency using MIN reduction
  *   2. Actual wrapper task - conditionally posts the real gather/scatter operation
  *
- * Dependencies: allgather wrapper → actual wrapper
+ * Dependencies: allreduce wrapper → actual wrapper
  *
- * The allgather wrapper uses the internal service allgather API to gather datatypes,
- * then validates them synchronously. The actual wrapper checks the validation result
- * and only posts the real collective if validation succeeded.
+ * The allreduce wrapper uses the internal service allreduce API with MIN operation
+ * and the min/max trick to detect mismatches in O(1) message size (doesn't scale with ranks).
+ * The actual wrapper checks the validation result and only posts the real collective
+ * if validation succeeded.
  *
  * @param task The actual collective task (already created by TL/CL)
  * @return Pointer to schedule (as ucc_coll_task_t*), or NULL on error
@@ -421,7 +401,7 @@ static ucc_status_t ucc_dt_check_schedule_finalize(ucc_coll_task_t *task)
 static ucc_coll_task_t* ucc_dt_check_create_schedule(ucc_coll_task_t *task)
 {
     ucc_schedule_t           *schedule;
-    ucc_coll_task_t          *allgather_wrapper;
+    ucc_coll_task_t          *allreduce_wrapper;
     ucc_coll_task_t          *actual_wrapper;
     ucc_base_coll_args_t      empty_bargs;
     ucc_status_t              status;
@@ -441,79 +421,79 @@ static ucc_coll_task_t* ucc_dt_check_create_schedule(ucc_coll_task_t *task)
         ucc_free(schedule);
         return NULL;
     }
-    /* Create allgather wrapper task from memory pool */
-    allgather_wrapper = ucc_mpool_get(&task->bargs.team->contexts[0]->lib->stub_tasks_mp);
-    if (!allgather_wrapper) {
-        ucc_error("failed to allocate allgather wrapper task from mpool");
+    /* Create allreduce wrapper task from memory pool */
+    allreduce_wrapper = ucc_mpool_get(&task->bargs.team->contexts[0]->lib->stub_tasks_mp);
+    if (!allreduce_wrapper) {
+        ucc_error("failed to allocate allreduce wrapper task from mpool");
         goto error_schedule;
     }
-    /* Initialize allgather wrapper task with minimal bargs (only needs team) */
+    /* Initialize allreduce wrapper task with minimal bargs (only needs team) */
     memset(&empty_bargs, 0, sizeof(empty_bargs));
     empty_bargs.team = task->bargs.team;
-    status = ucc_coll_task_init(allgather_wrapper, &empty_bargs, task->team);
+    status = ucc_coll_task_init(allreduce_wrapper, &empty_bargs, task->team);
     if (status != UCC_OK) {
-        ucc_error("failed to init allgather wrapper task: %s",
+        ucc_error("failed to init allreduce wrapper task: %s",
                   ucc_status_string(status));
-        ucc_mpool_put(allgather_wrapper);
+        ucc_mpool_put(allreduce_wrapper);
         goto error_schedule;
     }
-    /* Give dt_check state to allgather wrapper */
-    allgather_wrapper->dt_check = task->dt_check;
+    /* Give dt_check state to allreduce wrapper */
+    allreduce_wrapper->dt_check = task->dt_check;
     /* Store actual_task pointer in dt_check for wrapper to access */
-    allgather_wrapper->dt_check->actual_task = task;
-    /* Set allgather wrapper functions */
-    allgather_wrapper->post     = ucc_dt_check_allgather_post;
-    allgather_wrapper->progress = ucc_dt_check_allgather_progress;
-    allgather_wrapper->finalize = ucc_dt_check_allgather_finalize;
-    allgather_wrapper->status   = UCC_OPERATION_INITIALIZED;
-    /* Add allgather wrapper to schedule - starts when schedule starts */
-    status = ucc_task_subscribe_dep(&schedule->super, allgather_wrapper,
+    allreduce_wrapper->dt_check->actual_task = task;
+    /* Set allreduce wrapper functions */
+    allreduce_wrapper->post     = ucc_dt_check_allreduce_post;
+    allreduce_wrapper->progress = ucc_dt_check_allreduce_progress;
+    allreduce_wrapper->finalize = ucc_dt_check_allreduce_finalize;
+    allreduce_wrapper->status   = UCC_OPERATION_INITIALIZED;
+    /* Add allreduce wrapper to schedule - starts when schedule starts */
+    status = ucc_task_subscribe_dep(&schedule->super, allreduce_wrapper,
                                     UCC_EVENT_SCHEDULE_STARTED);
     if (status != UCC_OK) {
-        ucc_error("failed to subscribe allgather wrapper: %s",
+        ucc_error("failed to subscribe allreduce wrapper: %s",
                   ucc_status_string(status));
-        goto error_allgather_wrapper;
+        goto error_allreduce_wrapper;
     }
-    status = ucc_schedule_add_task(schedule, allgather_wrapper);
+    status = ucc_schedule_add_task(schedule, allreduce_wrapper);
     if (status != UCC_OK) {
-        ucc_error("failed to add allgather wrapper to schedule: %s",
+        ucc_error("failed to add allreduce wrapper to schedule: %s",
                   ucc_status_string(status));
-        goto error_allgather_wrapper;
+        goto error_allreduce_wrapper;
     }
     /* Create actual task wrapper that conditionally posts the actual task */
     actual_wrapper = ucc_mpool_get(&task->bargs.team->contexts[0]->lib->stub_tasks_mp);
     if (!actual_wrapper) {
         ucc_error("failed to allocate actual wrapper task from mpool");
-        goto error_allgather_wrapper;
+        goto error_allreduce_wrapper;
     }
     status = ucc_coll_task_init(actual_wrapper, &empty_bargs, task->team);
     if (status != UCC_OK) {
         ucc_error("failed to init actual wrapper task: %s",
                   ucc_status_string(status));
         ucc_mpool_put(actual_wrapper);
-        goto error_allgather_wrapper;
+        goto error_allreduce_wrapper;
     }
     /* Share dt_check with actual wrapper - it contains pointer to actual_task */
-    actual_wrapper->dt_check = allgather_wrapper->dt_check;
+    actual_wrapper->dt_check = allreduce_wrapper->dt_check;
     /* Set actual wrapper functions */
     actual_wrapper->post     = ucc_dt_check_actual_wrapper_post;
     actual_wrapper->progress = ucc_dt_check_actual_wrapper_progress;
     actual_wrapper->finalize = ucc_dt_check_actual_wrapper_finalize;
     actual_wrapper->status   = UCC_OPERATION_INITIALIZED;
-    /* Add actual wrapper to schedule - depends on allgather completing */
-    status = ucc_task_subscribe_dep(allgather_wrapper, actual_wrapper, UCC_EVENT_COMPLETED);
+    /* Add actual wrapper to schedule - depends on allreduce completing */
+    status = ucc_task_subscribe_dep(allreduce_wrapper, actual_wrapper, UCC_EVENT_COMPLETED);
     if (status != UCC_OK) {
         ucc_error("failed to subscribe actual wrapper dependency: %s",
                   ucc_status_string(status));
         ucc_mpool_put(actual_wrapper);
-        goto error_allgather_wrapper;
+        goto error_allreduce_wrapper;
     }
     status = ucc_schedule_add_task(schedule, actual_wrapper);
     if (status != UCC_OK) {
         ucc_error("failed to add actual wrapper to schedule: %s",
                   ucc_status_string(status));
         ucc_mpool_put(actual_wrapper);
-        goto error_allgather_wrapper;
+        goto error_allreduce_wrapper;
     }
     /* Set schedule functions */
     schedule->super.post     = ucc_schedule_start;
@@ -521,8 +501,8 @@ static ucc_coll_task_t* ucc_dt_check_create_schedule(ucc_coll_task_t *task)
     schedule->super.finalize = ucc_dt_check_schedule_finalize;
     return &schedule->super;
 
-error_allgather_wrapper:
-    ucc_mpool_put(allgather_wrapper);  /* Return to pool, not free */
+error_allreduce_wrapper:
+    ucc_mpool_put(allreduce_wrapper);  /* Return to pool, not free */
 error_schedule:
     ucc_coll_task_destruct(&schedule->super);
     ucc_free(schedule);
@@ -748,12 +728,15 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
 
     /* Setup non-blocking datatype check for rooted collectives
      *
-     * This implements transparent validation using a schedule with three tasks:
-     * 1. Service allgather task: gathers datatypes from all ranks
-     * 2. Validation task: validates the gathered datatypes
-     * 3. Actual collective task: the real gather/scatter operation
+     * This implements transparent validation using a schedule with two tasks:
+     * 1. Allreduce validation task: uses MIN reduction with min/max trick to detect mismatches
+     * 2. Actual collective task: the real gather/scatter operation
      *
-     * Dependencies: allgather → validation → actual task
+     * Validation uses allreduce (MIN) on [dt, -dt, mem, -mem]:
+     *   - Message size: constant 4 int64_t values (doesn't scale with number of ranks)
+     *   - After reduction: min(dt) == -min(-dt) means all ranks have same datatype
+     *
+     * Dependencies: allreduce validation → actual task
      * If validation fails, the dependency mechanism prevents the actual task from posting.
      */
     if (coll_args->coll_type == UCC_COLL_TYPE_GATHER ||
@@ -775,9 +758,6 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
                 ucc_error("failed to create dt_check schedule");
                 /* Clean up dt_check state before going to coll_finalize */
                 if (task->dt_check) {
-                    if (task->dt_check->gathered_values) {
-                        ucc_free(task->dt_check->gathered_values);
-                    }
                     ucc_free(task->dt_check);
                     task->dt_check = NULL;
                 }
