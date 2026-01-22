@@ -1,11 +1,12 @@
 /**
-* Copyright (c) NVIDIA CORPORATION & AFFILIATES, 2001-2024. ALL RIGHTS RESERVED.
-* Copyright (C) ARM Ltd. 2016.  ALL RIGHTS RESERVED.
-* Copyright (C) Shanghai Zhaoxin Semiconductor Co., Ltd. 2020. ALL RIGHTS RESERVED.
-* Copyright (C) Rivos Inc. 2023
-*
-* See file LICENSE for terms.
-*/
+ * Copyright (c) NVIDIA CORPORATION & AFFILIATES, 2001-2024. ALL RIGHTS RESERVED.
+ * Copyright (C) ARM Ltd. 2016.  ALL RIGHTS RESERVED.
+ * Copyright (C) Shanghai Zhaoxin Semiconductor Co., Ltd. 2020. ALL RIGHTS RESERVED.
+ * Copyright (C) Rivos Inc. 2023
+ * Copyright (C) 2026,      Fujitsu Limited. ALL RIGHTS RESERVED.
+ *
+ * See file LICENSE for terms.
+ */
 
 #ifndef UCC_ARCH_CPU_H
 #define UCC_ARCH_CPU_H
@@ -36,6 +37,8 @@ typedef enum ucc_cpu_model {
     UCC_CPU_MODEL_ZHAOXIN_WUDAOKOU,
     UCC_CPU_MODEL_ZHAOXIN_LUJIAZUI,
     UCC_CPU_MODEL_NVIDIA_GRACE,
+    UCC_CPU_MODEL_FUJITSU_A64FX,
+    UCC_CPU_MODEL_FUJITSU_MONAKA,
     UCC_CPU_MODEL_LAST
 } ucc_cpu_model_t;
 
@@ -108,6 +111,10 @@ static inline ucc_cpu_model_t ucc_get_model_from_str(const char *m_name)
         return UCC_CPU_MODEL_ZHAOXIN_LUJIAZUI;
     if (strcasecmp(m_name, "grace") == 0)
         return UCC_CPU_MODEL_NVIDIA_GRACE;
+    if (strcasecmp(m_name, "a64fx") == 0)
+        return UCC_CPU_MODEL_FUJITSU_A64FX;
+    if (strcasecmp(m_name, "monaka") == 0)
+        return UCC_CPU_MODEL_FUJITSU_MONAKA;
     return UCC_CPU_MODEL_UNKNOWN;
 }
 
