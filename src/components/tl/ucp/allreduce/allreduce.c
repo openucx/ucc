@@ -32,7 +32,7 @@ ucc_base_coll_alg_info_t
         [UCC_TL_UCP_ALLREDUCE_ALG_RING] =
             {.id   = UCC_TL_UCP_ALLREDUCE_ALG_RING,
              .name = "ring",
-             .desc = "ring-based allreduce (optimized for BW and simple topologies)"},
+             .desc = "ring-based allreduce using reduce-scatter + allgather"},
         [UCC_TL_UCP_ALLREDUCE_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 

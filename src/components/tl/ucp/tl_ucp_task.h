@@ -219,17 +219,6 @@ typedef struct ucc_tl_ucp_task {
             uint32_t                tokens;
             uint32_t                npolls;
         } alltoall_onesided;
-        struct {
-            void                   *scratch;
-            ucc_mc_buffer_header_t *scratch_mc_header;
-            ucc_ee_executor_task_t *etask;
-            ucc_ee_executor_t      *executor;
-            ucc_tl_ucp_copy_task_t *copy_task;
-            int                     phase;
-            int                     step;
-            size_t                  chunk_size;
-            int                     p2p_posted;
-        } allreduce_ring;
         char                        plugin_data[UCC_TL_UCP_TASK_PLUGIN_MAX_DATA];
     };
     uint32_t flush_posted;
