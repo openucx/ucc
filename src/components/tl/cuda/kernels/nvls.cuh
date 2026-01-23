@@ -81,6 +81,64 @@ struct NvlsBf16Ops {
         MULTIMEM_ST_BF16(v, ptr);
     }
 };
+
+struct NvlsInt32Ops {
+    __device__ static inline void ld(uint4 &v, const uint32_t *ptr) {
+        asm("multimem.ld_reduce.global.add.v4.s32 {%0,%1,%2,%3}, [%4];"
+            : "=r"(v.x), "=r"(v.y), "=r"(v.z), "=r"(v.w)
+            : "l"(ptr)
+            : "memory");
+    }
+    __device__ static inline void st(const uint4 &v, uint32_t *ptr) {
+        asm volatile("multimem.st.global.v4.s32 [%0], {%1,%2,%3,%4};" ::"l"(ptr),
+                     "r"(v.x), "r"(v.y), "r"(v.z), "r"(v.w)
+                     : "memory");
+    }
+};
+
+struct NvlsInt64Ops {
+    __device__ static inline void ld(ulonglong2 &v1, ulonglong2 &v2, const uint64_t *ptr) {
+        asm("multimem.ld_reduce.global.add.v2.s64 {%0,%1}, [%2];"
+            : "=l"(v1.x), "=l"(v1.y) : "l"(ptr) : "memory");
+        asm("multimem.ld_reduce.global.add.v2.s64 {%0,%1}, [%2+16];"
+            : "=l"(v2.x), "=l"(v2.y) : "l"(ptr) : "memory");
+    }
+    __device__ static inline void st(const ulonglong2 &v1, const ulonglong2 &v2, uint64_t *ptr) {
+        asm volatile("multimem.st.global.v2.s64 [%0], {%1,%2};" ::"l"(ptr),
+                     "l"(v1.x), "l"(v1.y) : "memory");
+        asm volatile("multimem.st.global.v2.s64 [%0+16], {%1,%2};" ::"l"(ptr),
+                     "l"(v2.x), "l"(v2.y) : "memory");
+    }
+};
+
+struct NvlsUint32Ops {
+    __device__ static inline void ld(uint4 &v, const uint32_t *ptr) {
+        asm("multimem.ld_reduce.global.add.v4.u32 {%0,%1,%2,%3}, [%4];"
+            : "=r"(v.x), "=r"(v.y), "=r"(v.z), "=r"(v.w)
+            : "l"(ptr)
+            : "memory");
+    }
+    __device__ static inline void st(const uint4 &v, uint32_t *ptr) {
+        asm volatile("multimem.st.global.v4.u32 [%0], {%1,%2,%3,%4};" ::"l"(ptr),
+                     "r"(v.x), "r"(v.y), "r"(v.z), "r"(v.w)
+                     : "memory");
+    }
+};
+
+struct NvlsUint64Ops {
+    __device__ static inline void ld(ulonglong2 &v1, ulonglong2 &v2, const uint64_t *ptr) {
+        asm("multimem.ld_reduce.global.add.v2.u64 {%0,%1}, [%2];"
+            : "=l"(v1.x), "=l"(v1.y) : "l"(ptr) : "memory");
+        asm("multimem.ld_reduce.global.add.v2.u64 {%0,%1}, [%2+16];"
+            : "=l"(v2.x), "=l"(v2.y) : "l"(ptr) : "memory");
+    }
+    __device__ static inline void st(const ulonglong2 &v1, const ulonglong2 &v2, uint64_t *ptr) {
+        asm volatile("multimem.st.global.v2.u64 [%0], {%1,%2};" ::"l"(ptr),
+                     "l"(v1.x), "l"(v1.y) : "memory");
+        asm volatile("multimem.st.global.v2.u64 [%0+16], {%1,%2};" ::"l"(ptr),
+                     "l"(v2.x), "l"(v2.y) : "memory");
+    }
+};
 #endif // __cplusplus
 
 #endif // UCC_TL_CUDA_NVLS_CUH_
