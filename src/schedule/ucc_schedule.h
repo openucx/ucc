@@ -80,14 +80,15 @@ typedef struct ucc_service_coll_req ucc_service_coll_req_t;
  *   - Send [dt, -dt, mem, -mem] with MIN reduction
  *   - After reduction: if min(dt) == -min(-dt), all ranks have same dt
  *   - Same principle for memory type
- *   - Message size: constant 4 integers (doesn't scale with number of ranks)
+ *   - Message size: 8 bytes (4 × int16, doesn't scale with number of ranks)
+ *   - Optimized for predefined datatypes only (max value 136 fits in int16)
  *
  * If validation fails, the dependency mechanism prevents the actual task from posting.
  */
 typedef struct ucc_dt_check_state {
     ucc_service_coll_req_t *check_req;        /* Service allreduce request */
-    int64_t                 reduced_values[4];/* Result: [min(dt), min(-dt), min(mem), min(-mem)] */
-    int64_t                 local_values[4];  /* Local: [dt, -dt, mem, -mem] */
+    int16_t                 reduced_values[4];/* Result: [min(dt), min(-dt), min(mem), min(-mem)] */
+    int16_t                 local_values[4];  /* Local: [dt, -dt, mem, -mem] */
     ucc_subset_t            subset;           /* Subset for service allreduce */
     int                     validated;        /* 1 if validation passed, 0 if failed */
     struct ucc_coll_task   *actual_task;      /* Pointer to actual collective task */

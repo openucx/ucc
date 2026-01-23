@@ -134,16 +134,25 @@ static ucc_status_t ucc_dt_check_start_validation(ucc_coll_task_t *task)
     }
     memset(dt_check, 0, sizeof(ucc_dt_check_state_t));
     task->dt_check = dt_check;
-    /* Setup local values for min/max trick: [dt, -dt, mem, -mem] */
-    if (is_contig) {
-        dt_check->local_values[0] = (int64_t) local_dt;
-        dt_check->local_values[1] = -(int64_t) local_dt;
+    /* Setup local values for min/max trick: [dt, -dt, mem, -mem]
+     * Note: Only predefined datatypes are supported (max value 136 fits in int16).
+     * Generic datatypes use 64-bit pointers and would overflow int16, so we
+     * explicitly reject them here to prevent overflow from user arguments. */
+    if (!UCC_DT_IS_PREDEFINED(local_dt)) {
+        /* Generic or invalid datatype - reject to prevent int16 overflow */
+        dt_check->local_values[0] = (int16_t) UCC_ERR_NOT_SUPPORTED;
+        dt_check->local_values[1] = -(int16_t) UCC_ERR_NOT_SUPPORTED;
+    } else if (is_contig) {
+        /* Predefined contiguous datatype - safe to cast to int16 */
+        dt_check->local_values[0] = (int16_t) local_dt;
+        dt_check->local_values[1] = -(int16_t) local_dt;
     } else {
-        dt_check->local_values[0] = (int64_t) UCC_ERR_NOT_SUPPORTED;
-        dt_check->local_values[1] = -(int64_t) UCC_ERR_NOT_SUPPORTED;
+        /* Predefined but non-contiguous datatype */
+        dt_check->local_values[0] = (int16_t) UCC_ERR_NOT_SUPPORTED;
+        dt_check->local_values[1] = -(int16_t) UCC_ERR_NOT_SUPPORTED;
     }
-    dt_check->local_values[2] = (int64_t) local_mem_type;
-    dt_check->local_values[3] = -(int64_t) local_mem_type;
+    dt_check->local_values[2] = (int16_t) local_mem_type;
+    dt_check->local_values[3] = -(int16_t) local_mem_type;
     /* Setup subset for full team - will be used when service allreduce is posted */
     dt_check->subset.myrank = team->rank;
     dt_check->subset.map.type = UCC_EP_MAP_FULL;
@@ -173,7 +182,7 @@ out:
 static ucc_status_t ucc_dt_validate_results(ucc_coll_task_t *task)
 {
     ucc_dt_check_state_t *dt_check = task->dt_check;
-    int64_t              *reduced;
+    int16_t              *reduced;
 
     /* Safety checks */
     if (!dt_check) {
@@ -181,7 +190,7 @@ static ucc_status_t ucc_dt_validate_results(ucc_coll_task_t *task)
     }
     reduced = dt_check->reduced_values;
     /* Check if any rank has non-contiguous datatype */
-    if (reduced[0] == (int64_t) UCC_ERR_NOT_SUPPORTED) {
+    if (reduced[0] == (int16_t) UCC_ERR_NOT_SUPPORTED) {
         return UCC_ERR_NOT_SUPPORTED;
     }
     /* Check if all ranks have the same datatype using min/max trick */
@@ -212,10 +221,10 @@ static ucc_status_t ucc_dt_check_allreduce_post(ucc_coll_task_t *allreduce_wrapp
         return UCC_ERR_INVALID_PARAM;
     }
 
-    /* Start service allreduce with MIN operation on 4 int64_t values */
+    /* Start service allreduce with MIN operation on 4 int16_t values */
     status = ucc_service_allreduce(team, dt_check->local_values,
                                    dt_check->reduced_values,
-                                   UCC_DT_INT64, 4, UCC_OP_MIN,
+                                   UCC_DT_INT16, 4, UCC_OP_MIN,
                                    dt_check->subset, &dt_check->check_req);
     if (status != UCC_OK) {
         allreduce_wrapper->status = status;
@@ -733,7 +742,7 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
      * 2. Actual collective task: the real gather/scatter operation
      *
      * Validation uses allreduce (MIN) on [dt, -dt, mem, -mem]:
-     *   - Message size: constant 4 int64_t values (doesn't scale with number of ranks)
+     *   - Message size: 8 bytes (4 × int16_t, doesn't scale with number of ranks)
      *   - After reduction: min(dt) == -min(-dt) means all ranks have same datatype
      *
      * Dependencies: allreduce validation → actual task
