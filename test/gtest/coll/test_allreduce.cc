@@ -290,7 +290,15 @@ template<typename T>
 class test_allreduce_alg : public test_allreduce<T>
 {};
 
-using test_allreduce_alg_type = ::testing::Types<TypeOpPair<UCC_DT_INT32, sum>>;
+// Expanded type list for allreduce algorithm tests to cover more data types and operations
+using test_allreduce_alg_type = ::testing::Types<
+    TypeOpPair<UCC_DT_INT32, sum>,
+    TypeOpPair<UCC_DT_FLOAT32, sum>,
+    TypeOpPair<UCC_DT_INT32, prod>,
+    TypeOpPair<UCC_DT_INT32, max>,
+    TypeOpPair<UCC_DT_INT32, min>,
+    TypeOpPair<UCC_DT_FLOAT64, sum>
+>;
 TYPED_TEST_CASE(test_allreduce_alg, test_allreduce_alg_type);
 
 TYPED_TEST(test_allreduce_alg, sra_knomial_pipelined) {
@@ -435,6 +443,92 @@ TYPED_TEST(test_allreduce_alg, rab_pipelined) {
             }
         }
     }
+}
+
+TYPED_TEST(test_allreduce_alg, ring) {
+    int           n_procs = 15;
+    ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
+                             {"UCC_TL_UCP_TUNE", "allreduce:0-inf:@ring"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    int           repeat = 3;
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);
+    }
+
+    // Test with various data sizes: small, medium, large
+    for (auto count : {8, 65536, 123567}) {
+        for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
+            for (auto m : mt) {
+                SET_MEM_TYPE(m);
+                this->set_inplace(inplace);
+                this->data_init(n_procs, TypeParam::dt, count, ctxs, true);
+                UccReq req(team, ctxs);
+
+                for (auto i = 0; i < repeat; i++) {
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, this->data_validate(ctxs));
+                    this->reset(ctxs);
+                }
+                this->data_fini(ctxs);
+            }
+        }
+    }
+}
+
+TYPED_TEST(test_allreduce_alg, ring_edge_cases) {
+    // Test with non-power-of-two team sizes and edge cases
+    for (auto team_size : {3, 7, 13}) {
+        ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
+                                 {"UCC_TL_UCP_TUNE", "allreduce:0-inf:@ring"}};
+        UccJob        job(team_size, UccJob::UCC_JOB_CTX_GLOBAL, env);
+        UccTeam_h     team = job.create_team(team_size);
+        UccCollCtxVec ctxs;
+
+        for (auto count : {0, 1, 3, 17}) {
+            SET_MEM_TYPE(UCC_MEMORY_TYPE_HOST);
+            this->set_inplace(TEST_NO_INPLACE);
+            this->data_init(team_size, TypeParam::dt, count, ctxs, false);
+            UccReq req(team, ctxs);
+
+            req.start();
+            req.wait();
+            EXPECT_EQ(true, this->data_validate(ctxs));
+            this->data_fini(ctxs);
+        }
+    }
+}
+
+TYPED_TEST(test_allreduce_alg, ring_persistent) {
+    // Test persistent operation - results should be consistent across multiple calls
+    int           n_procs = 8;
+    ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
+                             {"UCC_TL_UCP_TUNE", "allreduce:0-inf:@ring"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    UccCollCtxVec ctxs;
+
+    SET_MEM_TYPE(UCC_MEMORY_TYPE_HOST);
+    this->set_inplace(TEST_NO_INPLACE);
+    // Use a larger buffer for persistent test
+    size_t count = 1024;
+    this->data_init(n_procs, TypeParam::dt, count, ctxs, true);
+    UccReq req(team, ctxs);
+    // Run multiple iterations to verify persistence
+    for (int i = 0; i < 5; i++) {
+        req.start();
+        req.wait();
+        EXPECT_EQ(true, this->data_validate(ctxs));
+        this->reset(ctxs);
+    }
+    this->data_fini(ctxs);
 }
 
 #ifdef HAVE_UCX
