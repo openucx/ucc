@@ -731,7 +731,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
     
     if (config->node_local_id == UCC_ULUNITS_AUTO) {
-        if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&params->oob.n_oob_eps > 1) {
+        if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB && params->oob.n_oob_eps > 1) {
             do {
                 /* UCC context create is blocking fn, so we can wait here for the
                 completion of addr exchange */
