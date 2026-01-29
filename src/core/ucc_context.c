@@ -752,15 +752,15 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
             }
             ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
 
-            ucc_subset_t set;
-            ucc_topo_t  *topo = NULL;
-            
-            memset(&set.map, 0, sizeof(ucc_ep_map_t));
-            set.map.type   = UCC_EP_MAP_FULL;
-            set.myrank     = params->oob.oob_ep;
-            set.map.ep_num = params->oob.n_oob_eps;
-            
             if (ctx->topo) {
+                ucc_subset_t set;
+                ucc_topo_t  *topo = NULL;
+                
+                memset(&set.map, 0, sizeof(ucc_ep_map_t));
+                set.map.type   = UCC_EP_MAP_FULL;
+                set.myrank     = params->oob.oob_ep;
+                set.map.ep_num = params->oob.n_oob_eps;
+            
                 status = ucc_topo_init(set, ctx->topo, &topo);
                 if (UCC_OK != status) {
                     ucc_warn("failed to init topo for computing local rank");
