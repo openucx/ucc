@@ -68,6 +68,83 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_nccl_team_t)
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_nccl_team_t, ucc_base_team_t);
 UCC_CLASS_DEFINE(ucc_tl_nccl_team_t, ucc_tl_team_t);
 
+/* Before destroying a communicator, remove it from every open memory handle
+ * that was registered against it.  This prevents use-after-free in mem_unmap
+ * and avoids calling ncclCommDeregister on a freed ncclComm_t.
+ *
+ * ncclCommDeregister is a potentially slow NCCL/CUDA call that must NOT be
+ * made while holding a spinlock.  We therefore collect all (comm, handle)
+ * pairs under the locks, null the slots, release both locks, and only then
+ * call ncclCommDeregister. */
+static void ucc_tl_nccl_team_deregister_memhs(ucc_tl_nccl_team_t *team)
+{
+#if NCCL_HAS_UBR
+    ucc_tl_nccl_context_t   *ctx = UCC_TL_NCCL_TEAM_CTX(team);
+    ucc_tl_nccl_memh_data_t *m_data;
+    int                      i, n = 0, capacity = 8;
+    int                      oom = 0;
+    struct {
+        ncclComm_t  comm;
+        void       *handle;
+    }                       *pending, *tmp;
+
+    pending = ucc_malloc(capacity * sizeof(*pending), "nccl_deregister_list");
+    if (!pending) {
+        tl_error(ctx->super.super.lib,
+                 "NCCL UBR: OOM allocating deregistration list; slots will be "
+                 "nulled and ncclCommDestroy will release handles");
+        oom      = 1;
+        capacity = 0;
+    }
+
+    /* Always walk every m_data and null every matching slot regardless of OOM.
+     * Nulling prevents mem_unmap from calling ncclCommDeregister on a comm
+     * that is about to be destroyed.  Pairs we cannot store in the pending
+     * buffer are handled implicitly by the subsequent ncclCommDestroy call. */
+    ucc_spin_lock(&ctx->memh_lock);
+    ucc_list_for_each(m_data, &ctx->memh_list, list_elem) {
+        ucc_spin_lock(&m_data->lock);
+        for (i = 0; i < m_data->num_comms; i++) {
+            if (m_data->registered_comms[i] == team->nccl_comm) {
+                if (!oom && n == capacity) {
+                    capacity *= 2;
+                    tmp = ucc_realloc(pending, capacity * sizeof(*pending),
+                                      "nccl_deregister_list");
+                    if (!tmp) {
+                        tl_error(ctx->super.super.lib,
+                                 "NCCL UBR: OOM growing deregistration list; "
+                                 "remaining handles released by ncclCommDestroy");
+                        oom = 1;
+                    } else {
+                        pending = tmp;
+                    }
+                }
+                if (!oom) {
+                    pending[n].comm   = m_data->registered_comms[i];
+                    pending[n].handle = m_data->nccl_handles[i];
+                    n++;
+                }
+                /* Null unconditionally so mem_unmap skips this slot. */
+                m_data->registered_comms[i] = NULL;
+                m_data->nccl_handles[i]     = NULL;
+                break;
+            }
+        }
+        ucc_spin_unlock(&m_data->lock);
+    }
+    ucc_spin_unlock(&ctx->memh_lock);
+
+    /* Explicitly deregister the pairs we collected; any not collected due to
+     * OOM are cleaned up by the subsequent ncclCommDestroy. */
+    for (i = 0; i < n; i++) {
+        ncclCommDeregister(pending[i].comm, pending[i].handle);
+    }
+    ucc_free(pending); /* free(NULL) is safe when initial malloc failed */
+#else
+    (void)team;
+#endif
+}
+
 ucc_status_t ucc_tl_nccl_team_destroy(ucc_base_team_t *tl_team)
 {
     ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
@@ -85,6 +162,8 @@ ucc_status_t ucc_tl_nccl_team_destroy(ucc_base_team_t *tl_team)
         team->stream = NULL;
     }
     if (team->nccl_comm) {
+        /* Deregister from all open memory handles before the comm is freed */
+        ucc_tl_nccl_team_deregister_memhs(team);
         if (team->comm_state == TL_NCCL_COMM_STATE_ERROR) {
             ncclCommAbort(team->nccl_comm);
         } else {
