@@ -753,7 +753,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                 }
                 ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
 
-                // clean up addr_storage
+                /* clean up addr_storage */
                 ucc_free(ctx->addr_storage.storage);
                 ctx->addr_storage.storage = NULL;
                 ctx->addr_storage.addr_len = 0;
