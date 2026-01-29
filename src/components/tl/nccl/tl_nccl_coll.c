@@ -9,6 +9,7 @@
 #include "components/mc/ucc_mc.h"
 #include "components/ec/ucc_ec.h"
 #include "core/ucc_ee.h"
+#include "core/ucc_context.h"
 #include "utils/ucc_compiler_def.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
@@ -127,6 +128,143 @@ static inline ucc_status_t ucc_tl_nccl_check_and_convert_buffer_reduction(
     return UCC_OK;
 }
 
+#if NCCL_HAS_UBR
+/* Helper function to lazily register a memory region with NCCL communicator */
+static inline ucc_status_t ucc_tl_nccl_lazy_register_memh(
+    void *buffer, size_t length, ucc_tl_nccl_team_t *team,
+    ucc_mem_map_mem_h memh)
+{
+    ucc_tl_nccl_context_t   *ctx = UCC_TL_NCCL_TEAM_CTX(team);
+    ucc_tl_nccl_memh_data_t *m_data;
+    ucc_mem_map_memh_t      *mem_handle;
+    ncclResult_t             nccl_status;
+    ncclComm_t              *new_comms;
+    void                   **new_handles;
+    void                    *nccl_handle;
+    int                      i, new_max;
+    uintptr_t                buf_start, buf_end, region_start, region_end;
+
+    tl_debug(UCC_TL_TEAM_LIB(team),
+             "NCCL UBR: lazy_register_memh ENTRY: buf=%p, len=%zu, memh=%p",
+             buffer, length, memh);
+
+    /* Skip if UBR is not available or memh not provided */
+    if (!ctx->ubr_available || !memh) {
+        tl_debug(UCC_TL_TEAM_LIB(team),
+                 "NCCL UBR: SKIP - ubr_available=%d, memh=%p",
+                 ctx->ubr_available, memh);
+        return UCC_OK;
+    }
+
+    mem_handle = (ucc_mem_map_memh_t *)memh;
+    tl_debug(UCC_TL_TEAM_LIB(team),
+             "NCCL UBR: searching for nccl in %d TLs", mem_handle->num_tls);
+    
+    m_data     = NULL;
+    for (i = 0; i < mem_handle->num_tls; i++) {
+        tl_debug(UCC_TL_TEAM_LIB(team),
+                 "NCCL UBR: checking TL[%d]: name='%s'", i, mem_handle->tl_h[i].tl_name);
+        if (strcmp(mem_handle->tl_h[i].tl_name, "nccl") == 0) {
+            m_data = (ucc_tl_nccl_memh_data_t *)mem_handle->tl_h[i].tl_data;
+            tl_debug(UCC_TL_TEAM_LIB(team),
+                     "NCCL UBR: found nccl TL, m_data=%p", m_data);
+            break;
+        }
+    }
+
+    if (!m_data) {
+        /* No NCCL memh data - buffer not registered with TL/NCCL */
+        tl_debug(UCC_TL_TEAM_LIB(team),
+                 "NCCL UBR: NO nccl memh_data found - skipping");
+        return UCC_OK;
+    }
+
+    /* Verify that the entire buffer is within the registered memory region */
+    buf_start    = (uintptr_t)buffer;
+    buf_end      = buf_start + length;
+    region_start = (uintptr_t)m_data->address;
+    region_end   = region_start + m_data->length;
+
+    if (buf_start < region_start || buf_end > region_end) {
+        tl_error(
+            UCC_TL_TEAM_LIB(team),
+            "NCCL UBR: buffer [%p, %p) is outside registered region [%p, %p)",
+            buffer,
+            (void *)buf_end,
+            m_data->address,
+            (void *)region_end);
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    /* Check if already registered with this communicator */
+    for (i = 0; i < m_data->num_comms; i++) {
+        if (m_data->registered_comms[i] == team->nccl_comm) {
+            /* Already registered */
+            return UCC_OK;
+        }
+    }
+
+    /* Need to register the memory region with this communicator */
+    nccl_status = ncclCommRegister(
+        team->nccl_comm, m_data->address, m_data->length, &nccl_handle);
+    if (nccl_status != ncclSuccess) {
+        tl_warn(
+            UCC_TL_TEAM_LIB(team),
+            "NCCL UBR: failed to register region %p, size %zu: %s",
+            m_data->address,
+            m_data->length,
+            ncclGetErrorString(nccl_status));
+        /* Don't fail - UBR is an optimization */
+        return UCC_OK;
+    }
+
+    /* Add this comm and handle to the registered lists */
+    if (m_data->num_comms >= m_data->max_comms) {
+        /* Need to grow the arrays */
+        new_max   = (m_data->max_comms == 0) ? 4 : (m_data->max_comms * 2);
+        new_comms = (ncclComm_t *)ucc_realloc(
+            m_data->registered_comms,
+            new_max * sizeof(ncclComm_t),
+            "nccl_registered_comms");
+        if (!new_comms) {
+            tl_error(
+                UCC_TL_TEAM_LIB(team),
+                "failed to allocate memory for registered comms array");
+            /* Buffer is registered but we can't track it - this is a problem */
+            return UCC_ERR_NO_MEMORY;
+        }
+        m_data->registered_comms = new_comms;
+
+        new_handles              = (void **)ucc_realloc(
+            m_data->nccl_handles, new_max * sizeof(void *), "nccl_handles");
+        if (!new_handles) {
+            tl_error(
+                UCC_TL_TEAM_LIB(team),
+                "failed to allocate memory for NCCL handles array");
+            return UCC_ERR_NO_MEMORY;
+        }
+        m_data->nccl_handles = new_handles;
+        m_data->max_comms    = new_max;
+    }
+
+    m_data->registered_comms[m_data->num_comms] = team->nccl_comm;
+    m_data->nccl_handles[m_data->num_comms]     = nccl_handle;
+    m_data->num_comms++;
+
+    tl_debug(
+        UCC_TL_TEAM_LIB(team),
+        "NCCL UBR: lazily registered region %p, size %zu with comm %p "
+        "(for buffer [%p, %p))",
+        m_data->address,
+        m_data->length,
+        team->nccl_comm,
+        buffer,
+        (void *)buf_end);
+
+    return UCC_OK;
+}
+#endif
+
 ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t *team,
                                    ucc_tl_nccl_task_t **coll_task)
@@ -175,6 +313,77 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
             return status;
         }
     }
+
+#if NCCL_HAS_UBR
+    /* Lazily register memory regions if they were pre-mapped and UBR is enabled */
+    if (nccl_ctx->ubr_available) {
+        ucc_mem_map_mem_h src_memh = NULL;
+        ucc_mem_map_mem_h dst_memh = NULL;
+        ucc_rank_t        grank    = UCC_TL_TEAM_RANK(nccl_team);
+        
+        tl_debug(team->context->lib, 
+                 "NCCL UBR: checking for memh in init_task, mask=0x%lx, flags=0x%lx",
+                 (unsigned long)coll_args->args.mask,
+                 (coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) ? 
+                     (unsigned long)coll_args->args.flags : 0UL);
+        
+        /* Register source buffer's memory region if memh provided */
+        if (coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH) {
+            /* Check if global or local memh */
+            if ((coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
+                (coll_args->args.flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)) {
+                src_memh = coll_args->args.src_memh.global_memh[grank];
+                tl_debug(team->context->lib,
+                         "NCCL UBR: using global_memh[%d]=%p for src", grank, src_memh);
+            } else {
+                src_memh = coll_args->args.src_memh.local_memh;
+                tl_debug(team->context->lib,
+                         "NCCL UBR: using local_memh=%p for src", src_memh);
+            }
+            
+            tl_debug(team->context->lib,
+                     "NCCL UBR: calling lazy_register for src buffer %p, size %zu",
+                     coll_args->args.src.info.buffer,
+                     coll_args->args.src.info.count *
+                         ucc_dt_size(coll_args->args.src.info.datatype));
+            
+            status = ucc_tl_nccl_lazy_register_memh(
+                coll_args->args.src.info.buffer,
+                coll_args->args.src.info.count *
+                    ucc_dt_size(coll_args->args.src.info.datatype),
+                nccl_team,
+                src_memh);
+            if (ucc_unlikely(status != UCC_OK)) {
+                tl_error(team->context->lib,
+                         "NCCL UBR: lazy_register failed with status %d", status);
+                ucc_mpool_put(task);
+                return status;
+            }
+        }
+
+        /* Register destination buffer's memory region if memh provided */
+        if (coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH) {
+            /* Check if global or local memh */
+            if ((coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
+                (coll_args->args.flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)) {
+                dst_memh = coll_args->args.dst_memh.global_memh[grank];
+            } else {
+                dst_memh = coll_args->args.dst_memh.local_memh;
+            }
+            
+            status = ucc_tl_nccl_lazy_register_memh(
+                coll_args->args.dst.info.buffer,
+                coll_args->args.dst.info.count *
+                    ucc_dt_size(coll_args->args.dst.info.datatype),
+                nccl_team,
+                dst_memh);
+            if (ucc_unlikely(status != UCC_OK)) {
+                ucc_mpool_put(task);
+                return status;
+            }
+        }
+    }
+#endif
 
     *coll_task = task;
     return UCC_OK;
