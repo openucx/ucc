@@ -731,36 +731,27 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
     
     if (config->node_local_id == UCC_ULUNITS_AUTO) {
-        if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
-            if (params->oob.n_oob_eps > 1) {
-                do {
-                    /* UCC context create is blocking fn, so we can wait here for the
-                    completion of addr exchange */
-                    status = ucc_core_ctx_id_exchange(ctx, &ctx->params.oob,
-                                                    &ctx->addr_storage);
-                    if (status < 0) {
-                        ucc_error("failed to exchange addresses during context "
-                                "creation with status: %s",
-                                ucc_status_string(status));
-                        goto error_ctx_create;
-                    }
-                } while (status == UCC_INPROGRESS);
-                status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
-                if (UCC_OK != status) {
-                    ucc_free(ctx->addr_storage.storage);
-                    ucc_error("failed to init ctx topo");
+        if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&params->oob.n_oob_eps > 1) {
+            do {
+                /* UCC context create is blocking fn, so we can wait here for the
+                completion of addr exchange */
+                status = ucc_core_ctx_id_exchange(ctx, &ctx->params.oob,
+                                                &ctx->addr_storage);
+                if (status < 0) {
+                    ucc_error("failed to exchange addresses during context "
+                            "creation with status: %s",
+                            ucc_status_string(status));
                     goto error_ctx_create;
                 }
-                ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
-
-                /* clean up addr_storage */
+            } while (status == UCC_INPROGRESS);
+            status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
+            if (UCC_OK != status) {
                 ucc_free(ctx->addr_storage.storage);
-                ctx->addr_storage.storage = NULL;
-                ctx->addr_storage.addr_len = 0;
-                ctx->addr_storage.size = 0;
-                ctx->addr_storage.rank = UCC_RANK_MAX;
-                ctx->addr_storage.flags = 0;
+                ucc_error("failed to init ctx topo");
+                goto error_ctx_create;
             }
+            ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
+
             ucc_subset_t set;
             ucc_topo_t  *topo = NULL;
             
@@ -778,6 +769,14 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                     ucc_topo_cleanup(topo);
                 }
             }
+
+            /* clean up addr_storage */
+            ucc_free(ctx->addr_storage.storage);
+            ctx->addr_storage.storage = NULL;
+            ctx->addr_storage.addr_len = 0;
+            ctx->addr_storage.size = 0;
+            ctx->addr_storage.rank = UCC_RANK_MAX;
+            ctx->addr_storage.flags = 0;
         }
     }
     
