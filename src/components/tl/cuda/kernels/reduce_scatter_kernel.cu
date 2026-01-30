@@ -47,6 +47,37 @@ __global__ void __launch_bounds__(UCC_TL_CUDA_MAX_NVLS_THREADS)
         total_blocks * (launch_counter * 2 + 2));
 }
 
+__global__ void __launch_bounds__(UCC_TL_CUDA_MAX_NVLS_THREADS)
+    reduce_scatter_kernel_vec64(
+        ucc_tl_cuda_nvls_control_t *mc_bar, ucc_tl_cuda_nvls_control_t *uc_bar,
+        const uint32_t total_blocks, uint64_t launch_counter,
+        uint64_t *base_u64, size_t offset, size_t count, uint64_t *dst_u64)
+{
+    // pre barrier
+    nvls_bar(
+        &(mc_bar->arrival_counter),
+        &(uc_bar->arrival_counter),
+        total_blocks * (launch_counter * 2 + 1));
+
+    size_t thread_offset = (threadIdx.x + blockIdx.x * blockDim.x) * 4;
+    size_t stride        = blockDim.x * gridDim.x * 4;
+
+    for (size_t idx = offset + thread_offset; idx < offset + count;
+         idx += stride) {
+        ulonglong2 val1, val2;
+        NvlsInt64Ops::ld(val1, val2, base_u64 + idx);
+        uint64_t *dst = dst_u64 + (idx - offset);
+        reinterpret_cast<ulonglong2 *>(dst)[0] = val1;
+        reinterpret_cast<ulonglong2 *>(dst)[1] = val2;
+    }
+
+    // post barrier
+    nvls_bar(
+        &(mc_bar->arrival_counter),
+        &(uc_bar->arrival_counter),
+        total_blocks * (launch_counter * 2 + 2));
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -100,6 +131,54 @@ ucc_status_t post_reduce_scatter_kernel(
                 offset,
                 count,
                 reinterpret_cast<uint32_t *>(dst_ptr));
+        break;
+    case UCC_DT_INT32:
+        reduce_scatter_kernel_vec32<NvlsInt32Ops>
+            <<<sm_count, threads, 0, stream>>>(
+                mc_bar,
+                uc_bar,
+                expected_blocks,
+                launch_counter,
+                base_u32,
+                offset,
+                count,
+                reinterpret_cast<uint32_t *>(dst_ptr));
+        break;
+    case UCC_DT_UINT32:
+        reduce_scatter_kernel_vec32<NvlsUint32Ops>
+            <<<sm_count, threads, 0, stream>>>(
+                mc_bar,
+                uc_bar,
+                expected_blocks,
+                launch_counter,
+                base_u32,
+                offset,
+                count,
+                reinterpret_cast<uint32_t *>(dst_ptr));
+        break;
+    case UCC_DT_INT64:
+        reduce_scatter_kernel_vec64
+            <<<sm_count, threads, 0, stream>>>(
+                mc_bar,
+                uc_bar,
+                expected_blocks,
+                launch_counter,
+                reinterpret_cast<uint64_t *>(mc_base_addr),
+                offset,
+                count,
+                reinterpret_cast<uint64_t *>(dst_ptr));
+        break;
+    case UCC_DT_UINT64:
+        reduce_scatter_kernel_vec64
+            <<<sm_count, threads, 0, stream>>>(
+                mc_bar,
+                uc_bar,
+                expected_blocks,
+                launch_counter,
+                reinterpret_cast<uint64_t *>(mc_base_addr),
+                offset,
+                count,
+                reinterpret_cast<uint64_t *>(dst_ptr));
         break;
     default:
         return UCC_ERR_NOT_SUPPORTED;
