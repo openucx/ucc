@@ -5,6 +5,7 @@
  */
 
 #include "ec_cuda_executor.h"
+#include "components/ec/ucc_ec_log.h"
 
 ucc_status_t ucc_cuda_executor_interruptible_start(ucc_ee_executor_t *executor);
 
@@ -45,7 +46,7 @@ ucc_status_t ucc_cuda_executor_init(const ucc_ee_executor_params_t *params,
         eee->requested_ops = 1;
     }
 
-    ec_debug(&ucc_ec_cuda.super, "executor init, eee: %p", eee);
+    ec_trace(&ucc_ec_cuda.super, "executor init, eee: %p", eee);
     eee->super.ee_type = params->ee_type;
     eee->state         = UCC_EC_CUDA_EXECUTOR_INITIALIZED;
 
@@ -76,7 +77,7 @@ ucc_status_t ucc_cuda_executor_finalize(ucc_ee_executor_t *executor)
     ucc_ec_cuda_executor_t *eee = ucc_derived_of(executor,
                                                  ucc_ec_cuda_executor_t);
 
-    ec_debug(&ucc_ec_cuda.super, "executor free, eee: %p", eee);
+    ec_trace(&ucc_ec_cuda.super, "executor free, eee: %p", eee);
     ucc_assert(eee->state == UCC_EC_CUDA_EXECUTOR_INITIALIZED);
     ucc_mpool_put(eee);
 

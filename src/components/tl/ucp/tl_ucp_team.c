@@ -8,15 +8,18 @@
 #include "tl_ucp_ep.h"
 #include "tl_ucp_coll.h"
 #include "tl_ucp_sendrecv.h"
-#include "utils/ucc_malloc.h"
 #include "utils/ucc_parser.h"
-#include "utils/ucc_string.h"
 #include "coll_score/ucc_coll_score.h"
+#include "coll_patterns/ring.h"
 
 static inline ucc_status_t ucc_tl_ucp_get_topo(ucc_tl_ucp_team_t *team)
 {
     ucc_subset_t  subset;
     ucc_status_t  status;
+
+    if (UCC_TL_IS_SERVICE_TEAM(team)) {
+        return UCC_OK;
+    }
 
     status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
                                       &UCC_TL_TEAM_MAP(team),
@@ -60,6 +63,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->topo            = NULL;
     self->opt_radix       = UCC_UUNITS_AUTO_RADIX;
     self->opt_radix_host  = UCC_UUNITS_AUTO_RADIX;
+    self->cuda_ring       = NULL;
 
     status = ucc_config_clone_table(&UCC_TL_UCP_TEAM_LIB(self)->cfg, &self->cfg,
                                     ucc_tl_ucp_lib_config_table);
@@ -95,21 +99,45 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     if (self->topo && !UCC_TL_IS_SERVICE_TEAM(self)) {
         tsize = UCC_TL_TEAM_SIZE(self);
 
-        min_radix = ucc_min(tsize, 3);
-        max_radix = tsize;
+        min_radix       = ucc_min(tsize, 3);
+        max_radix       = tsize;
         self->opt_radix = ucc_kn_get_opt_radix(tsize, min_radix, max_radix);
         if (ucc_topo_is_single_ppn(self->topo)) {
             self->opt_radix_host = self->opt_radix;
         } else {
             if (self->topo->topo->sock_bound) {
                 min_radix = 2;
-                max_radix = ucc_min(tsize, ucc_topo_min_socket_size(self->topo));
-                self->opt_radix_host = ucc_kn_get_opt_radix(tsize, min_radix,
-                                                            max_radix);
+                max_radix = ucc_min(
+                    tsize, ucc_topo_min_socket_size(self->topo));
+                self->opt_radix_host = ucc_kn_get_opt_radix(
+                    tsize, min_radix, max_radix);
             }
         }
-        tl_debug(tl_context->lib, "opt knomial radix: general %d host %d",
-                 self->opt_radix, self->opt_radix_host);
+        tl_debug(
+            tl_context->lib,
+            "opt knomial radix: general %d host %d",
+            self->opt_radix,
+            self->opt_radix_host);
+
+        self->cuda_ring = ucc_calloc(1, sizeof(*self->cuda_ring), "cuda_ring");
+        if (!self->cuda_ring) {
+            tl_error(UCC_TL_TEAM_LIB(self), "failed to allocate cuda ring");
+            return UCC_ERR_NO_MEMORY;
+        }
+
+        status = ucc_ring_pattern_init_topo(
+            self->topo, UCC_MEMORY_TYPE_CUDA, 8, self->cuda_ring);
+        if (UCC_OK != status) {
+            ucc_free(self->cuda_ring);
+            self->cuda_ring = NULL;
+            tl_debug(UCC_TL_TEAM_LIB(self), "failed to init cuda ring");
+        } else {
+            ucc_ring_pattern_set_rank(self->cuda_ring,
+                                      UCC_TL_TEAM_RANK(self));
+            if (UCC_TL_TEAM_RANK(self) == 0) {
+                ucc_ring_pattern_print(self->cuda_ring);
+            }
+        }
     }
 
     tl_debug(tl_context->lib, "posted tl team: %p", self);
@@ -128,6 +156,12 @@ UCC_CLASS_DEFINE(ucc_tl_ucp_team_t, ucc_tl_team_t);
 ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 {
     ucc_tl_ucp_team_t *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
+
+    if (team->cuda_ring) {
+        ucc_ring_pattern_destroy(team->cuda_ring);
+        ucc_free(team->cuda_ring);
+        team->cuda_ring = NULL;
+    }
 
     if (team->topo) {
         ucc_ep_map_destroy_nested(&team->ctx_map);
