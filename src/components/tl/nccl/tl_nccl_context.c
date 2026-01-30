@@ -265,6 +265,28 @@ ucc_tl_nccl_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
     return UCC_OK;
 }
 
+/* Map memory for NCCL User Buffer Registration (UBR).
+ * 
+ * This function creates a memory handle for UBR but does not immediately register
+ * the buffer with NCCL communicators. The actual registration happens lazily when
+ * the buffer is first used in a collective operation.
+ * 
+ * Requirements:
+ * - NCCL >= 2.19.0 compiled with UBR support
+ * - UCC_TL_NCCL_ENABLE_UBR must be enabled (default: try)
+ * - Buffer must be CUDA device memory (cudaMalloc, cudaMallocManaged, etc.)
+ * - Buffer must have non-zero length
+ * 
+ * Lifecycle:
+ * - mem_map() creates handle (no NCCL registration)
+ * - team_create() initializes NCCL communicators (no registration)
+ * - collective_init() triggers lazy registration via ncclCommRegister()
+ * - mem_unmap() deregisters via ncclCommDeregister()
+ * 
+ * Best Practice: Call mem_unmap() BEFORE team_destroy() for clean deregistration.
+ * However, if team_destroy() is called first, NCCL automatically cleans up all
+ * registrations, so no resource leak occurs (just a debug message in mem_unmap)
+ */
 ucc_status_t ucc_tl_nccl_mem_map(
     const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
     ucc_mem_map_memh_t *memh, ucc_mem_map_tl_t *tl_h)
@@ -283,6 +305,13 @@ ucc_status_t ucc_tl_nccl_mem_map(
     if (mode != UCC_MEM_MAP_MODE_EXPORT && mode != UCC_MEM_MAP_MODE_IMPORT) {
         tl_debug(ctx->super.super.lib,
                  "NCCL UBR: unsupported mode %d", mode);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    /* Reject zero-length buffers */
+    if (memh->len == 0) {
+        tl_debug(ctx->super.super.lib,
+                 "NCCL UBR: zero-length buffer, skipping mem_map");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -334,7 +363,20 @@ ucc_status_t ucc_tl_nccl_mem_unmap(
     m_data = (ucc_tl_nccl_memh_data_t *)tl_h->tl_data;
 
 #if NCCL_HAS_UBR
-    /* Deregister from all NCCL communicators this buffer was registered with */
+    /* Deregister from all NCCL communicators this buffer was registered with
+     * 
+     * LIFECYCLE NOTE: Best practice is to call ucc_mem_unmap() BEFORE 
+     * ucc_team_destroy() to ensure clean deregistration. However, if a team 
+     * is destroyed first, NCCL automatically cleans up all buffer registrations
+     * during ncclCommDestroy() via ncclRegCleanup(). In this case:
+     * - ncclCommDeregister() will return ncclInvalidArgument (comm already freed)
+     * - No resource leak occurs (NCCL already cleaned up)
+     * - We log a debug message and continue
+     * 
+     * We cannot detect dangling comm pointers before calling ncclCommDeregister()
+     * because we have no notification when teams are destroyed. We rely on NCCL's
+     * CommCheck() to safely detect invalid communicators.
+     */
     for (i = 0; i < m_data->num_comms; i++) {
         nccl_status = ncclCommDeregister(
             m_data->registered_comms[i], m_data->nccl_handles[i]);
@@ -344,7 +386,17 @@ ucc_status_t ucc_tl_nccl_mem_unmap(
                 "NCCL UBR: deregistered buffer %p from comm %p",
                 m_data->address,
                 m_data->registered_comms[i]);
+        } else if (nccl_status == ncclInvalidArgument) {
+            /* Comm was likely already destroyed - NCCL auto-cleaned the registration.
+             * This can happen if team was destroyed before mem_unmap was called.
+             * No resource leak occurs as NCCL's ncclRegCleanup() already freed everything. */
+            tl_debug(
+                ctx->super.super.lib,
+                "NCCL UBR: comm %p already destroyed, buffer %p was auto-cleaned by NCCL",
+                m_data->registered_comms[i],
+                m_data->address);
         } else {
+            /* Unexpected error */
             tl_warn(
                 ctx->super.super.lib,
                 "NCCL UBR: failed to deregister buffer %p from comm %p: %s",

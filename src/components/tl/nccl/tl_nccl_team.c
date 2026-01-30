@@ -63,7 +63,6 @@ free_unique_id:
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_nccl_team_t)
 {
     tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
-    /* Note: Buffer deregistration happens in ucc_mem_unmap() */
 }
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_nccl_team_t, ucc_base_team_t);
@@ -115,7 +114,6 @@ check_finalize:
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_nccl_team_t)(tl_team);
     return UCC_OK;
 }
-
 
 ucc_status_t ucc_tl_nccl_comm_init(ucc_tl_nccl_team_t *team)
 {

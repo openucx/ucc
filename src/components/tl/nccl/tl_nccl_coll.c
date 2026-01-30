@@ -144,38 +144,22 @@ static inline ucc_status_t ucc_tl_nccl_lazy_register_memh(
     int                      i, new_max;
     uintptr_t                buf_start, buf_end, region_start, region_end;
 
-    tl_debug(UCC_TL_TEAM_LIB(team),
-             "NCCL UBR: lazy_register_memh ENTRY: buf=%p, len=%zu, memh=%p",
-             buffer, length, memh);
-
     /* Skip if UBR is not available or memh not provided */
     if (!ctx->ubr_available || !memh) {
-        tl_debug(UCC_TL_TEAM_LIB(team),
-                 "NCCL UBR: SKIP - ubr_available=%d, memh=%p",
-                 ctx->ubr_available, memh);
         return UCC_OK;
     }
 
     mem_handle = (ucc_mem_map_memh_t *)memh;
-    tl_debug(UCC_TL_TEAM_LIB(team),
-             "NCCL UBR: searching for nccl in %d TLs", mem_handle->num_tls);
-    
     m_data     = NULL;
     for (i = 0; i < mem_handle->num_tls; i++) {
-        tl_debug(UCC_TL_TEAM_LIB(team),
-                 "NCCL UBR: checking TL[%d]: name='%s'", i, mem_handle->tl_h[i].tl_name);
         if (strcmp(mem_handle->tl_h[i].tl_name, "nccl") == 0) {
             m_data = (ucc_tl_nccl_memh_data_t *)mem_handle->tl_h[i].tl_data;
-            tl_debug(UCC_TL_TEAM_LIB(team),
-                     "NCCL UBR: found nccl TL, m_data=%p", m_data);
             break;
         }
     }
 
     if (!m_data) {
         /* No NCCL memh data - buffer not registered with TL/NCCL */
-        tl_debug(UCC_TL_TEAM_LIB(team),
-                 "NCCL UBR: NO nccl memh_data found - skipping");
         return UCC_OK;
     }
 
@@ -194,6 +178,13 @@ static inline ucc_status_t ucc_tl_nccl_lazy_register_memh(
             m_data->address,
             (void *)region_end);
         return UCC_ERR_INVALID_PARAM;
+    }
+
+    /* Verify team communicator is initialized */
+    if (!team->nccl_comm) {
+        tl_debug(UCC_TL_TEAM_LIB(team),
+                 "NCCL UBR: communicator not initialized, skipping registration");
+        return UCC_OK;
     }
 
     /* Check if already registered with this communicator */
@@ -230,17 +221,20 @@ static inline ucc_status_t ucc_tl_nccl_lazy_register_memh(
             tl_error(
                 UCC_TL_TEAM_LIB(team),
                 "failed to allocate memory for registered comms array");
-            /* Buffer is registered but we can't track it - this is a problem */
+            /* Deregister the buffer since we can't track it */
+            ncclCommDeregister(team->nccl_comm, nccl_handle);
             return UCC_ERR_NO_MEMORY;
         }
         m_data->registered_comms = new_comms;
 
-        new_handles              = (void **)ucc_realloc(
+        new_handles = (void **)ucc_realloc(
             m_data->nccl_handles, new_max * sizeof(void *), "nccl_handles");
         if (!new_handles) {
             tl_error(
                 UCC_TL_TEAM_LIB(team),
                 "failed to allocate memory for NCCL handles array");
+            /* Deregister the buffer since we can't track it */
+            ncclCommDeregister(team->nccl_comm, nccl_handle);
             return UCC_ERR_NO_MEMORY;
         }
         m_data->nccl_handles = new_handles;
