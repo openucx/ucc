@@ -1,10 +1,11 @@
 /**
-* Copyright (c) 2001-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-* Copyright (C) ARM Ltd. 2016-2020.  ALL RIGHTS RESERVED.
-* Copyright (C) Stony Brook University. 2016-2020.  ALL RIGHTS RESERVED.
-*
-* See file LICENSE for terms.
-*/
+ * Copyright (c) 2001-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (C) ARM Ltd. 2016-2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Stony Brook University. 2016-2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) 2026,      Fujitsu Limited. ALL RIGHTS RESERVED.
+ *
+ * See file LICENSE for terms.
+ */
 
 #ifndef UCC_AARCH64_CPU_H_
 #define UCC_AARCH64_CPU_H_
@@ -71,6 +72,15 @@ static inline ucc_cpu_model_t ucc_arch_get_cpu_model()
     if ((ucc_arch_get_cpu_vendor() == UCC_CPU_VENDOR_NVIDIA) &&
         (cpuid.part == 0xd4f)) {
         return UCC_CPU_MODEL_NVIDIA_GRACE;
+    }
+
+    if (ucc_arch_get_cpu_vendor() == UCC_CPU_VENDOR_FUJITSU_ARM) {
+        if (cpuid.part == 0x001) {
+            return UCC_CPU_MODEL_FUJITSU_A64FX;
+        }
+        if (cpuid.part == 0x003) {
+            return UCC_CPU_MODEL_FUJITSU_MONAKA;
+        }
     }
 
     return UCC_CPU_MODEL_ARM_AARCH64;
