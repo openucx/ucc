@@ -145,7 +145,6 @@ typedef struct ucc_coll_task {
     /* timestamp of the start time: either post or triggered_post */
     double                             start_time;
     uint32_t                           seq_num;
-    ucc_dt_check_state_t              *dt_check;  /* DT validation state */
 } ucc_coll_task_t;
 
 extern struct ucc_mpool_ops ucc_coll_task_mpool_ops;
@@ -160,6 +159,19 @@ typedef struct ucc_schedule {
     ucc_context_t   *ctx;
     ucc_coll_task_t *tasks[UCC_SCHEDULE_MAX_TASKS];
 } ucc_schedule_t;
+
+/**
+ * @brief Extended schedule for datatype validation
+ *
+ * This schedule type includes embedded validation state to avoid
+ * increasing the size of ucc_coll_task_t. The validation state is
+ * accessed through the schedule pointer.
+ */
+typedef struct ucc_dt_check_schedule {
+    ucc_schedule_t       super;
+    ucc_dt_check_state_t dt_check;
+    ucc_coll_task_t     *actual_task; /* The original collective task */
+} ucc_dt_check_schedule_t;
 
 void ucc_coll_task_construct(ucc_coll_task_t *task);
 
