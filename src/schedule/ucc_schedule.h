@@ -76,8 +76,8 @@ typedef struct ucc_service_coll_req ucc_service_coll_req_t;
  *   1. Validation task: performs service allreduce (MIN) and validates results
  *   2. Actual collective task: depends on validation completing successfully
  *
- * Validation algorithm uses min/max trick with single allreduce:
- *   - Send [dt, -dt, mem, -mem] with MIN reduction
+ * Validation algorithm uses min/max trick with single in-place allreduce:
+ *   - Send/receive [dt, -dt, mem, -mem] with MIN reduction
  *   - After reduction: if min(dt) == -min(-dt), all ranks have same dt
  *   - Same principle for memory type
  *   - Message size: 8 bytes (4 × int16, doesn't scale with number of ranks)
@@ -86,12 +86,11 @@ typedef struct ucc_service_coll_req ucc_service_coll_req_t;
  * If validation fails, the dependency mechanism prevents the actual task from posting.
  */
 typedef struct ucc_dt_check_state {
-    ucc_service_coll_req_t *check_req;        /* Service allreduce request */
-    int16_t                 reduced_values[4];/* Result: [min(dt), min(-dt), min(mem), min(-mem)] */
-    int16_t                 local_values[4];  /* Local: [dt, -dt, mem, -mem] */
-    ucc_subset_t            subset;           /* Subset for service allreduce */
-    int                     validated;        /* 1 if validation passed, 0 if failed */
-    struct ucc_coll_task   *actual_task;      /* Pointer to actual collective task */
+    ucc_service_coll_req_t *check_req;   /* Service allreduce request */
+    int16_t                 values[4];   /* In-place: [dt, -dt, mem, -mem] */
+    ucc_subset_t            subset;      /* Subset for service allreduce */
+    int                     validated;   /* 1 if validation passed, 0 if failed */
+    struct ucc_coll_task   *actual_task; /* Pointer to actual collective task */
 } ucc_dt_check_state_t;
 
 enum {
