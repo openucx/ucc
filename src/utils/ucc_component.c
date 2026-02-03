@@ -18,9 +18,14 @@
 #include <glob.h>
 #include <unistd.h>
 #include <assert.h>
+#include <string.h>
 
 #define IFACE_NAME_LEN_MAX                                                     \
     (UCC_MAX_FRAMEWORK_NAME_LEN + UCC_MAX_COMPONENT_NAME_LEN + 32)
+
+static ucc_status_t ucc_components_load_from_path(
+    const char *path, const char *framework_name,
+    ucc_component_iface_t ***ifaces, int *n_loaded);
 
 static ucc_status_t ucc_component_load_one(const char *so_path,
                                            const char *framework_name,
@@ -113,12 +118,10 @@ ucc_component_check_ids_uniq(ucc_component_framework_t *framework)
 ucc_status_t ucc_components_load(const char *framework_name,
                                  ucc_component_framework_t *framework)
 {
-    glob_t globbuf;
-    int    i, n_loaded;
-    char  *full_pattern;
+    ucc_component_iface_t **ifaces   = NULL;
+    int                     n_loaded = 0;
     ucc_status_t            status;
-    size_t                  pattern_size;
-    ucc_component_iface_t **ifaces = NULL;
+    int                     i;
 
     framework->n_components = 0;
     framework->components   = NULL;
@@ -130,53 +133,18 @@ ucc_status_t ucc_components_load(const char *framework_name,
         return UCC_ERR_INVALID_PARAM;
     }
 
-    pattern_size =
-        strlen(ucc_global_config.component_path) + strlen(framework_name) + 16;
-    full_pattern = (char *)ucc_malloc(pattern_size, "full_pattern");
-    if (!full_pattern) {
-        ucc_error("failed to allocate %zd bytes for full_pattern",
-                  pattern_size);
-        return UCC_ERR_NO_MEMORY;
-    }
-    ucc_snprintf_safe(full_pattern, pattern_size, "%s/libucc_%s_*.so",
-                      ucc_global_config.component_path, framework_name);
-    glob(full_pattern, 0, NULL, &globbuf);
-    ucc_free(full_pattern);
-    n_loaded          = 0;
-
-    dlerror(); /* Clear any existing error */
-    ifaces = (ucc_component_iface_t **)ucc_malloc(
-        globbuf.gl_pathc * sizeof(ucc_component_iface_t *), "ifaces");
-    if (!ifaces) {
-        ucc_error("failed to allocate %zd bytes for ifaces",
-                  globbuf.gl_pathc * sizeof(ucc_component_iface_t *));
-        return UCC_ERR_NO_MEMORY;
+    /* Load components from the standard component path */
+    status = ucc_components_load_from_path(ucc_global_config.component_path,
+                                           framework_name, &ifaces, &n_loaded);
+    if (status != UCC_OK) {
+        return status;
     }
 
-    for (i = 0; i < globbuf.gl_pathc; i++) {
-        status = ucc_component_load_one(globbuf.gl_pathv[i], framework_name,
-                                        &ifaces[n_loaded]);
-        if (status != UCC_OK) {
-            continue;
-        }
-        n_loaded++;
-    }
-
-    assert(n_loaded <= globbuf.gl_pathc);
-    if (globbuf.gl_pathc > 0) {
-        globfree(&globbuf);
-    }
-    if (!n_loaded) {
-        if (ifaces) {
-            ucc_free(ifaces);
-        }
-        return UCC_ERR_NOT_FOUND;
-    }
-
-    ifaces = ucc_realloc(ifaces, n_loaded * sizeof(ucc_component_iface_t *),
-                         "ifaces");
+    /* Set up framework structure */
     framework->components   = ifaces;
     framework->n_components = n_loaded;
+
+    /* Check that all component IDs are unique */
     if (UCC_OK != ucc_component_check_ids_uniq(framework)) {
         /* This can only happen when the new component is added
            (potentially as a plugin - black box) and its name hash
@@ -188,8 +156,9 @@ ucc_status_t ucc_components_load(const char *framework_name,
         goto err;
     }
 
-    framework->names.names =
-        ucc_malloc(sizeof(char *) * n_loaded, "components_names");
+    /* Build component names array */
+    framework->names.names = ucc_malloc(sizeof(char *) * n_loaded,
+                                        "components_names");
     if (!framework->names.names) {
         ucc_error("failed to allocate %zd bytes for components names",
                   sizeof(char *) * n_loaded);
@@ -200,7 +169,9 @@ ucc_status_t ucc_components_load(const char *framework_name,
     for (i = 0; i < n_loaded; i++) {
         framework->names.names[i] = strdup(framework->components[i]->name);
     }
+
     return UCC_OK;
+
 err:
     ucc_free(framework->components);
     return status;
@@ -246,4 +217,179 @@ char* ucc_get_framework_components_list(ucc_component_framework_t *framework,
         }
     }
     return list;
+}
+
+static ucc_status_t ucc_components_load_from_path(
+    const char *path, const char *framework_name,
+    ucc_component_iface_t ***ifaces, int *n_loaded)
+{
+    glob_t                  globbuf;
+    int                     i, loaded_count;
+    char                   *full_pattern;
+    ucc_status_t            status;
+    size_t                  pattern_size;
+    ucc_component_iface_t **new_ifaces      = NULL;
+    ucc_component_iface_t **combined_ifaces = NULL;
+
+    if (!path || strlen(path) == 0) {
+        return UCC_ERR_NOT_FOUND;
+    }
+
+    pattern_size = strlen(path) + strlen(framework_name) + 16;
+    full_pattern = (char *)ucc_malloc(pattern_size, "full_pattern");
+    if (!full_pattern) {
+        ucc_error(
+            "failed to allocate %zd bytes for full_pattern", pattern_size);
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    ucc_snprintf_safe(
+        full_pattern, pattern_size, "%s/libucc_%s_*.so", path, framework_name);
+    glob(full_pattern, 0, NULL, &globbuf);
+    ucc_free(full_pattern);
+
+    if (globbuf.gl_pathc == 0) {
+        globfree(&globbuf);
+        return UCC_ERR_NOT_FOUND;
+    }
+
+    new_ifaces = (ucc_component_iface_t **)ucc_malloc(
+        globbuf.gl_pathc * sizeof(ucc_component_iface_t *), "new_ifaces");
+    if (!new_ifaces) {
+        ucc_error(
+            "failed to allocate %zd bytes for new_ifaces",
+            globbuf.gl_pathc * sizeof(ucc_component_iface_t *));
+        globfree(&globbuf);
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    loaded_count = 0;
+    dlerror(); /* Clear any existing error */
+
+    for (i = 0; i < globbuf.gl_pathc; i++) {
+        status = ucc_component_load_one(
+            globbuf.gl_pathv[i], framework_name, &new_ifaces[loaded_count]);
+        if (status != UCC_OK) {
+            continue;
+        }
+        loaded_count++;
+    }
+
+    globfree(&globbuf);
+
+    if (loaded_count == 0) {
+        ucc_free(new_ifaces);
+        return UCC_ERR_NOT_FOUND;
+    }
+
+    /* Combine with existing ifaces if any */
+    if (*ifaces != NULL && *n_loaded > 0) {
+        combined_ifaces = (ucc_component_iface_t **)ucc_malloc(
+            (*n_loaded + loaded_count) * sizeof(ucc_component_iface_t *),
+            "combined_ifaces");
+        if (!combined_ifaces) {
+            ucc_error("failed to allocate memory for combined_ifaces");
+            ucc_free(new_ifaces);
+            return UCC_ERR_NO_MEMORY;
+        }
+        memcpy(
+            combined_ifaces,
+            *ifaces,
+            *n_loaded * sizeof(ucc_component_iface_t *));
+        memcpy(
+            combined_ifaces + *n_loaded,
+            new_ifaces,
+            loaded_count * sizeof(ucc_component_iface_t *));
+        ucc_free(*ifaces);
+        ucc_free(new_ifaces);
+        *ifaces = combined_ifaces;
+    } else {
+        *ifaces = new_ifaces;
+    }
+
+    *n_loaded += loaded_count;
+    return UCC_OK;
+}
+
+ucc_status_t ucc_components_load_user_component(const char *path,
+                                                 const char *framework_name,
+                                                 ucc_component_framework_t *framework)
+{
+    ucc_component_iface_t **ifaces = NULL;
+    int                     n_loaded = 0;
+    int                     i, original_count;
+    ucc_status_t            status;
+
+    if (!path || !framework_name || !framework) {
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    if (strlen(path) == 0) {
+        return UCC_OK;
+    }
+
+    ucc_info("loading user %s components from: %s", framework_name, path);
+
+    /* Copy existing components so we can append */
+    original_count = framework->n_components;
+    if (original_count > 0) {
+        ifaces = (ucc_component_iface_t **)ucc_malloc(
+            original_count * sizeof(ucc_component_iface_t *), "ifaces");
+        if (!ifaces) {
+            ucc_error("failed to allocate memory for ifaces");
+            return UCC_ERR_NO_MEMORY;
+        }
+        memcpy(ifaces, framework->components,
+               original_count * sizeof(ucc_component_iface_t *));
+        n_loaded = original_count;
+    }
+
+    status = ucc_components_load_from_path(path, framework_name,
+                                           &ifaces, &n_loaded);
+    if (status == UCC_ERR_NOT_FOUND) {
+        ucc_info("no user %s components found in %s", framework_name, path);
+        if (ifaces && n_loaded == original_count) {
+            ucc_free(ifaces);
+        }
+        return UCC_ERR_NOT_FOUND;
+    } else if (status != UCC_OK) {
+        ucc_free(ifaces);
+        return status;
+    }
+
+    for (i = original_count; i < n_loaded; i++) {
+        ucc_info("loaded user %s component: %s",
+                 framework_name, framework->components[i]->name);
+    }
+
+    /* Update framework with new component list */
+    if (original_count > 0) {
+        ucc_free(framework->components);
+    }
+    framework->components   = ifaces;
+    framework->n_components = n_loaded;
+
+    /* Update component names array */
+    if (framework->names.names) {
+        for (i = 0; i < framework->names.count; i++) {
+            free(framework->names.names[i]);
+        }
+        ucc_free(framework->names.names);
+    }
+
+    framework->names.names = ucc_malloc(sizeof(char *) * n_loaded,
+                                        "components_names");
+    if (!framework->names.names) {
+        ucc_error("failed to allocate %zd bytes for components names",
+                  sizeof(char *) * n_loaded);
+        return UCC_ERR_NO_MEMORY;
+    }
+    framework->names.count = n_loaded;
+    for (i = 0; i < n_loaded; i++) {
+        framework->names.names[i] = strdup(framework->components[i]->name);
+    }
+
+    ucc_info("loaded %d user %s component(s)", n_loaded - original_count,
+             framework_name);
+    return UCC_OK;
 }

@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "ucc_global_opts.h"
+#include "components/mc/base/ucc_mc_base.h"
 #include "utils/debug/log_def.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_component.h"
@@ -161,6 +162,26 @@ ucc_status_t ucc_constructor(void)
         ucc_error("no memory components were found in the "
                   "ucc modules dir: %s", cfg->component_path);
         goto exit_unlock_mutex;
+    }
+    /* Load user MC components from separate path if configured */
+    if (cfg->mc_user_component_path &&
+        strlen(cfg->mc_user_component_path) > 0) {
+        int orig = cfg->mc_framework.n_components;
+        int i;
+
+        status = ucc_components_load_user_component(
+            cfg->mc_user_component_path, "mc", &cfg->mc_framework);
+        if (UCC_OK != status && UCC_ERR_NOT_FOUND != status) {
+            ucc_error("failed to load user MC components: %d (%s)",
+                      status, ucc_status_string(status));
+            goto exit_unlock_mutex;
+        }
+        /* Mark newly loaded MC entries with the sentinel type so ucc_mc_init()
+         * assigns them a unique dynamic memory type > UCC_MEMORY_TYPE_LAST. */
+        for (i = orig; i < cfg->mc_framework.n_components; i++) {
+            ucc_derived_of(cfg->mc_framework.components[i],
+                           ucc_mc_base_t)->type = UCC_MEMORY_TYPE_LAST;
+        }
     }
     status = ucc_components_load("ec", &cfg->ec_framework);
     if (status != UCC_OK) {

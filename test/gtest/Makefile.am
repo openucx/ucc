@@ -46,6 +46,8 @@ gtest_LDADD = \
 	$(top_builddir)/src/libucc.la \
 	$(GTEST_LIBS)
 
+gtest_DEPENDENCIES = core/libucc_mc_mock.la
+
 
 gtest_CPPFLAGS = \
 	$(BASE_CPPFLAGS) \
@@ -62,7 +64,18 @@ gtest_CFLAGS   = $(BASE_CFLAGS) $(AM_CPPFLAGS)
 gtest_CXXFLAGS = -std=gnu++11 \
 	$(BASE_CXXFLAGS) $(GTEST_CXXFLAGS) \
 	-DGTEST_UCM_HOOK_LIB_DIR="\"${abs_builddir}/ucm/test_dlopen/.libs\"" \
-	-DGTEST_UCC_TOP_SRCDIR="\"${UCC_TOP_SRCDIR}\""
+	-DGTEST_UCC_TOP_SRCDIR="\"${UCC_TOP_SRCDIR}\"" \
+	-DGTEST_MC_USER_LIB_DIR="\"${abs_builddir}/core/.libs\""
+
+# Mock MC component .so for user-component loading tests
+noinst_LTLIBRARIES = core/libucc_mc_mock.la
+
+core_libucc_mc_mock_la_SOURCES  = core/libucc_mc_mock.c
+core_libucc_mc_mock_la_CPPFLAGS = $(BASE_CPPFLAGS) \
+	-I$(top_srcdir)/src \
+	-I$(top_builddir)/src
+core_libucc_mc_mock_la_LDFLAGS  = -module -avoid-version -shared \
+	-rpath ${abs_builddir}/core/.libs
 
 gtest_SOURCES =                           \
 	common/gtest-all.cc                   \
@@ -75,6 +88,7 @@ gtest_SOURCES =                           \
 	core/test_context_config.cc           \
 	core/test_context.cc                  \
 	core/test_mc.cc                       \
+	core/test_mc_user_component.cc        \
 	core/test_mc_reduce.cc                \
 	core/test_team.cc                     \
 	core/test_schedule.cc                 \
