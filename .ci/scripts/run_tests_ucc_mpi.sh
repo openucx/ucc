@@ -8,6 +8,9 @@ SCRIPT_DIR="$(
 cd "${SCRIPT_DIR}"
 . "${SCRIPT_DIR}/env.sh"
 
+# Disable SSH host key checking for CI (avoids "REMOTE HOST IDENTIFICATION HAS CHANGED" errors)
+export OMPI_MCA_plm_rsh_args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p${DOCKER_SSH_PORT}"
+
 HOSTFILE="$1"
 
 if [ -z "$HOSTFILE" ]; then
@@ -53,6 +56,21 @@ if [ "$ib_port_state" -eq 0 ]; then
 fi
 echo "INFO: Using InfiniBand device $DEV (port is Up)"
 
+# Check all hosts have IPv4 on the IB interface (required for NCCL bootstrap)
+echo "INFO: Checking IPv4 on IB interface on all hosts..."
+for host in $(cat "$HOSTFILE"); do
+    IB_IF=$(ssh "$host" "ibdev2netdev 2>/dev/null | grep '${DEV} ' | sed -n 's/.*==> \\([^ ]*\\).*/\1/p' | head -1" 2>/dev/null || true)
+    if [ -z "$IB_IF" ]; then
+        echo "ERROR: Host $host: could not find interface for IB device $DEV"
+        exit 1
+    fi
+    if ! ssh "$host" "ip -4 addr show $IB_IF 2>/dev/null | grep -q 'inet '"; then
+        echo "ERROR: Host $host has no IPv4 on IB interface $IB_IF. NCCL bootstrap requires IPv4 on the IB interface."
+        exit 1
+    fi
+    echo "INFO: $host has IPv4 on $IB_IF"
+done
+
 function mpi_params {
     ppn=$1
     nnodes=$2
@@ -61,7 +79,7 @@ function mpi_params {
     fi
     echo "-np $((nnodes*ppn)) --oversubscribe --hostfile ${HOSTFILE} \
 --map-by ppr:$ppn:node --bind-to socket  \
--x PATH -x LD_LIBRARY_PATH --mca opal_common_ucx_opal_mem_hooks 1 --mca plm_rsh_args -p12345 \
+-x PATH -x LD_LIBRARY_PATH --mca opal_common_ucx_opal_mem_hooks 1 \
 --mca coll ^ucc,hcoll \
 -x UCX_NET_DEVICES=$DEV:1"
 }
@@ -109,7 +127,9 @@ for MT in "" "-T"; do
     echo "INFO: UCC MPI unit tests (TL/UCP) ..."
     # shellcheck disable=SC2086
     tlucp_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp "
-    mpirun $(mpi_params $PPN) $tlucp_args $EXE $MT $TG --mtypes host,cuda
+    tlucp_args+=" -x UCX_LOG_LEVEL=info "
+    # Disable cuda_ipc - can cause hangs with UCC TL CUDA compatibility
+    mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $tlucp_args $EXE $MT $TG --mtypes host,cuda
     echo "INFO: UCC MPI unit tests (TL/UCP) ... DONE"
 
 
