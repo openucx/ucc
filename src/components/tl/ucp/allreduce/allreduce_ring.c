@@ -117,13 +117,6 @@ ucc_status_t ucc_tl_ucp_allreduce_ring_init(ucc_base_coll_args_t *coll_args,
 
     /*
      * Step 1: Reduce-Scatter Ring
-     *
-     * Takes the full input and produces a scattered partial result.
-     * Each rank ends up with count/tsize elements of the reduced data.
-     *
-     * For reduce_scatter_ring:
-     * - dst.info.count should be the per-rank output count (count/tsize)
-     * - The algorithm internally computes total = dst.info.count * tsize
      */
     rs_args                        = *coll_args;
     rs_args.args.coll_type         = UCC_COLL_TYPE_REDUCE_SCATTER;
@@ -142,14 +135,6 @@ ucc_status_t ucc_tl_ucp_allreduce_ring_init(ucc_base_coll_args_t *coll_args,
 
     /*
      * Step 2: Allgather Ring
-     *
-     * Collects the scattered partial results from all ranks.
-     * After reduce-scatter, each rank has its portion in the dst buffer
-     * at offset (rank * count/tsize). Allgather performs in-place.
-     *
-     * For allgather_ring:
-     * - dst.info.count should be the total output count
-     * - IN_PLACE flag since data is already in correct position in dst buffer
      */
     ag_args                      = *coll_args;
     ag_args.args.coll_type       = UCC_COLL_TYPE_ALLGATHER;
@@ -185,7 +170,6 @@ ucc_status_t ucc_tl_ucp_allreduce_ring_init(ucc_base_coll_args_t *coll_args,
         err_ag,
         status);
 
-    /* Set up schedule callbacks */
     schedule->super.post     = ucc_tl_ucp_allreduce_ring_start;
     schedule->super.finalize = ucc_tl_ucp_allreduce_ring_finalize;
 
