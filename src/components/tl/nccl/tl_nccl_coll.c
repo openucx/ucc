@@ -169,6 +169,11 @@ static inline ucc_status_t ucc_tl_nccl_lazy_register_memh(
     region_start = (uintptr_t)m_data->address;
     region_end   = region_start + m_data->length;
 
+    if (length > (UINTPTR_MAX - buf_start)) {
+        tl_error(UCC_TL_TEAM_LIB(team), "NCCL UBR: buffer size causes overflow");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
     if (buf_start < region_start || buf_end > region_end) {
         tl_error(
             UCC_TL_TEAM_LIB(team),
@@ -314,12 +319,7 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
         ucc_mem_map_mem_h src_memh = NULL;
         ucc_mem_map_mem_h dst_memh = NULL;
         ucc_rank_t        grank    = UCC_TL_TEAM_RANK(nccl_team);
-        
-        tl_debug(team->context->lib, 
-                 "NCCL UBR: checking for memh in init_task, mask=0x%lx, flags=0x%lx",
-                 (unsigned long)coll_args->args.mask,
-                 (coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) ? 
-                     (unsigned long)coll_args->args.flags : 0UL);
+        ucc_count_t       total_count;
         
         /* Register source buffer's memory region if memh provided */
         if (coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH) {
@@ -327,29 +327,32 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
             if ((coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
                 (coll_args->args.flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)) {
                 src_memh = coll_args->args.src_memh.global_memh[grank];
-                tl_debug(team->context->lib,
-                         "NCCL UBR: using global_memh[%d]=%p for src", grank, src_memh);
             } else {
                 src_memh = coll_args->args.src_memh.local_memh;
-                tl_debug(team->context->lib,
-                         "NCCL UBR: using local_memh=%p for src", src_memh);
             }
-            
-            tl_debug(team->context->lib,
-                     "NCCL UBR: calling lazy_register for src buffer %p, size %zu",
-                     coll_args->args.src.info.buffer,
-                     coll_args->args.src.info.count *
-                         ucc_dt_size(coll_args->args.src.info.datatype));
-            
+
+            if (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHERV ||
+                coll_args->args.coll_type == UCC_COLL_TYPE_ALLTOALLV ||
+                coll_args->args.coll_type == UCC_COLL_TYPE_GATHERV ||
+                coll_args->args.coll_type == UCC_COLL_TYPE_SCATTERV) {
+                total_count = ucc_coll_args_get_v_buffer_size(
+                    &coll_args->args,
+                    coll_args->args.src.info_v.counts,
+                    coll_args->args.src.info_v.displacements,
+                    UCC_TL_TEAM_SIZE(nccl_team));
+            } else {
+                total_count = coll_args->args.src.info.count;
+            }
             status = ucc_tl_nccl_lazy_register_memh(
                 coll_args->args.src.info.buffer,
-                coll_args->args.src.info.count *
-                    ucc_dt_size(coll_args->args.src.info.datatype),
+                total_count * ucc_dt_size(coll_args->args.src.info.datatype),
                 nccl_team,
                 src_memh);
             if (ucc_unlikely(status != UCC_OK)) {
-                tl_error(team->context->lib,
-                         "NCCL UBR: lazy_register failed with status %d", status);
+                tl_error(
+                    team->context->lib,
+                    "NCCL UBR: lazy_register failed with status %d",
+                    status);
                 ucc_mpool_put(task);
                 return status;
             }
@@ -364,11 +367,23 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
             } else {
                 dst_memh = coll_args->args.dst_memh.local_memh;
             }
-            
+
+            if (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHERV ||
+                coll_args->args.coll_type == UCC_COLL_TYPE_ALLTOALLV ||
+                coll_args->args.coll_type == UCC_COLL_TYPE_GATHERV ||
+                coll_args->args.coll_type == UCC_COLL_TYPE_SCATTERV) {
+                total_count = ucc_coll_args_get_v_buffer_size(
+                    &coll_args->args,
+                    coll_args->args.dst.info_v.counts,
+                    coll_args->args.dst.info_v.displacements,
+                    UCC_TL_TEAM_SIZE(nccl_team));
+            } else {
+                total_count = coll_args->args.dst.info.count;
+            }
+
             status = ucc_tl_nccl_lazy_register_memh(
                 coll_args->args.dst.info.buffer,
-                coll_args->args.dst.info.count *
-                    ucc_dt_size(coll_args->args.dst.info.datatype),
+                total_count * ucc_dt_size(coll_args->args.dst.info.datatype),
                 nccl_team,
                 dst_memh);
             if (ucc_unlikely(status != UCC_OK)) {
