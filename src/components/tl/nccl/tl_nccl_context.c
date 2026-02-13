@@ -324,7 +324,12 @@ ucc_status_t ucc_tl_nccl_mem_map(
         return UCC_ERR_NO_MEMORY;
     }
 
-    /* Store buffer information - registration will happen lazily on first use */
+    /* For NCCL UBR, we only store metadata (address/length) for lazy registration.
+     * When ncclCommRegister is called later, it stores this metadata locally.
+     * The NCCL communicator handles IPC handle exchange internally during collective
+     * operations (via point-to-point proxy calls), so we don't need special IMPORT
+     * handling. We can use memh->address/memh->len directly in both EXPORT and IMPORT
+     * modes - the address should be valid in the current process context. */
     m_data->address          = memh->address;
     m_data->length           = memh->len;
     m_data->registered_comms = NULL;
@@ -431,8 +436,14 @@ ucc_status_t ucc_tl_nccl_memh_pack(
     ucc_tl_nccl_memh_data_t *m_data;
     void                    *packed;
 
+    /* If tl_h is NULL, return early */
+    if (!tl_h) {
+        *pack_buffer = NULL;
+        return UCC_OK;
+    }
+
     /* If UBR is not available/disabled or no TL data, return empty pack */
-    if (!ctx->ubr_available || !tl_h || !tl_h->tl_data) {
+    if (!ctx->ubr_available || !tl_h->tl_data) {
         tl_h->packed_size = 0;
         *pack_buffer      = NULL;
         return UCC_OK;

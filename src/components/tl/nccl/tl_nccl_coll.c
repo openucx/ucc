@@ -163,16 +163,16 @@ static inline ucc_status_t ucc_tl_nccl_lazy_register_memh(
         return UCC_OK;
     }
 
+    if (length > (UINTPTR_MAX - (uintptr_t)buffer)) {
+        tl_error(UCC_TL_TEAM_LIB(team), "NCCL UBR: buffer size causes overflow");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
     /* Verify that the entire buffer is within the registered memory region */
     buf_start    = (uintptr_t)buffer;
     buf_end      = buf_start + length;
     region_start = (uintptr_t)m_data->address;
     region_end   = region_start + m_data->length;
-
-    if (length > (UINTPTR_MAX - buf_start)) {
-        tl_error(UCC_TL_TEAM_LIB(team), "NCCL UBR: buffer size causes overflow");
-        return UCC_ERR_INVALID_PARAM;
-    }
 
     if (buf_start < region_start || buf_end > region_end) {
         tl_error(
