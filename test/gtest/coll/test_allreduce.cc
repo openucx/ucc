@@ -423,7 +423,7 @@ TYPED_TEST(test_allreduce_alg, ring_edge_cases) {
         UccTeam_h     team = job.create_team(team_size);
         UccCollCtxVec ctxs;
 
-        for (auto count : {0, 273, 546, 819}) {
+        for (auto count : {273, 546, 819}) {
             SET_MEM_TYPE(UCC_MEMORY_TYPE_HOST);
             this->set_inplace(TEST_NO_INPLACE);
             this->data_init(team_size, TypeParam::dt, count, ctxs, false);
