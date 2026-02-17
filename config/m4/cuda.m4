@@ -164,9 +164,22 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                                  [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH110_PTX}"],
                                  [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH111_PTX}"])])])])],
                    [NVCC_ARCH="$with_nvcc_gencode"])
-             AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])
-             AC_MSG_RESULT([NVCC gencodes: $NVCC_ARCH])
-         ])
+            AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])
+            AC_MSG_RESULT([NVCC gencodes: $NVCC_ARCH])
+
+            # Generate NVLS-specific architecture codes (SASS only, no PTX)
+            # NVLS requires NVSwitch (datacenter only): Hopper (CC 9.0), Blackwell (CC 10.0)
+            # Filter NVCC_ARCH to keep only sm_90 and sm_100 gencode flags
+            NVCC_ARCH_NVLS=""
+            for _ucc_nvls_flag in $NVCC_ARCH
+            do
+                if echo "$_ucc_nvls_flag" | grep -q -E "sm_90|sm_100" 2>/dev/null; then
+                    NVCC_ARCH_NVLS="$NVCC_ARCH_NVLS $_ucc_nvls_flag"
+                fi
+            done
+            AC_SUBST([NVCC_ARCH_NVLS], ["$NVCC_ARCH_NVLS"])
+            AC_MSG_RESULT([NVCC NVLS gencodes: $NVCC_ARCH_NVLS])
+        ])
 
 
          LDFLAGS="$save_LDFLAGS"

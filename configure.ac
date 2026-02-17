@@ -282,7 +282,8 @@ AC_MSG_NOTICE([     NVCC gencodes:   ${NVCC_ARCH}])
 ])
 AC_MSG_NOTICE([ DOCA UROM enabled:   ${doca_urom_happy}])
 AS_IF([test "x$nvls_happy" = "xyes"],[
-AC_MSG_NOTICE([ NVLS (NVLINK SHARP):   enabled])
+AC_MSG_NOTICE([NVLS (NVLINK SHARP):   enabled])
+AC_MSG_NOTICE([ NVCC NVLS gencodes:   ${NVCC_ARCH_NVLS}])
 ])
 AS_IF([test "x$rocm_happy" = xyes],[
 AC_MSG_NOTICE([ROCM architectures:   ${ROCM_ARCH}])
