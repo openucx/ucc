@@ -170,10 +170,21 @@ AS_IF([test "x$cuda_checked" != "xyes"],
             # Generate NVLS-specific architecture codes (SASS only, no PTX)
             # NVLS requires NVSwitch (datacenter only): Hopper (CC 9.0), Blackwell (CC 10.0)
             # Filter NVCC_ARCH to keep only sm_90 and sm_100 gencode flags
+            # Handle both "-gencode=arch=..." (single token) and "-gencode arch=..." (two tokens)
             NVCC_ARCH_NVLS=""
+            _ucc_pending_gencode=""
             for _ucc_nvls_flag in $NVCC_ARCH
             do
-                if echo "$_ucc_nvls_flag" | grep -q -E "sm_90|sm_100" 2>/dev/null; then
+                if test "x$_ucc_nvls_flag" = "x-gencode"; then
+                    _ucc_pending_gencode="-gencode"
+                    continue
+                fi
+                if test -n "$_ucc_pending_gencode"; then
+                    if echo "$_ucc_nvls_flag" | grep -q -E "sm_90|sm_100" 2>/dev/null; then
+                        NVCC_ARCH_NVLS="$NVCC_ARCH_NVLS $_ucc_pending_gencode $_ucc_nvls_flag"
+                    fi
+                    _ucc_pending_gencode=""
+                elif echo "$_ucc_nvls_flag" | grep -q -E "sm_90|sm_100" 2>/dev/null; then
                     NVCC_ARCH_NVLS="$NVCC_ARCH_NVLS $_ucc_nvls_flag"
                 fi
             done
