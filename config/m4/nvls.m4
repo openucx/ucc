@@ -27,7 +27,7 @@ AS_IF([test "x$nvls_checked" != "xyes"],[
             [
                 # NVLS requires NVSwitch (datacenter only): Hopper (CC 9.0), Blackwell (CC 10.0)
                 nvls_arch_supported="no"
-                AS_IF([echo "$NVCC_ARCH" | grep -E "sm_90|sm_100" >/dev/null 2>&1],
+                AS_IF([echo "$NVCC_ARCH" | grep -E "$ARCH_NVLS_LIST" >/dev/null 2>&1],
                       [nvls_arch_supported="yes"])
 
                 AS_IF([test "x$nvls_arch_supported" = "xyes"],
