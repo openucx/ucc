@@ -36,6 +36,21 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(ucc_base_coll_args_t *coll_args,
                                              ucc_base_team_t      *team,
                                              ucc_coll_task_t     **task_h);
 
+static inline int ucc_tl_cuda_allreduce_nvls_dt_supported(ucc_datatype_t dt)
+{
+    switch (dt) {
+    case UCC_DT_FLOAT32:
+    case UCC_DT_BFLOAT16:
+    case UCC_DT_INT32:
+    case UCC_DT_UINT32:
+    case UCC_DT_INT64:
+    case UCC_DT_UINT64:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 static inline int ucc_tl_cuda_allreduce_alg_from_str(const char *str)
 {
     int i;
