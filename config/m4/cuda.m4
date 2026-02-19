@@ -6,6 +6,8 @@
 CUDA_MIN_REQUIRED_MAJOR=11
 CUDA_MIN_REQUIRED_MINOR=0
 
+ARCH_NVLS_LIST="sm_90|sm_100"
+
 ARCH7_CODE="-gencode=arch=compute_52,code=sm_52"
 ARCH8_CODE="-gencode=arch=compute_60,code=sm_60 -gencode=arch=compute_61,code=sm_61"
 ARCH9_CODE="-gencode=arch=compute_70,code=sm_70"
@@ -164,9 +166,30 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                                  [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH110_PTX}"],
                                  [NVCC_ARCH="${ARCH7_CODE} ${ARCH8_CODE} ${ARCH9_CODE} ${ARCH10_CODE} ${ARCH110_CODE} ${ARCH111_CODE} ${ARCH111_PTX}"])])])])],
                    [NVCC_ARCH="$with_nvcc_gencode"])
-             AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])
-             AC_MSG_RESULT([NVCC gencodes: $NVCC_ARCH])
-         ])
+            AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])
+            AC_MSG_RESULT([NVCC gencodes: $NVCC_ARCH])
+
+            # Generate NVLS-specific architecture codes (SASS only, no PTX)
+            # NVLS requires NVSwitch (datacenter only): Hopper (CC 9.0), Blackwell (CC 10.0)
+            # Filter NVCC_ARCH to keep only sm_90 and sm_100 gencode flags
+            # Handle both "-gencode=arch=..." (single token) and "-gencode arch=..." (two tokens)
+            NVCC_ARCH_NVLS=""
+            _ucc_pending_gencode=""
+            for _ucc_nvls_flag in $NVCC_ARCH
+            do
+                if test "x$_ucc_nvls_flag" = "x-gencode"; then
+                    _ucc_pending_gencode="-gencode"
+                    continue
+                fi
+                if echo "$_ucc_nvls_flag" | grep -q -E "$ARCH_NVLS_LIST" 2>/dev/null; then
+                    NVCC_ARCH_NVLS="$NVCC_ARCH_NVLS $_ucc_pending_gencode $_ucc_nvls_flag"
+                fi
+                _ucc_pending_gencode=""
+            done
+            NVCC_ARCH_NVLS=$(echo $NVCC_ARCH_NVLS)
+            AC_SUBST([NVCC_ARCH_NVLS], ["$NVCC_ARCH_NVLS"])
+            AC_MSG_RESULT([NVCC NVLS gencodes: $NVCC_ARCH_NVLS])
+        ])
 
 
          LDFLAGS="$save_LDFLAGS"

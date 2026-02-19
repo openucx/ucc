@@ -44,9 +44,9 @@ CONFIGURE_FLAGS="--with-ucx=${UCX_INSTALL_DIR} --with-cuda=${CUDA_HOME} \
 # Add NVLS support if enabled
 if [ "${UCC_ENABLE_NVLS}" = "yes" ] || [ "${UCC_ENABLE_NVLS}" = "true" ] || [ "${UCC_ENABLE_NVLS}" = "1" ]; then
     echo "INFO: Enabling NVLS support for GB300NVL72"
-    CONFIGURE_FLAGS="${CONFIGURE_FLAGS} --with-nvls --with-nvcc-gencode=\"-gencode arch=compute_100,code=sm_100\""
+    CONFIGURE_FLAGS="${CONFIGURE_FLAGS} --with-nvls --with-nvcc-gencode=\"-gencode=arch=compute_100,code=sm_100\""
 else
-    CONFIGURE_FLAGS="${CONFIGURE_FLAGS} --with-nvcc-gencode=\"-gencode arch=compute_86,code=sm_86\""
+    CONFIGURE_FLAGS="${CONFIGURE_FLAGS} --with-nvcc-gencode=\"-gencode=arch=compute_86,code=sm_86\""
 fi
 if [ "${UCC_ENABLE_GTEST}" = "yes" ] || [ "${UCC_ENABLE_GTEST}" = "true" ] || [ "${UCC_ENABLE_GTEST}" = "1" ]; then
     echo "INFO: Enabling gtest"
