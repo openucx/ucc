@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "ucc_context.h"
+#include "components/topo/ucc_topo.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
 #include "utils/ucc_malloc.h"
@@ -583,6 +584,77 @@ poll:
     return UCC_OK;
 }
 
+ucc_status_t ucc_core_ctx_id_exchange(ucc_context_t *context, ucc_oob_coll_t *oob,
+                                      ucc_addr_storage_t *addr_storage)
+{
+    ucc_status_t      status;
+    ucc_rank_t        i;
+
+poll:
+    if (addr_storage->oob_req) {
+        status = oob->req_test(addr_storage->oob_req);
+        if (status < 0) {
+            oob->req_free(addr_storage->oob_req);
+            ucc_error("oob req test failed during topo addr exchange");
+            return status;
+        } else if (UCC_INPROGRESS == status) {
+            return status;
+        }
+        oob->req_free(addr_storage->oob_req);
+        addr_storage->oob_req = NULL;
+    }
+    if (0 == addr_storage->addr_len) {
+        if (NULL == addr_storage->storage) {
+            addr_storage->size = oob->n_oob_eps;
+
+            addr_storage->storage = (ucc_context_id_t *)ucc_malloc(
+                addr_storage->size * sizeof(ucc_context_id_t), "ctx_ids_storage");
+            if (!addr_storage->storage) {
+                ucc_error(
+                    "failed to allocate %zd bytes for ctx_ids storage",
+                    addr_storage->size * sizeof(ucc_context_id_t));
+                return UCC_ERR_NO_MEMORY;
+            }
+            addr_storage->addr_len = sizeof(ucc_context_id_t);
+
+            status = oob->allgather(&context->id, addr_storage->storage,
+                                    sizeof(ucc_context_id_t), oob->coll_info,
+                                    &addr_storage->oob_req);
+            if (UCC_OK != status) {
+                ucc_free(addr_storage->storage);
+                ucc_error("failed to start oob allgather for ctx_ids");
+                return status;
+            }
+            goto poll;
+        }
+    }
+    ucc_assert(addr_storage->storage != NULL);
+    if (addr_storage->addr_len == 0 ) {
+        ucc_free(addr_storage->storage);
+        addr_storage->storage = NULL;
+        return UCC_OK;
+    }
+
+    {
+        ucc_context_id_t *ctx_ids = (ucc_context_id_t *)addr_storage->storage;
+        ucc_rank_t r = UCC_RANK_MAX;
+
+        for (i = 0; i < addr_storage->size; i++) {
+            if (UCC_CTX_ID_EQUAL(context->id, ctx_ids[i])) {
+                if (r != UCC_RANK_MAX) {
+                    ucc_error("ctx_id collision: %d %d", r, i);
+                    return UCC_ERR_NO_MESSAGE;
+                }
+                r = i;
+            }
+        }
+
+        addr_storage->flags = 0;
+        addr_storage->rank = r;
+    }
+    return UCC_OK;
+}
+
 static void remove_tl_ctx_from_array(ucc_tl_context_t **array, unsigned *size,
                                      ucc_tl_context_t *tl_ctx)
 {
@@ -654,6 +726,60 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         ucc_check_wait_for_debugger(ctx->rank);
 #endif
     }
+
+    ctx->id.pi      = *proc_info;
+    ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
+    
+    if (config->node_local_id == UCC_ULUNITS_AUTO) {
+        if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB && params->oob.n_oob_eps > 1) {
+            do {
+                /* UCC context create is blocking fn, so we can wait here for the
+                completion of addr exchange */
+                status = ucc_core_ctx_id_exchange(ctx, &ctx->params.oob,
+                                                &ctx->addr_storage);
+                if (status < 0) {
+                    ucc_error("failed to exchange addresses during context "
+                            "creation with status: %s",
+                            ucc_status_string(status));
+                    goto error_ctx_create;
+                }
+            } while (status == UCC_INPROGRESS);
+            status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
+            if (UCC_OK != status) {
+                ucc_free(ctx->addr_storage.storage);
+                ucc_error("failed to init ctx topo");
+                goto error_ctx_create;
+            }
+            ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
+
+            if (ctx->topo) {
+                ucc_subset_t set;
+                ucc_topo_t  *topo = NULL;
+                
+                memset(&set.map, 0, sizeof(ucc_ep_map_t));
+                set.map.type   = UCC_EP_MAP_FULL;
+                set.myrank     = params->oob.oob_ep;
+                set.map.ep_num = params->oob.n_oob_eps;
+            
+                status = ucc_topo_init(set, ctx->topo, &topo);
+                if (UCC_OK != status) {
+                    ucc_warn("failed to init topo for computing local rank");
+                } else {
+                    b_params.node_local_id = ucc_topo_node_local_rank(topo);
+                    ucc_topo_cleanup(topo);
+                }
+            }
+
+            /* clean up addr_storage */
+            ucc_free(ctx->addr_storage.storage);
+            ctx->addr_storage.storage = NULL;
+            ctx->addr_storage.addr_len = 0;
+            ctx->addr_storage.size = 0;
+            ctx->addr_storage.rank = UCC_RANK_MAX;
+            ctx->addr_storage.flags = 0;
+        }
+    }
+    
     status = ucc_create_tl_contexts(ctx, config, b_params);
     if (UCC_OK != status) {
         /* only critical error could have happened - bail */
@@ -733,8 +859,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         ucc_error("failed to init progress queue for context %p", ctx);
         goto error_ctx_create;
     }
-    ctx->id.pi      = *proc_info;
-    ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
+
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
         params->oob.n_oob_eps > 1) {
         do {
@@ -750,7 +875,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
             }
         } while (status == UCC_INPROGRESS);
 
-        if (topo_required) {
+        if (topo_required && !ctx->topo) {
             /* At least one available CL context reported it needs topo info */
             status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
             if (UCC_OK != status) {
