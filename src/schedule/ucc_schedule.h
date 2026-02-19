@@ -62,6 +62,37 @@ typedef struct ucc_event_manager {
     ucc_em_listener_t listeners[MAX_LISTENERS];
 } ucc_event_manager_t;
 
+/* Forward declaration for service collective request */
+typedef struct ucc_service_coll_req ucc_service_coll_req_t;
+
+/**
+ * @brief Datatype validation state for rooted collectives
+ *
+ * This structure holds the state for transparent datatype validation
+ * before executing the actual collective operation. The validation uses a service
+ * allreduce with MIN operation to efficiently detect mismatches.
+ *
+ * Design: Uses a schedule with two tasks:
+ *   1. Validation task: performs service allreduce (MIN) and validates results
+ *   2. Actual collective task: depends on validation completing successfully
+ *
+ * Validation algorithm uses min/max trick with single in-place allreduce:
+ *   - Send/receive [dt, -dt, mem, -mem] with MIN reduction
+ *   - After reduction: if min(dt) == -min(-dt), all ranks have same dt
+ *   - Same principle for memory type
+ *   - Message size: 8 bytes (4 × int16, doesn't scale with number of ranks)
+ *   - Optimized for predefined datatypes only (max value 136 fits in int16)
+ *
+ * If validation fails, the dependency mechanism prevents the actual task from posting.
+ */
+typedef struct ucc_dt_check_state {
+    ucc_service_coll_req_t *check_req;   /* Service allreduce request */
+    int16_t                 values[4];   /* In-place: [dt, -dt, mem, -mem] */
+    ucc_subset_t            subset;      /* Subset for service allreduce */
+    int                     validated;   /* 1 if validation passed, 0 if failed */
+    struct ucc_coll_task   *actual_task; /* Pointer to actual collective task */
+} ucc_dt_check_state_t;
+
 enum {
     UCC_COLL_TASK_FLAG_CB                    = UCC_BIT(0),
     /* executor is required for collective*/
@@ -128,6 +159,19 @@ typedef struct ucc_schedule {
     ucc_context_t   *ctx;
     ucc_coll_task_t *tasks[UCC_SCHEDULE_MAX_TASKS];
 } ucc_schedule_t;
+
+/**
+ * @brief Extended schedule for datatype validation
+ *
+ * This schedule type includes embedded validation state to avoid
+ * increasing the size of ucc_coll_task_t. The validation state is
+ * accessed through the schedule pointer.
+ */
+typedef struct ucc_dt_check_schedule {
+    ucc_schedule_t       super;
+    ucc_dt_check_state_t dt_check;
+    ucc_coll_task_t     *actual_task; /* The original collective task */
+} ucc_dt_check_schedule_t;
 
 void ucc_coll_task_construct(ucc_coll_task_t *task);
 
@@ -265,3 +309,4 @@ static inline int ucc_coll_task_is_cl_hier(const ucc_coll_task_t *task)
 }
 
 #endif
+

@@ -40,4 +40,17 @@ void ucc_internal_oob_finalize(ucc_team_oob_coll_t *oob);
 
 ucc_status_t ucc_collective_finalize_internal(ucc_coll_task_t *task);
 
+/**
+ * Create datatype validation schedule for rooted collectives
+ *
+ * This function checks if datatype validation is needed and creates a schedule
+ * with validation logic if required. If validation is not needed, returns the
+ * original task unchanged.
+ *
+ * @param team The UCC team
+ * @param task The actual collective task (already created by TL/CL)
+ * @return Schedule with validation (as ucc_coll_task_t*), or original task, or NULL on error
+ */
+ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task);
+
 #endif
