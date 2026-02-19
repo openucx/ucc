@@ -6,6 +6,8 @@
 CUDA_MIN_REQUIRED_MAJOR=11
 CUDA_MIN_REQUIRED_MINOR=0
 
+ARCH_NVLS_LIST="sm_90|sm_100"
+
 ARCH7_CODE="-gencode=arch=compute_52,code=sm_52"
 ARCH8_CODE="-gencode=arch=compute_60,code=sm_60 -gencode=arch=compute_61,code=sm_61"
 ARCH9_CODE="-gencode=arch=compute_70,code=sm_70"
@@ -179,14 +181,10 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                     _ucc_pending_gencode="-gencode"
                     continue
                 fi
-                if test -n "$_ucc_pending_gencode"; then
-                    if echo "$_ucc_nvls_flag" | grep -q -E "sm_90|sm_100" 2>/dev/null; then
-                        NVCC_ARCH_NVLS="$NVCC_ARCH_NVLS $_ucc_pending_gencode $_ucc_nvls_flag"
-                    fi
-                    _ucc_pending_gencode=""
-                elif echo "$_ucc_nvls_flag" | grep -q -E "sm_90|sm_100" 2>/dev/null; then
-                    NVCC_ARCH_NVLS="$NVCC_ARCH_NVLS $_ucc_nvls_flag"
+                if echo "$_ucc_nvls_flag" | grep -q -E "$ARCH_NVLS_LIST" 2>/dev/null; then
+                    NVCC_ARCH_NVLS="$NVCC_ARCH_NVLS $_ucc_pending_gencode $_ucc_nvls_flag"
                 fi
+                _ucc_pending_gencode=""
             done
             AC_SUBST([NVCC_ARCH_NVLS], ["$NVCC_ARCH_NVLS"])
             AC_MSG_RESULT([NVCC NVLS gencodes: $NVCC_ARCH_NVLS])
