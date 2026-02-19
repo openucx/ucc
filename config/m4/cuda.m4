@@ -186,6 +186,7 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                 fi
                 _ucc_pending_gencode=""
             done
+            NVCC_ARCH_NVLS=$(echo $NVCC_ARCH_NVLS)
             AC_SUBST([NVCC_ARCH_NVLS], ["$NVCC_ARCH_NVLS"])
             AC_MSG_RESULT([NVCC NVLS gencodes: $NVCC_ARCH_NVLS])
         ])
