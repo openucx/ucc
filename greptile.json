@@ -1,5 +1,5 @@
 {
-    "labels": ["Ready-For-Review"],
+    "labels": ["Ready-For-Review", "ai-review"],
     "triggerOnUpdates": true,
     "shouldUpdateDescription": false,
     "strictness": 2,

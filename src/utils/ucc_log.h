@@ -10,6 +10,7 @@
 #include "config.h"
 #include "core/ucc_global_opts.h"
 #include "core/ucc_dt.h"
+#include "utils/ucc_mem_type.h"
 #include "utils/debug/log_def.h"
 
 /* Collective trace logger */
