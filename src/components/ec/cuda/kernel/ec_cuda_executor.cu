@@ -118,8 +118,8 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
     return executor_reduce_complex(task, op, dt);
 }
 
-__global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
-                                int q_size, int useCoopLaunch)
+__global__ void executor_kernel(
+    volatile ucc_ec_cuda_executor_t *eee, int q_size, int useCoopLaunch)
 {
     const uint32_t  worker_id   = blockIdx.x;
     const uint32_t  num_workers = gridDim.x;
@@ -213,16 +213,11 @@ ucc_status_t ucc_ec_cuda_persistent_kernel_start(
         dim3  dimBlock(num_threads, 1, 1);
         dim3  dimGrid(num_blocks, 1, 1);
         cudaLaunchCooperativeKernel(
-            (void *)executor_kernel,
-            dimGrid,
-            dimBlock,
-            kernelArgs,
-            0,
-            stream);
+            (void *)executor_kernel, dimGrid, dimBlock, kernelArgs, 0, stream);
     } else {
         executor_start<<<1, 1, 0, stream>>>(eee->dev_state, eee->dev_cidx);
-        executor_kernel<<<num_blocks, num_threads, 0, stream>>>(eee, q_size,
-                                                                 kernelUseCoop);
+        executor_kernel<<<num_blocks, num_threads, 0, stream>>>(
+            eee, q_size, kernelUseCoop);
         executor_shutdown_ack<<<1, 1, 0, stream>>>(eee->dev_state);
     }
     CUDA_CHECK(cudaGetLastError());

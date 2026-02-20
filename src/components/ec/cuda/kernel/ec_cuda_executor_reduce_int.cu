@@ -14,9 +14,8 @@
 #include "ec_cuda_reduce_ops.h"
 #undef UCC_EC_CUDA_REDUCE_OPS_DEVICE_ONLY
 
-__device__ ucc_status_t executor_reduce_int(ucc_ee_executor_task_args_t *task,
-                                            ucc_reduction_op_t op,
-                                            ucc_datatype_t dt)
+__device__ ucc_status_t executor_reduce_int(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op, ucc_datatype_t dt)
 {
     switch (dt) {
     case UCC_DT_INT8:

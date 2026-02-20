@@ -14,9 +14,8 @@
 #include "ec_cuda_reduce_ops.h"
 #undef UCC_EC_CUDA_REDUCE_OPS_DEVICE_ONLY
 
-__device__ ucc_status_t executor_reduce_fp(ucc_ee_executor_task_args_t *task,
-                                           ucc_reduction_op_t op,
-                                           ucc_datatype_t dt)
+__device__ ucc_status_t executor_reduce_fp(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op, ucc_datatype_t dt)
 {
     switch (dt) {
     case UCC_DT_FLOAT16:
@@ -38,8 +37,8 @@ __device__ ucc_status_t executor_reduce_fp(ucc_ee_executor_task_args_t *task,
 #endif
     case UCC_DT_BFLOAT16:
         ucc_assert_system(2 == sizeof(__nv_bfloat16));
-        DT_REDUCE_FLOAT(__nv_bfloat16, task, op,
-                        REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
+        DT_REDUCE_FLOAT(
+            __nv_bfloat16, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
         break;
     default:
         return UCC_ERR_NOT_SUPPORTED;
