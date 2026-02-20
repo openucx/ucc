@@ -141,7 +141,7 @@ __forceinline__ __device__ void LoadVec(T *d, T *s)
         }                                                                      \
     } while (0)
 
-#define CUDA_REDUCE_WITH_OP(NAME, _OP)                                          \
+#define CUDA_REDUCE_WITH_OP_DEVICE(NAME, _OP)                                   \
     template <typename Type, typename AlphaType, bool triggered, bool strided,  \
               int UNROLL, typename TaskType>                                    \
     __device__ void ucc_reduce_cuda_##NAME(TaskType task, uint16_t flags)       \
@@ -176,27 +176,28 @@ __forceinline__ __device__ void LoadVec(T *d, T *s)
                    UCC_EE_EXECUTOR_NUM_BUFS * sizeof(Type *));                  \
             n_src2 = task_default_p->n_srcs - 1;                                \
             s1     = s[0];                                                      \
-            for (int i = 0; i < MAXSRCS && i <= n_src2; i++)                    \
+            for (int i = 0; i < MAXSRCS && i <= n_src2; i++) {                  \
                 alignedVec |= ptrAlignVec<Type, vectype>(s[i]);                 \
+            }                                                                   \
         }                                                                       \
         alignedVec |= ptrAlignVec<Type, vectype>(d);                            \
         ucc_assert_system(sizeof(vectype) % sizeof(Type) == 0);                 \
         /* Successive calls to CUDA_REDUCE_WITH_OP_CHUNK to reduce the buffer.*/\
-        /* Each call enables or disables vectorization and/or loop unrollin   */\
+        /* Each call enables or disables vectorization and/or loop unrolling  */\
         /* optimizations. Each one of the four calls except the last one may  */\
         /* only reduce the buffer partially and leave data remainder to be    */\
         /* treated by the subsequent calls.                                   */\
         if (triggered && alignedVec == 0) {                                     \
-            /* if buffers align, use vectorized loads and unrolling */          \
             CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, vectype);         \
-            /* call with vectorization but without unrolling */                 \
             CUDA_REDUCE_WITH_OP_CHUNK(1, 1, _OP, vectype);                      \
         }                                                                       \
-        /* call with unrolling but without vectorization */                     \
         CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, Type);                \
-        /* last call without unrolling nor vectorization */                     \
         CUDA_REDUCE_WITH_OP_CHUNK(1, 1, _OP, Type);                             \
-    }                                                                           \
+    }
+
+#ifndef UCC_EC_CUDA_REDUCE_OPS_DEVICE_ONLY
+#define CUDA_REDUCE_WITH_OP(NAME, _OP)                                          \
+    CUDA_REDUCE_WITH_OP_DEVICE(NAME, _OP)                                       \
     template <typename Type, typename AlphaType, bool triggered, int UNROLL>    \
     __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(ucc_eee_task_reduce_t task,  \
                                                    uint16_t              flags) \
@@ -211,7 +212,12 @@ __forceinline__ __device__ void LoadVec(T *d, T *s)
         ucc_reduce_cuda_##NAME<Type, AlphaType, triggered, true, UNROLL,        \
                                ucc_eee_task_reduce_strided_t>(task, flags);     \
     }
+#else
+#define CUDA_REDUCE_WITH_OP(NAME, _OP)                                          \
+    CUDA_REDUCE_WITH_OP_DEVICE(NAME, _OP)
+#endif
 
+#ifndef UCC_EC_CUDA_REDUCE_OPS_DEVICE_ONLY
 #define CUDA_REDUCE_WITH_OP_MULTI_DST(NAME, _OP)                               \
     template <typename _Type, bool triggered>                                  \
     __global__ void UCC_REDUCE_CUDA_MULTI_DST_##NAME(                          \
@@ -230,6 +236,7 @@ __forceinline__ __device__ void LoadVec(T *d, T *s)
             }                                                                  \
         }                                                                      \
     }
+#endif
 
 CUDA_REDUCE_WITH_OP(SUM, DO_OP_SUM);
 CUDA_REDUCE_WITH_OP(PROD, DO_OP_PROD);
@@ -242,6 +249,7 @@ CUDA_REDUCE_WITH_OP(BAND, DO_OP_BAND);
 CUDA_REDUCE_WITH_OP(BOR, DO_OP_BOR);
 CUDA_REDUCE_WITH_OP(BXOR, DO_OP_BXOR);
 
+#ifndef UCC_EC_CUDA_REDUCE_OPS_DEVICE_ONLY
 CUDA_REDUCE_WITH_OP_MULTI_DST(SUM,  DO_OP_SUM);
 CUDA_REDUCE_WITH_OP_MULTI_DST(PROD, DO_OP_PROD);
 CUDA_REDUCE_WITH_OP_MULTI_DST(MIN,  DO_OP_MIN);
@@ -252,6 +260,7 @@ CUDA_REDUCE_WITH_OP_MULTI_DST(LXOR, DO_OP_LXOR);
 CUDA_REDUCE_WITH_OP_MULTI_DST(BAND, DO_OP_BAND);
 CUDA_REDUCE_WITH_OP_MULTI_DST(BOR,  DO_OP_BOR);
 CUDA_REDUCE_WITH_OP_MULTI_DST(BXOR, DO_OP_BXOR);
+#endif
 
 #define DT_REDUCE_INT(_Type, _task, _op, ...)                                  \
     do {                                                                       \

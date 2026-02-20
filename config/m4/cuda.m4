@@ -142,6 +142,12 @@ AS_IF([test "x$cuda_checked" != "xyes"],
          # Advanced CUDA configuration only for TL CUDA builds
          AS_IF([test "x$tl_cuda_will_be_available" = "xyes" -a "x$cuda_happy" = "xyes"],
          [
+            # Speed up compilation of heavily templated CUDA translation units
+            # (e.g. reduction kernels) by parallelizing nvcc front-end/back-end work.
+            # This does not change runtime behavior.
+            AS_IF([test $CUDA_MAJOR_VERSION -ge 12],
+                  [NVCC_CFLAGS="$NVCC_CFLAGS --threads 0 --split-compile 0"])
+
              # Check if CUDA version is 13 or higher, which requires C++17 support.
              # If the compiler supports C++17, add the flag to NVCC_CFLAGS. If not, warn the user but still add the flag (build may fail).
              AS_IF([test $CUDA_MAJOR_VERSION -ge 13],

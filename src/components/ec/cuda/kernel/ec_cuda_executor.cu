@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -13,10 +13,11 @@
 extern "C" {
 #include "../ec_cuda.h"
 }
-#include "ec_cuda_reduce_ops.h"
+#include "ec_cuda_executor_reduce_dev.h"
 #include <cooperative_groups.h>
 using namespace cooperative_groups;
 
+#include "ec_cuda_reduce_ops.h"
 #define align_pow2(_n, _p) ((_n) & ((_p) - 1))
 
 __global__ void executor_start(ucc_ec_cuda_executor_state_t *state,
@@ -88,23 +89,6 @@ __device__ void executor_copy_task(ucc_eee_task_copy_t &task)
     }
 }
 
-#define LAUNCH_REDUCE_A(NAME, _Type, _AlphaType, _task, _unroll, ...)          \
-    do {                                                                       \
-        if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
-            ucc_reduce_cuda_##NAME<_Type, _AlphaType, true, false, _unroll,    \
-                                   ucc_eee_task_reduce_t>(_task->reduce,       \
-                                                          _task->flags);       \
-        } else {                                                               \
-            ucc_reduce_cuda_##NAME<_Type, _AlphaType, true, true, _unroll,     \
-                                   ucc_eee_task_reduce_strided_t>(             \
-                _task->reduce_strided, _task->flags);                          \
-        }                                                                      \
-        return UCC_OK;                                                         \
-    } while (0)
-
-#define LAUNCH_REDUCE(NAME, _Type, _task, _unroll, ...)                        \
-    LAUNCH_REDUCE_A(NAME, _Type, _Type, _task, _unroll)
-
 __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
 {
     ucc_reduction_op_t op;
@@ -125,78 +109,17 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
         return UCC_OK;
     }
 
-    switch (dt) {
-    case UCC_DT_INT8:
-        DT_REDUCE_INT(int8_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
-        break;
-    case UCC_DT_INT16:
-        DT_REDUCE_INT(int16_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
-        break;
-    case UCC_DT_INT32:
-        DT_REDUCE_INT(int32_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
-        break;
-    case UCC_DT_INT64:
-        DT_REDUCE_INT(int64_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
-        break;
-    case UCC_DT_UINT8:
-        DT_REDUCE_INT(uint8_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
-        break;
-    case UCC_DT_UINT16:
-        DT_REDUCE_INT(uint16_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
-        break;
-    case UCC_DT_UINT32:
-        DT_REDUCE_INT(uint32_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
-        break;
-    case UCC_DT_UINT64:
-        DT_REDUCE_INT(uint64_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
-        break;
-    case UCC_DT_FLOAT16:
-        DT_REDUCE_FLOAT(__half, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
-        break;
-    case UCC_DT_FLOAT32:
-#if SIZEOF_FLOAT == 4
-        DT_REDUCE_FLOAT(float, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
-        break;
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_FLOAT64:
-#if SIZEOF_DOUBLE == 8
-        DT_REDUCE_FLOAT(double, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
-        break;
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_FLOAT32_COMPLEX:
-#if SIZEOF_CUFLOATCOMPLEX == 8
-        DT_REDUCE_FLOAT_COMPLEX(cuFloatComplex, float, task, op,
-                                REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
-        break;
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_FLOAT64_COMPLEX:
-#if SIZEOF_CUDOUBLECOMPLEX == 16
-        DT_REDUCE_FLOAT_COMPLEX(cuDoubleComplex, double, task, op,
-                                REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
-        break;
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_BFLOAT16:
-        ucc_assert_system(2 == sizeof(__nv_bfloat16));
-        DT_REDUCE_FLOAT(__nv_bfloat16, task, op,
-                        REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
-        break;
-    default:
-        return UCC_ERR_NOT_SUPPORTED;
+    if (executor_reduce_int(task, op, dt) == UCC_OK) {
+        return UCC_OK;
     }
-    return UCC_OK;
+    if (executor_reduce_fp(task, op, dt) == UCC_OK) {
+        return UCC_OK;
+    }
+    return executor_reduce_complex(task, op, dt);
 }
 
-template<bool useCoopLaunch>
 __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
-                                int q_size)
+                                int q_size, int useCoopLaunch)
 {
     const uint32_t  worker_id   = blockIdx.x;
     const uint32_t  num_workers = gridDim.x;
@@ -267,16 +190,12 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
     }
 }
 
-
 extern "C" {
 ucc_status_t ucc_ec_cuda_executor_kernel_calc_max_threads(int *max)
 {
-    int use_coop_launch = EC_CUDA_CONFIG->use_cooperative_launch;
     cudaFuncAttributes attr;
 
-    CUDA_CHECK(cudaFuncGetAttributes(
-        &attr,
-        (use_coop_launch ? executor_kernel<true> : executor_kernel<false>)));
+    CUDA_CHECK(cudaFuncGetAttributes(&attr, executor_kernel));
     *max = (attr.maxThreadsPerBlock / WARP_SIZE) * WARP_SIZE;
     return UCC_OK;
 }
@@ -287,13 +206,14 @@ ucc_status_t ucc_ec_cuda_persistent_kernel_start(
     cudaStream_t stream        = (cudaStream_t)eee->super.ee_context;
     int          q_size        = EC_CUDA_CONFIG->exec_max_tasks;
     int          useCoopLaunch = EC_CUDA_CONFIG->use_cooperative_launch;
+    int          kernelUseCoop = useCoopLaunch;
 
     if (useCoopLaunch) {
-        void *kernelArgs[] = {&eee, &q_size};
+        void *kernelArgs[] = {&eee, &q_size, &kernelUseCoop};
         dim3  dimBlock(num_threads, 1, 1);
         dim3  dimGrid(num_blocks, 1, 1);
         cudaLaunchCooperativeKernel(
-            (void *)executor_kernel<true>,
+            (void *)executor_kernel,
             dimGrid,
             dimBlock,
             kernelArgs,
@@ -301,8 +221,8 @@ ucc_status_t ucc_ec_cuda_persistent_kernel_start(
             stream);
     } else {
         executor_start<<<1, 1, 0, stream>>>(eee->dev_state, eee->dev_cidx);
-        executor_kernel<false>
-            <<<num_blocks, num_threads, 0, stream>>>(eee, q_size);
+        executor_kernel<<<num_blocks, num_threads, 0, stream>>>(eee, q_size,
+                                                                 kernelUseCoop);
         executor_shutdown_ack<<<1, 1, 0, stream>>>(eee->dev_state);
     }
     CUDA_CHECK(cudaGetLastError());
