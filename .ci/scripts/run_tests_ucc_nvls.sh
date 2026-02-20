@@ -11,3 +11,5 @@ export UCC_TL_CUDA_NVLS_SM_COUNT=20
 export UCC_TL_CUDA_TUNE=allreduce:cuda:@0
 
 /opt/nvidia/bin/ucc/build/bin/ucc_perftest -c allreduce -F -m cuda -b 1k -e 32M -d bfloat16 -o sum
+/opt/nvidia/bin/ucc/build/bin/ucc_test_mpi -c allreduce -F -m cuda -b 1k -e 32M -d bfloat16 -o sum
+/opt/nvidia/bin/ucc/build/bin/ucc_test_mpi -c reduce_scatter -F -m cuda -b 1k -e 32M -d bfloat16 -o sum
