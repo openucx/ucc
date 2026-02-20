@@ -2,6 +2,10 @@ name: Linter-NVIDIA
 
 on: [push, pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
@@ -50,7 +54,7 @@ jobs:
         wget --no-verbose ${HPCX_LINK}
         tar xjf hpcx-v2.22.1-gcc-doca_ofed-ubuntu22.04-cuda12-x86_64.tbz
         mv hpcx-v2.22.1-gcc-doca_ofed-ubuntu22.04-cuda12-x86_64 hpcx
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Build UCC
       run: |
         ./autogen.sh

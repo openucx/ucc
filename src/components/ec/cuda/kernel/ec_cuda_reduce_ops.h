@@ -141,77 +141,99 @@ __forceinline__ __device__ void LoadVec(T *d, T *s)
         }                                                                      \
     } while (0)
 
-#define CUDA_REDUCE_WITH_OP(NAME, _OP)                                          \
-    template <typename Type, typename AlphaType, bool triggered, bool strided,  \
-              int UNROLL, typename TaskType>                                    \
-    __device__ void ucc_reduce_cuda_##NAME(TaskType task, uint16_t flags)       \
-    {                                                                           \
-        Type *       d          = (Type *)task.dst;                             \
-        bool         alignedVec = 0;                                            \
-        size_t       offset     = 0;                                            \
-        const size_t count      = task.count;                                   \
-        const int    MAXSRCS = strided ? USHRT_MAX : UCC_EE_EXECUTOR_NUM_BUFS;  \
-        const int    ALLOC_SIZE = strided ? 1 : UCC_EE_EXECUTOR_NUM_BUFS;       \
-        Type *       s[ALLOC_SIZE];                                             \
-        Type *       s1;                                                        \
-        Type *       s2;                                                        \
-        __shared__ uint16_t n_src2;                                             \
-        size_t              ld;                                                 \
-        size_t              i, j, k, line;                                      \
-        if (strided) {                                                          \
-            ucc_eee_task_reduce_strided_t *task_strided_p =                     \
-                (ucc_eee_task_reduce_strided_t *)&task;                         \
-            n_src2 = task_strided_p->n_src2;                                    \
-            s1     = (Type *)task_strided_p->src1;                              \
-            s2     = (Type *)task_strided_p->src2;                              \
-            ld     = task_strided_p->stride / sizeof(Type);                     \
-            ucc_assert_system(task_strided_p->stride % sizeof(Type) == 0);      \
-            alignedVec |= ptrAlignVec<Type, vectype>(s1);                       \
-            alignedVec |= ptrAlignVec<Type, vectype>(s2);                       \
-            alignedVec |= ((task_strided_p->stride % sizeof(vectype)) != 0);    \
-        } else {                                                                \
-            ucc_eee_task_reduce_t *task_default_p =                             \
-                (ucc_eee_task_reduce_t *)&task;                                 \
-            memcpy(s, task_default_p->srcs,                                     \
-                   UCC_EE_EXECUTOR_NUM_BUFS * sizeof(Type *));                  \
-            n_src2 = task_default_p->n_srcs - 1;                                \
-            s1     = s[0];                                                      \
-            for (int i = 0; i < MAXSRCS && i <= n_src2; i++)                    \
-                alignedVec |= ptrAlignVec<Type, vectype>(s[i]);                 \
-        }                                                                       \
-        alignedVec |= ptrAlignVec<Type, vectype>(d);                            \
-        ucc_assert_system(sizeof(vectype) % sizeof(Type) == 0);                 \
-        /* Successive calls to CUDA_REDUCE_WITH_OP_CHUNK to reduce the buffer.*/\
-        /* Each call enables or disables vectorization and/or loop unrollin   */\
-        /* optimizations. Each one of the four calls except the last one may  */\
-        /* only reduce the buffer partially and leave data remainder to be    */\
-        /* treated by the subsequent calls.                                   */\
-        if (triggered && alignedVec == 0) {                                     \
-            /* if buffers align, use vectorized loads and unrolling */          \
-            CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, vectype);         \
-            /* call with vectorization but without unrolling */                 \
-            CUDA_REDUCE_WITH_OP_CHUNK(1, 1, _OP, vectype);                      \
-        }                                                                       \
-        /* call with unrolling but without vectorization */                     \
-        CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, Type);                \
-        /* last call without unrolling nor vectorization */                     \
-        CUDA_REDUCE_WITH_OP_CHUNK(1, 1, _OP, Type);                             \
-    }                                                                           \
-    template <typename Type, typename AlphaType, bool triggered, int UNROLL>    \
-    __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(ucc_eee_task_reduce_t task,  \
-                                                   uint16_t              flags) \
-    {                                                                           \
-        ucc_reduce_cuda_##NAME<Type, AlphaType, triggered, false, UNROLL,       \
-                               ucc_eee_task_reduce_t>(task, flags);             \
-    }                                                                           \
-    template <typename Type, typename AlphaType, bool triggered, int UNROLL>    \
-    __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                             \
-        ucc_eee_task_reduce_strided_t task, uint16_t flags)                     \
-    {                                                                           \
-        ucc_reduce_cuda_##NAME<Type, AlphaType, triggered, true, UNROLL,        \
-                               ucc_eee_task_reduce_strided_t>(task, flags);     \
+#define CUDA_REDUCE_WITH_OP_DEVICE(NAME, _OP)                                    \
+    template <                                                                   \
+        typename Type,                                                           \
+        typename AlphaType,                                                      \
+        bool triggered,                                                          \
+        bool strided,                                                            \
+        int  UNROLL,                                                             \
+        typename TaskType>                                                       \
+    __device__ void ucc_reduce_cuda_##NAME(TaskType task, uint16_t flags)        \
+    {                                                                            \
+        Type        *d          = (Type *)task.dst;                              \
+        bool         alignedVec = 0;                                             \
+        size_t       offset     = 0;                                             \
+        const size_t count      = task.count;                                    \
+        const int    MAXSRCS = strided ? USHRT_MAX : UCC_EE_EXECUTOR_NUM_BUFS;   \
+        const int    ALLOC_SIZE = strided ? 1 : UCC_EE_EXECUTOR_NUM_BUFS;        \
+        Type        *s[ALLOC_SIZE];                                              \
+        Type        *s1;                                                         \
+        Type        *s2;                                                         \
+        __shared__ uint16_t n_src2;                                              \
+        size_t              ld;                                                  \
+        size_t              i, j, k, line;                                       \
+        if (strided) {                                                           \
+            ucc_eee_task_reduce_strided_t                                        \
+                *task_strided_p = (ucc_eee_task_reduce_strided_t *)&task;        \
+            n_src2              = task_strided_p->n_src2;                        \
+            s1                  = (Type *)task_strided_p->src1;                  \
+            s2                  = (Type *)task_strided_p->src2;                  \
+            ld                  = task_strided_p->stride / sizeof(Type);         \
+            ucc_assert_system(task_strided_p->stride % sizeof(Type) == 0);       \
+            alignedVec |= ptrAlignVec<Type, vectype>(s1);                        \
+            alignedVec |= ptrAlignVec<Type, vectype>(s2);                        \
+            alignedVec |= ((task_strided_p->stride % sizeof(vectype)) != 0);     \
+        } else {                                                                 \
+            ucc_eee_task_reduce_t                                                \
+                *task_default_p = (ucc_eee_task_reduce_t *)&task;                \
+            memcpy(                                                              \
+                s,                                                               \
+                task_default_p->srcs,                                            \
+                UCC_EE_EXECUTOR_NUM_BUFS * sizeof(Type *));                      \
+            n_src2 = task_default_p->n_srcs - 1;                                 \
+            s1     = s[0];                                                       \
+            for (int i = 0; i < MAXSRCS && i <= n_src2; i++) {                   \
+                alignedVec |= ptrAlignVec<Type, vectype>(s[i]);                  \
+            }                                                                    \
+        }                                                                        \
+        alignedVec |= ptrAlignVec<Type, vectype>(d);                             \
+        ucc_assert_system(sizeof(vectype) % sizeof(Type) == 0);                  \
+        /* Successive calls to CUDA_REDUCE_WITH_OP_CHUNK to reduce the buffer.*/ \
+        /* Each call enables or disables vectorization and/or loop unrolling  */ \
+        /* optimizations. Each one of the four calls except the last one may  */ \
+        /* only reduce the buffer partially and leave data remainder to be    */ \
+        /* treated by the subsequent calls.                                   */ \
+        if (triggered && alignedVec == 0) {                                      \
+            CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, vectype);          \
+            CUDA_REDUCE_WITH_OP_CHUNK(1, 1, _OP, vectype);                       \
+        }                                                                        \
+        CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, Type);                 \
+        CUDA_REDUCE_WITH_OP_CHUNK(1, 1, _OP, Type);                              \
     }
 
+#ifndef UCC_EC_CUDA_REDUCE_OPS_DEVICE_ONLY
+#define CUDA_REDUCE_WITH_OP(NAME, _OP)                                         \
+    CUDA_REDUCE_WITH_OP_DEVICE(NAME, _OP)                                      \
+    template <typename Type, typename AlphaType, bool triggered, int UNROLL>   \
+    __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(                            \
+        ucc_eee_task_reduce_t task, uint16_t flags)                            \
+    {                                                                          \
+        ucc_reduce_cuda_##NAME<                                                \
+            Type,                                                              \
+            AlphaType,                                                         \
+            triggered,                                                         \
+            false,                                                             \
+            UNROLL,                                                            \
+            ucc_eee_task_reduce_t>(task, flags);                               \
+    }                                                                          \
+    template <typename Type, typename AlphaType, bool triggered, int UNROLL>   \
+    __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                            \
+        ucc_eee_task_reduce_strided_t task, uint16_t flags)                    \
+    {                                                                          \
+        ucc_reduce_cuda_##NAME<                                                \
+            Type,                                                              \
+            AlphaType,                                                         \
+            triggered,                                                         \
+            true,                                                              \
+            UNROLL,                                                            \
+            ucc_eee_task_reduce_strided_t>(task, flags);                       \
+    }
+#else
+#define CUDA_REDUCE_WITH_OP(NAME, _OP) CUDA_REDUCE_WITH_OP_DEVICE(NAME, _OP)
+#endif
+
+#ifndef UCC_EC_CUDA_REDUCE_OPS_DEVICE_ONLY
 #define CUDA_REDUCE_WITH_OP_MULTI_DST(NAME, _OP)                               \
     template <typename _Type, bool triggered>                                  \
     __global__ void UCC_REDUCE_CUDA_MULTI_DST_##NAME(                          \
@@ -230,6 +252,7 @@ __forceinline__ __device__ void LoadVec(T *d, T *s)
             }                                                                  \
         }                                                                      \
     }
+#endif
 
 CUDA_REDUCE_WITH_OP(SUM, DO_OP_SUM);
 CUDA_REDUCE_WITH_OP(PROD, DO_OP_PROD);
@@ -242,6 +265,7 @@ CUDA_REDUCE_WITH_OP(BAND, DO_OP_BAND);
 CUDA_REDUCE_WITH_OP(BOR, DO_OP_BOR);
 CUDA_REDUCE_WITH_OP(BXOR, DO_OP_BXOR);
 
+#ifndef UCC_EC_CUDA_REDUCE_OPS_DEVICE_ONLY
 CUDA_REDUCE_WITH_OP_MULTI_DST(SUM,  DO_OP_SUM);
 CUDA_REDUCE_WITH_OP_MULTI_DST(PROD, DO_OP_PROD);
 CUDA_REDUCE_WITH_OP_MULTI_DST(MIN,  DO_OP_MIN);
@@ -252,6 +276,7 @@ CUDA_REDUCE_WITH_OP_MULTI_DST(LXOR, DO_OP_LXOR);
 CUDA_REDUCE_WITH_OP_MULTI_DST(BAND, DO_OP_BAND);
 CUDA_REDUCE_WITH_OP_MULTI_DST(BOR,  DO_OP_BOR);
 CUDA_REDUCE_WITH_OP_MULTI_DST(BXOR, DO_OP_BXOR);
+#endif
 
 #define DT_REDUCE_INT(_Type, _task, _op, ...)                                  \
     do {                                                                       \
