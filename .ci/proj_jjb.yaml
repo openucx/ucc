@@ -228,6 +228,12 @@
                 string(name: 'sha1', value: githubHelper.getMergedSHA()),
                 string(name: 'githubData', value: VARIABLE_FROM_POST)
             ], propagate: false, wait: true
+        }}, 'ucc-run-coverity': {{
+            def jobName = 'ucc-run-coverity'
+            build job: jobName, parameters: [
+                string(name: 'sha1', value: githubHelper.getMergedSHA()),
+                string(name: 'githubData', value: VARIABLE_FROM_POST)
+            ], propagate: false, wait: true
         }}
         githubHelper.updateCommitStatus(blueOceanUrl, "Blossom CI ended", GitHubCommitState.SUCCESS)
       }} catch(Exception ex) {{
@@ -235,6 +241,57 @@
           githubHelper.updateCommitStatus(blueOceanUrl, "Blossom CI ended", GitHubCommitState.FAILURE)
           throw ex
       }}
+
+- job-template:
+    name: "{jjb_proj}-run-coverity"
+    folder: "{jjb_folder}"
+    project-type: pipeline
+    properties:
+      - github:
+          url: "{jjb_git_web}"
+      - build-discarder:
+          days-to-keep: 30
+          num-to-keep: 20
+      - inject:
+          keep-system-variables: true
+          properties-content: |
+            jjb_proj="{jjb_proj}-run-coverity"
+    description: Do NOT edit this job through the Web GUI !
+    concurrent: true
+    sandbox: true
+    parameters:
+      - string:
+          name: "sha1"
+          default: "master"
+          description: "Commit to be checked, set by PR"
+      - string:
+          name: "DEBUG"
+          default: 0
+          description: "Enable debug prints and traces, valid values are 0-9"
+      - bool:
+          name: "BUILD_DOCKERS"
+          default: false
+          description: "Rebuild docker containers"
+      - string:
+          name: "CONF_FILE"
+          default: ".ci/pipeline/run_coverity_matrix.yaml"
+          description: "Regex to select job config file"
+      - string:
+          name: "githubData"
+          default: ""
+          description: "Variables from post"
+    pipeline-scm:
+      scm:
+        - git:
+            url: "{jjb_git}"
+            credentials-id: "{jjb_gh_auth_id}"
+            branches: [ '$sha1' ]
+            shallow-clone: true
+            depth: 10
+            refspec: "+refs/heads/*:refs/remotes/origin/* +refs/pull/*:refs/remotes/origin/pr/*"
+            browser: githubweb
+            browser-url: "{jjb_git}"
+      script-path: "{jjb_jenkinsfile}"
 
 - project:
     name: ucc-build
@@ -251,3 +308,4 @@
       - "{jjb_proj}-build-hpcsdk"
       - "{jjb_proj}-ci-dispatcher"
       - "{jjb_proj}-test-nvls"
+      - "{jjb_proj}-run-coverity"

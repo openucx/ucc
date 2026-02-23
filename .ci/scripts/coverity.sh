@@ -1,4 +1,4 @@
-#!/bin/bash -eE
+#!/bin/bash -eEx
 
 set -o pipefail
 
@@ -24,8 +24,10 @@ module load hpcx-gcc
 module load dev/cuda12.9.0
 module load dev/nccl_2.26.5-1_cuda12.9.0
 module load tools/cov-2021.12
+
 ./autogen.sh
 ./configure --with-nccl --with-tls=cuda,nccl,self,sharp,shm,ucp,mlx5 --with-ucx="${HPCX_UCX_DIR}" --with-sharp="${HPCX_SHARP_DIR}" --with-nvcc-gencode="-gencode arch=compute_86,code=sm_86"
+
 make_opt="-j$(($(nproc) / 2 + 1))"
 COV_BUILD_DIR=$(dirname "$0")/cov-build
 mkdir -p "$COV_BUILD_DIR"

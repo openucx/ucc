@@ -1,0 +1,51 @@
+# Coverity static analysis environment for UCC.
+# CUDA devel + NCCL + UCX + SHARP + autotools. No GPU required at runtime.
+# Mount /hpc/local at runtime and use COVERITY_MODULE (e.g. tools/cov-2021.12) to load Coverity via module.
+ARG CUDA_VER=13.1.0
+FROM nvcr.io/nvidia/cuda:${CUDA_VER}-devel-ubuntu24.04
+
+# ARG NVIDIA_ROOT_DIR=/opt/nvidia
+# ARG UCX_GITHUB_URL=https://github.com/openucx/ucx.git
+# ARG UCX_BRANCH=v1.20.x
+# ARG UCX_BUILD_TYPE=release-mt
+# # HPC-X tarball for SHARP (headers/libs for UCC configure; Ubuntu22/CUDA12 tarball works for compile)
+# ARG HPCX_TARBALL_URL=https://content.mellanox.com/hpc/hpc-x/v2.25.1_cuda13/hpcx-v2.25.1-gcc-inbox-ubuntu24.04-cuda13-x86_64.tbz
+
+ENV DEBIAN_FRONTEND=noninteractive
+# ENV SRC_DIR=${NVIDIA_ROOT_DIR}/src
+# ENV BIN_DIR=${NVIDIA_ROOT_DIR}/bin
+# ENV CUDA_HOME=/usr/local/cuda
+# ENV UCX_INSTALL_DIR=${BIN_DIR}/ucx/build-${UCX_BUILD_TYPE}
+# ENV HPCX_DIR=/opt/hpcx
+# ENV HPCX_SHARP_DIR=${HPCX_DIR}/sharp
+# ENV PATH=${CUDA_HOME}/bin:${PATH}
+# ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf automake build-essential ca-certificates environment-modules git libtool \
+    libnuma-dev libevent-dev make wget bzip2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install SHARP from HPC-X tarball (for UCC configure --with-sharp)
+# RUN mkdir -p "${HPCX_DIR}" && cd /tmp \
+#     && wget -q --no-check-certificate "${HPCX_TARBALL_URL}" -O hpcx.tbz \
+#     && tar xjf hpcx.tbz \
+#     && mv hpcx-v2.25.1-gcc-inbox-ubuntu24.04-cuda13-x86_64/* "${HPCX_DIR}/" \
+#     && rm -rf hpcx.tbz hpcx-v2.25.1-gcc-inbox-ubuntu24.04-cuda13-x86_64
+
+# RUN mkdir -p "${SRC_DIR}" "${BIN_DIR}" \
+#     && git clone --depth 1 -b "${UCX_BRANCH}" "${UCX_GITHUB_URL}" "${SRC_DIR}/ucx" \
+#     && cd "${SRC_DIR}/ucx" \
+#     && ./autogen.sh \
+#     && mkdir -p build-${UCX_BUILD_TYPE} && cd build-${UCX_BUILD_TYPE} \
+#     && ../contrib/configure-release-mt --with-cuda="${CUDA_HOME}" --prefix="${UCX_INSTALL_DIR}" \
+#     && make -j$(nproc) install \
+#     && rm -rf "${SRC_DIR}/ucx" \
+#     && echo "${UCX_INSTALL_DIR}/lib" > /etc/ld.so.conf.d/ucx.conf \
+#     && ldconfig
+
+# ENV PATH=${UCX_INSTALL_DIR}/bin:${PATH}
+# ENV LD_LIBRARY_PATH=${UCX_INSTALL_DIR}/lib:${LD_LIBRARY_PATH}
+# ENV COVERITY_HOME=${COVERITY_HOME:-/opt/coverity}
+
+WORKDIR /workspace
