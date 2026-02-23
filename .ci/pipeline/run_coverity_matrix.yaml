@@ -1,0 +1,45 @@
+---
+job: "run-coverity"
+
+credentials:
+  - {
+      credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0",
+      usernameVariable: "UCC_USERNAME",
+      passwordVariable: "UCC_PASSWORD",
+    }
+
+registry_host: "harbor.mellanox.com"
+registry_path: "/torch-ucc"
+registry_auth: "ucc-harbor-credentials"
+
+kubernetes:
+  cloud: il-ipp-blossom-prod
+  namespace: hpcx
+  limits: "{memory: 16Gi, cpu: 16000m}"
+  requests: "{memory: 16Gi, cpu: 16000m}"
+
+# Mount host Coverity install so container can use it (set COVERITY_HOME to path under /hpc/local if needed)
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /auto/sw_tools/Commercial/Synopsys/Coverity, hostPath: /auto/sw_tools/Commercial/Synopsys/Coverity}
+
+runs_on_dockers:
+  - {
+      url: "harbor.mellanox.com/hpcx/x86_64/ubuntu24.04/builder:mofed-24.10-3.2.5.0",
+      name: "coverity",
+      arch: "x86_64",
+    }
+
+timeout_minutes: 60
+
+steps:
+  - name: Run Coverity
+    credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0"
+    containerSelector: "{name: 'coverity'}"
+    run: |
+      export UCC_PASSWORD=$UCC_PASSWORD
+      export UCC_USERNAME=$UCC_USERNAME
+      export MODULEPATH="/hpc/local/etc/modulefiles"
+      echo "Running coverity"
+      ${WORKSPACE}/.ci/scripts/coverity.sh
+    archiveArtifacts: .ci/scripts/cov-build/*
