@@ -16,6 +16,15 @@
 #include <sys/prctl.h>   // for prctl()
 #include <unistd.h>      // for close()
 
+/* RHEL 8 glibc headers (kernel 4.18) don't define pidfd syscall numbers */
+#ifndef SYS_pidfd_open
+#define SYS_pidfd_open 434
+#endif
+
+#ifndef SYS_pidfd_getfd
+#define SYS_pidfd_getfd 438
+#endif
+
 ucc_status_t ucc_tl_cuda_nvls_check_support(
     ucc_tl_cuda_lib_t *lib, int device, int is_multinode)
 {

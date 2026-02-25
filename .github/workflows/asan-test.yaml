@@ -2,6 +2,10 @@ name: ASAN Tests
 
 on: [push, pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
@@ -28,7 +32,7 @@ jobs:
         cd /tmp/ucx && ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
         make -j install
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Run gtest ASAN
       run: |
         export ASAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=1:print_suppressions=0

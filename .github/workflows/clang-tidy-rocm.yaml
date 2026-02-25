@@ -2,6 +2,10 @@ name: Linter-ROCM
 
 on: [push, pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
@@ -43,7 +47,7 @@ jobs:
         cd /tmp/ucx && ./autogen.sh
         CC=gcc CXX=g++ ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install --with-rocm=/opt/rocm
         make -j install
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Build UCC
       run: |
         ./autogen.sh
