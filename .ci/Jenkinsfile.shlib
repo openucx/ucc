@@ -7,7 +7,7 @@
 
 // load pipeline functions
 // Requires pipeline-github-lib plugin to load library from github
-@Library('github.com/Mellanox/ci-demo@master')
+@Library('github.com/Mellanox/ci-demo@stable_hpcx')
 def matrix = new com.mellanox.cicd.Matrix()
 
 def githubHelper = null

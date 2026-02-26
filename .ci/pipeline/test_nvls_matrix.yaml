@@ -26,7 +26,7 @@ env:
   SLURM_HEAD_NODE: 'dlcluster.nvidia.com'
   SLURM_ACCOUNT: 'blackwell-ci'
   SLURM_JOB_NAME: 'ucc-ci-test-nvls-${BUILD_NUMBER}'
-  SLURM_JOB_TIMEOUT: '00:30:00'
+  SLURM_JOB_TIMEOUT: '00:40:00'
   TEST_TIMEOUT_MINUTES: 35
 
 kubernetes:
