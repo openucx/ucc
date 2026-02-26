@@ -152,6 +152,12 @@ ucc_status_t ucc_context_progress_deregister(ucc_context_t *ctx,
 ucc_status_t ucc_core_addr_exchange(ucc_context_t *context, ucc_oob_coll_t *oob,
                                     ucc_addr_storage_t *addr_storage);
 
+/* Performs context id address exchange between the processes group defined by OOB.
+   This function is used to exchange the context ids between the processes in order
+   to find the local rank.
+*/
+ucc_status_t ucc_core_ctx_id_exchange(ucc_context_t *context, ucc_oob_coll_t *oob,
+                                      ucc_addr_storage_t *addr_storage);
 /* UCC context packed address layout:
    --------------------------------------------------------------------------
    |n_components|id0|offset0|id1|offset1|..|idN|offsetN|data0|data1|..|dataN|
