@@ -18,6 +18,9 @@
 #include "schedule/ucc_schedule.h"
 #include "coll_score/ucc_coll_score.h"
 #include "ucc_ee.h"
+#include "ucc_global_opts.h"
+#include "ucc_service_coll.h"
+
 
 #define UCC_BUFFER_INFO_CHECK_MEM_TYPE(_info) do {                             \
     if ((_info).mem_type == UCC_MEMORY_TYPE_UNKNOWN) {                         \
@@ -255,6 +258,38 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
         goto free_scratch;
     }
 
+    /* Setup non-blocking datatype check for rooted collectives
+     *
+     * This implements transparent validation using a schedule with two tasks:
+     * 1. Allreduce validation task: uses MIN reduction with min/max trick to detect mismatches
+     * 2. Actual collective task: the real gather/scatter operation
+     *
+     * Validation uses allreduce (MIN) on [dt, -dt, mem, -mem]:
+     *   - Message size: 8 bytes (4 × int16_t, doesn't scale with number of ranks)
+     *   - After reduction: min(dt) == -min(-dt) means all ranks have same datatype
+     *
+     * Dependencies: allreduce validation → actual task
+     * If validation fails, the dependency mechanism prevents the actual task from posting.
+     */
+    if (coll_args->coll_type == UCC_COLL_TYPE_GATHER ||
+        coll_args->coll_type == UCC_COLL_TYPE_GATHERV ||
+        coll_args->coll_type == UCC_COLL_TYPE_SCATTER ||
+        coll_args->coll_type == UCC_COLL_TYPE_SCATTERV) {
+        /* Check if datatype validation is needed and create schedule if so */
+        {
+            ucc_coll_task_t *validated_task;
+
+            validated_task = ucc_service_dt_check(team, task);
+            if (!validated_task) {
+                ucc_error("failed to create dt_check schedule");
+                status = UCC_ERR_NO_MEMORY;
+                goto coll_finalize;
+            }
+            /* Return schedule if validation was needed, or original task if not */
+            task = validated_task;
+        }
+    }
+    /* Setup top-level task (actual task or schedule) */
     task->flags |= UCC_COLL_TASK_FLAG_TOP_LEVEL;
     if (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
         task->flags |= UCC_COLL_TASK_FLAG_EXECUTOR_STOP;
@@ -624,3 +659,5 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
 
     return ucc_progress_queue_enqueue(task->bargs.team->contexts[0]->pq, ev_task);
 }
+
+
