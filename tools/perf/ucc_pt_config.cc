@@ -458,7 +458,7 @@ void ucc_pt_config::print_help()
     std::cout << "  -w <number>: number of warmup iterations"<<std::endl;
     std::cout << "  -f <number>: multiplication factor between sizes. Default : 2."<<std::endl;
     std::cout << "  -N <number>: number of buffers"<<std::endl;
-    std::cout << "  -M: use local memory registration for collectives"<<std::endl;
+    std::cout << "  -M <none|local|global>: memory registration mode for collectives"<<std::endl;
     std::cout << "  -T: triggered collective"<<std::endl;
     std::cout << "  -F: enable full print"<<std::endl;
     std::cout << "  -S: <number>: root shift for rooted collectives"<<std::endl;

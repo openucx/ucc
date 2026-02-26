@@ -83,7 +83,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     self->ids         = NULL;
     shm_id = -1;
     self->sync = (void*)-1;
-    /* Defensive init: ensure remote scratch mapping arrays are NULL/zeroed
+    /* Defensive init: ensure remote mapping arrays are NULL/zeroed
        even if we return early (e.g., multinode NVLS regime or failures) */
     for (i = 0; i < UCC_TL_CUDA_MAX_PEERS; i++) {
         self->scratch.rem[i] = NULL;
@@ -235,6 +235,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
     // destroy the nvls context
     ucc_tl_cuda_nvls_destroy(self);
 #endif
+
 
     if (self->ids) {
         if (self->sync != (void*)-1) {
@@ -445,6 +446,7 @@ barrier:
                            exit_err, status);
         }
     }
+
     team->oob_req = NULL;
     tl_debug(lib, "initialized tl team: %p", team);
 
