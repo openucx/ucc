@@ -6,15 +6,17 @@
 #define UCC_TOPO_H_
 #include "ucc_sbgp.h"
 #include "utils/ucc_proc_info.h"
+#include "utils/ucc_coll_utils.h"
 
 /* Topo data structure initialized per UCC context.
-   key element of this struct is the array of ucc_proc_info_t
-   that is constructed during ucc_context_topo_init using
-   ucc_addr_storage_t. In other words the topo struct can
-   be initialized after the exchange of addresses is performed. */
+   key elements of this struct are the arrays of ucc_proc_info_t and
+   ucc_host_info_t that are constructed during ucc_context_topo_init using
+   ucc_addr_storage_t. In other words the topo struct can be initialized after
+   the exchange of addresses is performed. */
 
 typedef struct ucc_context_topo {
     ucc_proc_info_t *procs;
+    ucc_host_info_t *hosts;
     ucc_rank_t       n_procs;
     ucc_rank_t       nnodes;
     ucc_rank_t       min_ppn;       /*< smallest ppn value across the nodes
@@ -32,6 +34,14 @@ typedef struct ucc_context_topo {
 } ucc_context_topo_t;
 
 typedef struct ucc_addr_storage ucc_addr_storage_t;
+
+/* Device map for a team topo. Each entry corresponds to a TEAM RANK and stores
+   an index into ucc_host_info_t::gpus for that rank's host. Use
+   UCC_DEVICE_ID_INVALID when the rank has no device mapping. */
+typedef struct ucc_device_map {
+    ucc_device_id_t *device_ids;
+    ucc_rank_t       n_ranks;
+} ucc_device_map_t;
 
 /* This topo structure is initialized over a SUBSET of processes
    from ucc_context_topo_t.
@@ -72,6 +82,7 @@ typedef struct ucc_topo {
                                     across all nodes of a team */
     ucc_rank_t   max_numa_size; /*< max number of processes on a numa,
                                     across all nodes of a team */
+    ucc_device_map_t device_map; /*< map of team ranks to device indices */
 } ucc_topo_t;
 
 /* Initializes ctx level topo structure using addr_storage.
@@ -79,14 +90,16 @@ typedef struct ucc_topo {
    into array for each participating proc. The array is then sorted
    (see ucc_compare_proc_info in ucc_topo.c) that allows O(N) local
    subgroup discoveries */
-ucc_status_t ucc_context_topo_init(ucc_addr_storage_t * storage,
-                                   ucc_context_topo_t **topo);
-void         ucc_context_topo_cleanup(ucc_context_topo_t *topo);
+ucc_status_t ucc_context_topo_init(
+    ucc_addr_storage_t *storage, ucc_context_topo_t **topo);
+
+void ucc_context_topo_cleanup(ucc_context_topo_t *topo);
 
 /* Initializes topo structure for a subset, e.g. for a team */
-ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *topo,
-                           ucc_topo_t **subset_topo);
-void         ucc_topo_cleanup(ucc_topo_t *subset_topo);
+ucc_status_t ucc_topo_init(
+    ucc_subset_t set, ucc_context_topo_t *topo, ucc_topo_t **subset_topo);
+
+void ucc_topo_cleanup(ucc_topo_t *subset_topo);
 
 ucc_sbgp_t *ucc_topo_get_sbgp(ucc_topo_t *topo, ucc_sbgp_type_t type);
 
@@ -110,6 +123,25 @@ static inline int ucc_rank_on_local_node(ucc_rank_t team_rank, ucc_topo_t *topo)
     ucc_rank_t my_ctx_rank = ucc_ep_map_eval(topo->set.map, topo->set.myrank);
 
     return procs[ctx_rank].host_hash == procs[my_ctx_rank].host_hash;
+}
+
+static inline ucc_host_id_t ucc_topo_get_node_host_id(ucc_topo_t *topo,
+                                                      ucc_rank_t node_index)
+{
+    ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+    ucc_rank_t  leader_rank;
+    ucc_rank_t  ctx_rank;
+
+    if (sbgp->status == UCC_SBGP_NOT_EXISTS) {
+        ucc_assert(ucc_topo_is_single_node(topo));
+        leader_rank = 0;
+    } else {
+        leader_rank = ucc_ep_map_eval(sbgp->map, node_index);
+    }
+
+    ctx_rank = ucc_ep_map_eval(topo->set.map, leader_rank);
+    ucc_assert(ctx_rank < topo->topo->n_procs);
+    return topo->topo->procs[ctx_rank].host_id;
 }
 
 /* Returns min ppn value across the nodes */
@@ -258,9 +290,39 @@ static inline ucc_rank_t ucc_topo_nnodes(ucc_topo_t *topo)
     return sbgp->group_size;
 }
 
-/* Returns node leaders array - array that maps each rank to the TEAM RANK that 
+/* Returns node leaders array - array that maps each rank to the TEAM RANK that
    is the leader of that rank's node. Also returns per-node leaders array - array
    mapping node_id to the TEAM RANK of that node's leader */
 ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leaders_out);
+
+
+/**
+ * @brief Checks if all ranks in the topology have valid GPU device information.
+ *
+ * This function iterates through all hosts in the provided topology subset
+ * and verifies that each host has visible GPUs. It is typically used to
+ * determine whether further device-based operations can be performed across
+ * the topology.
+ *
+ * @param [in] topo   Pointer to the topology structure.
+ *
+ * @return 1 if all ranks have device information, 0 otherwise.
+ */
+int ucc_topo_has_device_info(const ucc_topo_t *topo);
+
+/**
+ * @brief Checks if all ranks in a sub-group are fully NVLink-connected.
+ *
+ * This function determines whether all ranks within the provided sub-group
+ * (sbgp) are fully connected via NVLink within the given topology.
+ *
+ * @param [in] topo   Pointer to the topology structure.
+ * @param [in] sbgp   Pointer to the sub-group structure.
+ *
+ * @return 1 if all ranks are NVLink-connected, 0 otherwise.
+ */
+int ucc_topo_is_nvlink_fully_connected(
+    const ucc_topo_t *topo, const ucc_sbgp_t *sbgp);
+
 
 #endif

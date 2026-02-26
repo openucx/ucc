@@ -15,6 +15,7 @@
 #include <ucp/api/ucp.h>
 #include <ucs/memory/memory_type.h>
 #include "core/ucc_service_coll.h"
+#include "coll_patterns/ring.h"
 
 #ifndef UCC_TL_UCP_DEFAULT_SCORE
 #define UCC_TL_UCP_DEFAULT_SCORE 10
@@ -177,6 +178,7 @@ typedef struct ucc_tl_ucp_team {
     ucc_ep_map_t               ctx_map;
     ucc_rank_t                 opt_radix; /* generic opt radix */
     ucc_rank_t                 opt_radix_host; /* host specific opt radix */
+    ucc_ring_pattern_t         *cuda_ring;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

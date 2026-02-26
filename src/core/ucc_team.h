@@ -62,8 +62,8 @@ void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src);
    In that case we need to map rank to ctx_rank first. Otherwise, addr
    storage is per-team: just use rank then.
 
-   The returned value is "header": it stores proc_info, ctx_id and addresses
-   of TL/CL components.*/
+   The returned value is "header": it stores proc_info, host info, ctx_id and
+   addresses of TL/CL components.*/
 static inline ucc_context_addr_header_t *
 ucc_get_team_ep_header(ucc_context_t *context, ucc_team_t *team,
                        ucc_rank_t rank)

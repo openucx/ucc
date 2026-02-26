@@ -6,7 +6,6 @@
 #define UCC_SBGP_H_
 #include "ucc/api/ucc.h"
 #include "utils/ucc_datastruct.h"
-#include "utils/ucc_coll_utils.h"
 
 typedef enum ucc_sbgp_type_t
 {
@@ -17,6 +16,8 @@ typedef enum ucc_sbgp_type_t
                                     This group does not exist if processes are
                                     not bound to a single SOCKET node. */
     UCC_SBGP_NODE,               /* Group of ranks on the same NODE. */
+    UCC_SBGP_NODE_NVLINK,        /* Group of ranks on the same NODE that share
+                                    the same GPU or NVLink-connected GPUs. */
     UCC_SBGP_NODE_LEADERS,       /* Group of ranks with local_node_rank = 0.
                                     This group EXISTS when team spans at least 2
                                     nodes. This group is ENABLED for procs with
@@ -85,6 +86,10 @@ ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
 
 ucc_status_t ucc_sbgp_create_all_numas(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
                                        int *n_sbgps);
+
+ucc_status_t ucc_sbgp_create_all_node_nvlinks(ucc_topo_t *topo,
+                                              ucc_sbgp_t **sbgps,
+                                              int *n_sbgps);
 
 ucc_status_t ucc_sbgp_create_node(ucc_topo_t *topo, ucc_sbgp_t *sbgp);
 
