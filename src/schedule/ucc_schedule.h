@@ -76,7 +76,8 @@ enum {
     UCC_COLL_TASK_FLAG_IS_SCHEDULE           = UCC_BIT(5),
     /* if set task can be casted to scheulde */
     UCC_COLL_TASK_FLAG_IS_PIPELINED_SCHEDULE = UCC_BIT(6),
-
+    /* fragment completed and is waiting to be restarted (pipelined schedules) */
+    UCC_COLL_TASK_FLAG_RESTART_PENDING       = UCC_BIT(7),
 };
 
 typedef struct ucc_coll_task {
@@ -210,6 +211,7 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
             ucc_error("failure in task %p, %s", task,
                       ucc_status_string(task->status));
         }
+        ucc_assert_always(status < 0);
         ucc_event_manager_notify(task, UCC_EVENT_ERROR);
     }
 
