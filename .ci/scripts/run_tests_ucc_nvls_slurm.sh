@@ -4,7 +4,7 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source "${SCRIPT_DIR}/env.sh"
 
-readonly SLURM_COMMAND="srun --jobid=${SLURM_JOB_ID} --nodes=${SLURM_NODES} --mpi=pmi2 --ntasks-per-node=1 --container-image=${DOCKER_IMAGE_NAME} '/opt/nvidia/src/ucc/.ci/scripts/run_tests_ucc_nvls.sh'"
+readonly SLURM_COMMAND="srun --jobid=${SLURM_JOB_ID} --nodes=${SLURM_NODES} --mpi=pmix --ntasks-per-node=1 --container-image=${DOCKER_IMAGE_NAME} '/opt/nvidia/src/ucc/.ci/scripts/run_tests_ucc_nvls.sh'"
 
 # Validate SLURM_HEAD_NODE is set
 if [ -z "${SLURM_HEAD_NODE}" ]; then

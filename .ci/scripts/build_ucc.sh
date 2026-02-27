@@ -5,6 +5,7 @@ export CXXFLAGS="-Wno-error=maybe-uninitialized"
 
 export UCC_ENABLE_GTEST=${UCC_ENABLE_GTEST:-yes}
 export UCC_ENABLE_NVLS=${UCC_ENABLE_NVLS:-no}
+export UCC_BUILD_TLS=${UCC_BUILD_TLS:-cuda,nccl,self,sharp,shm,ucp,mlx5}
 
 # In containers, calculate based on memory limits to avoid OOM
 # Determine number of parallel build jobs based on available system memory if running inside a container/Kubernetes
@@ -39,7 +40,7 @@ cd "${UCC_SRC_DIR}/build"
 # Build base configure flags
 CONFIGURE_FLAGS="--with-ucx=${UCX_INSTALL_DIR} --with-cuda=${CUDA_HOME} \
     --prefix=${UCC_INSTALL_DIR} --with-mpi \
-    --with-tls=cuda,nccl,self,sharp,shm,ucp,mlx5"
+    --with-tls=${UCC_BUILD_TLS}"
 
 # Add NVLS support if enabled
 if [ "${UCC_ENABLE_NVLS}" = "yes" ] || [ "${UCC_ENABLE_NVLS}" = "true" ] || [ "${UCC_ENABLE_NVLS}" = "1" ]; then
