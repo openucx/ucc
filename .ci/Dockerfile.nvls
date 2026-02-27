@@ -1,0 +1,74 @@
+ARG CUDA_VER='13.1.1'
+FROM nvcr.io/nvidia/cuda:${CUDA_VER}-devel-ubuntu24.04
+
+ARG _UID=6213
+ARG _GID=11429
+ARG _LOGIN=swx-jenkins
+ARG _GROUP=swx-jenkins
+ARG _HOME=/labhome
+ARG UCC_ENABLE_NVLS=yes
+ARG UCC_ENABLE_GTEST=no
+ARG UCC_BUILD_TLS=cuda,ucp
+
+#==============================================================================
+# Build tools
+#==============================================================================
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sudo \
+    build-essential \
+    autoconf \
+    automake \
+    libtool \
+    numactl \
+    libnuma-dev \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+#==============================================================================
+# Install HPC-X (provides UCX + OpenMPI)
+#==============================================================================
+ARG HPCX_VERSION=v2.25.1
+ARG HPCX_CUDA=cuda13
+ARG HPCX_OS=ubuntu24.04
+RUN cd /tmp && \
+    HPCX_ARCH=$(uname -m) && \
+    HPCX_FILENAME="hpcx-${HPCX_VERSION}-gcc-inbox-${HPCX_OS}-${HPCX_CUDA}-${HPCX_ARCH}" && \
+    wget -q "https://content.mellanox.com/hpc/hpc-x/${HPCX_VERSION}_${HPCX_CUDA}/${HPCX_FILENAME}.tbz" && \
+    tar xf "${HPCX_FILENAME}.tbz" && \
+    mv "${HPCX_FILENAME}" /opt/hpcx && \
+    rm -f "${HPCX_FILENAME}.tbz"
+
+#==============================================================================
+# Environment
+#==============================================================================
+ENV CUDA_HOME=/usr/local/cuda
+ENV SRC_DIR=/opt/nvidia/src
+ENV UCX_INSTALL_DIR=/opt/hpcx/ucx
+ENV UCC_INSTALL_DIR=/opt/nvidia/bin/ucc/build
+ENV PATH=/opt/hpcx/ompi/bin:${PATH}
+ENV LD_LIBRARY_PATH=/opt/hpcx/ompi/lib:/opt/hpcx/ucx/lib:${LD_LIBRARY_PATH}
+ENV OPAL_PREFIX=/opt/hpcx/ompi
+
+#==============================================================================
+# Build UCC
+#==============================================================================
+RUN rm -rf ${SRC_DIR}/ucc
+COPY . ${SRC_DIR}/ucc
+
+ENV UCC_ENABLE_NVLS=${UCC_ENABLE_NVLS}
+ENV UCC_ENABLE_GTEST=${UCC_ENABLE_GTEST}
+ENV UCC_BUILD_TLS=${UCC_BUILD_TLS}
+RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucc.sh
+
+#==============================================================================
+# User setup
+#==============================================================================
+RUN echo "${_LOGIN} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+RUN chown -R ${_UID}:${_GID} /opt/nvidia
+RUN if ! getent group "${_GID}" > /dev/null 2>&1; then \
+        groupadd -g "${_GID}" "${_GROUP}"; \
+    fi && \
+    useradd --no-create-home --uid ${_UID} --gid ${_GID} --home ${_HOME}/${_LOGIN} ${_LOGIN}
+
+USER ${_LOGIN}

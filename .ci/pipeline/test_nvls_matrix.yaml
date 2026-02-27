@@ -18,7 +18,7 @@ volumes:
   - { mountPath: "/home/svcnbu-swx-hpcx", hostPath: "/labhome/svcnbu-swx-hpcx" }
 
 env:
-  CUDA_VER: 13.0
+  CUDA_VER: 13.1.1
   UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/aarch64/ubuntu24.04/cuda${CUDA_VER}"
   DOCKER_IMAGE_TAG: "${BUILD_NUMBER}"
   SLURM_NODES: 2
@@ -28,6 +28,7 @@ env:
   SLURM_JOB_NAME: 'ucc-ci-test-nvls-${BUILD_NUMBER}'
   SLURM_JOB_TIMEOUT: '00:40:00'
   TEST_TIMEOUT_MINUTES: 35
+  NVLS_MPI_PPN: 4
 
 kubernetes:
   cloud: il-ipp-blossom-prod
@@ -38,12 +39,12 @@ kubernetes:
 # cloud pod to build the shared docker image
 runs_on_dockers:
   - {
-      file: ".ci/Dockerfile.ngc_pytorch",
-      name: "ngc_pytorch",
+      file: ".ci/Dockerfile.nvls",
+      name: "nvls",
       tag: "${DOCKER_IMAGE_TAG}",
       arch: "aarch64",
       uri: "${UCC_URI_SUFFIX}",
-      build_args: "--no-cache --build-arg ARCH=aarch64 --build-arg OS=ubuntu24.04 --build-arg CUDA_VER=${CUDA_VER} --build-arg _UID=149917 --build-arg _GID=30 --build-arg _LOGIN=svcnbu-swx-hpcx --build-arg _GROUP=svcnbu-swx-hpcx --build-arg UCC_ENABLE_NVLS=yes --build-arg UCC_ENABLE_GTEST=no",
+      build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg _UID=149917 --build-arg _GID=30 --build-arg _LOGIN=svcnbu-swx-hpcx --build-arg _GROUP=svcnbu-swx-hpcx",
     }
   - {
       file: ".ci/dockerfiles/Dockerfile.build_helper",
@@ -75,6 +76,6 @@ steps:
       set -x
       export DOCKER_IMAGE_NAME="${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
       export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
-      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_tests_ucc_nvls_slurm.sh
+      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_tests_ucc_nvls_all_slurm.sh
     always: |
       sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/stop_slurm_allocation.sh
