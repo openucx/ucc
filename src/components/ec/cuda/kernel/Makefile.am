@@ -25,7 +25,28 @@ CCLD = $(NVCC)
 ec_cuda_executor.lo: ec_cuda_executor.cu
 	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
 
-ec_cuda_executor_reduce_int.lo: ec_cuda_executor_reduce_int.cu
+ec_cuda_executor_reduce_int8.lo: ec_cuda_executor_reduce_int8.cu
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
+
+ec_cuda_executor_reduce_int16.lo: ec_cuda_executor_reduce_int16.cu
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
+
+ec_cuda_executor_reduce_int32.lo: ec_cuda_executor_reduce_int32.cu
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
+
+ec_cuda_executor_reduce_int64.lo: ec_cuda_executor_reduce_int64.cu
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
+
+ec_cuda_executor_reduce_uint8.lo: ec_cuda_executor_reduce_uint8.cu
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
+
+ec_cuda_executor_reduce_uint16.lo: ec_cuda_executor_reduce_uint16.cu
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
+
+ec_cuda_executor_reduce_uint32.lo: ec_cuda_executor_reduce_uint32.cu
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
+
+ec_cuda_executor_reduce_uint64.lo: ec_cuda_executor_reduce_uint64.cu
 	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
 
 ec_cuda_executor_reduce_fp.lo: ec_cuda_executor_reduce_fp.cu
@@ -37,10 +58,17 @@ ec_cuda_executor_reduce_complex.lo: ec_cuda_executor_reduce_complex.cu
 # Device link step for RDC objects: resolves cross-TU __device__ calls.
 # Produces a proper libtool .lo object so that libtool reliably includes it
 # when the convenience library is absorbed into the parent shared library.
-ec_cuda_executor_dlink.lo: ec_cuda_executor.lo ec_cuda_executor_reduce_int.lo ec_cuda_executor_reduce_fp.lo ec_cuda_executor_reduce_complex.lo
+ec_cuda_executor_dlink.lo: ec_cuda_executor.lo ec_cuda_executor_reduce_int8.lo ec_cuda_executor_reduce_int16.lo ec_cuda_executor_reduce_int32.lo ec_cuda_executor_reduce_int64.lo ec_cuda_executor_reduce_uint8.lo ec_cuda_executor_reduce_uint16.lo ec_cuda_executor_reduce_uint32.lo ec_cuda_executor_reduce_uint64.lo ec_cuda_executor_reduce_fp.lo ec_cuda_executor_reduce_complex.lo
 	$(NVCC) -dlink \
 	  .libs/ec_cuda_executor.o \
-	  .libs/ec_cuda_executor_reduce_int.o \
+	  .libs/ec_cuda_executor_reduce_int8.o \
+	  .libs/ec_cuda_executor_reduce_int16.o \
+	  .libs/ec_cuda_executor_reduce_int32.o \
+	  .libs/ec_cuda_executor_reduce_int64.o \
+	  .libs/ec_cuda_executor_reduce_uint8.o \
+	  .libs/ec_cuda_executor_reduce_uint16.o \
+	  .libs/ec_cuda_executor_reduce_uint32.o \
+	  .libs/ec_cuda_executor_reduce_uint64.o \
 	  .libs/ec_cuda_executor_reduce_fp.o \
 	  .libs/ec_cuda_executor_reduce_complex.o \
 	  -o .libs/ec_cuda_executor_dlink.o $(NVCC_ARCH) -Xcompiler -fPIC
@@ -63,10 +91,20 @@ comp_noinst = libucc_ec_cuda_kernels.la
 
 libucc_ec_cuda_kernels_la_SOURCES  = ec_cuda_wait_kernel.cu              \
                                      ec_cuda_executor.cu                 \
-                                     ec_cuda_executor_reduce_int.cu      \
+                                     ec_cuda_executor_reduce_int8.cu     \
+                                     ec_cuda_executor_reduce_int16.cu    \
+                                     ec_cuda_executor_reduce_int32.cu    \
+                                     ec_cuda_executor_reduce_int64.cu    \
+                                     ec_cuda_executor_reduce_uint8.cu    \
+                                     ec_cuda_executor_reduce_uint16.cu   \
+                                     ec_cuda_executor_reduce_uint32.cu   \
+                                     ec_cuda_executor_reduce_uint64.cu   \
                                      ec_cuda_executor_reduce_fp.cu       \
                                      ec_cuda_executor_reduce_complex.cu  \
-                                     ec_cuda_reduce.cu
+                                     ec_cuda_reduce.cu                   \
+                                     ec_cuda_reduce_int.cu               \
+                                     ec_cuda_reduce_float.cu             \
+                                     ec_cuda_reduce_complex.cu
 libucc_ec_cuda_kernels_la_CPPFLAGS =
 libucc_ec_cuda_kernels_la_LDFLAGS = -prefer-pic
 libucc_ec_cuda_kernels_la_LIBADD = ec_cuda_executor_dlink.lo

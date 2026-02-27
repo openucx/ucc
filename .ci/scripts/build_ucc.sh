@@ -55,6 +55,11 @@ fi
 
 echo "INFO: Configure flags: ${CONFIGURE_FLAGS}"
 eval "${UCC_SRC_DIR}/configure ${CONFIGURE_FLAGS}"
+
+# Skip libtool relinking during install: the relink produces identical RUNPATH
+# and adds ~5s of pure overhead per build.
+sed -i 's/need_relink=yes/need_relink=no/g' libtool
+
 make "-j${nproc}" install
 echo "${UCC_INSTALL_DIR}/lib" > /etc/ld.so.conf.d/ucc.conf
 ldconfig

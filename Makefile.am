@@ -5,23 +5,39 @@
 #
 
 if !DOCS_ONLY
-SUBDIRS =      \
-	src        \
-	contrib    \
-	tools/info \
-	cmake
+SUBDIRS = src
+
+PARALLEL_SUBDIRS = contrib tools/info cmake
 
 if HAVE_MPICXX
-SUBDIRS +=     \
-	tools/perf \
-	test/mpi
+PARALLEL_SUBDIRS += tools/perf test/mpi
 endif
 
 if HAVE_GTEST
-SUBDIRS += test/gtest
+PARALLEL_SUBDIRS += test/gtest
 gtest:
 	@make -C test/gtest test
 endif
+
+DIST_SUBDIRS = src contrib tools/info cmake tools/perf test/mpi test/gtest
+
+all-local: $(PARALLEL_SUBDIRS:%=all-par/%)
+all-par/%:
+	+$(MAKE) -C $* all
+
+install-data-local: $(PARALLEL_SUBDIRS:%=install-par/%)
+install-exec-local: $(PARALLEL_SUBDIRS:%=install-par/%)
+install-par/%:
+	+$(MAKE) -C $* install
+
+clean-local: $(PARALLEL_SUBDIRS:%=clean-par/%)
+clean-par/%:
+	+$(MAKE) -C $* clean
+
+distclean-local: $(PARALLEL_SUBDIRS:%=distclean-par/%)
+distclean-par/%:
+	-+$(MAKE) -C $* distclean
+
 endif #!DOCS_ONLY
 
 include $(srcdir)/docs/doxygen/doxygen.am
