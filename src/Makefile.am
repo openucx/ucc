@@ -23,9 +23,52 @@ mc_dirs += components/mc/rocm
 ec_dirs += components/ec/rocm
 endif
 
-SUBDIRS = . $(cl_dirs) $(mc_dirs) $(ec_dirs)
+SUBDIRS = .
+
+# Component directories built in parallel after libucc.la.
+# All components depend only on libucc.la, not on each other,
+# so GNU make's job server can schedule them concurrently with -j.
+COMPONENT_DIRS = $(cl_dirs) $(mc_dirs) $(ec_dirs)
 
 include components/tl/makefile.am
+
+# All possible component subdirectories (including conditional ones)
+# needed for make dist to find all source files.
+DIST_SUBDIRS = .                       \
+    components/cl/basic                \
+    components/cl/hier                 \
+    components/cl/doca_urom            \
+    components/mc/cpu                  \
+    components/mc/cuda                 \
+    components/mc/rocm                 \
+    components/ec/cpu                  \
+    components/ec/cuda                 \
+    components/ec/rocm                 \
+    components/tl/cuda                 \
+    components/tl/mlx5                 \
+    components/tl/nccl                 \
+    components/tl/rccl                 \
+    components/tl/self                 \
+    components/tl/sharp                \
+    components/tl/ucp
+
+all-local: $(COMPONENT_DIRS:%=all-component/%)
+all-component/%: libucc.la
+	+$(MAKE) -C $* all
+
+# Component installs must wait for libucc.la to be installed to the prefix
+# first, otherwise libtool relinking fails with "cannot find -lucc".
+install-exec-local: install-libLTLIBRARIES $(COMPONENT_DIRS:%=install-component/%)
+install-component/%: libucc.la install-libLTLIBRARIES
+	+$(MAKE) -C $* install
+
+clean-local: $(COMPONENT_DIRS:%=clean-component/%)
+clean-component/%:
+	+$(MAKE) -C $* clean
+
+distclean-local: $(COMPONENT_DIRS:%=distclean-component/%)
+distclean-component/%:
+	-+$(MAKE) -C $* distclean
 
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =
