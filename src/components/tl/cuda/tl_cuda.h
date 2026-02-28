@@ -215,6 +215,8 @@ struct ucc_tl_cuda_task {
             ucc_tl_cuda_mem_info_t mem_info_dst;
             void                  *peer_map_addr_src[UCC_TL_CUDA_MAX_PEERS];
             void                  *peer_map_addr_dst[UCC_TL_CUDA_MAX_PEERS];
+            uintptr_t              peer_src_d_ptr[UCC_TL_CUDA_MAX_PEERS];
+            uintptr_t              peer_dst_d_ptr[UCC_TL_CUDA_MAX_PEERS];
             int                    num_posted;
             ucc_datatype_t         sdt;
             ucc_datatype_t         rdt;
