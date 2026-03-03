@@ -151,7 +151,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: ompi-build
-        path: /
+        path: /tmp
     - name: Restore permissions
       run: |
         chmod -R +x /tmp/ucx/install/bin /tmp/ucx/install/lib || true
@@ -217,7 +217,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: ompi-build
-        path: /
+        path: /tmp
     - name: Restore permissions
       run: |
         chmod -R +x /tmp/ucx/install/bin /tmp/ucx/install/lib || true
