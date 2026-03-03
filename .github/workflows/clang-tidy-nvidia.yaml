@@ -58,7 +58,9 @@ jobs:
         key: ucx-nvidia-${{ env.OPEN_UCX_BRANCH }}-${{ hashFiles('.github/workflows/clang-tidy-nvidia.yaml') }}
     - name: Get UCX
       if: steps.cache-ucx.outputs.cache-hit != 'true'
-      run: git clone --depth 1 ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
+      run: |
+        rm -rf /tmp/ucx
+        git clone --depth 1 ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
       if: steps.cache-ucx.outputs.cache-hit != 'true'
       run: |

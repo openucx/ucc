@@ -25,7 +25,9 @@ jobs:
         key: ucx-release-${{ env.OPEN_UCX_BRANCH }}-${{ hashFiles('.github/workflows/main.yaml') }}
     - name: Get UCX
       if: steps.cache-ucx.outputs.cache-hit != 'true'
-      run: git clone --depth 1 ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
+      run: |
+        rm -rf /tmp/ucx
+        git clone --depth 1 ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
       if: steps.cache-ucx.outputs.cache-hit != 'true'
       run: |
@@ -111,6 +113,7 @@ jobs:
     - name: Get OMPI
       if: steps.cache-ompi.outputs.cache-hit != 'true'
       run: |
+        rm -rf /tmp/ompi
         git clone --depth 1 ${OPEN_MPI_LINK} -b ${OPEN_MPI_BRANCH} /tmp/ompi
         cd /tmp/ompi
         git submodule update --init --recursive --depth 1
@@ -238,7 +241,9 @@ jobs:
         key: imb-${{ hashFiles('.github/workflows/main.yaml') }}
     - name: Get IMB
       if: steps.cache-imb.outputs.cache-hit != 'true'
-      run: git clone --depth 1 ${IMB_LINK} /tmp/imb
+      run: |
+        rm -rf /tmp/imb
+        git clone --depth 1 ${IMB_LINK} /tmp/imb
     - name: Build IMB
       if: steps.cache-imb.outputs.cache-hit != 'true'
       run: |
