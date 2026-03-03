@@ -86,7 +86,7 @@ jobs:
       env:
         GTEST_TOTAL_SHARDS: 4
         GTEST_SHARD_INDEX: ${{ matrix.shard }}
-        ASAN_OPTIONS: fast_unwind_on_malloc=0:detect_leaks=1:print_suppressions=0
+        ASAN_OPTIONS: fast_unwind_on_malloc=1:detect_leaks=1:print_suppressions=0
         LSAN_OPTIONS: report_objects=1
         LD_LIBRARY_PATH: /tmp/ucc/install/lib:/tmp/ucx/install/lib:/tmp/clang-rt
       run: ./test/gtest/gtest
