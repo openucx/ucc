@@ -28,13 +28,6 @@ kubernetes:
   limits: "{memory: 16Gi, cpu: 16000m}"
   requests: "{memory: 16Gi, cpu: 16000m}"
 
-credentials:
-  - {
-      credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0",
-      usernameVariable: "UCC_USERNAME",
-      passwordVariable: "UCC_PASSWORD",
-    }
-
 # cloud pod to build the shared docker image
 runs_on_dockers:
   - {
@@ -58,7 +51,6 @@ runs_on_dockers:
 runs_on_agents:
   - nodeLabel: "swx-clx01"
   - nodeLabel: "swx-clx02"
-  - nodeLabel: "ml-test-node-gpu"
 
 timeout_minutes: 360
 
@@ -74,17 +66,6 @@ steps:
       docker pull "${UCC_DOCKER_IMAGE_NAME}:base"
       # pull the CI image
       docker pull "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
-
-  #============================================================================
-  - name: Run Coverity
-    credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0"
-    agentSelector: "{nodeLabel: 'ml-test-node-gpu'}"
-    run: |
-      export UCC_PASSWORD=$UCC_PASSWORD
-      export UCC_USERNAME=$UCC_USERNAME
-      echo "Running coverity"
-      ${WORKSPACE}/.ci/scripts/coverity.sh
-    archiveArtifacts: .ci/scripts/cov-build/*
 
   #============================================================================
   - name: Run UCC / Torch-UCC tests

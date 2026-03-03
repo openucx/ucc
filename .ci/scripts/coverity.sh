@@ -6,11 +6,15 @@ handle_error() {
     err_code=$?
     local script_name="${0##*/}"
     local last_command="${BASH_COMMAND}"
-    local error_line="${BASH_LINENO[${BASH_LINENO[@]} - 1]}"
+    local last_idx=$((${#BASH_LINENO[@]} - 1))
+    local error_line="${BASH_LINENO[$last_idx]:-?}"
     echo "Error: ${script_name} - Command '${last_command}' failed at line ${error_line}."
     exit $err_code
 }
 trap 'handle_error' ERR
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+. "${SCRIPT_DIR}/common.sh"
 
 #
 # This script runs static code analysis using Coverity.
@@ -20,14 +24,22 @@ export UCC_PASSWORD=$UCC_PASSWORD
 export UCC_USERNAME=$UCC_USERNAME
 topdir=$(git rev-parse --show-toplevel)
 cd "$topdir" || exit 1
+
+# Ensure modulecmd gets shell type "bash" (fixes "Unknown shell type '(load)'" in Jenkins/K8s).
+# Source init if present for MODULEPATH etc., then force module() to pass bash to modulecmd.
+for _f in /usr/share/modules/init/bash /etc/profile.d/modules.sh; do
+    [ -f "$_f" ] && source "$_f" && break
+done
+module() { eval "$(modulecmd bash "$@")"; }
+set -x
 module load hpcx-gcc
 module load dev/cuda12.9.0
 module load dev/nccl_2.26.5-1_cuda12.9.0
 module load tools/cov-2021.12
 ./autogen.sh
 ./configure --with-nccl --with-tls=cuda,nccl,self,sharp,shm,ucp,mlx5 --with-ucx="${HPCX_UCX_DIR}" --with-sharp="${HPCX_SHARP_DIR}" --with-nvcc-gencode="-gencode arch=compute_86,code=sm_86"
-make_opt="-j$(($(nproc) / 2 + 1))"
-COV_BUILD_DIR=$(dirname "$0")/cov-build
+make_opt="-j${NPROC:-$(($(nproc) / 2 + 1))}"
+COV_BUILD_DIR="${SCRIPT_DIR}/cov-build"
 mkdir -p "$COV_BUILD_DIR"
 COV_ANALYSE_OPTIONS+=" --all"
 COV_ANALYSE_OPTIONS+=" --enable-fnptr"
@@ -80,7 +92,7 @@ function run_coverity_analysis() {
 
     # Run cov-analyze
     # shellcheck disable=SC2086
-    cov-analyze --dir "${COV_BUILD_DIR}" "$@" --jobs auto $COV_ANALYSE_OPTIONS
+    cov-analyze --dir "${COV_BUILD_DIR}" "$@" --jobs ${NPROC:-auto} $COV_ANALYSE_OPTIONS
     err_code=$?
     return $err_code
 }
