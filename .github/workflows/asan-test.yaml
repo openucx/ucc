@@ -24,9 +24,17 @@ jobs:
         echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends clang-${CLANG_VER} clang++-${CLANG_VER} libclang-rt-${CLANG_VER}-dev
+    - name: Cache UCX
+      id: cache-ucx
+      uses: actions/cache@v4
+      with:
+        path: /tmp/ucx/install
+        key: ucx-asan-${{ env.OPEN_UCX_BRANCH }}-${{ hashFiles('.github/workflows/asan-test.yaml') }}
     - name: Get UCX
-      run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
+      run: git clone --depth 1 ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
       run: |
         cd /tmp/ucx && ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix /tmp/ucx/install
