@@ -41,7 +41,7 @@ jobs:
         cd /tmp/ucx && ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix /tmp/ucx/install
         make -j install
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Build UCC (ASAN)
       run: |
         ./autogen.sh
@@ -52,7 +52,7 @@ jobs:
         CLANG_RT_DIR=$(dirname $(clang-${CLANG_VER} -print-file-name=libclang_rt.asan-x86_64.so))
         cp -a ${CLANG_RT_DIR} /tmp/clang-rt
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ucc-asan-build
         path: |
@@ -70,9 +70,9 @@ jobs:
         shard: [0, 1, 2, 3]
     name: test (shard ${{ matrix.shard }}/4)
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Download build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: ucc-asan-build
         path: /

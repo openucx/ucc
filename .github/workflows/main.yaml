@@ -34,14 +34,14 @@ jobs:
         cd /tmp/ucx && ./autogen.sh
         ./contrib/configure-release --without-java --without-go --disable-numa --prefix /tmp/ucx/install
         make -j install
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Build UCC
       run: |
         ./autogen.sh
         ./configure --prefix=/tmp/ucc/install --enable-gtest --with-ucx=/tmp/ucx/install
         make -j`nproc` install
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ucc-build
         path: |
@@ -58,9 +58,9 @@ jobs:
         shard: [0, 1]
     name: test (shard ${{ matrix.shard }}/2)
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Download build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: ucc-build
         path: /
@@ -96,7 +96,7 @@ jobs:
     needs: build
     steps:
     - name: Download build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: ucc-build
         path: /
@@ -134,7 +134,7 @@ jobs:
 
         make -j install
     - name: Upload OMPI build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ompi-build
         path: |
@@ -148,9 +148,9 @@ jobs:
     name: OMPI perftest
     needs: ompi-build
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Download OMPI build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: ompi-build
         path: /tmp
@@ -224,7 +224,7 @@ jobs:
     needs: ompi-build
     steps:
     - name: Download OMPI build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: ompi-build
         path: /tmp

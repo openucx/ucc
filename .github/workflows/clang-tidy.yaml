@@ -42,7 +42,7 @@ jobs:
         cd /tmp/ucx && ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
         make -j install
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Build UCC
       run: |
         ./autogen.sh
