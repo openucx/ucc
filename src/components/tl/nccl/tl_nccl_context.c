@@ -202,6 +202,47 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_context_t,
     if (cuda_st != cudaSuccess) {
         return UCC_ERR_NO_MEMORY;
     }
+
+    /* Initialize UBR support */
+    self->ubr_available = 0;
+
+#if NCCL_HAS_UBR
+    /* Check if UBR should be enabled based on config and NCCL version */
+    if (self->cfg.enable_ubr != UCC_NO) {
+        self->ubr_available = 1;
+        tl_debug(
+            self->super.super.lib,
+            "NCCL User Buffer Registration available (NCCL %d.%d.%d), using "
+            "lazy registration",
+            NCCL_MAJOR,
+            NCCL_MINOR,
+            NCCL_PATCH);
+    } else {
+        tl_debug(
+            self->super.super.lib,
+            "NCCL User Buffer Registration disabled by config");
+    }
+#else
+    if (self->cfg.enable_ubr == UCC_YES) {
+        tl_error(
+            self->super.super.lib,
+            "NCCL User Buffer Registration requested but NCCL version %d.%d.%d "
+            "< 2.19.0",
+            NCCL_MAJOR,
+            NCCL_MINOR,
+            NCCL_PATCH);
+        cudaFree(self->scratch_buf);
+        ucc_mpool_cleanup(&self->req_mp, 1);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    tl_debug(
+        self->super.super.lib,
+        "NCCL User Buffer Registration not available (NCCL %d.%d.%d < 2.19.0)",
+        NCCL_MAJOR,
+        NCCL_MINOR,
+        NCCL_PATCH);
+#endif
+
     tl_debug(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 }
@@ -224,20 +265,210 @@ ucc_tl_nccl_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_nccl_mem_map(const ucc_base_context_t *context, int type, /* NOLINT */
-                                 void *memh, void *tl_h) /* NOLINT */
+/* Map memory for NCCL User Buffer Registration (UBR).
+ * 
+ * This function creates a memory handle for UBR but does not immediately register
+ * the buffer with NCCL communicators. The actual registration happens lazily when
+ * the buffer is first used in a collective operation.
+ * 
+ * Requirements:
+ * - NCCL >= 2.19.0 compiled with UBR support
+ * - UCC_TL_NCCL_ENABLE_UBR must be enabled (default: try)
+ * - Buffer must be CUDA device memory (cudaMalloc, cudaMallocManaged, etc.)
+ * - Buffer must have non-zero length
+ * 
+ * Lifecycle:
+ * - mem_map() creates handle (no NCCL registration)
+ * - team_create() initializes NCCL communicators (no registration)
+ * - collective_init() triggers lazy registration via ncclCommRegister()
+ * - mem_unmap() deregisters via ncclCommDeregister()
+ * 
+ * Best Practice: Call mem_unmap() BEFORE team_destroy() for clean deregistration.
+ * However, if team_destroy() is called first, NCCL automatically cleans up all
+ * registrations, so no resource leak occurs (just a debug message in mem_unmap)
+ */
+ucc_status_t ucc_tl_nccl_mem_map(
+    const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+    ucc_mem_map_memh_t *memh, ucc_mem_map_tl_t *tl_h)
 {
-    return UCC_ERR_NOT_SUPPORTED;
+    ucc_tl_nccl_context_t *ctx = ucc_derived_of(context, ucc_tl_nccl_context_t);
+    ucc_tl_nccl_memh_data_t *m_data;
+
+    /* Check if UBR is available and enabled */
+    if (!ctx->ubr_available) {
+        tl_debug(
+            ctx->super.super.lib, "NCCL UBR not available, skipping mem_map");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    /* Support both EXPORT and IMPORT modes for global memh */
+    if (mode != UCC_MEM_MAP_MODE_EXPORT && mode != UCC_MEM_MAP_MODE_IMPORT) {
+        tl_debug(ctx->super.super.lib,
+                 "NCCL UBR: unsupported mode %d", mode);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    /* Reject zero-length buffers */
+    if (memh->len == 0) {
+        tl_debug(ctx->super.super.lib,
+                 "NCCL UBR: zero-length buffer, skipping mem_map");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    /* Allocate TL-specific memory handle data */
+    m_data = (ucc_tl_nccl_memh_data_t *)ucc_calloc(
+        1, sizeof(ucc_tl_nccl_memh_data_t), "tl_nccl_memh_data");
+    if (!m_data) {
+        tl_error(
+            ctx->super.super.lib, "failed to allocate TL memory handle data");
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    /* For NCCL UBR, we only store metadata (address/length) for lazy registration.
+     * When ncclCommRegister is called later, it stores this metadata locally.
+     * The NCCL communicator handles IPC handle exchange internally during collective
+     * operations (via point-to-point proxy calls), so we don't need special IMPORT
+     * handling. We can use memh->address/memh->len directly in both EXPORT and IMPORT
+     * modes - the address should be valid in the current process context. */
+    m_data->address          = memh->address;
+    m_data->length           = memh->len;
+    m_data->registered_comms = NULL;
+    m_data->nccl_handles     = NULL;
+    m_data->num_comms        = 0;
+    m_data->max_comms        = 0;
+
+    /* Set TL handle data */
+    tl_h->tl_data = m_data;
+    strncpy(tl_h->tl_name, "nccl", UCC_MEM_MAP_TL_NAME_LEN - 1);
+    tl_h->tl_name[UCC_MEM_MAP_TL_NAME_LEN - 1] = '\0';
+
+    tl_debug(ctx->super.super.lib,
+             "NCCL UBR: %s memh for buffer %p, size %zu (lazy registration)",
+             mode == UCC_MEM_MAP_MODE_EXPORT ? "created" : "imported",
+             memh->address, memh->len);
+
+    return UCC_OK;
 }
 
-ucc_status_t ucc_tl_nccl_mem_unmap(const ucc_base_context_t *context, int type, /* NOLINT */
-                                   void *memh) /* NOLINT */
+ucc_status_t ucc_tl_nccl_mem_unmap(
+    const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+    ucc_mem_map_tl_t *tl_h)
 {
-    return UCC_ERR_NOT_SUPPORTED;
+    ucc_tl_nccl_context_t *ctx = ucc_derived_of(context, ucc_tl_nccl_context_t);
+    ucc_tl_nccl_memh_data_t *m_data;
+#if NCCL_HAS_UBR
+    ncclResult_t nccl_status;
+    int          i;
+#endif
+
+    if (!tl_h || !tl_h->tl_data) {
+        return UCC_OK;
+    }
+
+    m_data = (ucc_tl_nccl_memh_data_t *)tl_h->tl_data;
+
+#if NCCL_HAS_UBR
+    /* Deregister from all NCCL communicators this buffer was registered with
+     * 
+     * LIFECYCLE NOTE: Best practice is to call ucc_mem_unmap() BEFORE 
+     * ucc_team_destroy() to ensure clean deregistration. However, if a team 
+     * is destroyed first, NCCL automatically cleans up all buffer registrations
+     * during ncclCommDestroy() via ncclRegCleanup(). In this case:
+     * - ncclCommDeregister() will return ncclInvalidArgument (comm already freed)
+     * - No resource leak occurs (NCCL already cleaned up)
+     * - We log a debug message and continue
+     * 
+     * We cannot detect dangling comm pointers before calling ncclCommDeregister()
+     * because we have no notification when teams are destroyed. We rely on NCCL's
+     * CommCheck() to safely detect invalid communicators.
+     */
+    for (i = 0; i < m_data->num_comms; i++) {
+        nccl_status = ncclCommDeregister(
+            m_data->registered_comms[i], m_data->nccl_handles[i]);
+        if (nccl_status == ncclSuccess) {
+            tl_debug(
+                ctx->super.super.lib,
+                "NCCL UBR: deregistered buffer %p from comm %p",
+                m_data->address,
+                m_data->registered_comms[i]);
+        } else if (nccl_status == ncclInvalidArgument) {
+            /* Comm was likely already destroyed - NCCL auto-cleaned the registration.
+             * This can happen if team was destroyed before mem_unmap was called.
+             * No resource leak occurs as NCCL's ncclRegCleanup() already freed everything. */
+            tl_debug(
+                ctx->super.super.lib,
+                "NCCL UBR: comm %p already destroyed, buffer %p was auto-cleaned by NCCL",
+                m_data->registered_comms[i],
+                m_data->address);
+        } else {
+            /* Unexpected error */
+            tl_warn(
+                ctx->super.super.lib,
+                "NCCL UBR: failed to deregister buffer %p from comm %p: %s",
+                m_data->address,
+                m_data->registered_comms[i],
+                ncclGetErrorString(nccl_status));
+        }
+    }
+
+    /* Free the arrays */
+    if (m_data->registered_comms) {
+        ucc_free(m_data->registered_comms);
+    }
+    if (m_data->nccl_handles) {
+        ucc_free(m_data->nccl_handles);
+    }
+#endif
+
+    /* Free the TL data */
+    ucc_free(m_data);
+    tl_h->tl_data = NULL;
+
+    tl_debug(ctx->super.super.lib, "NCCL UBR: unmapped buffer");
+    return UCC_OK;
 }
 
-ucc_status_t ucc_tl_nccl_memh_pack(const ucc_base_context_t *context, /* NOLINT */
-                                   int type, void *memh, void **pack_buffer) /* NOLINT */
+ucc_status_t ucc_tl_nccl_memh_pack(
+    const ucc_base_context_t *context, ucc_mem_map_mode_t mode,
+    ucc_mem_map_tl_t *tl_h, void **pack_buffer)
 {
-    return UCC_ERR_NOT_SUPPORTED;
+    ucc_tl_nccl_context_t   *ctx = ucc_derived_of(context, ucc_tl_nccl_context_t);
+    ucc_tl_nccl_memh_data_t *m_data;
+    void                    *packed;
+
+    /* If tl_h is NULL, return early */
+    if (!tl_h) {
+        *pack_buffer = NULL;
+        return UCC_OK;
+    }
+
+    /* If UBR is not available/disabled or no TL data, return empty pack */
+    if (!ctx->ubr_available || !tl_h->tl_data) {
+        tl_h->packed_size = 0;
+        *pack_buffer      = NULL;
+        return UCC_OK;
+    }
+
+    m_data = (ucc_tl_nccl_memh_data_t *)tl_h->tl_data;
+
+    /* Pack minimal data (address + length) so this TL is included in the memh.
+     * The core filters out TLs with packed_size == 0, so we must pack something.
+     * Actual NCCL registration happens lazily when buffer is first used. */
+    tl_h->packed_size = sizeof(void *) + sizeof(size_t);
+    packed = ucc_malloc(tl_h->packed_size, "nccl_memh_pack");
+    if (!packed) {
+        tl_error(ctx->super.super.lib,
+                 "failed to allocate pack buffer");
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    memcpy(packed, &m_data->address, sizeof(void *));
+    memcpy((char *)packed + sizeof(void *), &m_data->length, sizeof(size_t));
+    *pack_buffer = packed;
+
+    tl_debug(ctx->super.super.lib,
+             "NCCL UBR: packed memh for buffer %p, size %zu (lazy registration)",
+             m_data->address, m_data->length);
+
+    return UCC_OK;
 }
