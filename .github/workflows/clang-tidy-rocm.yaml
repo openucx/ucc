@@ -1,9 +1,9 @@
-name: Linter-ROCM
+name: Lint
 
 on: [push, pull_request]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: lint-rocm-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -16,6 +16,7 @@ env:
 jobs:
   clang-tidy:
     runs-on: ubuntu-22.04
+    name: clang-tidy (ROCm)
     steps:
     - name: Install dependencies
       run: |

@@ -1,4 +1,4 @@
-name: OpenMPI tests
+name: Build & Test
 
 on: [push, pull_request]
 
@@ -17,10 +17,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends doxygen doxygen-latex
     - name: Cache UCX
       id: cache-ucx
       uses: actions/cache@v4
@@ -58,7 +54,7 @@ jobs:
     strategy:
       matrix:
         shard: [0, 1]
-    name: gtest (shard ${{ matrix.shard }}/2)
+    name: test (shard ${{ matrix.shard }}/2)
     steps:
     - uses: actions/checkout@v4
     - name: Download build artifacts
@@ -94,6 +90,7 @@ jobs:
 
   ompi-build:
     runs-on: ubuntu-latest
+    name: OMPI build
     needs: build
     steps:
     - name: Download build artifacts
@@ -153,6 +150,7 @@ jobs:
 
   ompi-perftest:
     runs-on: ubuntu-latest
+    name: OMPI perftest
     needs: ompi-build
     steps:
     - name: Download OMPI build artifacts
@@ -219,6 +217,7 @@ jobs:
 
   ompi-imb:
     runs-on: ubuntu-latest
+    name: OMPI IMB
     needs: ompi-build
     steps:
     - name: Download OMPI build artifacts

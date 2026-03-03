@@ -1,9 +1,9 @@
-name: Linter
+name: Lint
 
 on: [push, pull_request]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: lint-cpu-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -13,6 +13,7 @@ env:
 jobs:
   clang-tidy:
     runs-on: ubuntu-22.04
+    name: clang-tidy
     steps:
     - name: Install dependencies
       run: |
