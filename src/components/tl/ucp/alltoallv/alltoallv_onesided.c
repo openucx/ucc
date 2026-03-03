@@ -7,6 +7,7 @@
 #include "config.h"
 #include "tl_ucp.h"
 #include "alltoallv.h"
+#include "alltoall/alltoall.h"
 #include "core/ucc_progress_queue.h"
 #include "utils/ucc_math.h"
 #include "tl_ucp_sendrecv.h"
@@ -57,10 +58,10 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_data_start(ucc_coll_task_t *ctask)
                                         data_size, peer, src_memh,
                                         dst_memh, team, task),
                       task, out);
+        UCPCHECK_GOTO(ucc_tl_ucp_ep_flush(peer, team, task), task, out);
         UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer,
                                             dst_memh, team),
                       task, out);
-        UCPCHECK_GOTO(ucc_tl_ucp_ep_flush(peer, team, task), task, out);
     }
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 out:
@@ -78,16 +79,12 @@ void ucc_tl_ucp_alltoallv_onesided_data_progress(ucc_coll_task_t *ctask)
         return;
     }
 
-    tl_debug(UCC_TL_TEAM_LIB(team),
-             "onesided data transfer completed successfully");
     pSync[0]           = 0;
     task->super.status = UCC_OK;
 }
 
 ucc_status_t ucc_tl_ucp_alltoallv_onesided_sched_start(ucc_coll_task_t *task)
 {
-    tl_debug(UCC_TASK_LIB(task),
-             "starting onesided alltoallv schedule (will run displacement exchange then data transfer)");
     return ucc_schedule_start(task);
 }
 
@@ -183,7 +180,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
         goto free_schedule;
     }
 
-    /* exchange displacements with alltoall */
+    /* exchange displacements with pairwise alltoall */
     memset(&bargs, 0, sizeof(bargs));
     bargs.args.coll_type         = UCC_COLL_TYPE_ALLTOALL;
     bargs.args.mask              = 0;
@@ -198,15 +195,12 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
     bargs.args.dst.info.mem_type = UCC_MEMORY_TYPE_HOST;
 
     bargs.team = team->params.team;
-    status     = ucc_tl_ucp_coll_init(&bargs, team, &a2a_task);
+    status     = ucc_tl_ucp_alltoall_pairwise_init(&bargs, team, &a2a_task);
     if (ucc_unlikely(status != UCC_OK)) {
         tl_error(UCC_TL_TEAM_LIB(tl_team),
                  "failed to init displs exchange alltoall");
         goto free_schedule;
     }
-
-    tl_debug(UCC_TL_TEAM_LIB(tl_team),
-             "initialized displacement exchange alltoall as Task 0");
 
     data_task = ucc_tl_ucp_init_task(coll_args, team);
     if (!data_task) {
