@@ -12,14 +12,13 @@ env:
   CLANG_VER: 17
 
 jobs:
-  gtest-asan:
+  build:
     runs-on: ubuntu-22.04
     steps:
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends wget gpg
-        # Setup LLVM repository
         sudo mkdir -p /etc/apt/keyrings
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg
         echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
@@ -30,14 +29,57 @@ jobs:
     - name: Build UCX
       run: |
         cd /tmp/ucx && ./autogen.sh
-        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix /tmp/ucx/install
         make -j install
     - uses: actions/checkout@v4
-    - name: Run gtest ASAN
+    - name: Build UCC (ASAN)
       run: |
-        export ASAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=1:print_suppressions=0
-        export LSAN_OPTIONS=report_objects=1
         ./autogen.sh
         CFLAGS="-fsanitize=address" CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
         make -j install
-        ./test/gtest/gtest
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ucc-asan-build
+        path: |
+          /tmp/ucx/install
+          /tmp/ucc/install
+          test/gtest/gtest
+        retention-days: 1
+
+  gtest-asan:
+    runs-on: ubuntu-22.04
+    needs: build
+    strategy:
+      matrix:
+        shard: [0, 1, 2, 3]
+    name: gtest-asan (shard ${{ matrix.shard }}/4)
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends wget gpg
+        sudo mkdir -p /etc/apt/keyrings
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends libclang-rt-${CLANG_VER}-dev
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: ucc-asan-build
+        path: /
+    - name: Restore permissions
+      run: |
+        chmod -R +x /tmp/ucx/install/bin /tmp/ucx/install/lib || true
+        chmod -R +x /tmp/ucc/install/bin /tmp/ucc/install/lib || true
+        chmod +x test/gtest/gtest
+    - name: Run UCC gtest (ASAN, shard ${{ matrix.shard }}/4)
+      env:
+        GTEST_TOTAL_SHARDS: 4
+        GTEST_SHARD_INDEX: ${{ matrix.shard }}
+        ASAN_OPTIONS: fast_unwind_on_malloc=0:detect_leaks=1:print_suppressions=0
+        LSAN_OPTIONS: report_objects=1
+        LD_LIBRARY_PATH: /tmp/ucc/install/lib:/tmp/ucx/install/lib
+      run: ./test/gtest/gtest

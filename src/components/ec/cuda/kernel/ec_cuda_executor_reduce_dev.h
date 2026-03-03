@@ -37,7 +37,35 @@ extern "C" {
 #define LAUNCH_REDUCE(NAME, _Type, _task, _unroll, ...)                        \
     LAUNCH_REDUCE_A(NAME, _Type, _Type, _task, _unroll)
 
-__device__ ucc_status_t executor_reduce_int(
+__device__ ucc_status_t executor_reduce_int8(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
+    ucc_datatype_t dt);
+
+__device__ ucc_status_t executor_reduce_int16(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
+    ucc_datatype_t dt);
+
+__device__ ucc_status_t executor_reduce_int32(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
+    ucc_datatype_t dt);
+
+__device__ ucc_status_t executor_reduce_int64(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
+    ucc_datatype_t dt);
+
+__device__ ucc_status_t executor_reduce_uint8(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
+    ucc_datatype_t dt);
+
+__device__ ucc_status_t executor_reduce_uint16(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
+    ucc_datatype_t dt);
+
+__device__ ucc_status_t executor_reduce_uint32(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
+    ucc_datatype_t dt);
+
+__device__ ucc_status_t executor_reduce_uint64(
     ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
     ucc_datatype_t dt);
 
