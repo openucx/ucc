@@ -6,6 +6,7 @@
 
 #include "tl_ucp.h"
 #include "tl_ucp_ep.h"
+#include "utils/ucc_time.h"
 
 // NOLINTNEXTLINE
 static void ucc_tl_ucp_err_handler(void *arg, ucp_ep_h ep, ucs_status_t status)
@@ -88,6 +89,8 @@ static inline ucp_ep_h get_next_ep_to_close(
     return ep;
 }
 
+#define UCC_TL_UCP_EP_CLOSE_TIMEOUT 60.0
+
 void ucc_tl_ucp_close_eps(
     ucc_tl_ucp_worker_t *worker, ucc_tl_ucp_context_t *ctx)
 {
@@ -101,6 +104,7 @@ void ucc_tl_ucp_close_eps(
     ucp_request_param_t param;
     size_t              max_eps;
     ucs_status_ptr_t   *reqs;
+    double              deadline;
 
     max_eps = worker->eps
                   ? (size_t)ctx->super.super.ucc_context->params.oob.n_oob_eps
@@ -108,17 +112,49 @@ void ucc_tl_ucp_close_eps(
     if (max_eps == 0) {
         return;
     }
+
+    /* Without OOB, peers cannot coordinate graceful shutdown and flush may
+       hang indefinitely on unreachable peers. Use force-close to avoid
+       blocking. With OOB, a barrier after close ensures all peers are
+       reachable, so graceful flush is safe. */
+    param.op_attr_mask = UCP_OP_ATTR_FIELD_FLAGS;
+    param.flags        = UCC_TL_CTX_HAS_OOB(ctx) ? 0 : UCP_EP_CLOSE_FLAG_FORCE;
+
     reqs = (ucs_status_ptr_t *)ucc_calloc(max_eps, sizeof(*reqs), "close_reqs");
     if (!reqs) {
-        tl_error(
-            ctx->super.super.lib, "failed to allocate close requests array");
+        tl_warn(
+            ctx->super.super.lib,
+            "failed to allocate close_reqs, falling back to sequential "
+            "close");
+        ep = get_next_ep_to_close(worker, ctx, &i);
+        while (ep) {
+            close_req = ucp_ep_close_nbx(ep, &param);
+            if (UCS_PTR_IS_PTR(close_req)) {
+                do {
+                    ucp_worker_progress(ctx->worker.ucp_worker);
+                    if (ctx->cfg.service_worker != 0) {
+                        ucp_worker_progress(ctx->service_worker.ucp_worker);
+                    }
+                    status = ucp_request_check_status(close_req);
+                } while (status == UCS_INPROGRESS);
+                ucp_request_free(close_req);
+            } else {
+                status = UCS_PTR_STATUS(close_req);
+            }
+            ucc_assert(status <= UCS_OK);
+            if (status != UCS_OK) {
+                tl_error(
+                    ctx->super.super.lib,
+                    "error during ucp ep close, ep %p, status %s",
+                    ep,
+                    ucs_status_string(status));
+            }
+            ep = get_next_ep_to_close(worker, ctx, &i);
+        }
         return;
     }
 
-    /* Use graceful flush with OOB, force close otherwise */
-    param.op_attr_mask = UCP_OP_ATTR_FIELD_FLAGS;
-    param.flags        = UCC_TL_CTX_HAS_OOB(ctx) ? 0 : UCP_EP_CLOSE_FLAG_FORCE;
-    ep                 = get_next_ep_to_close(worker, ctx, &i);
+    ep = get_next_ep_to_close(worker, ctx, &i);
     while (ep) {
         close_req = ucp_ep_close_nbx(ep, &param);
         if (UCS_PTR_IS_PTR(close_req)) {
@@ -138,7 +174,15 @@ void ucc_tl_ucp_close_eps(
     }
 
     n_inflight = n_reqs;
+    deadline   = ucc_get_time() + UCC_TL_UCP_EP_CLOSE_TIMEOUT;
     while (n_inflight > 0) {
+        if (ucc_unlikely(ucc_get_time() > deadline)) {
+            tl_warn(
+                ctx->super.super.lib,
+                "ep close timed out, %d requests still in-flight",
+                n_inflight);
+            break;
+        }
         ucp_worker_progress(ctx->worker.ucp_worker);
         if (ctx->cfg.service_worker != 0) {
             ucp_worker_progress(ctx->service_worker.ucp_worker);
@@ -162,6 +206,12 @@ void ucc_tl_ucp_close_eps(
             } else {
                 n_inflight++;
             }
+        }
+    }
+
+    for (j = 0; j < n_reqs; j++) {
+        if (reqs[j]) {
+            ucp_request_free(reqs[j]);
         }
     }
 
