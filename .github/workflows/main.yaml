@@ -102,7 +102,6 @@ jobs:
       run: |
         chmod -R +x /tmp/ucx/install/bin /tmp/ucx/install/lib || true
         chmod -R +x /tmp/ucc/install/bin /tmp/ucc/install/lib || true
-    - uses: actions/checkout@v4
     - name: Cache OMPI
       id: cache-ompi
       uses: actions/cache@v4
@@ -131,13 +130,6 @@ jobs:
         --with-ucc=/tmp/ucc/install
 
         make -j install
-    - name: Build ucc_perftest (with OMPI)
-      run: |
-        set -e
-        ./autogen.sh
-        CC=/tmp/ompi/install/bin/mpicc CXX=/tmp/ompi/install/bin/mpicxx \
-          ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-mpi=/tmp/ompi/install
-        make -j`nproc` install
     - name: Upload OMPI build artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -153,6 +145,7 @@ jobs:
     name: OMPI perftest
     needs: ompi-build
     steps:
+    - uses: actions/checkout@v4
     - name: Download OMPI build artifacts
       uses: actions/download-artifact@v4
       with:
@@ -163,6 +156,13 @@ jobs:
         chmod -R +x /tmp/ucx/install/bin /tmp/ucx/install/lib || true
         chmod -R +x /tmp/ucc/install/bin /tmp/ucc/install/lib || true
         chmod -R +x /tmp/ompi/install/bin /tmp/ompi/install/lib || true
+    - name: Build ucc_perftest (with OMPI)
+      run: |
+        set -e
+        ./autogen.sh
+        CC=/tmp/ompi/install/bin/mpicc CXX=/tmp/ompi/install/bin/mpicxx \
+          ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-mpi=/tmp/ompi/install
+        make -j`nproc` install
     - name: Run ucc_perftest
       run: |
         set -e
@@ -230,9 +230,17 @@ jobs:
         chmod -R +x /tmp/ucx/install/bin /tmp/ucx/install/lib || true
         chmod -R +x /tmp/ucc/install/bin /tmp/ucc/install/lib || true
         chmod -R +x /tmp/ompi/install/bin /tmp/ompi/install/lib || true
+    - name: Cache IMB
+      id: cache-imb
+      uses: actions/cache@v4
+      with:
+        path: /tmp/imb
+        key: imb-${{ hashFiles('.github/workflows/main.yaml') }}
     - name: Get IMB
+      if: steps.cache-imb.outputs.cache-hit != 'true'
       run: git clone --depth 1 ${IMB_LINK} /tmp/imb
     - name: Build IMB
+      if: steps.cache-imb.outputs.cache-hit != 'true'
       run: |
         cd /tmp/imb
         make CC=/tmp/ompi/install/bin/mpicc CXX=/tmp/ompi/install/bin/mpicxx CPPFLAGS="-DCHECK=1" -j IMB-MPI1
