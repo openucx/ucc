@@ -84,14 +84,10 @@ jobs:
         cmake --build .
         ./test_ucc
 
-  ompi-tests:
+  ompi-build:
     runs-on: ubuntu-latest
     needs: build
     steps:
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends doxygen doxygen-latex
     - name: Download build artifacts
       uses: actions/download-artifact@v4
       with:
@@ -102,12 +98,20 @@ jobs:
         chmod -R +x /tmp/ucx/install/bin /tmp/ucx/install/lib || true
         chmod -R +x /tmp/ucc/install/bin /tmp/ucc/install/lib || true
     - uses: actions/checkout@v4
+    - name: Cache OMPI
+      id: cache-ompi
+      uses: actions/cache@v4
+      with:
+        path: /tmp/ompi/install
+        key: ompi-${{ env.OPEN_MPI_BRANCH }}-${{ hashFiles('.github/workflows/main.yaml') }}
     - name: Get OMPI
+      if: steps.cache-ompi.outputs.cache-hit != 'true'
       run: |
-         git clone ${OPEN_MPI_LINK} -b ${OPEN_MPI_BRANCH} /tmp/ompi
-         cd /tmp/ompi
-         git submodule update --init --recursive
+        git clone --depth 1 ${OPEN_MPI_LINK} -b ${OPEN_MPI_BRANCH} /tmp/ompi
+        cd /tmp/ompi
+        git submodule update --init --recursive --depth 1
     - name: Build OMPI
+      if: steps.cache-ompi.outputs.cache-hit != 'true'
       run: >
         cd /tmp/ompi
 
@@ -129,68 +133,111 @@ jobs:
         CC=/tmp/ompi/install/bin/mpicc CXX=/tmp/ompi/install/bin/mpicxx \
           ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-mpi=/tmp/ompi/install
         make -j`nproc` install
+    - name: Upload OMPI build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ompi-build
+        path: |
+          /tmp/ucx/install
+          /tmp/ucc/install
+          /tmp/ompi/install
+        retention-days: 1
+
+  ompi-perftest:
+    runs-on: ubuntu-latest
+    needs: ompi-build
+    steps:
+    - name: Download OMPI build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: ompi-build
+        path: /
+    - name: Restore permissions
+      run: |
+        chmod -R +x /tmp/ucx/install/bin /tmp/ucx/install/lib || true
+        chmod -R +x /tmp/ucc/install/bin /tmp/ucc/install/lib || true
+        chmod -R +x /tmp/ompi/install/bin /tmp/ompi/install/lib || true
     - name: Run ucc_perftest
       run: |
         set -e
         test -x /tmp/ucc/install/bin/ucc_perftest
         export LD_LIBRARY_PATH=/tmp/ucc/install/lib:/tmp/ucx/install/lib:/tmp/ompi/install/lib:$LD_LIBRARY_PATH
+        MPI_ARGS=(
+          -np 4 -H localhost:4
+          --bind-to none
+          --mca pml ucx
+          --mca pml_ucx_tls any
+          --mca pml_ucx_devices any
+          --mca coll_ucc_enable 0
+          -x LD_LIBRARY_PATH
+          -x UCC_LOG_LEVEL=info
+          -x UCC_TLS=ucp
+          -x UCC_CONFIG_FILE=
+        )
+        PERFTEST_ARGS=(-m host -d float32 -b 1024 -e 1024 -n 10 -w 2)
         COLLS=(
           allgather allgatherv allreduce alltoall alltoallv
           barrier bcast gather gatherv
           reduce reduce_scatter reduce_scatterv scatterv
         )
-        for c in "${COLLS[@]}"; do
-          echo "Running ucc_perftest -c ${c}"
-          /tmp/ompi/install/bin/mpirun \
-            -np 4 -H localhost:4 \
-            --bind-to none \
-            --mca pml ucx \
-            --mca pml_ucx_tls any \
-            --mca pml_ucx_devices any \
-            --mca coll_ucc_enable 0 \
-            -x LD_LIBRARY_PATH \
-            -x UCC_LOG_LEVEL=info \
-            -x UCC_TLS=ucp \
-            -x UCC_CONFIG_FILE= \
-            /tmp/ucc/install/bin/ucc_perftest \
-              -c "${c}" -m host -d float32 -b 1024 -e 1024 -n 10 -w 2
-        done
         INPLACE_COLLS=(
           allgather allgatherv allreduce
           gather gatherv
           reduce reduce_scatter reduce_scatterv
         )
-        for c in "${INPLACE_COLLS[@]}"; do
-          echo "Running ucc_perftest (inplace) -c ${c}"
-          /tmp/ompi/install/bin/mpirun \
-            -np 4 -H localhost:4 \
-            --bind-to none \
-            --mca pml ucx \
-            --mca pml_ucx_tls any \
-            --mca pml_ucx_devices any \
-            --mca coll_ucc_enable 0 \
-            -x LD_LIBRARY_PATH \
-            -x UCC_LOG_LEVEL=info \
-            -x UCC_TLS=ucp \
-            -x UCC_CONFIG_FILE= \
-            /tmp/ucc/install/bin/ucc_perftest \
-              -c "${c}" -m host -d float32 -b 1024 -e 1024 -n 10 -w 2 -i
-        done
+        (
+          for c in "${COLLS[@]}"; do
+            echo "Running ucc_perftest -c ${c}"
+            /tmp/ompi/install/bin/mpirun "${MPI_ARGS[@]}" \
+              /tmp/ucc/install/bin/ucc_perftest -c "${c}" "${PERFTEST_ARGS[@]}"
+          done
+        ) &
+        PID_REGULAR=$!
+        (
+          for c in "${INPLACE_COLLS[@]}"; do
+            echo "Running ucc_perftest (inplace) -c ${c}"
+            /tmp/ompi/install/bin/mpirun "${MPI_ARGS[@]}" \
+              /tmp/ucc/install/bin/ucc_perftest -c "${c}" "${PERFTEST_ARGS[@]}" -i
+          done
+        ) &
+        PID_INPLACE=$!
+        FAILED=0
+        wait $PID_REGULAR || FAILED=1
+        wait $PID_INPLACE || FAILED=1
+        if [ $FAILED -ne 0 ]; then
+          echo "ERROR: ucc_perftest failed"
+          exit 1
+        fi
+
+  ompi-imb:
+    runs-on: ubuntu-latest
+    needs: ompi-build
+    steps:
+    - name: Download OMPI build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: ompi-build
+        path: /
+    - name: Restore permissions
+      run: |
+        chmod -R +x /tmp/ucx/install/bin /tmp/ucx/install/lib || true
+        chmod -R +x /tmp/ucc/install/bin /tmp/ucc/install/lib || true
+        chmod -R +x /tmp/ompi/install/bin /tmp/ompi/install/lib || true
     - name: Get IMB
-      run: git clone ${IMB_LINK} /tmp/imb
+      run: git clone --depth 1 ${IMB_LINK} /tmp/imb
     - name: Build IMB
       run: |
-         cd /tmp/imb
-         make CC=/tmp/ompi/install/bin/mpicc CXX=/tmp/ompi/install/bin/mpicxx CPPFLAGS="-DCHECK=1" -j IMB-MPI1
+        cd /tmp/imb
+        make CC=/tmp/ompi/install/bin/mpicc CXX=/tmp/ompi/install/bin/mpicxx CPPFLAGS="-DCHECK=1" -j IMB-MPI1
     - name: Run IMB-DCHECK
       run: >
-         /tmp/ompi/install/bin/mpirun
-         -np 8
-         -H localhost:8
-         --bind-to none
-         --mca pml ucx
-         --mca pml_ucx_tls any
-         --mca pml_ucx_devices any
-         --mca coll_ucc_priority 100
-         --mca coll_ucc_enable 1
-         /tmp/imb/IMB-MPI1 ${IMB_COLLS} -iter 10 -iter_policy off
+        /tmp/ompi/install/bin/mpirun
+        -np 8
+        -H localhost:8
+        --bind-to none
+        --mca pml ucx
+        --mca pml_ucx_tls any
+        --mca pml_ucx_devices any
+        --mca coll_ucc_priority 100
+        --mca coll_ucc_enable 1
+        /tmp/imb/IMB-MPI1 ${IMB_COLLS} -iter 10 -iter_policy off
