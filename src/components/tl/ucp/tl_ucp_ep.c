@@ -94,8 +94,9 @@ static inline ucp_ep_h get_next_ep_to_close(
 void ucc_tl_ucp_close_eps(
     ucc_tl_ucp_worker_t *worker, ucc_tl_ucp_context_t *ctx)
 {
-    int                 i      = 0;
-    int                 n_reqs = 0;
+    int                 i         = 0;
+    int                 n_reqs    = 0;
+    int                 timed_out = 0;
     int                 n_inflight;
     int                 j;
     ucp_ep_h            ep;
@@ -131,31 +132,36 @@ void ucc_tl_ucp_close_eps(
         while (ep) {
             close_req = ucp_ep_close_nbx(ep, &param);
             if (UCS_PTR_IS_PTR(close_req)) {
-                do {
-                    if (ucc_unlikely(ucc_get_time() > deadline)) {
-                        tl_warn(
-                            ctx->super.super.lib,
-                            "ep close timed out in sequential fallback");
-                        ucp_request_free(close_req);
-                        return;
-                    }
-                    ucp_worker_progress(ctx->worker.ucp_worker);
-                    if (ctx->cfg.service_worker != 0) {
-                        ucp_worker_progress(ctx->service_worker.ucp_worker);
-                    }
-                    status = ucp_request_check_status(close_req);
-                } while (status == UCS_INPROGRESS);
+                if (!timed_out) {
+                    do {
+                        if (ucc_unlikely(ucc_get_time() > deadline)) {
+                            tl_warn(
+                                ctx->super.super.lib,
+                                "ep close timed out in sequential "
+                                "fallback");
+                            timed_out = 1;
+                            break;
+                        }
+                        ucp_worker_progress(ctx->worker.ucp_worker);
+                        if (ctx->cfg.service_worker != 0) {
+                            ucp_worker_progress(ctx->service_worker.ucp_worker);
+                        }
+                        status = ucp_request_check_status(close_req);
+                    } while (status == UCS_INPROGRESS);
+                }
                 ucp_request_free(close_req);
             } else {
                 status = UCS_PTR_STATUS(close_req);
             }
-            ucc_assert(status <= UCS_OK);
-            if (status != UCS_OK) {
-                tl_error(
-                    ctx->super.super.lib,
-                    "error during ucp ep close, ep %p, status %s",
-                    ep,
-                    ucs_status_string(status));
+            if (!timed_out) {
+                ucc_assert(status <= UCS_OK);
+                if (status != UCS_OK) {
+                    tl_error(
+                        ctx->super.super.lib,
+                        "error during ucp ep close, ep %p, status %s",
+                        ep,
+                        ucs_status_string(status));
+                }
             }
             ep = get_next_ep_to_close(worker, ctx, &i);
         }
