@@ -126,11 +126,19 @@ void ucc_tl_ucp_close_eps(
             ctx->super.super.lib,
             "failed to allocate close_reqs, falling back to sequential "
             "close");
-        ep = get_next_ep_to_close(worker, ctx, &i);
+        deadline = ucc_get_time() + UCC_TL_UCP_EP_CLOSE_TIMEOUT;
+        ep       = get_next_ep_to_close(worker, ctx, &i);
         while (ep) {
             close_req = ucp_ep_close_nbx(ep, &param);
             if (UCS_PTR_IS_PTR(close_req)) {
                 do {
+                    if (ucc_unlikely(ucc_get_time() > deadline)) {
+                        tl_warn(
+                            ctx->super.super.lib,
+                            "ep close timed out in sequential fallback");
+                        ucp_request_free(close_req);
+                        return;
+                    }
                     ucp_worker_progress(ctx->worker.ucp_worker);
                     if (ctx->cfg.service_worker != 0) {
                         ucp_worker_progress(ctx->service_worker.ucp_worker);
