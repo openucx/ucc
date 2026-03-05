@@ -276,18 +276,16 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
         coll_args->coll_type == UCC_COLL_TYPE_SCATTER ||
         coll_args->coll_type == UCC_COLL_TYPE_SCATTERV) {
         /* Check if datatype validation is needed and create schedule if so */
-        {
-            ucc_coll_task_t *validated_task;
+        ucc_coll_task_t *validated_task;
 
-            validated_task = ucc_service_dt_check(team, task);
-            if (!validated_task) {
-                ucc_error("failed to create dt_check schedule");
-                status = UCC_ERR_NO_MEMORY;
-                goto coll_finalize;
-            }
-            /* Return schedule if validation was needed, or original task if not */
-            task = validated_task;
+        validated_task = ucc_service_dt_check(team, task, &status);
+        if (!validated_task) {
+            ucc_error("failed to create dt_check schedule: %s",
+                      ucc_status_string(status));
+            goto coll_finalize;
         }
+        /* Return schedule if validation was needed, or original task if not */
+        task = validated_task;
     }
     /* Setup top-level task (actual task or schedule) */
     task->flags |= UCC_COLL_TASK_FLAG_TOP_LEVEL;

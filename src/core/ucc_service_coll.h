@@ -49,8 +49,10 @@ ucc_status_t ucc_collective_finalize_internal(ucc_coll_task_t *task);
  *
  * @param team The UCC team
  * @param task The actual collective task (already created by TL/CL)
+ * @param status_out If non-NULL, set to the error status when returning NULL
  * @return Schedule with validation (as ucc_coll_task_t*), or original task, or NULL on error
  */
-ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task);
+ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task,
+                                      ucc_status_t *status_out);
 
 #endif
