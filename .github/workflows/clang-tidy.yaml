@@ -1,9 +1,9 @@
-name: Linter
+name: Lint
 
 on: [push, pull_request]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: lint-cpu-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -13,6 +13,7 @@ env:
 jobs:
   clang-tidy:
     runs-on: ubuntu-22.04
+    name: clang-tidy
     steps:
     - name: Install dependencies
       run: |
@@ -24,14 +25,24 @@ jobs:
         echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends clang-tidy-${CLANG_VER} bear
+    - name: Cache UCX
+      id: cache-ucx
+      uses: actions/cache@v4
+      with:
+        path: /tmp/ucx/install
+        key: ucx-tidy-${{ env.OPEN_UCX_BRANCH }}-${{ hashFiles('.github/workflows/clang-tidy.yaml') }}
     - name: Get UCX
-      run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
+      run: |
+        rm -rf /tmp/ucx
+        git clone --depth 1 ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
       run: |
         cd /tmp/ucx && ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
         make -j install
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Build UCC
       run: |
         ./autogen.sh

@@ -1,9 +1,9 @@
-name: Linter-NVIDIA
+name: Lint
 
 on: [push, pull_request]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: lint-cuda-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -18,6 +18,7 @@ env:
 jobs:
   clang-tidy:
     runs-on: ubuntu-22.04
+    name: clang-tidy (CUDA)
     steps:
     - name: Install dependencies
       run: |
@@ -29,32 +30,57 @@ jobs:
         echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends clang-tidy-${CLANG_VER} bear clang-${CLANG_VER} clang++-${CLANG_VER}
+    - name: Cache MLNX_OFED tarball
+      id: cache-ofed
+      uses: actions/cache@v4
+      with:
+        path: MLNX_OFED_LINUX-${{ env.MLNX_OFED_VER }}-ubuntu22.04-x86_64.tgz
+        key: mlnx-ofed-${{ env.MLNX_OFED_VER }}
+    - name: Download MLNX_OFED
+      if: steps.cache-ofed.outputs.cache-hit != 'true'
+      run: wget --no-verbose http://content.mellanox.com/ofed/MLNX_OFED-${MLNX_OFED_VER}/MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu22.04-x86_64.tgz
     - name: Install extra rdma dependencies
       run: |
-        wget --no-verbose http://content.mellanox.com/ofed/MLNX_OFED-${MLNX_OFED_VER}/MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu22.04-x86_64.tgz
-        sudo tar -xvzf MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu22.04-x86_64.tgz
+        sudo tar -xzf MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu22.04-x86_64.tgz
         sudo chmod -R a+rwx MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu22.04-x86_64
-        sudo MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu22.04-x86_64/mlnxofedinstall --skip-unsupported-devices-check --user-space-only --without-fw-update --force --basic -vvv
+        sudo MLNX_OFED_LINUX-${MLNX_OFED_VER}-ubuntu22.04-x86_64/mlnxofedinstall --skip-unsupported-devices-check --user-space-only --without-fw-update --force --basic -v
     - name: Install extra cuda dependencies
       run: |
         wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
         sudo dpkg -i cuda-keyring_1.1-1_all.deb
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends cuda-cudart-dev-${CUDA_VER} cuda-nvcc-${CUDA_VER} cuda-nvml-dev-${CUDA_VER}
+    - name: Cache UCX
+      id: cache-ucx
+      uses: actions/cache@v4
+      with:
+        path: /tmp/ucx/install
+        key: ucx-nvidia-${{ env.OPEN_UCX_BRANCH }}-${{ hashFiles('.github/workflows/clang-tidy-nvidia.yaml') }}
     - name: Get UCX
-      run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
+      run: |
+        rm -rf /tmp/ucx
+        git clone --depth 1 ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
       run: |
         cd /tmp/ucx && ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
         make -j install
+    - name: Cache HPCX
+      id: cache-hpcx
+      uses: actions/cache@v4
+      with:
+        path: /tmp/hpcx
+        key: hpcx-v2.22.1
     - name: Download HPCX
+      if: steps.cache-hpcx.outputs.cache-hit != 'true'
       run: |
         cd /tmp
         wget --no-verbose ${HPCX_LINK}
         tar xjf hpcx-v2.22.1-gcc-doca_ofed-ubuntu22.04-cuda12-x86_64.tbz
         mv hpcx-v2.22.1-gcc-doca_ofed-ubuntu22.04-cuda12-x86_64 hpcx
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Build UCC
       run: |
         ./autogen.sh
