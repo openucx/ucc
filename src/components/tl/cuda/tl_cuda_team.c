@@ -103,6 +103,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     }
 #endif
 
+    if (UCC_TL_TEAM_SIZE(self) > UCC_TL_CUDA_MAX_PEERS) {
+        tl_debug(tl_context->lib,
+                 "team size %u exceeds max supported %d, "
+                 "increase UCC_TL_CUDA_MAX_PEERS to use TL CUDA",
+                 UCC_TL_TEAM_SIZE(self), UCC_TL_CUDA_MAX_PEERS);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     self->ids = ucc_malloc((UCC_TL_TEAM_SIZE(self) + 1) * sizeof(*(self->ids)),
                             "ids");
     if (!self->ids) {
