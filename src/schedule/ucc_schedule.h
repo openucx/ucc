@@ -170,7 +170,6 @@ typedef struct ucc_schedule {
 typedef struct ucc_dt_check_schedule {
     ucc_schedule_t       super;
     ucc_dt_check_state_t dt_check;
-    ucc_coll_task_t     *actual_task; /* The original collective task */
 } ucc_dt_check_schedule_t;
 
 void ucc_coll_task_construct(ucc_coll_task_t *task);

@@ -314,7 +314,7 @@ static void ucc_dt_check_allreduce_progress(ucc_coll_task_t *allreduce_wrapper)
     /* If service allreduce failed, mark validation as failed */
     if (status != UCC_OK) {
         dt_check->validated = 0;
-        allreduce_wrapper->status = status;
+        allreduce_wrapper->status = UCC_OK;
         return;
     }
 
@@ -433,7 +433,8 @@ static ucc_status_t ucc_dt_check_schedule_finalize(ucc_coll_task_t *task)
     return status;
 }
 
-ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task)
+ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task,
+                                      ucc_status_t *status_out)
 {
     ucc_dt_check_schedule_t  *dt_schedule;
     ucc_dt_check_state_t     *dt_check;
@@ -442,11 +443,10 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task)
     ucc_base_coll_args_t      empty_bargs;
     const ucc_coll_args_t    *args      = &task->bargs.args;
     ucc_rank_t                rank      = team->rank;
-    int                       root      = (int)args->root;
+    ucc_rank_t                root      = args->root;
     ucc_coll_type_t           coll_type = args->coll_type;
     ucc_datatype_t            local_dt       = UCC_DT_INT8;
     ucc_memory_type_t         local_mem_type = UCC_MEMORY_TYPE_UNKNOWN;
-    int                       is_contig;
     ucc_status_t              status;
 
     /* If check is disabled, return original task */
@@ -515,20 +515,14 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task)
         }
     }
 
-    /* Determine if local datatype is contiguous */
-    if (UCC_DT_IS_PREDEFINED(local_dt)) {
-        is_contig = 1;
-    } else if (UCC_DT_IS_GENERIC(local_dt)) {
-        is_contig = UCC_DT_IS_CONTIG(local_dt);
-    } else {
-        is_contig = 0;
-    }
-
     /* Allocate schedule with embedded dt_check */
     dt_schedule = (ucc_dt_check_schedule_t *)ucc_malloc(sizeof(*dt_schedule),
                                                          "dt_check_schedule");
     if (!dt_schedule) {
         ucc_error("failed to allocate dt_check_schedule");
+        if (status_out) {
+            *status_out = UCC_ERR_NO_MEMORY;
+        }
         return NULL;
     }
     memset(dt_schedule, 0, sizeof(*dt_schedule));
@@ -540,11 +534,11 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task)
         ucc_error("failed to initialize dt_check schedule: %s",
                   ucc_status_string(status));
         ucc_free(dt_schedule);
+        if (status_out) {
+            *status_out = status;
+        }
         return NULL;
     }
-
-    /* Store actual task pointer */
-    dt_schedule->actual_task = task;
 
     /* Setup embedded dt_check state */
     dt_check = &dt_schedule->dt_check;
@@ -553,14 +547,10 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task)
         /* Generic or invalid datatype - reject to prevent int16 overflow */
         dt_check->values[0] = (int16_t) UCC_ERR_NOT_SUPPORTED;
         dt_check->values[1] = -(int16_t) UCC_ERR_NOT_SUPPORTED;
-    } else if (is_contig) {
-        /* Predefined contiguous datatype - safe to cast to int16 */
+    } else {
+        /* Predefined datatypes are always contiguous - safe to cast to int16 */
         dt_check->values[0] = (int16_t) local_dt;
         dt_check->values[1] = -(int16_t) local_dt;
-    } else {
-        /* Predefined but non-contiguous datatype */
-        dt_check->values[0] = (int16_t) UCC_ERR_NOT_SUPPORTED;
-        dt_check->values[1] = -(int16_t) UCC_ERR_NOT_SUPPORTED;
     }
     dt_check->values[2] = (int16_t) local_mem_type;
     dt_check->values[3] = -(int16_t) local_mem_type;
@@ -577,6 +567,7 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task)
     allreduce_wrapper = ucc_mpool_get(&task->bargs.team->contexts[0]->lib->stub_tasks_mp);
     if (!allreduce_wrapper) {
         ucc_error("failed to allocate allreduce wrapper task from mpool");
+        status = UCC_ERR_NO_MEMORY;
         goto error_schedule;
     }
     /* Initialize allreduce wrapper task with minimal bargs (only needs team) */
@@ -613,6 +604,7 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task)
     actual_wrapper = ucc_mpool_get(&task->bargs.team->contexts[0]->lib->stub_tasks_mp);
     if (!actual_wrapper) {
         ucc_error("failed to allocate actual wrapper task from mpool");
+        status = UCC_ERR_NO_MEMORY;
         goto error_allreduce_wrapper;
     }
     status = ucc_coll_task_init(actual_wrapper, &empty_bargs, task->team);
@@ -643,6 +635,11 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task)
         goto error_allreduce_wrapper;
     }
 
+    /* Propagate executor requirement from actual_task to schedule */
+    if (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
+        dt_schedule->super.super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+    }
+
     /* Set schedule functions */
     dt_schedule->super.super.post     = ucc_schedule_start;
     dt_schedule->super.super.progress = NULL; /* Sub-tasks have their own progress functions */
@@ -650,9 +647,13 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task)
     return &dt_schedule->super.super;
 
 error_allreduce_wrapper:
+    ucc_coll_task_destruct(allreduce_wrapper);
     ucc_mpool_put(allreduce_wrapper);
 error_schedule:
     ucc_coll_task_destruct(&dt_schedule->super.super);
     ucc_free(dt_schedule);
+    if (status_out) {
+        *status_out = status;
+    }
     return NULL;
 }

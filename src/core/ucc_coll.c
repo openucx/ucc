@@ -279,10 +279,10 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
         {
             ucc_coll_task_t *validated_task;
 
-            validated_task = ucc_service_dt_check(team, task);
+            validated_task = ucc_service_dt_check(team, task, &status);
             if (!validated_task) {
-                ucc_error("failed to create dt_check schedule");
-                status = UCC_ERR_NO_MEMORY;
+                ucc_error("failed to create dt_check schedule: %s",
+                          ucc_status_string(status));
                 goto coll_finalize;
             }
             /* Return schedule if validation was needed, or original task if not */
