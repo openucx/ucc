@@ -69,13 +69,22 @@ steps:
       touch job_id.txt && chown svcnbu-swx-hpcx job_id.txt
       sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_slurm_allocation.sh
 
-  - name: Run UCC NVLS tests
+  - name: Run UCC NVLS perftest
     containerSelector: "{name: 'build_helper'}"
     timeout: "${TEST_TIMEOUT_MINUTES}"
     run: |
       set -x
       export DOCKER_IMAGE_NAME="${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
       export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
-      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_tests_ucc_nvls_all_slurm.sh
+      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_nvls_slurm.sh '/opt/nvidia/src/ucc/.ci/scripts/run_tests_ucc_nvls_all.sh' ${NVLS_MPI_PPN:-4}
+
+  - name: Run UCC NVLS MPI tests
+    containerSelector: "{name: 'build_helper'}"
+    timeout: "${TEST_TIMEOUT_MINUTES}"
+    run: |
+      set -x
+      export DOCKER_IMAGE_NAME="${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
+      export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
+      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_nvls_slurm.sh '/opt/nvidia/src/ucc/.ci/scripts/run_tests_ucc_nvls_mpi.sh' ${NVLS_MPI_PPN:-4}
     always: |
       sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/stop_slurm_allocation.sh

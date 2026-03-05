@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #==============================================================================
 # Install HPC-X (provides UCX + OpenMPI)
 #==============================================================================
-ARG HPCX_VERSION=v2.25.1
+ARG HPCX_VERSION=v2.26
 ARG HPCX_CUDA=cuda13
 ARG HPCX_OS=ubuntu24.04
 RUN cd /tmp && \
