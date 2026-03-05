@@ -3,6 +3,10 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source "${SCRIPT_DIR}/env.sh"
 
+if [ "${SLURM_LOCALID:-0}" = "0" ]; then
+    "${SCRIPT_DIR}/check_nvls_fabric.sh"
+fi
+
 export OMPI_MCA_coll=^hcoll
 export OMPI_MCA_coll_ucc_enable=0
 export UCC_TLS=cuda,ucp
