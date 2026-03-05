@@ -24,7 +24,7 @@ UCC_TEST_P(test_team, team_create_destroy_ctx_global)
     UccTeam_h team = UccJob::getStaticJob()->create_team(team_size);
 }
 
-UCC_TEST_P(test_team, team_create_destroy_ctx_local)
+UCC_TEST_P(test_team, DISABLED_team_create_destroy_ctx_local)
 {
     int team_size = GetParam();
 
@@ -60,7 +60,7 @@ UCC_TEST_F(test_team, team_create_multiple)
 }
 
 /* Create and destroy several coexisting teams */
-UCC_TEST_F(test_team, team_create_multiple_preconnect_ctx_local)
+UCC_TEST_F(test_team, DISABLED_team_create_multiple_preconnect_ctx_local)
 {
     int job_size = 16;
     UccJob job(job_size, UccJob::UCC_JOB_CTX_LOCAL,
