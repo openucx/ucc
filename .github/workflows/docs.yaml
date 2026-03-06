@@ -14,14 +14,14 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends doxygen doxygen-latex cm-super texlive-fonts-recommended
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Build UCC docs
       run: |
         ./autogen.sh
         ./configure --with-docs-only
         make docs
     - name: Upload docs
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: docs
         path: ${{ github.workspace }}/docs/doxygen-doc/ucc.pdf

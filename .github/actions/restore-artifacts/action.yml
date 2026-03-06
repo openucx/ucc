@@ -1,0 +1,28 @@
+name: Restore artifact permissions
+description: >
+  Download-artifact strips execute bits.  This action restores them for the
+  standard UCC/UCX/OMPI install trees used across CI jobs.
+inputs:
+  ucx:
+    description: Restore UCX install permissions
+    default: 'true'
+  ucc:
+    description: Restore UCC install permissions
+    default: 'true'
+  ompi:
+    description: Restore OMPI install permissions
+    default: 'false'
+runs:
+  using: composite
+  steps:
+  - shell: bash
+    run: |
+      if [ "${{ inputs.ucx }}" = "true" ]; then
+        chmod -R +x /tmp/ucx/install/bin /tmp/ucx/install/lib 2>/dev/null || true
+      fi
+      if [ "${{ inputs.ucc }}" = "true" ]; then
+        chmod -R +x /tmp/ucc/install/bin /tmp/ucc/install/lib 2>/dev/null || true
+      fi
+      if [ "${{ inputs.ompi }}" = "true" ]; then
+        chmod -R +x /tmp/ompi/install/bin /tmp/ompi/install/lib 2>/dev/null || true
+      fi
