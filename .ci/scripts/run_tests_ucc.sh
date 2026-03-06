@@ -14,7 +14,7 @@ UCC_SHARD_TIMEOUT_MINUTES=${UCC_SHARD_TIMEOUT_MINUTES:-30}
 if [ "${UCC_GTEST_SHARDS}" -le 1 ]; then
     timeout -v -k 30 ${UCC_SHARD_TIMEOUT_MINUTES}m make gtest
 else
-    num_gpus=$(nvidia-smi -L 2>/dev/null | wc -l)
+    num_gpus=$(nvidia-smi -L 2>/dev/null | wc -l || echo 0)
 
     pids=""
     for i in $(seq 0 $((UCC_GTEST_SHARDS - 1))); do
