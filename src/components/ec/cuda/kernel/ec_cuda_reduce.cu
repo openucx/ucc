@@ -11,6 +11,7 @@
 
 extern "C" {
 #include "../ec_cuda.h"
+#include "utils/ucc_math.h"
 }
 
 extern "C" {

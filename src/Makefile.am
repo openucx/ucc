@@ -38,6 +38,18 @@ COMPONENT_DIRS = $(cl_dirs) $(mc_dirs) $(ec_dirs) $(topo_dirs)
 
 include components/tl/makefile.am
 
+# Kernel-only subdirectories whose .cu compilation can overlap with libucc.la.
+# NVCC only needs headers (source tree + config.h from configure), so there is
+# no build-time dependency on the compiled core library.  The final link of the
+# parent component (libucc_ec_cuda.la, etc.) still waits for libucc.la below.
+early_cuda_kernel_dirs =
+if HAVE_CUDA
+early_cuda_kernel_dirs += components/ec/cuda/kernel
+endif
+if TL_CUDA_NVLS_ENABLED
+early_cuda_kernel_dirs += components/tl/cuda/kernels
+endif
+
 # All possible component subdirectories (including conditional ones)
 # needed for make dist to find all source files.
 DIST_SUBDIRS = .                       \
@@ -60,9 +72,24 @@ DIST_SUBDIRS = .                       \
     components/topo/cuda               \
     components/topo/ib
 
-all-local: $(COMPONENT_DIRS:%=all-component/%)
+all-local: $(early_cuda_kernel_dirs:%=compile-kernels/%) $(COMPONENT_DIRS:%=all-component/%)
+
+# Start CUDA kernel compilation immediately (no libucc.la dependency).
+compile-kernels/%:
+	+$(MAKE) -C $* all
+
+# Components wait for libucc.la before linking.
 all-component/%: libucc.la
 	+$(MAKE) -C $* all
+
+# Components that contain CUDA kernels must also wait for the early kernel
+# compilation to finish, so two make processes never run in the same directory.
+if HAVE_CUDA
+all-component/components/ec/cuda: compile-kernels/components/ec/cuda/kernel
+endif
+if TL_CUDA_NVLS_ENABLED
+all-component/components/tl/cuda: compile-kernels/components/tl/cuda/kernels
+endif
 
 # Component installs must wait for libucc.la to be installed to the prefix
 # first, otherwise libtool relinking fails with "cannot find -lucc".
@@ -73,6 +100,10 @@ install-component/%: libucc.la install-libLTLIBRARIES
 clean-local: $(COMPONENT_DIRS:%=clean-component/%)
 clean-component/%:
 	+$(MAKE) -C $* clean
+
+uninstall-local: $(COMPONENT_DIRS:%=uninstall-component/%)
+uninstall-component/%:
+	+$(MAKE) -C $* uninstall
 
 distclean-local: $(COMPONENT_DIRS:%=distclean-component/%)
 distclean-component/%:

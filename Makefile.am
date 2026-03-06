@@ -34,6 +34,14 @@ clean-local: $(PARALLEL_SUBDIRS:%=clean-par/%)
 clean-par/%:
 	+$(MAKE) -C $* clean
 
+uninstall-local: $(PARALLEL_SUBDIRS:%=uninstall-par/%)
+uninstall-par/%:
+	+$(MAKE) -C $* uninstall
+
+check-local: $(PARALLEL_SUBDIRS:%=check-par/%)
+check-par/%:
+	+$(MAKE) -C $* check
+
 distclean-local: $(PARALLEL_SUBDIRS:%=distclean-par/%)
 distclean-par/%:
 	-+$(MAKE) -C $* distclean
