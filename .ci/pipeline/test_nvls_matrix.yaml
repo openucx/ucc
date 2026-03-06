@@ -44,7 +44,7 @@ runs_on_dockers:
       tag: "${DOCKER_IMAGE_TAG}",
       arch: "aarch64",
       uri: "${UCC_URI_SUFFIX}",
-      build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg _UID=149917 --build-arg _GID=30 --build-arg _LOGIN=svcnbu-swx-hpcx --build-arg _GROUP=svcnbu-swx-hpcx",
+      build_args: "--build-arg ARCH=aarch64 --build-arg OS=ubuntu24.04 --build-arg CUDA_VER=${CUDA_VER} --build-arg _UID=149917 --build-arg _GID=30 --build-arg _LOGIN=svcnbu-swx-hpcx --build-arg _GROUP=svcnbu-swx-hpcx --build-arg UCC_ENABLE_NVLS=yes --build-arg UCC_ENABLE_GTEST=no",
     }
   - {
       file: ".ci/dockerfiles/Dockerfile.build_helper",
