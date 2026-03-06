@@ -4,9 +4,15 @@ set -o pipefail
 UCC_SRC_DIR="${SRC_DIR}/ucc"
 cd "${UCC_SRC_DIR}/build"
 
+echo "INFO: GPU diagnostics"
+nvidia-smi || echo "WARN: nvidia-smi failed"
+ls -la ${UCC_INSTALL_DIR}/lib/ucc/ 2>/dev/null || echo "WARN: UCC module dir not found"
+ldd ${UCC_INSTALL_DIR}/lib/ucc/libucc_mc_cuda.so 2>&1 || echo "WARN: ldd on mc_cuda failed"
+
 export UCX_WARN_UNUSED_ENV_VARS=n
 # Disable NCCL
 export UCC_TL_NCCL_TUNE=0
+export UCC_LOG_LEVEL=debug
 
 UCC_GTEST_SHARDS=${UCC_GTEST_SHARDS:-1}
 UCC_SHARD_TIMEOUT_MINUTES=${UCC_SHARD_TIMEOUT_MINUTES:-30}
