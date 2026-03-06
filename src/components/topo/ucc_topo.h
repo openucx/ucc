@@ -258,6 +258,16 @@ static inline ucc_rank_t ucc_topo_nnodes(ucc_topo_t *topo)
     return sbgp->group_size;
 }
 
+static inline ucc_rank_t ucc_topo_node_local_rank(ucc_topo_t *topo)
+{
+    ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
+
+    if (sbgp->status == UCC_SBGP_NOT_EXISTS) {
+        return 0;
+    }
+    return sbgp->group_rank;
+}
+
 /* Returns node leaders array - array that maps each rank to the TEAM RANK that 
    is the leader of that rank's node. Also returns per-node leaders array - array
    mapping node_id to the TEAM RANK of that node's leader */
