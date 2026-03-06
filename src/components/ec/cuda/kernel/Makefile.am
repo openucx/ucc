@@ -49,7 +49,16 @@ ec_cuda_executor_reduce_uint32.lo: ec_cuda_executor_reduce_uint32.cu
 ec_cuda_executor_reduce_uint64.lo: ec_cuda_executor_reduce_uint64.cu
 	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
 
-ec_cuda_executor_reduce_fp.lo: ec_cuda_executor_reduce_fp.cu
+ec_cuda_executor_reduce_float16.lo: ec_cuda_executor_reduce_float16.cu
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
+
+ec_cuda_executor_reduce_float32.lo: ec_cuda_executor_reduce_float32.cu
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
+
+ec_cuda_executor_reduce_float64.lo: ec_cuda_executor_reduce_float64.cu
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
+
+ec_cuda_executor_reduce_bfloat16.lo: ec_cuda_executor_reduce_bfloat16.cu
 	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS_RDC) $(NVCC_ARCH)
 
 ec_cuda_executor_reduce_complex.lo: ec_cuda_executor_reduce_complex.cu
@@ -58,7 +67,7 @@ ec_cuda_executor_reduce_complex.lo: ec_cuda_executor_reduce_complex.cu
 # Device link step for RDC objects: resolves cross-TU __device__ calls.
 # Produces a proper libtool .lo object so that libtool reliably includes it
 # when the convenience library is absorbed into the parent shared library.
-ec_cuda_executor_dlink.lo: ec_cuda_executor.lo ec_cuda_executor_reduce_int8.lo ec_cuda_executor_reduce_int16.lo ec_cuda_executor_reduce_int32.lo ec_cuda_executor_reduce_int64.lo ec_cuda_executor_reduce_uint8.lo ec_cuda_executor_reduce_uint16.lo ec_cuda_executor_reduce_uint32.lo ec_cuda_executor_reduce_uint64.lo ec_cuda_executor_reduce_fp.lo ec_cuda_executor_reduce_complex.lo
+ec_cuda_executor_dlink.lo: ec_cuda_executor.lo ec_cuda_executor_reduce_int8.lo ec_cuda_executor_reduce_int16.lo ec_cuda_executor_reduce_int32.lo ec_cuda_executor_reduce_int64.lo ec_cuda_executor_reduce_uint8.lo ec_cuda_executor_reduce_uint16.lo ec_cuda_executor_reduce_uint32.lo ec_cuda_executor_reduce_uint64.lo ec_cuda_executor_reduce_float16.lo ec_cuda_executor_reduce_float32.lo ec_cuda_executor_reduce_float64.lo ec_cuda_executor_reduce_bfloat16.lo ec_cuda_executor_reduce_complex.lo
 	$(NVCC) -dlink \
 	  .libs/ec_cuda_executor.o \
 	  .libs/ec_cuda_executor_reduce_int8.o \
@@ -69,7 +78,10 @@ ec_cuda_executor_dlink.lo: ec_cuda_executor.lo ec_cuda_executor_reduce_int8.lo e
 	  .libs/ec_cuda_executor_reduce_uint16.o \
 	  .libs/ec_cuda_executor_reduce_uint32.o \
 	  .libs/ec_cuda_executor_reduce_uint64.o \
-	  .libs/ec_cuda_executor_reduce_fp.o \
+	  .libs/ec_cuda_executor_reduce_float16.o \
+	  .libs/ec_cuda_executor_reduce_float32.o \
+	  .libs/ec_cuda_executor_reduce_float64.o \
+	  .libs/ec_cuda_executor_reduce_bfloat16.o \
 	  .libs/ec_cuda_executor_reduce_complex.o \
 	  -o .libs/ec_cuda_executor_dlink.o $(NVCC_ARCH) -Xcompiler -fPIC
 	@cp -f .libs/ec_cuda_executor_dlink.o ec_cuda_executor_dlink.o
@@ -99,7 +111,10 @@ libucc_ec_cuda_kernels_la_SOURCES  = ec_cuda_wait_kernel.cu              \
                                      ec_cuda_executor_reduce_uint16.cu   \
                                      ec_cuda_executor_reduce_uint32.cu   \
                                      ec_cuda_executor_reduce_uint64.cu   \
-                                     ec_cuda_executor_reduce_fp.cu       \
+                                     ec_cuda_executor_reduce_float16.cu  \
+                                     ec_cuda_executor_reduce_float32.cu  \
+                                     ec_cuda_executor_reduce_float64.cu  \
+                                     ec_cuda_executor_reduce_bfloat16.cu \
                                      ec_cuda_executor_reduce_complex.cu  \
                                      ec_cuda_reduce.cu                   \
                                      ec_cuda_reduce_int.cu               \

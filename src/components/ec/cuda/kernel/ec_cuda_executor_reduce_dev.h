@@ -69,7 +69,19 @@ __device__ ucc_status_t executor_reduce_uint64(
     ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
     ucc_datatype_t dt);
 
-__device__ ucc_status_t executor_reduce_fp(
+__device__ ucc_status_t executor_reduce_float16(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
+    ucc_datatype_t dt);
+
+__device__ ucc_status_t executor_reduce_float32(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
+    ucc_datatype_t dt);
+
+__device__ ucc_status_t executor_reduce_float64(
+    ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
+    ucc_datatype_t dt);
+
+__device__ ucc_status_t executor_reduce_bfloat16(
     ucc_ee_executor_task_args_t *task, ucc_reduction_op_t op,
     ucc_datatype_t dt);
 

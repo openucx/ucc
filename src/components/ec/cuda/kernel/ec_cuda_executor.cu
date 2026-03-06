@@ -133,7 +133,16 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
     if (executor_reduce_uint64(task, op, dt) == UCC_OK) {
         return UCC_OK;
     }
-    if (executor_reduce_fp(task, op, dt) == UCC_OK) {
+    if (executor_reduce_float16(task, op, dt) == UCC_OK) {
+        return UCC_OK;
+    }
+    if (executor_reduce_float32(task, op, dt) == UCC_OK) {
+        return UCC_OK;
+    }
+    if (executor_reduce_float64(task, op, dt) == UCC_OK) {
+        return UCC_OK;
+    }
+    if (executor_reduce_bfloat16(task, op, dt) == UCC_OK) {
         return UCC_OK;
     }
     return executor_reduce_complex(task, op, dt);
