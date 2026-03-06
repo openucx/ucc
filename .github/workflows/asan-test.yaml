@@ -1,4 +1,4 @@
-name: ASAN Tests
+name: ASAN
 
 on: [push, pull_request]
 
@@ -12,32 +12,80 @@ env:
   CLANG_VER: 17
 
 jobs:
-  gtest-asan:
-    runs-on: ubuntu-22.04
+  build:
+    runs-on: ubuntu-24.04
     steps:
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends wget gpg
-        # Setup LLVM repository
         sudo mkdir -p /etc/apt/keyrings
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg
-        echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
+        echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends clang-${CLANG_VER} clang++-${CLANG_VER} libclang-rt-${CLANG_VER}-dev
+    - name: Cache UCX
+      id: cache-ucx
+      uses: actions/cache@v4
+      with:
+        path: /tmp/ucx/install
+        key: ucx-asan-${{ env.OPEN_UCX_BRANCH }}-${{ hashFiles('.github/workflows/asan-test.yaml') }}
     - name: Get UCX
-      run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
+      run: |
+        rm -rf /tmp/ucx
+        git clone --depth 1 ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
       run: |
         cd /tmp/ucx && ./autogen.sh
-        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix /tmp/ucx/install
         make -j install
-    - uses: actions/checkout@v4
-    - name: Run gtest ASAN
+    - uses: actions/checkout@v6
+    - name: Build UCC (ASAN)
+      env:
+        LD_LIBRARY_PATH: /tmp/ucx/install/lib
       run: |
-        export ASAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=1:print_suppressions=0
-        export LSAN_OPTIONS=report_objects=1
         ./autogen.sh
         CFLAGS="-fsanitize=address" CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
         make -j install
-        ./test/gtest/gtest
+        cp test/gtest/gtest /tmp/ucc/install/bin/gtest
+    - name: Bundle clang runtime for test shards
+      run: |
+        CLANG_RT_DIR=$(dirname $(clang-${CLANG_VER} -print-file-name=libclang_rt.asan-x86_64.so))
+        cp -a ${CLANG_RT_DIR} /tmp/clang-rt
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        name: ucc-asan-build
+        path: |
+          /tmp/ucx/install
+          /tmp/ucc/install
+          /tmp/clang-rt
+        retention-days: 1
+
+  gtest-asan:
+    runs-on: ubuntu-24.04
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    name: ASAN (shard ${{ matrix.shard }})
+    steps:
+    - uses: actions/checkout@v6
+    - name: Download build artifacts
+      uses: actions/download-artifact@v7
+      with:
+        name: ucc-asan-build
+        path: /tmp
+    - name: Restore artifact permissions
+      uses: ./.github/actions/restore-artifacts
+    - name: Run UCC gtest (ASAN, shard ${{ matrix.shard }})
+      env:
+        GTEST_TOTAL_SHARDS: 4
+        GTEST_SHARD_INDEX: ${{ matrix.shard }}
+        ASAN_OPTIONS: fast_unwind_on_malloc=1:detect_leaks=1:print_suppressions=0
+        LSAN_OPTIONS: report_objects=1
+        LD_LIBRARY_PATH: /tmp/ucc/install/lib:/tmp/ucx/install/lib:/tmp/clang-rt
+      run: /tmp/ucc/install/bin/gtest
