@@ -1,9 +1,9 @@
-name: Linter-ROCM
+name: Lint (ROCm)
 
 on: [push, pull_request]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: lint-rocm-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -16,6 +16,7 @@ env:
 jobs:
   clang-tidy:
     runs-on: ubuntu-22.04
+    name: clang-tidy (ROCm)
     steps:
     - name: Install dependencies
       run: |
@@ -40,14 +41,24 @@ jobs:
           bear \
           rocm-hip-sdk
         sudo ln -sf /opt/rocm-${ROCM_VER} /opt/rocm
+    - name: Cache UCX
+      id: cache-ucx
+      uses: actions/cache@v4
+      with:
+        path: /tmp/ucx/install
+        key: ucx-rocm-${{ env.OPEN_UCX_BRANCH }}-${{ env.ROCM_VER }}-${{ hashFiles('.github/workflows/clang-tidy-rocm.yaml') }}
     - name: Get UCX
-      run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
+      run: |
+        rm -rf /tmp/ucx
+        git clone --depth 1 ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
       run: |
         cd /tmp/ucx && ./autogen.sh
         CC=gcc CXX=g++ ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install --with-rocm=/opt/rocm
         make -j install
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Build UCC
       run: |
         ./autogen.sh
