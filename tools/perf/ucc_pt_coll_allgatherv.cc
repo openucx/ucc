@@ -19,7 +19,7 @@ ucc_pt_coll_allgatherv::ucc_pt_coll_allgatherv(ucc_datatype_t dt,
     has_inplace_   = true;
     has_reduction_ = false;
     has_range_     = true;
-    has_bw_        = false;
+    has_bw_        = true;
     root_shift_    = 0;
 
     coll_args.mask                = UCC_COLL_ARGS_FIELD_FLAGS;
@@ -69,6 +69,21 @@ free_dst:
     ucc_pt_free(dst_header);
 exit:
     return st;
+}
+
+float ucc_pt_coll_allgatherv::get_bw(float time_ms, int grsize,
+                                     ucc_pt_test_args_t test_args)
+{
+    ucc_coll_args_t &args = test_args.coll_args;
+    float            N    = grsize;
+    size_t           count;
+    float            S;
+
+    count = ucc_coll_args_get_count(&args, args.dst.info_v.counts, 0);
+    S = static_cast<float>(count) * N *
+        ucc_dt_size(args.dst.info_v.datatype);
+
+    return (S / time_ms) * ((N - 1) / N) / 1000.0;
 }
 
 void ucc_pt_coll_allgatherv::free_args(ucc_pt_test_args_t &test_args)

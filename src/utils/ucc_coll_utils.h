@@ -18,12 +18,6 @@
 
 #define UCC_COLL_TYPE_ALL ((UCC_COLL_TYPE_LAST << 1) - 3)
 
-#define UCC_MEMORY_TYPE_ASYMMETRIC                                             \
-    ((ucc_memory_type_t)((int)UCC_MEMORY_TYPE_LAST + 1))
-
-#define UCC_MEMORY_TYPE_NOT_APPLY                                              \
-    ((ucc_memory_type_t)((int)UCC_MEMORY_TYPE_LAST + 2))
-
 #define UCC_MSG_SIZE_INVALID SIZE_MAX
 
 #define UCC_MSG_SIZE_ASYMMETRIC (UCC_MSG_SIZE_INVALID - 1)
@@ -70,12 +64,6 @@
 
 #define UCC_COLL_ARGS_ACTIVE_SET(_args)                                        \
     ((_args)->mask & UCC_COLL_ARGS_FIELD_ACTIVE_SET)
-
-#define UCC_MEM_TYPE_MASK_FULL (UCC_BIT(UCC_MEMORY_TYPE_HOST) |                \
-                                UCC_BIT(UCC_MEMORY_TYPE_CUDA) |                \
-                                UCC_BIT(UCC_MEMORY_TYPE_CUDA_MANAGED) |        \
-                                UCC_BIT(UCC_MEMORY_TYPE_ROCM) |                \
-                                UCC_BIT(UCC_MEMORY_TYPE_ROCM_MANAGED))
 
 static inline int ucc_coll_args_is_reduction(ucc_coll_type_t ct)
 {

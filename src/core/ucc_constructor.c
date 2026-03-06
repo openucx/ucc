@@ -176,6 +176,21 @@ ucc_status_t ucc_constructor(void)
         }
     }
 
+    status = ucc_components_load("sysinfo", &cfg->sysinfo_framework);
+    if (status != UCC_OK) {
+        if (status == UCC_ERR_NOT_FOUND) {
+            ucc_info("no sysinfo components were found in the "
+                     "ucc modules dir: %s. "
+                     "some sysinfo features will be disabled",
+                     cfg->component_path);
+            status = UCC_OK;
+        } else {
+            ucc_error("failed to load sysinfo components %d (%s)",
+                      status, ucc_status_string(status));
+            goto exit_unlock_mutex;
+        }
+    }
+
     if (UCC_OK != ucc_local_proc_info_init()) {
         ucc_error("failed to initialize local proc info");
         goto exit_unlock_mutex;
