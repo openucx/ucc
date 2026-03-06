@@ -36,7 +36,7 @@ runs_on_dockers:
       tag: "${BUILD_NUMBER}",
       arch: "x86_64",
       uri: "${UCC_URI_SUFFIX}",
-      build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER}",
+      build_args: "--build-arg CUDA_VER=${CUDA_VER}",
     }
   - {
       file: ".ci/dockerfiles/Dockerfile.build_helper",
@@ -44,7 +44,7 @@ runs_on_dockers:
       tag: "latest",
       arch: "x86_64",
       uri: "$arch/$name",
-      build_args: "--no-cache",
+      build_args: "",
     }
 
 # bare metal
