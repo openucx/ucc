@@ -22,6 +22,47 @@
 #define IFACE_NAME_LEN_MAX                                                     \
     (UCC_MAX_FRAMEWORK_NAME_LEN + UCC_MAX_COMPONENT_NAME_LEN + 32)
 
+/* Check if a module name from the allow list matches the given component.
+   Entries with a framework prefix are matched as <framework>_<component>
+   (e.g. "tl_cuda"), entries without a known framework prefix are matched
+   against the component name only (e.g. "cuda" matches cuda in any
+   framework). */
+static int ucc_modules_list_search(const ucc_config_names_array_t *names,
+                                   const char *framework_name,
+                                   const char *component_name)
+{
+    char     qualified[UCC_MAX_FRAMEWORK_NAME_LEN +
+                       UCC_MAX_COMPONENT_NAME_LEN + 2];
+    unsigned i;
+
+    ucc_snprintf_safe(qualified, sizeof(qualified), "%s_%s",
+                      framework_name, component_name);
+
+    for (i = 0; i < names->count; i++) {
+        if ((strcmp(names->names[i], qualified) == 0) ||
+            (strcmp(names->names[i], component_name) == 0)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int ucc_component_is_enabled(const char *framework_name,
+                                    const char *component_name)
+{
+    ucc_config_allow_list_t *modules = &ucc_global_config.modules;
+    int                      found;
+
+    if (modules->mode == UCC_CONFIG_ALLOW_LIST_ALLOW_ALL) {
+        return 1;
+    }
+
+    found = ucc_modules_list_search(&modules->array, framework_name,
+                                    component_name) >= 0;
+    return ((modules->mode == UCC_CONFIG_ALLOW_LIST_ALLOW) && found) ||
+           ((modules->mode == UCC_CONFIG_ALLOW_LIST_NEGATE) && !found);
+}
+
 static ucc_status_t ucc_component_load_one(const char *so_path,
                                            const char *framework_name,
                                            ucc_component_iface_t **c_iface)
@@ -49,6 +90,14 @@ static ucc_status_t ucc_component_load_one(const char *so_path,
     iface_struct_name_len = strlen(so_path) - basename_start - 3;
     ucc_strncpy_safe(iface_struct, so_path + basename_start,
                      iface_struct_name_len + 1);
+
+    if (!ucc_component_is_enabled(framework_name,
+                                  iface_struct + strlen(framework_pattern))) {
+        ucc_debug("component '%s_%s' is disabled by UCC_MODULES configuration",
+                  framework_name, iface_struct + strlen(framework_pattern));
+        *c_iface = NULL;
+        return UCC_ERR_NO_MESSAGE;
+    }
 
     handle = dlopen(so_path, RTLD_LAZY);
     if (!handle) {
