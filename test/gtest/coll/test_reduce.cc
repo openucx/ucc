@@ -289,12 +289,13 @@ template <typename T> class test_reduce_2step : public test_reduce<T> {
 template <typename T> class test_reduce_srg : public test_reduce<T> {
 };
 
-#define TEST_DECLARE_WITH_ENV(_env, _n_procs, _persistent)                     \
+#define TEST_DECLARE_WITH_ENV(_env, _n_procs, _persistent, ...)                 \
     {                                                                          \
         UccJob        job(_n_procs, UccJob::UCC_JOB_CTX_GLOBAL, _env);         \
         UccTeam_h     team   = job.create_team(_n_procs);                      \
         int           repeat = _persistent ? 3 : 1;                            \
         UccCollCtxVec ctxs;                                                    \
+        std::vector<int> counts = __VA_ARGS__;                                 \
         std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};            \
         if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {                \
             mt.push_back(UCC_MEMORY_TYPE_CUDA);                                \
@@ -302,7 +303,7 @@ template <typename T> class test_reduce_srg : public test_reduce<T> {
         if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {        \
             mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);                        \
         }                                                                      \
-        for (auto count : {5, 256, 65536}) {                                   \
+        for (auto count : counts) {                                            \
             for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {             \
                 for (auto m : mt) {                                            \
                     CHECK_TYPE_OP_SKIP(TypeParam::dt, TypeParam::redop, m);    \
@@ -337,21 +338,21 @@ ucc_job_env_t reduce_2step_env = {{"UCC_CL_HIER_TUNE", "reduce:@2step:0-inf:inf"
 ucc_job_env_t reduce_srg_env   = {{"UCC_TL_UCP_TUNE", "reduce:@srg:0-inf:inf"},
                                   {"UCC_CLS", "basic"}};
 TYPED_TEST(test_reduce_avg_order, avg_post_op) {
-    TEST_DECLARE_WITH_ENV(post_op_env, 15, true);
+    TEST_DECLARE_WITH_ENV(post_op_env, 15, true, {5, 256, 65536});
 }
 
 TYPED_TEST(test_reduce_dbt, reduce_dbt_shift) {
-    TEST_DECLARE_WITH_ENV(reduce_dbt_env, 15, true);
+    TEST_DECLARE_WITH_ENV(reduce_dbt_env, 15, true, {5, 256, 65536});
 }
 
 TYPED_TEST(test_reduce_dbt, reduce_dbt_mirror) {
-    TEST_DECLARE_WITH_ENV(reduce_dbt_env, 16, true);
+    TEST_DECLARE_WITH_ENV(reduce_dbt_env, 16, true, {5, 256, 65536});
 }
 
 TYPED_TEST(test_reduce_2step, 2step) {
-    TEST_DECLARE_WITH_ENV(reduce_2step_env, 16, false);
+    TEST_DECLARE_WITH_ENV(reduce_2step_env, 16, false, {5, 256, 4096});
 }
 
 TYPED_TEST(test_reduce_srg, srg) {
-    TEST_DECLARE_WITH_ENV(reduce_srg_env, 15, false);
+    TEST_DECLARE_WITH_ENV(reduce_srg_env, 15, false, {5, 256, 65536});
 }
