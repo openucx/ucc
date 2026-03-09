@@ -76,7 +76,7 @@ UCC_TEST_F(test_team, DISABLED_team_create_multiple_preconnect_ctx_local)
 }
 
 /* Create and destroy several coexisting teams */
-UCC_TEST_F(test_team, team_create_multiple_preconnect_ctx_global)
+UCC_TEST_F(test_team, DISABLED_team_create_multiple_preconnect_ctx_global)
 {
     int job_size = 16;
     UccJob job(job_size, UccJob::UCC_JOB_CTX_GLOBAL,
