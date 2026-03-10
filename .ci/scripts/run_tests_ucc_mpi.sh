@@ -23,13 +23,14 @@ export HEAD_NODE
 export MASTER_ADDR=${HEAD_NODE}
 
 NNODES=$(wc --lines "$HOSTFILE" | awk '{print $1}')
+SSH_PORT_OPT="-p ${DOCKER_SSH_PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 DEV=""
 CX7_DEV=""
 
 # Find first available active device
-for d in $(ssh $HEAD_NODE "ibstat -l"); do
-    state=$(ssh $HEAD_NODE "ibstat $d" | grep 'State:' | awk '{print $2}')
-    type=$(ssh $HEAD_NODE "ibstat $d" | grep 'CA type:' | awk '{print $3}')
+for d in $(ssh $SSH_PORT_OPT $HEAD_NODE "ibstat -l"); do
+    state=$(ssh $SSH_PORT_OPT $HEAD_NODE "ibstat $d" | grep 'State:' | awk '{print $2}')
+    type=$(ssh $SSH_PORT_OPT $HEAD_NODE "ibstat $d" | grep 'CA type:' | awk '{print $3}')
     if [ $state == 'Active' ]; then
         if [ "$DEV" == "" ]; then
             DEV=$d
@@ -47,11 +48,11 @@ if [ "x$DEV" == "x" ]; then
 fi
 
 # Verify the IB port is actually Up (not just Active in ibstat)
-ib_port_state=$(ssh $HEAD_NODE "ibdev2netdev" | grep "$DEV" | grep -c "Up" || true)
+ib_port_state=$(ssh $SSH_PORT_OPT $HEAD_NODE "ibdev2netdev" | grep "$DEV" | grep -c "Up" || true)
 if [ "$ib_port_state" -eq 0 ]; then
     echo "ERROR: InfiniBand device $DEV port is Down on $HEAD_NODE"
     echo "Please bring up the port with: sudo ip link set <interface> up"
-    ssh $HEAD_NODE "ibdev2netdev"
+    ssh $SSH_PORT_OPT $HEAD_NODE "ibdev2netdev"
     exit 1
 fi
 echo "INFO: Using InfiniBand device $DEV (port is Up)"
@@ -59,12 +60,12 @@ echo "INFO: Using InfiniBand device $DEV (port is Up)"
 # Check all hosts have IPv4 on the IB interface (required for NCCL bootstrap)
 echo "INFO: Checking IPv4 on IB interface on all hosts..."
 for host in $(cat "$HOSTFILE"); do
-    IB_IF=$(ssh "$host" "ibdev2netdev 2>/dev/null | grep '${DEV} ' | sed -n 's/.*==> \\([^ ]*\\).*/\1/p' | head -1" 2>/dev/null || true)
+    IB_IF=$(ssh $SSH_PORT_OPT "$host" "ibdev2netdev 2>/dev/null | grep '${DEV} ' | sed -n 's/.*==> \\([^ ]*\\).*/\1/p' | head -1" 2>/dev/null || true)
     if [ -z "$IB_IF" ]; then
         echo "ERROR: Host $host: could not find interface for IB device $DEV"
         exit 1
     fi
-    if ! ssh "$host" "ip -4 addr show $IB_IF 2>/dev/null | grep -q 'inet '"; then
+    if ! ssh $SSH_PORT_OPT "$host" "ip -4 addr show $IB_IF 2>/dev/null | grep -q 'inet '"; then
         echo "ERROR: Host $host has no IPv4 on IB interface $IB_IF. NCCL bootstrap requires IPv4 on the IB interface."
         exit 1
     fi
@@ -91,7 +92,7 @@ mpirun $(mpi_params 1) hostname
 # # shellcheck disable=SC2086
 mpirun $(mpi_params 1) cat /proc/1/cgroup
 
-NGPUS=$(ssh $HEAD_NODE 'nvidia-smi -L | wc -l')
+NGPUS=$(ssh $SSH_PORT_OPT $HEAD_NODE 'nvidia-smi -L | wc -l')
 PPN=4
 EXE=/opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi
 EXE+=" --inplace 2 --set_device 2 --root random:2 --count_bits 32,64 --displ_bits 32,64"
