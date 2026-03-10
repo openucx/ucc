@@ -25,8 +25,8 @@ env:
 kubernetes:
   cloud: il-ipp-blossom-prod
   namespace: hpcx
-  limits: "{memory: 16Gi, cpu: 16000m}"
-  requests: "{memory: 16Gi, cpu: 16000m}"
+  limits: "{memory: 32Gi, cpu: 32000m}"
+  requests: "{memory: 32Gi, cpu: 32000m}"
 
 # cloud pod to build the shared docker image
 runs_on_dockers:
