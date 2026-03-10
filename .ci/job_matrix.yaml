@@ -66,6 +66,26 @@ steps:
       docker pull "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
 
   #============================================================================
+  - name: Run docker containers
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    run: |
+      echo "INFO: Run docker containers"
+      ${WORKSPACE}/.ci/scripts/run_docker.sh
+    onfail: |
+      ${WORKSPACE}/.ci/scripts/stop_docker.sh
+
+  #============================================================================
+  - name: Run UCC MPI tests
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    timeout: ${MPI_TIMEOUT_MINUTES}
+    run: |
+      [ "$UCC_MPI_TESTS" = "false" ] && { echo "MPI tests were skipped !!!";exit 0; }
+      echo "INFO: Run UCC MPI tests"
+      ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh
+    onfail: |
+      ${WORKSPACE}/.ci/scripts/stop_docker.sh
+
+  #============================================================================
   - name: Run UCC gtest (shard 0)
     agentSelector: "{nodeLabel: 'swx-clx01'}"
     run: |
@@ -86,26 +106,6 @@ steps:
       timeout -k 20 ${UCC_TIMEOUT_MINUTES}m docker run -t --rm --name="ucc_gtest1_${BUILD_NUMBER}" -e GTEST_TOTAL_SHARDS=2 -e GTEST_SHARD_INDEX=1 $DOCKER_OPT "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}" bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
     always: |
       docker rm --force "ucc_gtest1_${BUILD_NUMBER}" || true
-
-  #============================================================================
-  - name: Run docker containers
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    run: |
-      echo "INFO: Run docker containers"
-      ${WORKSPACE}/.ci/scripts/run_docker.sh
-    onfail: |
-      ${WORKSPACE}/.ci/scripts/stop_docker.sh
-
-  #============================================================================
-  - name: Run UCC MPI tests
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    timeout: ${MPI_TIMEOUT_MINUTES}
-    run: |
-      [ "$UCC_MPI_TESTS" = "false" ] && { echo "MPI tests were skipped !!!";exit 0; }
-      echo "INFO: Run UCC MPI tests"
-      ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh
-    onfail: |
-      ${WORKSPACE}/.ci/scripts/stop_docker.sh
 
   #============================================================================
   - name: Run DLRM tests (UCC/GPU)
