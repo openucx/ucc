@@ -42,6 +42,6 @@ RUN chown -R ${_UID}:${_GID} /opt/nvidia
 RUN if ! getent group "${_GID}" > /dev/null 2>&1; then \
         groupadd -g "${_GID}" "${_GROUP}"; \
     fi && \
-    useradd --no-create-home --uid ${_UID} --gid ${_GID} --home ${_HOME}/${_LOGIN} ${_LOGIN}
+    useradd --no-create-home --uid ${_UID} --gid ${_GID} --home ${_HOME}/${_LOGIN} --shell /bin/bash ${_LOGIN}
 #==============================================================================
 USER ${_LOGIN}

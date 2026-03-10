@@ -1,7 +1,7 @@
 #!/bin/bash -eEx
 
 export PATH="/opt/hpcx/ompi/bin:$PATH"
-export LD_LIBRARY_PATH="/opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="/opt/hpcx/ompi/lib"
 export OPAL_PREFIX=/opt/hpcx/ompi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
