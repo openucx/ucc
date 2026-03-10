@@ -1,7 +1,8 @@
-FROM nvcr.io/nvidia/pytorch:26.02-py3
 ARG CUDA_VER='12.9'
+ARG UCC_VERSION='1.0.0'
 ARG ARCH='x86_64'
-ARG OS='ubuntu22.04'
+ARG OS='centos8'
+FROM harbor.mellanox.com/torch-ucc/ucc/${UCC_VERSION}/${ARCH}/${OS}/cuda${CUDA_VER}:base
 ARG _UID=6213
 ARG _GID=11429
 ARG _LOGIN=swx-jenkins
@@ -10,24 +11,11 @@ ARG _HOME=/labhome
 ARG UCC_ENABLE_NVLS=no
 ARG UCC_ENABLE_GTEST=yes
 
-ENV NVIDIA_ROOT_DIR=/opt/nvidia
-ENV SRC_DIR=${NVIDIA_ROOT_DIR}/src
-ENV BIN_DIR=${NVIDIA_ROOT_DIR}/bin
-ENV UCX_INSTALL_DIR=/opt/hpcx/ucx
-ENV UCC_INSTALL_DIR=${NVIDIA_ROOT_DIR}/ucc
-
-RUN mkdir -p ${SRC_DIR} ${BIN_DIR}
+RUN rm -rf  ${SRC_DIR}/ucc
 COPY . ${SRC_DIR}/ucc
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        autoconf automake libtool sudo openssh-server openssh-client \
-        infiniband-diags iproute2 rdma-core \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /run/sshd \
-    && ssh-keygen -A \
-    && sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config \
-    && sed -i 's/#StrictHostKeyChecking.*/StrictHostKeyChecking no/' /etc/ssh/ssh_config \
-    && echo "${_LOGIN} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+RUN apt update && apt install -y sudo && \
+    echo "${_LOGIN} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 RUN pip install 'protobuf'
 #==============================================================================
 # Build UCC
@@ -37,11 +25,13 @@ RUN echo "INFO: UCC_ENABLE_GTEST: ${UCC_ENABLE_GTEST}"
 ENV UCC_ENABLE_GTEST=${UCC_ENABLE_GTEST}
 RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucc.sh
 #==============================================================================
+# Install torch_ucc (UCC version) python module and build a wheel package
 RUN chown -R ${_UID}:${_GID} /opt/nvidia
 #==============================================================================
 RUN if ! getent group "${_GID}" > /dev/null 2>&1; then \
         groupadd -g "${_GID}" "${_GROUP}"; \
     fi && \
-    useradd --no-create-home --uid ${_UID} --gid ${_GID} --home ${_HOME}/${_LOGIN} --shell /bin/bash ${_LOGIN}
+    useradd --no-create-home --uid ${_UID} --gid ${_GID} --home ${_HOME}/${_LOGIN} ${_LOGIN}
 #==============================================================================
 USER ${_LOGIN}
+

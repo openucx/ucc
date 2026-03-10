@@ -12,12 +12,12 @@ volumes:
 
 env:
   CUDA_VER: 12.9
-  UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/x86_64/ubuntu22.04/cuda${CUDA_VER}"
+  UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}"
   UCC_DOCKER_IMAGE_NAME: "${registry_host}${registry_path}/${UCC_URI_SUFFIX}"
   NVIDIA_ROOT_DIR: "/opt/nvidia"
   SRC_DIR: "${NVIDIA_ROOT_DIR}/src"
   BIN_DIR: "${NVIDIA_ROOT_DIR}/bin"
-  DOCKER_OPT: "--pull always --network=host --uts=host --ipc=host --ulimit stack=67108864 --ulimit memlock=-1 --security-opt seccomp=unconfined --cap-add=SYS_ADMIN --device=/dev/infiniband/ --gpus all -e CUDA_MPS_PIPE_DIRECTORY="
+  DOCKER_OPT: "--pull always --network=host --uts=host --ipc=host --ulimit stack=67108864 --ulimit memlock=-1 --security-opt seccomp=unconfined --cap-add=SYS_ADMIN --device=/dev/infiniband/ --gpus all"
   UCC_TIMEOUT_MINUTES: 90
   DLRM_TIMEOUT_MINUTES: 45
   MPI_TIMEOUT_MINUTES: 20
@@ -25,8 +25,8 @@ env:
 kubernetes:
   cloud: il-ipp-blossom-prod
   namespace: hpcx
-  limits: "{memory: 32Gi, cpu: 32000m}"
-  requests: "{memory: 32Gi, cpu: 32000m}"
+  limits: "{memory: 16Gi, cpu: 16000m}"
+  requests: "{memory: 16Gi, cpu: 16000m}"
 
 # cloud pod to build the shared docker image
 runs_on_dockers:
@@ -36,7 +36,7 @@ runs_on_dockers:
       tag: "${BUILD_NUMBER}",
       arch: "x86_64",
       uri: "${UCC_URI_SUFFIX}",
-      build_args: "",
+      build_args: "--no-cache --build-arg CUDA_VER=${CUDA_VER}",
     }
   - {
       file: ".ci/dockerfiles/Dockerfile.build_helper",
@@ -44,7 +44,7 @@ runs_on_dockers:
       tag: "latest",
       arch: "x86_64",
       uri: "$arch/$name",
-      build_args: "",
+      build_args: "--no-cache",
     }
 
 # bare metal
@@ -62,6 +62,8 @@ steps:
       - "{nodeLabel: 'swx-clx02'}"
     run: |
       set -x
+      # make sure we always have base image for faster pull of CI image
+      docker pull "${UCC_DOCKER_IMAGE_NAME}:base"
       # pull the CI image
       docker pull "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
 
