@@ -7,28 +7,8 @@ export UCC_ENABLE_GTEST=${UCC_ENABLE_GTEST:-yes}
 export UCC_ENABLE_NVLS=${UCC_ENABLE_NVLS:-no}
 export UCC_BUILD_TLS=${UCC_BUILD_TLS:-cuda,nccl,self,sharp,shm,ucp,mlx5}
 
-# In containers, calculate based on memory limits to avoid OOM
-# Determine number of parallel build jobs based on available system memory if running inside a container/Kubernetes
-if [ -f /.dockerenv ] || [ -f /run/.containerenv ] || [ -n "${KUBERNETES_SERVICE_HOST}" ]; then
-    # Prefer cgroupv1 path, fall back to cgroupv2 or static default if not found
-    if [ -f /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
-        limit=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)
-    elif [ -f /sys/fs/cgroup/memory.max ]; then
-        limit=$(cat /sys/fs/cgroup/memory.max)
-        # If cgroupv2 limit is "max", meaning unlimited, set to 4GB to avoid OOM
-        [ "$limit" = "max" ] && limit=$((4 * 1024 * 1024 * 1024))
-    else
-        # Default to 4GB if no limit is found
-        limit=$((4 * 1024 * 1024 * 1024))
-    fi
-
-    # Use 1 build process per GB of memory, clamp in [1,16]
-    nproc=$((limit / (1024 * 1024 * 1024)))
-    [ "$nproc" -gt 16 ] && nproc=16
-    [ "$nproc" -lt 1 ] && nproc=1
-else
-    nproc=$(nproc --all)
-fi
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+. "${SCRIPT_DIR}/common.sh"
 
 echo "INFO: Build UCC"
 UCC_SRC_DIR="${SRC_DIR}/ucc"
@@ -61,7 +41,15 @@ fi
 
 echo "INFO: Configure flags: ${CONFIGURE_FLAGS}"
 eval "${UCC_SRC_DIR}/configure ${CONFIGURE_FLAGS}"
-make "-j${nproc}" install
+
+# Skip libtool relinking during install: the relink produces identical RUNPATH
+# and adds ~5s of pure overhead per build.
+if ! grep -q 'need_relink=yes' libtool; then
+    echo "WARN: libtool relinking patch had no effect (need_relink=yes not found)"
+fi
+sed -i 's/need_relink=yes/need_relink=no/g' libtool
+
+make "-j${NPROC}" install
 echo "${UCC_INSTALL_DIR}/lib" > /etc/ld.so.conf.d/ucc.conf
 ldconfig
 ldconfig -p | grep -i libucc

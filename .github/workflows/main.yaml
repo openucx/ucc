@@ -1,4 +1,4 @@
-name: OpenMPI tests
+name: Build & Test
 
 on: [push, pull_request]
 
@@ -14,42 +14,98 @@ env:
   IMB_LINK: https://github.com/intel/mpi-benchmarks.git
   IMB_COLLS: allgather,allgatherv,allreduce,alltoall,alltoallv,barrier,bcast,gather,gatherv,reduce,reduce_scatter,reduce_scatter_block,scatter,scatterv
 jobs:
-  tests:
+  build:
     runs-on: ubuntu-latest
     steps:
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends doxygen doxygen-latex
+    - name: Cache UCX
+      id: cache-ucx
+      uses: actions/cache@v4
+      with:
+        path: /tmp/ucx/install
+        key: ucx-release-${{ env.OPEN_UCX_BRANCH }}-${{ hashFiles('.github/workflows/main.yaml') }}
     - name: Get UCX
-      run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
+      run: |
+        rm -rf /tmp/ucx
+        git clone --depth 1 ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
+      if: steps.cache-ucx.outputs.cache-hit != 'true'
       run: |
         cd /tmp/ucx && ./autogen.sh
-        ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
+        ./contrib/configure-release --without-java --without-go --disable-numa --prefix /tmp/ucx/install
         make -j install
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Build UCC
       run: |
         ./autogen.sh
         ./configure --prefix=/tmp/ucc/install --enable-gtest --with-ucx=/tmp/ucx/install
         make -j`nproc` install
-        make gtest
+        cp test/gtest/gtest /tmp/ucc/install/bin/gtest
+    - name: Pack build artifacts
+      run: tar czf /tmp/ucc-build.tar.gz -C /tmp ucx/install ucc/install
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        name: ucc-build
+        path: /tmp/ucc-build.tar.gz
+        retention-days: 1
+
+  gtest:
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
+    name: test (shard ${{ matrix.shard }})
+    steps:
+    - uses: actions/checkout@v6
+    - name: Download build artifacts
+      uses: actions/download-artifact@v7
+      with:
+        name: ucc-build
+        path: /tmp
+    - name: Unpack build artifacts
+      run: tar xzf /tmp/ucc-build.tar.gz -C /tmp
+    - name: Run UCC gtest (shard ${{ matrix.shard }})
+      env:
+        GTEST_TOTAL_SHARDS: 2
+        GTEST_SHARD_INDEX: ${{ matrix.shard }}
+        LD_LIBRARY_PATH: /tmp/ucc/install/lib:/tmp/ucx/install/lib
+      run: /tmp/ucc/install/bin/gtest
     - name: Run ucc_info
+      if: matrix.shard == 0
       run: |
+        export LD_LIBRARY_PATH=/tmp/ucc/install/lib:/tmp/ucx/install/lib
         /tmp/ucc/install/bin/ucc_info -vc
     - name: Run CMake tests
+      if: matrix.shard == 0
       run: |
         set -e
+        export LD_LIBRARY_PATH=/tmp/ucc/install/lib:/tmp/ucx/install/lib
         cmake -S test/cmake -B /tmp/cmake-ucc -DCMAKE_PREFIX_PATH=/tmp/ucc/install
         cd /tmp/cmake-ucc
         cmake --build .
         ./test_ucc
+
+  ompi-build:
+    runs-on: ubuntu-latest
+    name: OMPI build
+    needs: build
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v7
+      with:
+        name: ucc-build
+        path: /tmp
+    - name: Unpack build artifacts
+      run: tar xzf /tmp/ucc-build.tar.gz -C /tmp
     - name: Get OMPI
       run: |
-         git clone ${OPEN_MPI_LINK} -b ${OPEN_MPI_BRANCH} /tmp/ompi
-         cd /tmp/ompi
-         git submodule update --init --recursive
+        rm -rf /tmp/ompi
+        git clone --depth 1 ${OPEN_MPI_LINK} -b ${OPEN_MPI_BRANCH} /tmp/ompi
+        cd /tmp/ompi
+        git submodule update --init --recursive --depth 1
     - name: Build OMPI
       run: >
         cd /tmp/ompi
@@ -65,75 +121,115 @@ jobs:
         --with-ucc=/tmp/ucc/install
 
         make -j install
+    - name: Pack OMPI build artifacts
+      run: tar czf /tmp/ompi-build.tar.gz -C /tmp ucx/install ucc/install ompi/install
+    - name: Upload OMPI build artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        name: ompi-build
+        path: /tmp/ompi-build.tar.gz
+        retention-days: 1
+
+  ucc-perftest:
+    runs-on: ubuntu-latest
+    name: UCC perftest
+    needs: ompi-build
+    steps:
+    - uses: actions/checkout@v6
+    - name: Download OMPI build artifacts
+      uses: actions/download-artifact@v7
+      with:
+        name: ompi-build
+        path: /tmp
+    - name: Unpack OMPI build artifacts
+      run: tar xzf /tmp/ompi-build.tar.gz -C /tmp
     - name: Build ucc_perftest (with OMPI)
       run: |
         set -e
+        ./autogen.sh
         CC=/tmp/ompi/install/bin/mpicc CXX=/tmp/ompi/install/bin/mpicxx \
-          ./configure --prefix=/tmp/ucc/install --enable-gtest --with-ucx=/tmp/ucx/install --with-mpi=/tmp/ompi/install
-        make -C tools/perf -j`nproc`
-        make -C tools/perf install
+          ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-mpi=/tmp/ompi/install
+        make -j`nproc` install
     - name: Run ucc_perftest
       run: |
         set -e
         test -x /tmp/ucc/install/bin/ucc_perftest
         export LD_LIBRARY_PATH=/tmp/ucc/install/lib:/tmp/ucx/install/lib:/tmp/ompi/install/lib:$LD_LIBRARY_PATH
+        MPI_ARGS=(
+          -np 4 -H localhost:4
+          --bind-to none
+          --mca pml ucx
+          --mca pml_ucx_tls any
+          --mca pml_ucx_devices any
+          --mca coll_ucc_enable 0
+          -x LD_LIBRARY_PATH
+          -x UCC_LOG_LEVEL=info
+          -x UCC_TLS=ucp
+          -x UCC_CONFIG_FILE=
+        )
+        PERFTEST_ARGS=(-m host -d float32 -b 1024 -e 1024 -n 10 -w 2)
         COLLS=(
           allgather allgatherv allreduce alltoall alltoallv
           barrier bcast gather gatherv
           reduce reduce_scatter reduce_scatterv scatterv
         )
-        for c in "${COLLS[@]}"; do
-          echo "Running ucc_perftest -c ${c}"
-          /tmp/ompi/install/bin/mpirun \
-            -np 4 -H localhost:4 \
-            --bind-to none \
-            --mca pml ucx \
-            --mca pml_ucx_tls any \
-            --mca pml_ucx_devices any \
-            --mca coll_ucc_enable 0 \
-            -x LD_LIBRARY_PATH \
-            -x UCC_LOG_LEVEL=info \
-            -x UCC_TLS=ucp \
-            -x UCC_CONFIG_FILE= \
-            /tmp/ucc/install/bin/ucc_perftest \
-              -c "${c}" -m host -d float32 -b 1024 -e 1024 -n 10 -w 2
-        done
         INPLACE_COLLS=(
           allgather allgatherv allreduce
           gather gatherv
           reduce reduce_scatter reduce_scatterv
         )
+        for c in "${COLLS[@]}"; do
+          echo "Running ucc_perftest -c ${c}"
+          /tmp/ompi/install/bin/mpirun "${MPI_ARGS[@]}" \
+            /tmp/ucc/install/bin/ucc_perftest -c "${c}" "${PERFTEST_ARGS[@]}"
+        done
         for c in "${INPLACE_COLLS[@]}"; do
           echo "Running ucc_perftest (inplace) -c ${c}"
-          /tmp/ompi/install/bin/mpirun \
-            -np 4 -H localhost:4 \
-            --bind-to none \
-            --mca pml ucx \
-            --mca pml_ucx_tls any \
-            --mca pml_ucx_devices any \
-            --mca coll_ucc_enable 0 \
-            -x LD_LIBRARY_PATH \
-            -x UCC_LOG_LEVEL=info \
-            -x UCC_TLS=ucp \
-            -x UCC_CONFIG_FILE= \
-            /tmp/ucc/install/bin/ucc_perftest \
-              -c "${c}" -m host -d float32 -b 1024 -e 1024 -n 10 -w 2 -i
+          /tmp/ompi/install/bin/mpirun "${MPI_ARGS[@]}" \
+            /tmp/ucc/install/bin/ucc_perftest -c "${c}" "${PERFTEST_ARGS[@]}" -i
         done
+
+  ompi-imb:
+    runs-on: ubuntu-latest
+    name: OMPI IMB
+    needs: ompi-build
+    steps:
+    - uses: actions/checkout@v6
+    - name: Download OMPI build artifacts
+      uses: actions/download-artifact@v7
+      with:
+        name: ompi-build
+        path: /tmp
+    - name: Unpack OMPI build artifacts
+      run: tar xzf /tmp/ompi-build.tar.gz -C /tmp
+    - name: Cache IMB
+      id: cache-imb
+      uses: actions/cache@v4
+      with:
+        path: /tmp/imb
+        key: imb-${{ env.OPEN_MPI_BRANCH }}-${{ hashFiles('.github/workflows/main.yaml', 'configure.ac') }}
     - name: Get IMB
-      run: git clone ${IMB_LINK} /tmp/imb
-    - name: Build IMB
+      if: steps.cache-imb.outputs.cache-hit != 'true'
       run: |
-         cd /tmp/imb
-         make CC=/tmp/ompi/install/bin/mpicc CXX=/tmp/ompi/install/bin/mpicxx CPPFLAGS="-DCHECK=1" -j IMB-MPI1
+        rm -rf /tmp/imb
+        git clone --depth 1 ${IMB_LINK} /tmp/imb
+    - name: Build IMB
+      if: steps.cache-imb.outputs.cache-hit != 'true'
+      run: |
+        cd /tmp/imb
+        make CC=/tmp/ompi/install/bin/mpicc CXX=/tmp/ompi/install/bin/mpicxx CPPFLAGS="-DCHECK=1" -j IMB-MPI1
     - name: Run IMB-DCHECK
+      env:
+        LD_LIBRARY_PATH: /tmp/ucc/install/lib:/tmp/ucx/install/lib:/tmp/ompi/install/lib
       run: >
-         /tmp/ompi/install/bin/mpirun
-         -np 8
-         -H localhost:8
-         --bind-to none
-         --mca pml ucx
-         --mca pml_ucx_tls any
-         --mca pml_ucx_devices any
-         --mca coll_ucc_priority 100
-         --mca coll_ucc_enable 1
-         /tmp/imb/IMB-MPI1 ${IMB_COLLS} -iter 10 -iter_policy off
+        /tmp/ompi/install/bin/mpirun
+        -np 8
+        -H localhost:8
+        --bind-to none
+        --mca pml ucx
+        --mca pml_ucx_tls any
+        --mca pml_ucx_devices any
+        --mca coll_ucc_priority 100
+        --mca coll_ucc_enable 1
+        -x LD_LIBRARY_PATH
+        /tmp/imb/IMB-MPI1 ${IMB_COLLS} -iter 10 -iter_policy off
