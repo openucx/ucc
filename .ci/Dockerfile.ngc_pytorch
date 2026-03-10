@@ -21,7 +21,7 @@ COPY . ${SRC_DIR}/ucc
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         autoconf automake libtool sudo openssh-server openssh-client \
-        infiniband-diags iproute2 \
+        infiniband-diags iproute2 rdma-core \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /run/sshd \
     && ssh-keygen -A \
