@@ -47,29 +47,27 @@ if [ "x$DEV" == "x" ]; then
     exit -1
 fi
 
-# Verify the IB port is actually Up (not just Active in ibstat)
-ib_port_state=$(ssh $SSH_PORT_OPT $HEAD_NODE "ibdev2netdev" | grep "$DEV" | grep -c "Up" || true)
-if [ "$ib_port_state" -eq 0 ]; then
-    echo "ERROR: InfiniBand device $DEV port is Down on $HEAD_NODE"
-    echo "Please bring up the port with: sudo ip link set <interface> up"
-    ssh $SSH_PORT_OPT $HEAD_NODE "ibdev2netdev"
+# Get network interface for IB device via sysfs
+IB_IF=$(ssh $SSH_PORT_OPT $HEAD_NODE "ls /sys/class/infiniband/${DEV}/device/net/ 2>/dev/null | head -1" || true)
+if [ -z "$IB_IF" ]; then
+    echo "ERROR: Could not find network interface for IB device $DEV on $HEAD_NODE"
     exit 1
 fi
-echo "INFO: Using InfiniBand device $DEV (port is Up)"
+echo "INFO: Using InfiniBand device $DEV (interface $IB_IF, ibstat: Active)"
 
 # Check all hosts have IPv4 on the IB interface (required for NCCL bootstrap)
 echo "INFO: Checking IPv4 on IB interface on all hosts..."
 for host in $(cat "$HOSTFILE"); do
-    IB_IF=$(ssh $SSH_PORT_OPT "$host" "ibdev2netdev 2>/dev/null | grep '${DEV} ' | sed -n 's/.*==> \\([^ ]*\\).*/\1/p' | head -1" 2>/dev/null || true)
-    if [ -z "$IB_IF" ]; then
+    HOST_IB_IF=$(ssh $SSH_PORT_OPT "$host" "ls /sys/class/infiniband/${DEV}/device/net/ 2>/dev/null | head -1" || true)
+    if [ -z "$HOST_IB_IF" ]; then
         echo "ERROR: Host $host: could not find interface for IB device $DEV"
         exit 1
     fi
-    if ! ssh $SSH_PORT_OPT "$host" "ip -4 addr show $IB_IF 2>/dev/null | grep -q 'inet '"; then
-        echo "ERROR: Host $host has no IPv4 on IB interface $IB_IF. NCCL bootstrap requires IPv4 on the IB interface."
+    if ! ssh $SSH_PORT_OPT "$host" "ip -4 addr show $HOST_IB_IF 2>/dev/null | grep -q 'inet '"; then
+        echo "ERROR: Host $host has no IPv4 on IB interface $HOST_IB_IF. NCCL bootstrap requires IPv4 on the IB interface."
         exit 1
     fi
-    echo "INFO: $host has IPv4 on $IB_IF"
+    echo "INFO: $host has IPv4 on $HOST_IB_IF"
 done
 
 function mpi_params {
