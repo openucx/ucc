@@ -78,10 +78,21 @@ for HOST in $(cat "$HOSTFILE"); do
         sudo /usr/sbin/sshd -D -p ${DOCKER_SSH_PORT}"
     echo "INFO: start docker container on $HOST ... DONE"
 
-    sleep 15
-
     echo "INFO: verify docker container on $HOST ..."
-    ssh -p "${DOCKER_SSH_PORT}" "$HOST" hostname
+    MAX_RETRIES=20
+    RETRY_DELAY=5
+    for i in $(seq 1 ${MAX_RETRIES}); do
+        if ssh -p "${DOCKER_SSH_PORT}" -o ConnectTimeout=5 "$HOST" hostname 2>/dev/null; then
+            break
+        fi
+        if [ "$i" -eq "${MAX_RETRIES}" ]; then
+            echo "ERROR: docker container SSH on $HOST:${DOCKER_SSH_PORT} not ready after $((MAX_RETRIES * RETRY_DELAY))s"
+            ssh -n "$HOST" "docker logs ${DOCKER_CONTAINER_NAME}" 2>&1 || true
+            exit 1
+        fi
+        echo "INFO: waiting for SSH on $HOST:${DOCKER_SSH_PORT} (attempt $i/${MAX_RETRIES})..."
+        sleep ${RETRY_DELAY}
+    done
     ssh -p "${DOCKER_SSH_PORT}" "$HOST" cat /proc/1/cgroup
     echo "INFO: verify docker container on $HOST ... DONE"
 done
