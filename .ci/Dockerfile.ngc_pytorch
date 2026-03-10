@@ -1,7 +1,7 @@
 FROM nvcr.io/nvidia/pytorch:26.02-py3
 ARG CUDA_VER='12.9'
 ARG ARCH='x86_64'
-ARG OS='centos8'
+ARG OS='ubuntu22.04'
 ARG _UID=6213
 ARG _GID=11429
 ARG _LOGIN=swx-jenkins
@@ -20,8 +20,12 @@ RUN mkdir -p ${SRC_DIR} ${BIN_DIR}
 COPY . ${SRC_DIR}/ucc
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        autoconf automake libtool sudo \
+        autoconf automake libtool sudo openssh-server openssh-client \
     && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /run/sshd \
+    && ssh-keygen -A \
+    && sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config \
+    && sed -i 's/#StrictHostKeyChecking.*/StrictHostKeyChecking no/' /etc/ssh/ssh_config \
     && echo "${_LOGIN} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 RUN pip install 'protobuf'
 #==============================================================================

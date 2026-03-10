@@ -85,6 +85,11 @@ for HOST in $(cat "$HOSTFILE"); do
         if ssh -p "${DOCKER_SSH_PORT}" -o ConnectTimeout=5 "$HOST" hostname 2>/dev/null; then
             break
         fi
+        if ! ssh -n "$HOST" "docker ps -q -f name=${DOCKER_CONTAINER_NAME}" 2>/dev/null | grep -q .; then
+            echo "ERROR: container ${DOCKER_CONTAINER_NAME} is no longer running on $HOST (sshd likely crashed)"
+            ssh -n "$HOST" "docker logs ${DOCKER_CONTAINER_NAME}" 2>&1 || true
+            exit 1
+        fi
         if [ "$i" -eq "${MAX_RETRIES}" ]; then
             echo "ERROR: docker container SSH on $HOST:${DOCKER_SSH_PORT} not ready after $((MAX_RETRIES * RETRY_DELAY))s"
             ssh -n "$HOST" "docker logs ${DOCKER_CONTAINER_NAME}" 2>&1 || true
