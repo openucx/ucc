@@ -38,6 +38,17 @@ typedef struct ucc_component_framework {
 ucc_status_t ucc_components_load(const char *framework_name,
                                  ucc_component_framework_t *framework);
 
+/* ucc_components_load_user_component loads user-defined components from a
+   separate path into an existing framework. New entries are appended after
+   the components already in the framework. The caller is responsible for any
+   framework-specific initialization of the newly added entries (e.g., marking
+   MC components with a sentinel type for dynamic type assignment).
+   Returns UCC_OK if any components were loaded, UCC_ERR_NOT_FOUND if the path
+   is empty or unset, or another error code on failure. */
+ucc_status_t ucc_components_load_user_component(const char *path,
+                                                 const char *framework_name,
+                                                 ucc_component_framework_t *framework);
+
 /* get the component_iface_t from the initialized framework
    using the iface name. Returns NULL if the iface with the given
    name is not found in the framework. */

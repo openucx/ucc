@@ -14,22 +14,23 @@
 UCC_LIST_HEAD(ucc_config_global_list);
 
 ucc_global_config_t ucc_global_config = {
-    .log_component    = {UCC_LOG_LEVEL_WARN, "UCC", "*"},
-    .coll_trace       = {UCC_LOG_LEVEL_WARN, "UCC_COLL", "*"},
-    .component_path   = NULL,
-    .install_path     = NULL,
-    .initialized      = 0,
-    .profile_mode     = 0,
-    .profile_file     = "",
-    .profile_log_size = 0,
-    .file_cfg         = 0,
-    .log_file         = "",
-    .log_file_size    = SIZE_MAX,
-    .log_file_rotate  = 0,
-    .log_buffer_size  = 1024,
-    .log_data_size    = 0,
-    .log_print_enable = 0,
-    .log_level_trigger = UCC_LOG_LEVEL_FATAL};
+    .log_component          = {UCC_LOG_LEVEL_WARN, "UCC", "*"},
+    .coll_trace             = {UCC_LOG_LEVEL_WARN, "UCC_COLL", "*"},
+    .component_path         = NULL,
+    .mc_user_component_path = NULL,
+    .install_path           = NULL,
+    .initialized            = 0,
+    .profile_mode           = 0,
+    .profile_file           = "",
+    .profile_log_size       = 0,
+    .file_cfg               = 0,
+    .log_file               = "",
+    .log_file_size          = SIZE_MAX,
+    .log_file_rotate        = 0,
+    .log_buffer_size        = 1024,
+    .log_data_size          = 0,
+    .log_print_enable       = 0,
+    .log_level_trigger      = UCC_LOG_LEVEL_FATAL};
 
 ucc_config_field_t ucc_global_config_table[] = {
     {"LOG_LEVEL", "warn",
@@ -107,6 +108,11 @@ ucc_config_field_t ucc_global_config_table[] = {
     {"LOG_LEVEL_TRIGGER", "fatal",
      "Log level to trigger error handling.",
      ucc_offsetof(ucc_global_config_t, log_level_trigger), UCC_CONFIG_TYPE_ENUM(ucc_log_level_names)},
+
+    {"MC_USER_PATH", "",
+     "Path to directory containing user-defined MC component libraries (.so files).\n"
+     "User MC components loaded from this path will be assigned dynamic memory types.\n",
+     ucc_offsetof(ucc_global_config_t, mc_user_component_path), UCC_CONFIG_TYPE_STRING},
 
     {NULL}
 };
