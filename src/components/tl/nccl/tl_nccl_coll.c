@@ -320,7 +320,14 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
         ucc_mem_map_mem_h dst_memh = NULL;
         ucc_rank_t        grank    = UCC_TL_TEAM_RANK(nccl_team);
         ucc_count_t       total_count;
-        
+        ucc_datatype_t    dt;
+        int               is_v_type;
+
+        is_v_type = (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHERV ||
+                     coll_args->args.coll_type == UCC_COLL_TYPE_ALLTOALLV ||
+                     coll_args->args.coll_type == UCC_COLL_TYPE_GATHERV ||
+                     coll_args->args.coll_type == UCC_COLL_TYPE_SCATTERV);
+
         /* Register source buffer's memory region if memh provided */
         if (coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH) {
             /* Check if global or local memh */
@@ -331,21 +338,20 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
                 src_memh = coll_args->args.src_memh.local_memh;
             }
 
-            if (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHERV ||
-                coll_args->args.coll_type == UCC_COLL_TYPE_ALLTOALLV ||
-                coll_args->args.coll_type == UCC_COLL_TYPE_GATHERV ||
-                coll_args->args.coll_type == UCC_COLL_TYPE_SCATTERV) {
+            if (is_v_type) {
                 total_count = ucc_coll_args_get_v_buffer_size(
                     &coll_args->args,
                     coll_args->args.src.info_v.counts,
                     coll_args->args.src.info_v.displacements,
                     UCC_TL_TEAM_SIZE(nccl_team));
+                dt = coll_args->args.src.info_v.datatype;
             } else {
                 total_count = coll_args->args.src.info.count;
+                dt          = coll_args->args.src.info.datatype;
             }
             status = ucc_tl_nccl_lazy_register_memh(
                 coll_args->args.src.info.buffer,
-                total_count * ucc_dt_size(coll_args->args.src.info.datatype),
+                total_count * ucc_dt_size(dt),
                 nccl_team,
                 src_memh);
             if (ucc_unlikely(status != UCC_OK)) {
@@ -368,22 +374,21 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
                 dst_memh = coll_args->args.dst_memh.local_memh;
             }
 
-            if (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHERV ||
-                coll_args->args.coll_type == UCC_COLL_TYPE_ALLTOALLV ||
-                coll_args->args.coll_type == UCC_COLL_TYPE_GATHERV ||
-                coll_args->args.coll_type == UCC_COLL_TYPE_SCATTERV) {
+            if (is_v_type) {
                 total_count = ucc_coll_args_get_v_buffer_size(
                     &coll_args->args,
                     coll_args->args.dst.info_v.counts,
                     coll_args->args.dst.info_v.displacements,
                     UCC_TL_TEAM_SIZE(nccl_team));
+                dt = coll_args->args.dst.info_v.datatype;
             } else {
                 total_count = coll_args->args.dst.info.count;
+                dt          = coll_args->args.dst.info.datatype;
             }
 
             status = ucc_tl_nccl_lazy_register_memh(
                 coll_args->args.dst.info.buffer,
-                total_count * ucc_dt_size(coll_args->args.dst.info.datatype),
+                total_count * ucc_dt_size(dt),
                 nccl_team,
                 dst_memh);
             if (ucc_unlikely(status != UCC_OK)) {
