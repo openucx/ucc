@@ -42,12 +42,17 @@ CONFIGURE_FLAGS="--with-ucx=${UCX_INSTALL_DIR} --with-cuda=${CUDA_HOME} \
     --prefix=${UCC_INSTALL_DIR} --with-mpi \
     --with-tls=${UCC_BUILD_TLS}"
 
-# Add NVLS support if enabled
-if [ "${UCC_ENABLE_NVLS}" = "yes" ] || [ "${UCC_ENABLE_NVLS}" = "true" ] || [ "${UCC_ENABLE_NVLS}" = "1" ]; then
+# Add NVLS support if enabled; otherwise build for multiple GPU archs for Slurm/CI portability
+if [ -n "${UCC_NVCC_GENCODE}" ]; then
+    echo "INFO: Using UCC_NVCC_GENCODE: ${UCC_NVCC_GENCODE}"
+    CONFIGURE_FLAGS="${CONFIGURE_FLAGS} --with-nvcc-gencode=\"${UCC_NVCC_GENCODE}\""
+elif [ "${UCC_ENABLE_NVLS}" = "yes" ] || [ "${UCC_ENABLE_NVLS}" = "true" ] || [ "${UCC_ENABLE_NVLS}" = "1" ]; then
     echo "INFO: Enabling NVLS support for GB300NVL72"
     CONFIGURE_FLAGS="${CONFIGURE_FLAGS} --with-nvls --with-nvcc-gencode=\"-gencode=arch=compute_100,code=sm_100\""
 else
-    CONFIGURE_FLAGS="${CONFIGURE_FLAGS} --with-nvcc-gencode=\"-gencode=arch=compute_86,code=sm_86\""
+    # Multi-arch build so the same image runs on V100 (7.0), A100 (8.0), A30/RTX (8.6), etc.
+    # Avoids "no kernel image is available for execution on the device" (CUDA error 209) on mixed clusters
+    CONFIGURE_FLAGS="${CONFIGURE_FLAGS} --with-nvcc-gencode=\"-gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86\""
 fi
 if [ "${UCC_ENABLE_GTEST}" = "yes" ] || [ "${UCC_ENABLE_GTEST}" = "true" ] || [ "${UCC_ENABLE_GTEST}" = "1" ]; then
     echo "INFO: Enabling gtest"

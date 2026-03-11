@@ -1,0 +1,93 @@
+---
+job: "ucc-gtest"
+
+step_allow_single_selector: true
+
+registry_host: "harbor.mellanox.com"
+registry_path: "/torch-ucc"
+registry_auth: "ucc-harbor-credentials"
+
+kubernetes:
+  cloud: il-ipp-blossom-prod
+  namespace: hpcx
+  limits: "{memory: 16Gi, cpu: 16000m}"
+  requests: "{memory: 8Gi, cpu: 8000m}"
+
+volumes:
+  - { mountPath: "/labhome/svcnbu-swx-hpcx", hostPath: "/labhome/svcnbu-swx-hpcx" }
+
+credentials:
+  - {
+      credentialsId: "svcnbu-swx-hpcx-corporate-user-pass",
+      usernameVariable: 'SERVICE_USER_USERNAME', passwordVariable: 'SERVICE_USER_PASSWORD',
+    }
+
+env:
+  CUDA_VER: 13.1.1
+  UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/x86_64/ubuntu24.04/cuda${CUDA_VER}"
+  SRC_DIR: "/opt/nvidia/src"
+  DOCKER_IMAGE_TAG: "${BUILD_NUMBER}"
+  SLURM_NODES: 1
+  SLURM_PARTITION: 'funk'
+  SLURM_GRES: 'gpu:1'  # request GPU so CUDA tests (e.g. test_asymmetric_memory) can run
+  SLURM_HEAD_NODE: 'scctl'
+  SLURM_JOB_NAME: 'ucc-ci-gtest-${BUILD_NUMBER}'
+  SLURM_CONTAINER_NAME: "ucc-ci-gtest-${BUILD_NUMBER}"
+  SLURM_JOB_TIMEOUT: '2:00:00'
+  SLURM_IMMEDIATE_TIMEOUT: 3600 # 1 hour
+  TEST_TIMEOUT_MINUTES: 90
+
+# cloud pod to build the shared docker image
+runs_on_dockers:
+  - {
+      file: ".ci/Dockerfile.nvls",
+      name: "cuda${CUDA_VER}-devel",
+      tag: "${DOCKER_IMAGE_TAG}",
+      arch: "x86_64",
+      uri: "${UCC_URI_SUFFIX}",
+      build_args: "--no-cache \
+                   --build-arg _UID=149917 \
+                   --build-arg _GID=30 \
+                   --build-arg _LOGIN=svcnbu-swx-hpcx \
+                   --build-arg _GROUP=svcnbu-swx-hpcx \
+                   --build-arg CUDA_VER=${CUDA_VER} \
+                   --build-arg UCC_ENABLE_NVLS=no \
+                   --build-arg UCC_ENABLE_GTEST=yes \
+                   --build-arg UCC_BUILD_TLS='cuda,nccl,self,sharp,shm,ucp,mlx5'",
+    }
+  - {
+      file: ".ci/dockerfiles/Dockerfile.build_helper",
+      name: "build_helper",
+      tag: "gtest",
+      arch: "x86_64",
+      uri: "$arch/$name",
+      build_args: "--no-cache \
+                   --build-arg _UID=149917 \
+                   --build-arg _GID=30 \
+                   --build-arg _LOGIN=svcnbu-swx-hpcx \
+                   --build-arg _GROUP=svcnbu-swx-hpcx \
+                   --build-arg _HOME=/labhome/svcnbu-swx-hpcx",
+    }
+
+timeout_minutes: 180
+
+steps:
+  - name: Allocate Environment
+    containerSelector: "{name: 'build_helper'}"
+    credentialsId: 'svcnbu-swx-hpcx-corporate-user-pass'
+    run: |
+      set -x
+      touch job_id.txt && chown svcnbu-swx-hpcx job_id.txt
+      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_slurm_allocation.sh
+
+  - name: Run UCC gtest tests
+    containerSelector: "{name: 'build_helper'}"
+    timeout: "${TEST_TIMEOUT_MINUTES}"
+    run: |
+      set -x
+      export DOCKER_IMAGE_NAME="${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
+      export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
+      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_tests_slurm.sh "${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
+    always: |
+      export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
+      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/stop_slurm_allocation.sh
