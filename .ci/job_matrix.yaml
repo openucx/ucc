@@ -17,8 +17,6 @@ env:
   NVIDIA_ROOT_DIR: "/opt/nvidia"
   SRC_DIR: "${NVIDIA_ROOT_DIR}/src"
   BIN_DIR: "${NVIDIA_ROOT_DIR}/bin"
-  DOCKER_OPT: "--pull always --network=host --uts=host --ipc=host --ulimit stack=67108864 --ulimit memlock=-1 --security-opt seccomp=unconfined --cap-add=SYS_ADMIN --device=/dev/infiniband/ --gpus all"
-  UCC_TIMEOUT_MINUTES: 90
   DLRM_TIMEOUT_MINUTES: 45
   MPI_TIMEOUT_MINUTES: 20
 
@@ -66,17 +64,6 @@ steps:
       docker pull "${UCC_DOCKER_IMAGE_NAME}:base"
       # pull the CI image
       docker pull "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
-
-  #============================================================================
-  - name: Run UCC / Torch-UCC tests
-    agentSelector: "{nodeLabel: 'swx-clx02'}"
-    run: |
-      set -x
-      echo "INFO: Run UCC tests"
-      hostname
-      timeout -k 20 ${UCC_TIMEOUT_MINUTES}m docker run -t --rm --name="ucc_tests_${BUILD_NUMBER}" $DOCKER_OPT "${UCC_DOCKER_IMAGE_NAME}:${BUILD_NUMBER}" bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
-    always: |
-      docker rm --force "ucc_tests_${BUILD_NUMBER}" || true
 
   #============================================================================
   - name: Run docker containers

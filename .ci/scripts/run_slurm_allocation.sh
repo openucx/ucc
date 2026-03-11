@@ -12,7 +12,9 @@ source "${SCRIPT_DIR}/env.sh"
 
 readonly SLURM_IMMEDIATE_TIMEOUT=${SLURM_IMMEDIATE_TIMEOUT:-600} # time to wait for resource allocation to be granted
 readonly SLURM_ACCOUNT=${SLURM_ACCOUNT:+"--account=${SLURM_ACCOUNT}"}
-readonly SLURM_ALLOCATION_CMD="salloc ${SLURM_ACCOUNT} -N ${SLURM_NODES} -p ${SLURM_PARTITION} --job-name=${SLURM_JOB_NAME} --immediate=${SLURM_IMMEDIATE_TIMEOUT} --time=${SLURM_JOB_TIMEOUT} --no-shell"
+# Request GPUs when SLURM_GRES is set (e.g. SLURM_GRES=gpu:1 for gtest CUDA tests)
+readonly SLURM_GRES_OPT=${SLURM_GRES:+"--gres=${SLURM_GRES}"}
+readonly SLURM_ALLOCATION_CMD="salloc ${SLURM_ACCOUNT} -N ${SLURM_NODES} -p ${SLURM_PARTITION} ${SLURM_GRES_OPT} --job-name=${SLURM_JOB_NAME} --immediate=${SLURM_IMMEDIATE_TIMEOUT} --time=${SLURM_JOB_TIMEOUT} --no-shell"
 readonly SLURM_GET_JOB_ID_CMD="squeue --noheader --name=${SLURM_JOB_NAME} --format=%i"
 
 case "${SLURM_HEAD_NODE}" in
