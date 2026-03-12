@@ -81,6 +81,67 @@ struct NvlsBf16Ops {
         MULTIMEM_ST_BF16(v, ptr);
     }
 };
+
+struct NvlsInt32Ops {
+    using value_type = int;
+    __device__ static inline void ld(int &v, const uint32_t *ptr) {
+        asm("multimem.ld_reduce.global.add.s32 %0, [%1];"
+            : "=r"(v)
+            : "l"(ptr)
+            : "memory");
+    }
+    __device__ static inline void st(const int &v, uint32_t *ptr) {
+        asm volatile("multimem.st.global.s32 [%0], %1;" ::"l"(ptr),
+                     "r"(v)
+                     : "memory");
+    }
+};
+
+struct NvlsUint32Ops {
+    using value_type = unsigned int;
+    __device__ static inline void ld(unsigned int &v, const uint32_t *ptr) {
+        asm("multimem.ld_reduce.global.add.u32 %0, [%1];"
+            : "=r"(v)
+            : "l"(ptr)
+            : "memory");
+    }
+    __device__ static inline void st(const unsigned int &v, uint32_t *ptr) {
+        asm volatile("multimem.st.global.u32 [%0], %1;" ::"l"(ptr),
+                     "r"(v)
+                     : "memory");
+    }
+};
+
+// PTX does not support s64 with add operation, so we use u64 instead
+struct NvlsInt64Ops {
+    using value_type = unsigned long long;
+    __device__ static inline void ld(unsigned long long &v, const uint64_t *ptr) {
+        asm("multimem.ld_reduce.global.add.u64 %0, [%1];"
+            : "=l"(v)
+            : "l"(ptr)
+            : "memory");
+    }
+    __device__ static inline void st(const unsigned long long &v, uint64_t *ptr) {
+        asm volatile("multimem.st.global.u64 [%0], %1;" ::"l"(ptr),
+                     "l"(v)
+                     : "memory");
+    }
+};
+
+struct NvlsUint64Ops {
+    using value_type = unsigned long long;
+    __device__ static inline void ld(unsigned long long &v, const uint64_t *ptr) {
+        asm("multimem.ld_reduce.global.add.u64 %0, [%1];"
+            : "=l"(v)
+            : "l"(ptr)
+            : "memory");
+    }
+    __device__ static inline void st(const unsigned long long &v, uint64_t *ptr) {
+        asm volatile("multimem.st.global.u64 [%0], %1;" ::"l"(ptr),
+                     "l"(v)
+                     : "memory");
+    }
+};
 #endif // __cplusplus
 
 #endif // UCC_TL_CUDA_NVLS_CUH_
