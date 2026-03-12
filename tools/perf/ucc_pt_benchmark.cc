@@ -47,7 +47,8 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
             cfg.gen.matrix.token_size_KB_mean,
             cfg.gen.matrix.num_tokens,
             cfg.gen.matrix.tgt_group_size_mean,
-            cfg.seed);
+            cfg.seed,
+            cfg.gen.matrix.shuffle);
     } else {
         /* assuming that the generator type is UCC_PT_GEN_TYPE_EXP */
         generator = new ucc_pt_generator_exponential(cfg.min_count, cfg.max_count, 2,
