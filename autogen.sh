@@ -19,7 +19,7 @@ touch config/m4/tls_list.m4
 for t in $(ls -d src/components/tl/*/); do
     echo "m4_include([$t/configure.m4])" >> config/m4/tls_list.m4
     plugin=$(basename $t)
-    echo "SUBDIRS += components/tl/$plugin" >> src/components/tl/makefile.am
+    echo "COMPONENT_DIRS += components/tl/$plugin" >> src/components/tl/makefile.am
 done
 
 # Detect and generate TL coll plugins makefiles
