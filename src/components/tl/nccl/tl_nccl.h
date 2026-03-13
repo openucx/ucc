@@ -44,6 +44,8 @@
 #define UCC_TL_NCCL_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
 #define NCCL_VERSION_COMM_INIT_NB NCCL_VERSION(2,14,3)
 #define NCCL_USE_NON_BLOCKING NCCL_VERSION_CODE >= NCCL_VERSION_COMM_INIT_NB
+#define NCCL_VERSION_UBR NCCL_VERSION(2,19,0)
+#define NCCL_HAS_UBR (NCCL_VERSION_CODE >= NCCL_VERSION_UBR)
 
 enum {
     TL_NCCL_COMM_STATE_ERROR,
@@ -76,6 +78,7 @@ typedef struct ucc_tl_nccl_context_config {
     ucc_tl_nccl_completion_sync_type_t sync_type;
     int                                nccl_cfg_blocking;
     int                                nccl_lazy_init;
+    int                                enable_ubr;
 } ucc_tl_nccl_context_config_t;
 
 typedef struct ucc_tl_nccl_lib {
@@ -84,11 +87,26 @@ typedef struct ucc_tl_nccl_lib {
 UCC_CLASS_DECLARE(ucc_tl_nccl_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
 
+/* Data structure for NCCL memory handle with lazy registration support */
+typedef struct ucc_tl_nccl_memh_data {
+    void       *address;
+    size_t      length;
+    /* Array of NCCL comms this buffer is registered with */
+    ncclComm_t *registered_comms;
+    /* Array of NCCL handles from ncclCommRegister */
+    void      **nccl_handles;
+    /* Number of comms in the array */
+    int         num_comms;
+    /* Allocated size of the array */
+    int         max_comms;
+} ucc_tl_nccl_memh_data_t;
+
 typedef struct ucc_tl_nccl_context {
     ucc_tl_context_t             super;
     ucc_tl_nccl_context_config_t cfg;
     ucc_mpool_t                  req_mp;
     void                        *scratch_buf;
+    int                          ubr_available;
 } ucc_tl_nccl_context_t;
 UCC_CLASS_DECLARE(ucc_tl_nccl_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
