@@ -49,16 +49,19 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_data_start(ucc_coll_task_t *ctask)
         sd_disp = ucc_coll_args_get_displacement(&TASK_ARGS(task), s_disp, peer) * sdt_size;
         data_size = ucc_coll_args_get_count(&TASK_ARGS(task), s_counts, peer) * sdt_size;
 
-        /* Use received displacement from peer (where peer told us to put data) */
-        recv_displ = ucc_coll_args_get_displacement(&TASK_ARGS(task), recv_displs, peer);
-        dd_disp = recv_displ * rdt_size;
+        if (data_size > 0) {
+            /* Use received displacement from peer (where peer told us to put data) */
+            recv_displ = ucc_coll_args_get_displacement(&TASK_ARGS(task),
+                                                        recv_displs, peer);
+            dd_disp = recv_displ * rdt_size;
 
-        UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, sd_disp),
-                                        PTR_OFFSET(dest, dd_disp),
-                                        data_size, peer, src_memh,
-                                        dst_memh, team, task),
-                      task, out);
-        UCPCHECK_GOTO(ucc_tl_ucp_ep_flush(peer, team, task), task, out);
+            UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, sd_disp),
+                                            PTR_OFFSET(dest, dd_disp),
+                                            data_size, peer, src_memh,
+                                            dst_memh, team, task),
+                          task, out);
+            UCPCHECK_GOTO(ucc_tl_ucp_ep_flush(peer, team, task), task, out);
+        }
         UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer,
                                             dst_memh, team),
                       task, out);
@@ -164,6 +167,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
     if (ucc_unlikely(status != UCC_OK)) {
         goto out;
     }
+    sched->scratch_mc_header = NULL;
     schedule = &sched->super.super;
     ucc_schedule_init(schedule, coll_args, team);
     schedule->super.post     = ucc_tl_ucp_alltoallv_onesided_sched_start;
