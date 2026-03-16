@@ -56,12 +56,13 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_data_start(ucc_coll_task_t *ctask)
                                                         recv_displs, peer);
             dd_disp = recv_displ * rdt_size;
 
-        UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, sd_disp),
-                                        PTR_OFFSET(dest, dd_disp),
-                                        data_size, mtype, peer, src_memh,
-                                        dst_memh, team, task),
-                      task, out);
-        UCPCHECK_GOTO(ucc_tl_ucp_ep_flush(peer, team, task), task, out);
+            UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, sd_disp),
+                                            PTR_OFFSET(dest, dd_disp),
+                                            data_size, mtype, peer, src_memh,
+                                            dst_memh, team, task),
+                          task, out);
+            UCPCHECK_GOTO(ucc_tl_ucp_ep_flush(peer, team, task), task, out);
+        }
         UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer,
                                             dst_memh, team),
                       task, out);
