@@ -378,6 +378,10 @@ TYPED_TEST(test_allreduce_alg, dbt) {
 
 TYPED_TEST(test_allreduce_alg, ring) {
     int           n_procs = 15;
+    /* "0-inf:@ring" forces ring for all message sizes; ring returns
+     * UCC_ERR_NOT_SUPPORTED when count % team_size != 0 (see
+     * ring_count_not_divisible).  All counts below are chosen to be
+     * divisible by n_procs so that this tune is valid here. */
     ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
                              {"UCC_TL_UCP_TUNE", "allreduce:0-inf:@ring"}};
     UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
@@ -401,6 +405,7 @@ TYPED_TEST(test_allreduce_alg, ring) {
                 this->set_inplace(inplace);
                 this->data_init(n_procs, TypeParam::dt, count, ctxs, true);
                 UccReq req(team, ctxs);
+                ASSERT_EQ(UCC_OK, req.status);
 
                 for (auto i = 0; i < repeat; i++) {
                     req.start();
@@ -440,6 +445,7 @@ TYPED_TEST(test_allreduce_alg, ring_edge_cases) {
                     this->data_init(team_size, TypeParam::dt, count, ctxs,
                                     false);
                     UccReq req(team, ctxs);
+                    ASSERT_EQ(UCC_OK, req.status);
 
                     req.start();
                     req.wait();
@@ -475,6 +481,7 @@ TYPED_TEST(test_allreduce_alg, ring_persistent) {
             this->set_inplace(inplace);
             this->data_init(n_procs, TypeParam::dt, count, ctxs, true);
             UccReq req(team, ctxs);
+            CHECK_REQ_NOT_SUPPORTED_SKIP(req, this->data_fini(ctxs));
             for (int i = 0; i < 5; i++) {
                 req.start();
                 req.wait();
@@ -486,23 +493,6 @@ TYPED_TEST(test_allreduce_alg, ring_persistent) {
     }
 }
 
-TYPED_TEST(test_allreduce_alg, ring_count_not_divisible) {
-    // Ring requires count % team_size == 0; verify graceful rejection otherwise.
-    int           n_procs = 15;
-    ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
-                             {"UCC_TL_UCP_TUNE", "allreduce:0-inf:@ring"}};
-    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
-    UccTeam_h     team = job.create_team(n_procs);
-    UccCollCtxVec ctxs;
-
-    // 16 is not divisible by 15, so the ring init must return NOT_SUPPORTED
-    SET_MEM_TYPE(UCC_MEMORY_TYPE_HOST);
-    this->set_inplace(TEST_NO_INPLACE);
-    this->data_init(n_procs, TypeParam::dt, 16, ctxs, false);
-    UccReq req(team, ctxs);
-    EXPECT_EQ(UCC_ERR_NOT_SUPPORTED, req.status);
-    this->data_fini(ctxs);
-}
 
 #ifdef HAVE_UCX
 TYPED_TEST(test_allreduce_alg, sliding_window)

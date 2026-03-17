@@ -156,23 +156,27 @@ ucc_status_t ucc_tl_ucp_allreduce_ring_init(ucc_base_coll_args_t *coll_args,
         goto err_rs;
     }
 
-    /* Add reduce-scatter to schedule and subscribe to schedule start */
-    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, rs_task), err_ag, status);
+    /* ucc_schedule_add_task always links the task into schedule->tasks[]
+     * before returning, even on error.  Jump targets must therefore reflect
+     * the state *after* the call, not only on success. */
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, rs_task), err_ag_rs_owned,
+                   status);
     UCC_CHECK_GOTO(
         ucc_event_manager_subscribe(
             &schedule->super,
             UCC_EVENT_SCHEDULE_STARTED,
             rs_task,
             ucc_task_start_handler),
-        err_ag,
+        err_ag_rs_owned,
         status);
 
-    /* Add allgather to schedule and subscribe to reduce-scatter completion */
-    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, ag_task), err_ag, status);
+    /* Same rule for ag_task: once add_task is called it is in the schedule. */
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, ag_task), err_schedule,
+                   status);
     UCC_CHECK_GOTO(
         ucc_event_manager_subscribe(
             rs_task, UCC_EVENT_COMPLETED, ag_task, ucc_task_start_handler),
-        err_ag,
+        err_schedule,
         status);
 
     schedule->super.post     = ucc_tl_ucp_allreduce_ring_start;
@@ -181,11 +185,14 @@ ucc_status_t ucc_tl_ucp_allreduce_ring_init(ucc_base_coll_args_t *coll_args,
     *task_h = &schedule->super;
     return UCC_OK;
 
-err_ag:
+err_ag_rs_owned:
+    /* rs_task is in the schedule; ucc_schedule_finalize will clean it up */
     ag_task->finalize(ag_task);
+    goto err_schedule;
 err_rs:
     rs_task->finalize(rs_task);
 err_schedule:
+    ucc_schedule_finalize(&schedule->super);
     ucc_tl_ucp_put_schedule(schedule);
 out:
     return status;
