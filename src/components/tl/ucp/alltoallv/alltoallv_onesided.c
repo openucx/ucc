@@ -120,12 +120,14 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
                                                 ucc_base_team_t      *team,
                                                 ucc_coll_task_t     **task_h)
 {
-    ucc_tl_ucp_team_t     *tl_team   = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_rank_t             gsize     = UCC_TL_TEAM_SIZE(tl_team);
-    ucc_tl_ucp_schedule_t *sched     = NULL;
-    ucc_schedule_t        *schedule  = NULL;
-    ucc_coll_task_t       *a2a_task  = NULL;
-    ucc_tl_ucp_task_t     *data_task = NULL;
+    ucc_tl_ucp_team_t     *tl_team        = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_rank_t             gsize          = UCC_TL_TEAM_SIZE(tl_team);
+    ucc_tl_ucp_schedule_t *sched          = NULL;
+    ucc_schedule_t        *schedule       = NULL;
+    ucc_coll_task_t       *a2a_task       = NULL;
+    ucc_tl_ucp_task_t     *data_task      = NULL;
+    int                    a2a_in_sched   = 0;
+    int                    data_in_sched  = 0;
     ucc_datatype_t         dt;
     ucc_base_coll_args_t   bargs;
     ucc_status_t           status;
@@ -215,15 +217,20 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
     data_task->super.progress = ucc_tl_ucp_alltoallv_onesided_data_progress;
     data_task->super.finalize = ucc_tl_ucp_alltoallv_onesided_data_finalize;
 
-    /* Add tasks to schedule and set dependencies */
-    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, a2a_task),
-                   free_tasks, status);
+    /* Add tasks to schedule and set dependencies.
+     * note: ucc_schedule_add_task always registers task in schedule->tasks[]
+     * regardless of its return value, so set the in_sched flag before
+     * checking the status to avoid freeing a task owned by the schedule. */
+    status = ucc_schedule_add_task(schedule, a2a_task);
+    a2a_in_sched = 1;
+    UCC_CHECK_GOTO(status, free_tasks, status);
     UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super, a2a_task,
                                           UCC_EVENT_SCHEDULE_STARTED),
                    free_tasks, status);
 
-    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, &data_task->super),
-                   free_tasks, status);
+    status = ucc_schedule_add_task(schedule, &data_task->super);
+    data_in_sched = 1;
+    UCC_CHECK_GOTO(status, free_tasks, status);
     UCC_CHECK_GOTO(ucc_task_subscribe_dep(a2a_task, &data_task->super,
                                           UCC_EVENT_COMPLETED),
                    free_tasks, status);
@@ -232,12 +239,15 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
     return UCC_OK;
 
 free_tasks:
-    if (data_task) {
+    /* Only free tasks not yet owned by the schedule; tasks already added
+     * will be released by ucc_schedule_finalize below. */
+    if (data_task && !data_in_sched) {
         ucc_tl_ucp_put_task(data_task);
     }
-    if (a2a_task && a2a_task->finalize) {
+    if (a2a_task && !a2a_in_sched && a2a_task->finalize) {
         a2a_task->finalize(a2a_task);
     }
+    ucc_schedule_finalize(&schedule->super);
 free_schedule:
     if (sched->scratch_mc_header) {
         ucc_mc_free(sched->scratch_mc_header);
