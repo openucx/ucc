@@ -202,11 +202,47 @@
     dsl: |
       @Library('blossom-github-lib@master')
       import ipp.blossom.*
+      import hudson.model.ParametersAction
+      import groovy.json.JsonSlurper
 
+      def getPrNumberFromPayload(String jsonStr) {{
+        if (!jsonStr?.trim()) return null
+        try {{
+          def payload = new JsonSlurper().parseText(jsonStr)
+          return payload?.issue?.number?.toString() ?: payload?.pull_request?.number?.toString()
+        }} catch (Exception e) {{ return null }}
+      }}
+      def currentPrNum = getPrNumberFromPayload(VARIABLE_FROM_POST)
+      if (currentPrNum) {{
+        def jenkins = Jenkins.get()
+        def currentBuildNum = env.BUILD_NUMBER as int
+        def folderName = "{jjb_folder}"
+        def dispatcherJobName = "ucc-ci-dispatcher"
+        def childJobNames = ["ucc", "ucc-build-hpcsdk", "ucc-test-nvls", "ucc-run-coverity", "ucc-test-gtest"]
+        ([dispatcherJobName] + childJobNames).each {{ jobName ->
+          def job = jenkins.getItemByFullName("${{folderName}}/${{jobName}}")
+          if (job) {{
+            job.getBuilds().each {{ b ->
+              if (!b.isBuilding()) return
+              if (jobName == dispatcherJobName && b.number >= currentBuildNum) return
+              def pa = b.getAction(ParametersAction.class)
+              if (!pa) return
+              def prevJson = (jobName == dispatcherJobName)
+                ? pa.getParameter("VARIABLE_FROM_POST")?.value
+                : pa.getParameter("githubData")?.value
+              def prevPrNum = getPrNumberFromPayload(prevJson)
+              if (prevPrNum == currentPrNum) {{
+                echo "Aborting previous build ${{jobName}} #${{b.number}} (same PR ${{currentPrNum}})"
+                b.doStop()
+              }}
+            }}
+          }}
+        }}
+      }}
       withCredentials([usernamePassword(credentialsId: 'svcnbu-swx-hpcx-github-token', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {{
         githubHelper = GithubHelper.getInstance("${{GIT_PASSWORD}}", VARIABLE_FROM_POST)
       }}
-      def blueOceanUrl = "${{JENKINS_URL}}blue/organizations/jenkins/UCC%2F${{env.JOB_BASE_NAME}}/detail/${{env.JOB_BASE_NAME}}/${{env.BUILD_NUMBER}}/pipeline/"
+      def blueOceanUrl = "${{JENKINS_URL}}blue/organizations/jenkins/{jjb_folder}%2F${{env.JOB_BASE_NAME}}/detail/${{env.JOB_BASE_NAME}}/${{env.BUILD_NUMBER}}/pipeline/"
       githubHelper.updateCommitStatus(blueOceanUrl, "Blossom CI started", GitHubCommitState.PENDING)
       currentBuild.description = githubHelper.getBuildDescription()
       try {{
