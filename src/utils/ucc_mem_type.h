@@ -19,6 +19,11 @@
 #define UCC_MEMORY_TYPE_NOT_APPLY                                              \
     ((ucc_memory_type_t)((int)UCC_MEMORY_TYPE_LAST + 2))
 
+/* First memory type value safe for user MC component registration.
+ * Starts after the two internal sentinels (ASYMMETRIC and NOT_APPLY). */
+#define UCC_MEMORY_TYPE_USER_FIRST                                             \
+    ((ucc_memory_type_t)((int)UCC_MEMORY_TYPE_LAST + 3))
+
 #define UCC_MEM_TYPE_MASK_FULL (UCC_BIT(UCC_MEMORY_TYPE_HOST) |                \
                                 UCC_BIT(UCC_MEMORY_TYPE_CUDA) |                \
                                 UCC_BIT(UCC_MEMORY_TYPE_CUDA_MANAGED) |        \

@@ -58,8 +58,17 @@ typedef struct ucc_msg_range {
 } ucc_msg_range_t;
 
 typedef struct ucc_coll_score {
-    ucc_list_link_t scores[UCC_COLL_TYPE_NUM][UCC_MEMORY_TYPE_LAST];
+    ucc_list_link_t *scores;      /* flat array [UCC_COLL_TYPE_NUM * n_mem_types] */
+    int              n_mem_types; /* total memory type slots (built-in + user) */
 } ucc_coll_score_t;
+
+/* Returns the list head for (coll_idx, mem_type) in the score array. */
+static inline ucc_list_link_t *ucc_score_list(const ucc_coll_score_t *s,
+                                               int                    ci,
+                                               ucc_memory_type_t      mt)
+{
+    return &s->scores[ci * s->n_mem_types + (int)mt];
+}
 
 typedef struct ucc_score_map ucc_score_map_t;
 

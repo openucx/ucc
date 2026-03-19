@@ -10,9 +10,8 @@ class test_score_str : public test_score {
 #define SCORE(_score, _ct, _mt)                                                \
     ({                                                                         \
         ucc_list_link_t *l =                                                   \
-            _score->scores[ucc_ilog2(UCC_COLL_TYPE_##_ct)]                     \
-                          [UCC_MEMORY_TYPE_##_mt]                              \
-                              .next;                                           \
+            ucc_score_list(_score, ucc_ilog2(UCC_COLL_TYPE_##_ct),            \
+                           UCC_MEMORY_TYPE_##_mt)->next;                       \
         ucc_msg_range_t *range =                                               \
             ucc_container_of(l, ucc_msg_range_t, super.list_elem);             \
         range->super.score;                                                    \

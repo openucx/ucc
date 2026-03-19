@@ -7,7 +7,10 @@
 #include "config.h"
 #include "components/mc/base/ucc_mc_base.h"
 #include "ucc_mc.h"
+#include "utils/ucc_mem_type.h"
+#ifdef HAVE_USER_COMPONENTS
 #include "ucc_mc_user_component.h"
+#endif
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
 
@@ -25,11 +28,15 @@ static inline const ucc_mc_ops_t *ucc_mc_get_ops(ucc_memory_type_t mem_type)
     if (mem_type < UCC_MEMORY_TYPE_LAST) {
         /* Built-in component - direct array lookup */
         return mc_ops[mem_type];
-    } else {
+    }
+#ifdef HAVE_USER_COMPONENTS
+    else {
         /* User component - lookup in registry */
         ucc_mc_user_component_entry_t *uc = ucc_mc_user_component_get_entry(mem_type);
         return uc ? &uc->mc->ops : NULL;
     }
+#endif
+    return NULL;
 }
 
 #define UCC_CHECK_MC_AVAILABLE(mc)                                             \
@@ -42,8 +49,8 @@ static inline const ucc_mc_ops_t *ucc_mc_get_ops(ucc_memory_type_t mem_type)
                     ucc_memory_type_names[mc]);                                \
             } else {                                                           \
                 ucc_error(                                                     \
-                    "MC user component with memory type %d not registered",    \
-                    mc);                                                       \
+                    "memory type %d not supported",                            \
+                    (int)(mc));                                                \
             }                                                                  \
             return UCC_ERR_NOT_SUPPORTED;                                      \
         }                                                                      \
@@ -55,8 +62,11 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
     ucc_mc_base_t    *mc;
     ucc_status_t      status;
     ucc_mc_attr_t     attr;
+#ifdef HAVE_USER_COMPONENTS
     int               is_user_component;
     ucc_memory_type_t assigned_type;
+    uint32_t          original_ref_cnt;
+#endif
 
     memset(mc_ops, 0, UCC_MEMORY_TYPE_LAST * sizeof(ucc_mc_ops_t *));
     n_mcs = ucc_global_config.mc_framework.n_components;
@@ -64,10 +74,16 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
         mc = ucc_derived_of(ucc_global_config.mc_framework.components[i],
                             ucc_mc_base_t);
 
+#ifdef HAVE_USER_COMPONENTS
         /* Detect if this is a user component (loaded from user component path).
          * User components are marked with UCC_MEMORY_TYPE_LAST by the loader
          * before being assigned a unique dynamic type. */
-        is_user_component = (mc->type >= UCC_MEMORY_TYPE_LAST);
+        /* Plugins loaded from UCC_MC_USER_PATH set type = UCC_MEMORY_TYPE_LAST
+         * as a sentinel.  After registration the type becomes >= USER_FIRST.
+         * Both must be treated as user components. */
+        is_user_component  = (mc->type >= UCC_MEMORY_TYPE_LAST);
+        original_ref_cnt   = mc->ref_cnt;
+#endif
 
         if (mc->ref_cnt == 0) {
             mc->config = ucc_malloc(mc->config_table.size);
@@ -95,6 +111,7 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
             }
             ucc_debug("mc %s initialized", mc->super.name);
 
+#ifdef HAVE_USER_COMPONENTS
             /* Register user components (only on first init to avoid duplicates) */
             if (is_user_component) {
                 status = ucc_mc_user_component_register(mc, &assigned_type);
@@ -111,6 +128,7 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
                 ucc_info("MC user component '%s' registered with memory_type=%d",
                          mc->super.name, assigned_type);
             }
+#endif
         } else {
             attr.field_mask = UCC_MC_ATTR_FIELD_THREAD_MODE;
             status = mc->get_attr(&attr);
@@ -124,11 +142,21 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
                          mc_params->thread_mode);
             }
         }
-        mc->ref_cnt++;
+#ifdef HAVE_USER_COMPONENTS
+        /* register() already incremented ref_cnt for user components on their
+         * first init (original_ref_cnt == 0).  Subsequent inits must still
+         * track the extra reference so finalize does not tear the component
+         * down while another context is still alive. */
+        if (!is_user_component || original_ref_cnt > 0)
+#endif
+            mc->ref_cnt++;
 
         /* Register built-in components in ops table (safe to do every time,
          * needed because memset clears mc_ops on each ucc_mc_init call) */
-        if (!is_user_component) {
+#ifdef HAVE_USER_COMPONENTS
+        if (!is_user_component)
+#endif
+        {
             mc_ops[mc->type] = &mc->ops;
         }
     }
@@ -151,6 +179,7 @@ ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type)
     return UCC_OK;
 }
 
+#ifdef HAVE_USER_COMPONENTS
 /* Context for memory query iteration */
 typedef struct {
     const void     *ptr;
@@ -177,13 +206,16 @@ static ucc_status_t ucc_mc_mem_query_cb(
     }
     return UCC_OK;
 }
+#endif
 
 ucc_status_t ucc_mc_get_mem_attr(const void *ptr, ucc_mem_attr_t *mem_attr)
 {
-    ucc_status_t           status;
     ucc_memory_type_t      mt;
     const ucc_mc_ops_t    *ops;
+    ucc_status_t           status;
+#ifdef HAVE_USER_COMPONENTS
     ucc_mc_mem_query_ctx_t query_ctx;
+#endif
 
     mem_attr->mem_type     = UCC_MEMORY_TYPE_HOST;
     mem_attr->base_address = (void *)ptr;
@@ -204,6 +236,7 @@ ucc_status_t ucc_mc_get_mem_attr(const void *ptr, ucc_mem_attr_t *mem_attr)
         }
     }
 
+#ifdef HAVE_USER_COMPONENTS
     /* Check user component memory types */
     query_ctx.ptr      = ptr;
     query_ctx.mem_attr = mem_attr;
@@ -212,6 +245,7 @@ ucc_status_t ucc_mc_get_mem_attr(const void *ptr, ucc_mem_attr_t *mem_attr)
     if (query_ctx.result == UCC_OK) {
         return UCC_OK;
     }
+#endif
 
     return UCC_OK;
 }
@@ -221,21 +255,26 @@ ucc_status_t ucc_mc_get_attr(ucc_mc_attr_t *attr, ucc_memory_type_t mem_type)
     ucc_memory_type_t mt = (mem_type == UCC_MEMORY_TYPE_CUDA_MANAGED)
                                ? UCC_MEMORY_TYPE_CUDA
                                : mem_type;
-    ucc_mc_base_t                 *mc;
+    ucc_mc_base_t *mc;
+#ifdef HAVE_USER_COMPONENTS
     ucc_mc_user_component_entry_t *uc;
+#endif
 
     UCC_CHECK_MC_AVAILABLE(mt);
 
     if (mt < UCC_MEMORY_TYPE_LAST) {
         mc = ucc_container_of(mc_ops[mt], ucc_mc_base_t, ops);
         return mc->get_attr(attr);
-    } else {
+    }
+#ifdef HAVE_USER_COMPONENTS
+    else {
         uc = ucc_mc_user_component_get_entry(mt);
         if (uc && uc->mc->get_attr) {
             return uc->mc->get_attr(attr);
         }
-        return UCC_ERR_NOT_SUPPORTED;
     }
+#endif
+    return UCC_ERR_NOT_SUPPORTED;
 }
 
 /* TODO: add the flexbility to bypass the mpool if the user asks for it */
@@ -338,7 +377,9 @@ ucc_status_t ucc_mc_finalize()
         }
     }
 
+#ifdef HAVE_USER_COMPONENTS
     ucc_mc_user_component_finalize_all();
+#endif
 
     return UCC_OK;
 }

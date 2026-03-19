@@ -86,4 +86,11 @@ typedef ucc_status_t (*ucc_mc_user_component_iter_cb_t)(
     ucc_mc_user_component_entry_t *user_component, void *ctx);
 ucc_status_t ucc_mc_user_component_iterate(ucc_mc_user_component_iter_cb_t callback, void *ctx);
 
+/**
+ * Returns the total number of memory type slots needed to cover all built-in
+ * and currently registered user memory types. Use this as the n_mem_types
+ * argument when allocating score arrays.
+ */
+int ucc_mc_total_mem_types(void);
+
 #endif /* UCC_MC_USER_COMPONENT_H_ */

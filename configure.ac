@@ -164,6 +164,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([HAVE_RDMACM],[false])
      AM_CONDITIONAL([HAVE_MLX5DV],[false])
      AM_CONDITIONAL([HAVE_DOCA_UROM], [false])
+     AM_CONDITIONAL([HAVE_USER_COMPONENTS], [false])
     ],
     [
      AM_CONDITIONAL([DOCS_ONLY], [false])
@@ -214,6 +215,16 @@ AS_IF([test "x$with_docs_only" = xyes],
 
      CHECK_DOCA_UROM
      AC_MSG_RESULT([DOCA_UROM support: $doca_urom_happy])
+
+     AC_ARG_WITH([user-components],
+                 [AS_HELP_STRING([--with-user-components],
+                                 [Enable support for user-defined MC components (default: yes)])],
+                 [], [with_user_components=yes])
+     AS_IF([test "x$with_user_components" != "xno"],
+           [AC_DEFINE([HAVE_USER_COMPONENTS], 1, [Enable user MC components])
+            user_components_happy=yes],
+           [user_components_happy=no])
+     AM_CONDITIONAL([HAVE_USER_COMPONENTS], [test "x$user_components_happy" = "xyes"])
 
      CHECK_GTEST
      AC_MSG_RESULT([GTEST support: $gtest_happy])
@@ -292,6 +303,7 @@ AC_MSG_NOTICE([ROCM architectures:   ${ROCM_ARCH}])
 ])
 AC_MSG_NOTICE([          Perftest:   ${mpi_enable}])
 AC_MSG_NOTICE([             Gtest:   ${gtest_enable}])
+AC_MSG_NOTICE([ User MC components:   ${user_components_happy}])
 AC_MSG_NOTICE([        MC modules:   <$(echo ${mc_modules}|tr ':' ' ') >])
 AC_MSG_NOTICE([        TL modules:   <$(echo ${tl_modules}|tr ':' ' ') >])
 AC_MSG_NOTICE([      TLCP modules:   <$(echo ${tlcp_modules}|tr ':' ' ') >])

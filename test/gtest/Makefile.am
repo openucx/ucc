@@ -124,6 +124,10 @@ gtest_SOURCES =                           \
 	active_set/test_active_set.cc         \
 	asym_mem/test_asymmetric_memory.cc
 
+if HAVE_USER_COMPONENTS
+gtest_SOURCES += coll_score/test_score_user_mt.cc
+endif
+
 if TL_MLX5_ENABLED
     gtest_SOURCES  += tl/mlx5/test_tl_mlx5.cc \
                       tl/mlx5/test_tl_mlx5_qps.cc\

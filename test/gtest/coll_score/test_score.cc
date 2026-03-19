@@ -23,11 +23,11 @@ UCC_TEST_F(test_score, add_range)
     value = 0;
     EXPECT_EQ(UCC_OK, ucc_coll_score_add_range(score, c, m, 16, 65536, value,
                                                NULL, NULL));
-    EXPECT_EQ(0, ucc_list_length(&score->scores[ucc_ilog2(c)][m]));
+    EXPECT_EQ(0, ucc_list_length(ucc_score_list(score, ucc_ilog2(c), m)));
     value = 10;
     EXPECT_EQ(UCC_OK, ucc_coll_score_add_range(score, c, m, 16, 65536, value,
                                                NULL, NULL));
-    EXPECT_EQ(1, ucc_list_length(&score->scores[ucc_ilog2(c)][m]));
+    EXPECT_EQ(1, ucc_list_length(ucc_score_list(score, ucc_ilog2(c), m)));
     ucc_coll_score_free(score);
 }
 
@@ -48,7 +48,7 @@ UCC_TEST_F(test_score, add_range_sorted)
                                                NULL, NULL));
     EXPECT_EQ(UCC_OK,
               ucc_coll_score_add_range(score, c, m, 20, 40, value, NULL, NULL));
-    ucc_list_link_t *list = &score->scores[ucc_ilog2(c)][m];
+    ucc_list_link_t *list = ucc_score_list(score, ucc_ilog2(c), m);
     EXPECT_EQ(4, ucc_list_length(list));
     ucc_msg_range_t *range;
     size_t           expected[4] = {0, 20, 50, 100};
@@ -84,7 +84,7 @@ ucc_status_t test_score::check_range(ucc_coll_score_t *   score,
                                      std::vector<range_t> check)
 {
     ucc_msg_range_t *range;
-    ucc_list_link_t *list = &score->scores[ucc_ilog2(c)][m];
+    ucc_list_link_t *list = ucc_score_list(score, ucc_ilog2(c), m);
     auto             r    = check.begin();
     if (check.size() != ucc_list_length(list)) {
         return UCC_ERR_NO_MESSAGE;
@@ -105,7 +105,7 @@ ucc_status_t test_score::check_fallback(ucc_coll_score_t *   score,
                                         ucc_memory_type_t    m,
                                         std::vector<std::vector<fallback_t> > check)
 {
-    ucc_list_link_t  *list = &score->scores[ucc_ilog2(c)][m];
+    ucc_list_link_t  *list = ucc_score_list(score, ucc_ilog2(c), m);
     auto              fb   = check.begin();
     ucc_list_link_t  *fallback;
     ucc_msg_range_t  *range;

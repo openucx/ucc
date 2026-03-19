@@ -357,9 +357,19 @@ ucc_status_t ucc_components_load_user_component(const char *path,
         return status;
     }
 
-    for (i = original_count; i < n_loaded; i++) {
-        ucc_info("loaded user %s component: %s",
-                 framework_name, framework->components[i]->name);
+    /* Check name-hash uniqueness against the combined list before committing.
+     * Use a temporary framework view so we can still bail out cleanly. */
+    {
+        ucc_component_framework_t tmp = *framework;
+        tmp.components   = ifaces;
+        tmp.n_components = n_loaded;
+        if (UCC_OK != ucc_component_check_ids_uniq(&tmp)) {
+            ucc_error("user %s component introduces a duplicate name hash; "
+                      "rename the component to resolve the conflict",
+                      framework_name);
+            ucc_free(ifaces);
+            return UCC_ERR_INVALID_PARAM;
+        }
     }
 
     /* Update framework with new component list */
@@ -368,6 +378,11 @@ ucc_status_t ucc_components_load_user_component(const char *path,
     }
     framework->components   = ifaces;
     framework->n_components = n_loaded;
+
+    for (i = original_count; i < n_loaded; i++) {
+        ucc_info("loaded user %s component: %s",
+                 framework_name, framework->components[i]->name);
+    }
 
     /* Update component names array */
     if (framework->names.names) {

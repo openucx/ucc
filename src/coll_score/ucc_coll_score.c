@@ -5,6 +5,9 @@
  */
 
 #include "ucc_coll_score.h"
+#ifdef HAVE_USER_COMPONENTS
+#include "components/mc/ucc_mc_user_component.h"
+#endif
 #include "utils/ucc_string.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_coll_utils.h"
@@ -22,17 +25,34 @@ char *ucc_score_to_str(ucc_score_t score, char *buf, size_t max) {
 
 ucc_status_t ucc_coll_score_alloc(ucc_coll_score_t **score)
 {
-    ucc_coll_score_t *s = ucc_malloc(sizeof(*s), "ucc_coll_score");
+#ifdef HAVE_USER_COMPONENTS
+    int               n_mem_types = ucc_mc_total_mem_types();
+#else
+    int               n_mem_types = UCC_MEMORY_TYPE_LAST;
+#endif
+    ucc_coll_score_t *s           = ucc_malloc(sizeof(*s), "ucc_coll_score");
     int               i, j;
+
     if (!s) {
         ucc_error("failed to allocate %zd bytes for ucc_coll_score",
                   sizeof(*s));
         *score = NULL;
         return UCC_ERR_NO_MEMORY;
     }
+    s->scores = (ucc_list_link_t *)ucc_calloc(
+        UCC_COLL_TYPE_NUM * n_mem_types, sizeof(ucc_list_link_t),
+        "coll_score_lists");
+    if (!s->scores) {
+        ucc_error("failed to allocate score lists for %d mem types",
+                  n_mem_types);
+        ucc_free(s);
+        *score = NULL;
+        return UCC_ERR_NO_MEMORY;
+    }
+    s->n_mem_types = n_mem_types;
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
-        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
-            ucc_list_head_init(&s->scores[i][j]);
+        for (j = 0; j < n_mem_types; j++) {
+            ucc_list_head_init(ucc_score_list(s, i, j));
         }
     }
     *score = s;
@@ -58,6 +78,12 @@ coll_score_add_range(ucc_coll_score_t *score, ucc_coll_type_t coll_type,
     if (start >= end) {
         return UCC_ERR_INVALID_PARAM;
     }
+    if ((int)mem_type >= score->n_mem_types) {
+        ucc_error("memory type %d exceeds score capacity %d; "
+                  "score was allocated before user MC component was registered",
+                  (int)mem_type, score->n_mem_types);
+        return UCC_ERR_INVALID_PARAM;
+    }
     r = ucc_malloc(sizeof(*r), "ucc_msg_range");
     if (!r) {
         ucc_error("failed to allocate %zd bytes for ucc_msg_range", sizeof(*r));
@@ -71,7 +97,7 @@ coll_score_add_range(ucc_coll_score_t *score, ucc_coll_type_t coll_type,
     r->super.score = msg_score;
     r->super.init  = init;
     r->super.team  = team;
-    list           = &score->scores[ucc_ilog2(coll_type)][mem_type];
+    list           = ucc_score_list(score, ucc_ilog2(coll_type), mem_type);
     insert_pos     = list;
     ucc_list_for_each(range, list, super.list_elem) {
         if (start >= range->end) {
@@ -115,11 +141,12 @@ void ucc_coll_score_free(ucc_coll_score_t *score)
         return;
     }
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
-        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
-            ucc_list_destruct(&score->scores[i][j], ucc_msg_range_t,
+        for (j = 0; j < score->n_mem_types; j++) {
+            ucc_list_destruct(ucc_score_list(score, i, j), ucc_msg_range_t,
                               ucc_msg_range_free, super.list_elem);
         }
     }
+    ucc_free(score->scores);
     ucc_free(score);
 }
 
@@ -412,16 +439,22 @@ ucc_status_t ucc_coll_score_merge(ucc_coll_score_t * score1,
 {
     ucc_coll_score_t *out;
     ucc_status_t      status;
+    ucc_list_link_t   empty;
     int               i, j;
+
+    ucc_list_head_init(&empty);
     status = ucc_coll_score_alloc(&out);
     if (UCC_OK != status) {
         goto out;
     }
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
-        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
-            status = ucc_coll_score_merge_one(&score1->scores[i][j],
-                                              &score2->scores[i][j],
-                                              &out->scores[i][j]);
+        for (j = 0; j < out->n_mem_types; j++) {
+            ucc_list_link_t *l1 = (j < score1->n_mem_types)
+                                      ? ucc_score_list(score1, i, j) : &empty;
+            ucc_list_link_t *l2 = (j < score2->n_mem_types)
+                                      ? ucc_score_list(score2, i, j) : &empty;
+            status = ucc_coll_score_merge_one(l1, l2,
+                                              ucc_score_list(out, i, j));
             if (UCC_OK != status) {
                 ucc_coll_score_free(out);
                 goto out;
@@ -710,15 +743,23 @@ static ucc_status_t ucc_coll_score_parse_str(const char *str,
         if (!ct) {
             ct_n = UCC_COLL_TYPE_NUM;
         }
+        /* mt_explicit: user specified a memory type in the string.
+         * When false (apply-to-all), extend the loop to cover user-registered
+         * types beyond UCC_MEMORY_TYPE_LAST; when true, keep the bitmask-
+         * gated loop over built-in types only. */
+        int mt_explicit = (mtypes != 0);
         if (!mtypes) {
             mtypes = UCC_MEM_TYPE_MASK_FULL;
         }
         if (!msg) {
             n_ranges = 1;
         }
+        int mt_max = mt_explicit ? (int)UCC_MEMORY_TYPE_LAST
+                                 : score->n_mem_types;
         for (c = 0; c < ct_n; c++) {
-            for (m = 0; m < UCC_MEMORY_TYPE_LAST; m++) {
-                if (!(UCC_BIT(m) & mtypes)) {
+            for (m = 0; m < mt_max; m++) {
+                if (m < (int)UCC_MEMORY_TYPE_LAST &&
+                    !(UCC_BIT(m) & mtypes)) {
                     continue;
                 }
                 ucc_coll_type_t   coll_type = ct ? ct[c] :
@@ -975,7 +1016,7 @@ ucc_status_t ucc_coll_score_update(ucc_coll_score_t  *score,
     ucc_memory_type_t mt;
 
     if (mt_n == 0) {
-        mt_n = UCC_MEMORY_TYPE_LAST;
+        mt_n = ucc_min(score->n_mem_types, update->n_mem_types);
     }
 
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
@@ -984,9 +1025,12 @@ ucc_status_t ucc_coll_score_update(ucc_coll_score_t  *score,
         }
         for (j = 0; j < mt_n; j++) {
             mt = (mtypes == NULL) ? (ucc_memory_type_t)j : mtypes[j];
+            if ((int)mt >= update->n_mem_types) {
+                continue;
+            }
             status = ucc_coll_score_update_one(
-                &score->scores[i][mt],
-                &update->scores[i][mt], default_score);
+                ucc_score_list(score, i, mt),
+                ucc_score_list(update, i, mt), default_score);
             if (UCC_OK != status) {
                 return status;
             }
@@ -1070,9 +1114,9 @@ ucc_status_t ucc_coll_score_dup(const ucc_coll_score_t *in,
         return status;
     }
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
-        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
-            status =
-                ucc_score_list_dup(&in->scores[i][j], &score->scores[i][j]);
+        for (j = 0; j < in->n_mem_types; j++) {
+            status = ucc_score_list_dup(ucc_score_list(in, i, j),
+                                        ucc_score_list(score, i, j));
             if (UCC_OK != status) {
                 return status;
             }
@@ -1089,8 +1133,9 @@ void ucc_coll_score_set(ucc_coll_score_t *score,
     ucc_msg_range_t  *range;
 
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
-        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
-            ucc_list_for_each(range, &score->scores[i][j], super.list_elem) {
+        for (j = 0; j < score->n_mem_types; j++) {
+            ucc_list_for_each(range, ucc_score_list(score, i, j),
+                              super.list_elem) {
                 range->super.score = value;
             }
         }

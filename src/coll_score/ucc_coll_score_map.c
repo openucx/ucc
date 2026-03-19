@@ -39,8 +39,8 @@ ucc_status_t ucc_coll_score_build_map(ucc_coll_score_t *score,
        to the range with higher score. That way components that report
        higher scores do not get overwritten at range boundary */
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
-        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
-            lst = &score->scores[i][j];
+        for (j = 0; j < score->n_mem_types; j++) {
+            lst = ucc_score_list(score, i, j);
             if (!ucc_list_is_empty(lst) && map->team_size == 0) {
                 /* For a given score_map all the entries refer to the base_teams
                    (CL/TL) of the same size/rank. So we can take the first one. */
@@ -94,6 +94,11 @@ static ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t *map,
            "host" range list */
         mt = UCC_MEMORY_TYPE_HOST;
     }
+    if ((int)mt >= map->score->n_mem_types) {
+        /* Memory type (e.g. a user-registered type) is beyond what this score
+           map covers — the map was built before the component was registered */
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     ucc_assert(ucc_coll_args_is_mem_symmetric(&bargs->args, map->team_rank));
     if (msgsize == UCC_MSG_SIZE_INVALID || msgsize == UCC_MSG_SIZE_ASYMMETRIC) {
         /* These algorithms require global communication to get the same msgsize estimation.
@@ -101,7 +106,7 @@ static ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t *map,
            range [0:inf]) */
         msgsize = 0;
     }
-    list = &map->score->scores[ct][mt];
+    list = ucc_score_list(map->score, ct, mt);
     ucc_list_for_each(r, list, super.list_elem) {
         if (msgsize >= r->start && msgsize <= r->end) {
             *range = r;
@@ -182,8 +187,8 @@ void ucc_coll_score_map_print_info(const ucc_score_map_t *map, int verbosity)
 
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
         all_empty = 1;
-        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
-            if (!ucc_list_is_empty(&map->score->scores[i][j])) {
+        for (j = 0; j < map->score->n_mem_types; j++) {
+            if (!ucc_list_is_empty(ucc_score_list(map->score, i, j))) {
                 all_empty = 0;
                 break;
             }
@@ -195,13 +200,13 @@ void ucc_coll_score_map_print_info(const ucc_score_map_t *map, int verbosity)
         left        = sizeof(coll_str);
         STR_APPEND(coll_str, left, 32, "%s:\n",
                    ucc_coll_type_str((ucc_coll_type_t)UCC_BIT(i)));
-        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
-            if (ucc_list_is_empty(&map->score->scores[i][j])) {
+        for (j = 0; j < map->score->n_mem_types; j++) {
+            if (ucc_list_is_empty(ucc_score_list(map->score, i, j))) {
                 continue;
             }
             STR_APPEND(coll_str, left, 32, "\t%s: ",
                        ucc_mem_type_str((ucc_memory_type_t)j));
-            ucc_list_for_each(range, &map->score->scores[i][j],
+            ucc_list_for_each(range, ucc_score_list(map->score, i, j),
                               super.list_elem) {
                 ucc_memunits_range_str(range->start, range->end, range_str,
                                        sizeof(range_str));
