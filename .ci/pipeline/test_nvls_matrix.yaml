@@ -81,7 +81,7 @@ steps:
       export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
       sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/stop_slurm_allocation.sh
 
-  - name: Run UCC NVLS MPI tests
+  - name: Run UCC NVLS MPI tests (allreduce)
     containerSelector: "{name: 'build_helper'}"
     timeout: "${TEST_TIMEOUT_MINUTES}"
     run: |
@@ -89,6 +89,18 @@ steps:
       export DOCKER_IMAGE_NAME="${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
       export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
       sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_tests_slurm.sh '/opt/nvidia/src/ucc/.ci/scripts/run_tests_ucc_nvls_mpi.sh' ${NVLS_MPI_PPN:-4}
+    onfail: |
+      export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
+      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/stop_slurm_allocation.sh
+
+  - name: Run UCC NVLS MPI tests (reduce_scatter)
+    containerSelector: "{name: 'build_helper'}"
+    timeout: "${TEST_TIMEOUT_MINUTES}"
+    run: |
+      set -x
+      export DOCKER_IMAGE_NAME="${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
+      export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
+      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_tests_slurm.sh '/opt/nvidia/src/ucc/.ci/scripts/run_tests_ucc_nvls_mpi_reduce_scatter.sh' ${NVLS_MPI_PPN:-4}
     always: |
       export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
       sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/stop_slurm_allocation.sh
