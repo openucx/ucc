@@ -165,8 +165,8 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
     ucc_status_t        status;
     size_t              offset_elements;
     size_t              count_elements;
-    size_t              offset_u32;
-    size_t              count_u32;
+    size_t              offset;
+    size_t              count;
 
     /* Validate op and datatype before allocating task */
     if (coll_args->args.op != UCC_OP_SUM) {
@@ -175,10 +175,12 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
             "NVLS reduce scatter(v) supported only with SUM operation");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if (dt != UCC_DT_FLOAT32 && dt != UCC_DT_BFLOAT16) {
+    if (dt != UCC_DT_FLOAT32 && dt != UCC_DT_BFLOAT16 && dt != UCC_DT_INT32 &&
+        dt != UCC_DT_UINT32 && dt != UCC_DT_INT64 && dt != UCC_DT_UINT64) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
-            "NVLS reduce scatter(v) supported only with float32/bfloat16");
+            "NVLS reduce scatter(v) supported only with "
+            "float32/bfloat16/int32/uint32/int64/uint64");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -191,11 +193,15 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
     count_elements  = get_count(task, trank);
 
     /* Convert from datatype elements to uint32_t indices for the kernel.
-     * For float32: 1 element = 1 uint32_t
+     * For float32/int32/uint32: 1 element = 1 uint32_t
+     * For int64/uint64: 1 element = 2 uint32_t
      * For bfloat16: 2 elements = 1 uint32_t */
-    if (dt == UCC_DT_FLOAT32) {
-        offset_u32 = offset_elements;
-        count_u32  = count_elements;
+    if (dt == UCC_DT_FLOAT32 || dt == UCC_DT_INT32 || dt == UCC_DT_UINT32) {
+        offset = offset_elements;
+        count  = count_elements;
+    } else if (dt == UCC_DT_INT64 || dt == UCC_DT_UINT64) {
+        offset = offset_elements * 2;
+        count  = count_elements * 2;
     } else { /* UCC_DT_BFLOAT16 */
         if (offset_elements % 2 != 0 || count_elements % 2 != 0) {
             tl_debug(
@@ -206,23 +212,23 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
                 count_elements);
             goto err_task_put;
         }
-        offset_u32 = offset_elements / 2;
-        count_u32  = count_elements / 2;
+        offset = offset_elements / 2;
+        count  = count_elements / 2;
     }
 
     /* NVLS requires 16-byte alignment (4 uint32_t elements) */
-    if (ucc_unlikely(offset_u32 % 4 != 0)) {
+    if (ucc_unlikely(offset % 4 != 0)) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
             "NVLS requires 16-byte alignment for offset, got offset=%zu",
-            offset_u32);
+            offset);
         goto err_task_put;
     }
-    if (ucc_unlikely(count_u32 % 4 != 0)) {
+    if (ucc_unlikely(count % 4 != 0)) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
             "NVLS requires 16-byte alignment for count, got count=%zu",
-            count_u32);
+            count);
         goto err_task_put;
     }
 
@@ -234,8 +240,8 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_nvls_init_common(
     }
 
     task->reduce_scatterv_nvls.dt      = dt;
-    task->reduce_scatterv_nvls.offset  = offset_u32;
-    task->reduce_scatterv_nvls.count   = count_u32;
+    task->reduce_scatterv_nvls.offset  = offset;
+    task->reduce_scatterv_nvls.count   = count;
     task->reduce_scatterv_nvls.mc_va   = (CUdeviceptr)TASK_SYMMETRIC_MC(task);
     task->reduce_scatterv_nvls.uc_va   = (CUdeviceptr)TASK_SYMMETRIC_UC(task);
     task->reduce_scatterv_nvls.coll_id = team->nvls.coll_ids[task->coll_id]++;

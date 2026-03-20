@@ -1,4 +1,6 @@
 #!/bin/bash -xe
+# NVLS reduce_scatter only. Run as a separate srun step (separate MPI job).
+# -m 1024:33554432:4 keeps per-rank counts NVLS-aligned.
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source "${SCRIPT_DIR}/env.sh"
@@ -17,6 +19,6 @@ EXE="/opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi"
 EXE+=" --set_device 2 --mtypes cuda"
 DTYPES="float32,int32,uint32,int64,uint64"
 
-echo "INFO: NVLS MPI tests (allreduce) ..."
-UCC_TL_CUDA_TUNE="allreduce:cuda:@0" $EXE -c allreduce -d ${DTYPES} -o sum -m 1024:33554432
-echo "INFO: NVLS MPI tests (allreduce) ... DONE"
+echo "INFO: NVLS MPI tests (reduce_scatter) ..."
+UCC_TL_CUDA_TUNE="reduce_scatter:cuda:@3" $EXE -c reduce_scatter -d ${DTYPES} -o sum -m 1024:33554432:4
+echo "INFO: NVLS MPI tests (reduce_scatter) ... DONE"
