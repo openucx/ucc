@@ -11,6 +11,11 @@
 
 #include <dlfcn.h>
 
+/* Integer value of UCC_MEMORY_TYPE_NOT_APPLY without the enum cast.
+ * Using the macro directly triggers clang-analyzer EnumCastOutOfRange because
+ * it casts an out-of-range value to ucc_memory_type_t. */
+#define UCC_MEMORY_TYPE_NOT_APPLY_INT ((int)UCC_MEMORY_TYPE_LAST + 2)
+
 typedef struct ucc_score_map {
     ucc_coll_score_t *score;
     /* Size, rank of the process in the base_team associated with that
@@ -89,7 +94,7 @@ static ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t *map,
     ucc_list_link_t *list;
     ucc_msg_range_t *r;
 
-    if (mt == UCC_MEMORY_TYPE_NOT_APPLY) {
+    if ((int)mt == UCC_MEMORY_TYPE_NOT_APPLY_INT) {
         /* Temporary solution: for Barrier, Fanin, Fanout - use
            "host" range list */
         mt = UCC_MEMORY_TYPE_HOST;

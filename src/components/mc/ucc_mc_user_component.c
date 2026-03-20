@@ -11,10 +11,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Integer base for dynamically-assigned memory types; equals
+ * (int)UCC_MEMORY_TYPE_LAST + 3 (reserving ASYMMETRIC and NOT_APPLY).
+ * Using an integer constant avoids clang-analyzer EnumCastOutOfRange warnings
+ * that fire when the UCC_MEMORY_TYPE_USER_FIRST macro casts out-of-range. */
+#define UCC_MC_USER_TYPE_BASE ((int)UCC_MEMORY_TYPE_LAST + 3)
+
 /* User component registry - only modified during initialization (single-threaded),
  * read-only afterwards. No locking needed. */
 static ucc_mc_user_component_entry_t *mc_user_component_list = NULL;
-static ucc_memory_type_t              next_memory_type       = UCC_MEMORY_TYPE_USER_FIRST;
+static int                            next_memory_type       = UCC_MC_USER_TYPE_BASE;
 
 ucc_status_t ucc_mc_user_component_register(
     ucc_mc_base_t *mc, ucc_memory_type_t *memory_type)
@@ -51,7 +57,7 @@ ucc_status_t ucc_mc_user_component_register(
         return UCC_ERR_NO_MEMORY;
     }
 
-    mt = next_memory_type++;
+    mt = (ucc_memory_type_t)next_memory_type++;
     mc->ref_cnt++;
 
     entry->mc          = mc;
@@ -69,7 +75,7 @@ ucc_status_t ucc_mc_user_component_unregister(ucc_memory_type_t memory_type)
 {
     ucc_mc_user_component_entry_t *entry, *prev;
 
-    if (memory_type < UCC_MEMORY_TYPE_USER_FIRST) {
+    if ((int)memory_type < UCC_MC_USER_TYPE_BASE) {
         ucc_error("cannot unregister builtin memory type %d", memory_type);
         return UCC_ERR_INVALID_PARAM;
     }
@@ -87,9 +93,11 @@ ucc_status_t ucc_mc_user_component_unregister(ucc_memory_type_t memory_type)
             entry->mc->ref_cnt--;
             if (entry->mc->ref_cnt == 0) {
                 entry->mc->finalize();
-                ucc_config_parser_release_opts(entry->mc->config,
-                                               entry->mc->config_table.table);
-                ucc_free(entry->mc->config);
+                if (entry->mc->config) {
+                    ucc_config_parser_release_opts(entry->mc->config,
+                                                   entry->mc->config_table.table);
+                    ucc_free(entry->mc->config);
+                }
             }
             ucc_free(entry);
             ucc_info("MC user component memory_type=%d unregistered", memory_type);
@@ -112,14 +120,14 @@ const char *ucc_mc_user_component_get_name(ucc_memory_type_t memory_type)
 
 int ucc_mc_is_user_component(ucc_memory_type_t memory_type)
 {
-    return (memory_type >= UCC_MEMORY_TYPE_USER_FIRST) ? 1 : 0;
+    return ((int)memory_type >= UCC_MC_USER_TYPE_BASE) ? 1 : 0;
 }
 
 ucc_mc_user_component_entry_t *ucc_mc_user_component_get_entry(ucc_memory_type_t memory_type)
 {
     ucc_mc_user_component_entry_t *entry;
 
-    if (memory_type < UCC_MEMORY_TYPE_USER_FIRST) {
+    if ((int)memory_type < UCC_MC_USER_TYPE_BASE) {
         return NULL;
     }
 
@@ -136,29 +144,40 @@ ucc_mc_user_component_entry_t *ucc_mc_user_component_get_entry(ucc_memory_type_t
 
 void ucc_mc_user_component_finalize_all(void)
 {
-    ucc_mc_user_component_entry_t *entry, *next;
+    ucc_mc_user_component_entry_t *entry, *next, *prev;
 
+    prev  = NULL;
     entry = mc_user_component_list;
     while (entry) {
         next = entry->next;
         entry->mc->ref_cnt--;
         if (entry->mc->ref_cnt == 0) {
             entry->mc->finalize();
-            ucc_config_parser_release_opts(entry->mc->config,
-                                           entry->mc->config_table.table);
-            ucc_free(entry->mc->config);
+            if (entry->mc->config) {
+                ucc_config_parser_release_opts(entry->mc->config,
+                                               entry->mc->config_table.table);
+                ucc_free(entry->mc->config);
+            }
+            if (prev) {
+                prev->next = next;
+            } else {
+                mc_user_component_list = next;
+            }
+            ucc_free(entry);
+        } else {
+            prev = entry;
         }
-        ucc_free(entry);
         entry = next;
     }
 
-    mc_user_component_list = NULL;
-    next_memory_type       = UCC_MEMORY_TYPE_USER_FIRST;
+    if (mc_user_component_list == NULL) {
+        next_memory_type = UCC_MC_USER_TYPE_BASE;
+    }
 }
 
 int ucc_mc_total_mem_types(void)
 {
-    return (int)next_memory_type;
+    return next_memory_type;
 }
 
 ucc_status_t ucc_mc_user_component_iterate(ucc_mc_user_component_iter_cb_t callback, void *ctx)

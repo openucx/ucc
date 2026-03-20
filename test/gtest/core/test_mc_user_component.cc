@@ -142,8 +142,11 @@ UCC_TEST_F(test_mc_user_component, available_tracks_registration)
 /* Unregistering an unknown type returns not-found */
 UCC_TEST_F(test_mc_user_component, unregister_unknown_type_fails)
 {
-    /* Use a type beyond LAST that was never registered */
-    ucc_memory_type_t bogus = (ucc_memory_type_t)(UCC_MEMORY_TYPE_LAST + 99);
+    /* Use a type beyond LAST that was never registered. Cast via int to avoid
+     * clang-analyzer EnumCastOutOfRange on the intentionally out-of-range value. */
+    int               bogus_val = (int)UCC_MEMORY_TYPE_LAST + 99;
+    ucc_memory_type_t bogus;
+    memcpy(&bogus, &bogus_val, sizeof(bogus));
     EXPECT_EQ(UCC_ERR_NOT_FOUND, ucc_mc_user_component_unregister(bogus));
 }
 
@@ -188,17 +191,14 @@ UCC_TEST_F(test_mc_user_component, mem_query_dispatch)
 {
     ucc_memory_type_t mt;
     ucc_mem_attr_t    mem_attr;
-    void             *ptr = malloc(64);
+    char              buf[64]; /* mock mem_query ignores the pointer value */
 
-    ASSERT_NE(nullptr, ptr);
     ASSERT_EQ(UCC_OK, ucc_mc_user_component_register(&mc_a, &mt));
     g_assigned_type_a = mt;
 
     mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
-    ASSERT_EQ(UCC_OK, ucc_mc_get_mem_attr(ptr, &mem_attr));
+    ASSERT_EQ(UCC_OK, ucc_mc_get_mem_attr(buf, &mem_attr));
     EXPECT_EQ(mt, mem_attr.mem_type);
-
-    free(ptr);
 }
 
 /* After ucc_mc_finalize, user component registry is cleared and type

@@ -163,6 +163,7 @@ ucc_status_t ucc_constructor(void)
                   "ucc modules dir: %s", cfg->component_path);
         goto exit_unlock_mutex;
     }
+#ifdef HAVE_USER_COMPONENTS
     /* Load user MC components from separate path if configured */
     if (cfg->mc_user_component_path &&
         strlen(cfg->mc_user_component_path) > 0) {
@@ -183,6 +184,7 @@ ucc_status_t ucc_constructor(void)
                            ucc_mc_base_t)->type = UCC_MEMORY_TYPE_LAST;
         }
     }
+#endif
     status = ucc_components_load("ec", &cfg->ec_framework);
     if (status != UCC_OK) {
         if (status == UCC_ERR_NOT_FOUND) {
