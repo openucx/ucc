@@ -341,6 +341,14 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
         team->scratch.rem[i] = NULL;
     }
 
+    if (!ucc_topo_has_device_info(UCC_TL_CORE_TEAM(team)->topo)) {
+        tl_debug(tl_team->context->lib,
+                 "not all ranks have visible GPU device info; "
+                 "skipping TL/CUDA team creation");
+        status = UCC_ERR_NOT_SUPPORTED;
+        goto exit_err;
+    }
+
     status = ucc_tl_cuda_team_topo_create(&team->super, &team->topo);
     if (status != UCC_OK) {
         goto exit_err;
