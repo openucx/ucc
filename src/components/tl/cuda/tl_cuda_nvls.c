@@ -673,6 +673,8 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         }
         if (status < 0) {
             tl_error(UCC_TL_TEAM_LIB(team), "NVLS barrier failed");
+            team->oob.req_free(team->oob_req);
+            team->oob_req = NULL;
             ucc_free(nvls->barrier_data);
             nvls->barrier_data = NULL;
             goto cleanup;
@@ -716,6 +718,7 @@ cleanup:
             tl_error(UCC_TL_TEAM_LIB(team),
                      "failed to free mc_va during cleanup");
         }
+        nvls->mc_va = 0;
     }
 
     // Unmap and free unicast VA if it was reserved/mapped
@@ -728,6 +731,7 @@ cleanup:
             tl_error(UCC_TL_TEAM_LIB(team),
                      "failed to free uc_va during cleanup");
         }
+        nvls->uc_va = 0;
     }
 
     // Release memory handle if it was created
@@ -736,6 +740,7 @@ cleanup:
             tl_error(UCC_TL_TEAM_LIB(team),
                      "failed to release mem_handle during cleanup");
         }
+        nvls->mc_memhandle = 0;
     }
 
     // Release multicast handle if it was created or imported
