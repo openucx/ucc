@@ -496,8 +496,24 @@ static ucc_status_t ucc_sysinfo_cuda_get_info(void **info, int *n_info)
             goto free_gpu_info;
         }
 
+#ifdef HAVE_NVLS
+        {
+            nvmlGpuFabricInfo_t fabric_info;
+
+            nvml_st = nvmlDeviceGetGpuFabricInfo(nvml_dev, &fabric_info);
+            if (nvml_st == NVML_SUCCESS &&
+                fabric_info.state == NVML_GPU_FABRIC_STATE_COMPLETED) {
+                gpu_info->gpus[i].fabric_capable   = 1;
+                gpu_info->gpus[i].fabric_clique_id = fabric_info.cliqueId;
+            } else {
+                gpu_info->gpus[i].fabric_capable   = 0;
+                gpu_info->gpus[i].fabric_clique_id = 0;
+            }
+        }
+#else
         gpu_info->gpus[i].fabric_capable   = 0;
         gpu_info->gpus[i].fabric_clique_id = 0;
+#endif
     }
 
     if (num_gpus > UCC_MAX_HOST_GPUS) {

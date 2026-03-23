@@ -329,6 +329,28 @@ ucc_status_t ucc_tl_cuda_nvls_init(
             return status;
         }
 
+        if (nvls->is_multinode) {
+            ucc_team_t *ucc_team = UCC_TL_CORE_TEAM(team);
+            ucc_rank_t  min_ppn, max_ppn;
+
+            if (!ucc_topo_is_single_nvlink_domain(ucc_team->topo)) {
+                tl_warn(lib,
+                        "NVLS: team spans multiple NVLink fabric domains or "
+                        "fabric info is unavailable; disabling multinode NVLS");
+                return UCC_ERR_NOT_SUPPORTED;
+            }
+
+            min_ppn = ucc_topo_min_ppn(ucc_team->topo);
+            max_ppn = ucc_topo_max_ppn(ucc_team->topo);
+            if (min_ppn != max_ppn) {
+                tl_warn(lib,
+                        "NVLS: non-uniform ppn across nodes "
+                        "(min_ppn=%u max_ppn=%u); disabling multinode NVLS",
+                        min_ppn, max_ppn);
+                return UCC_ERR_NOT_SUPPORTED;
+            }
+        }
+
         handle_types        = nvls->is_multinode
                                   ? CU_MEM_HANDLE_TYPE_FABRIC
                                   : CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR;
