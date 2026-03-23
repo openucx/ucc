@@ -329,6 +329,14 @@ ucc_status_t ucc_tl_cuda_nvls_init(
             return status;
         }
 
+        if (UCC_TL_TEAM_SIZE(team) > UCC_TL_CUDA_MAX_NVLS_PEERS) {
+            tl_warn(lib,
+                    "NVLS: team size %u exceeds maximum supported peers %d; "
+                    "disabling NVLS for this team",
+                    UCC_TL_TEAM_SIZE(team), UCC_TL_CUDA_MAX_NVLS_PEERS);
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+
         if (nvls->is_multinode) {
             ucc_team_t *ucc_team = UCC_TL_CORE_TEAM(team);
             ucc_rank_t  min_ppn, max_ppn;
