@@ -343,8 +343,11 @@ ucc_status_t ucc_tl_cuda_nvls_init(
 
             if (!ucc_topo_is_single_nvlink_domain(ucc_team->topo)) {
                 tl_warn(lib,
-                        "NVLS: team spans multiple NVLink fabric domains or "
-                        "fabric info is unavailable; disabling multinode NVLS");
+                        "NVLS: multinode team does not share a single NVLink "
+                        "fabric domain (mismatched clique IDs, different NVL "
+                        "partitions, or fabric info unavailable); "
+                        "run with UCC_LOG_LEVEL=DEBUG for details; "
+                        "disabling multinode NVLS");
                 return UCC_ERR_NOT_SUPPORTED;
             }
 

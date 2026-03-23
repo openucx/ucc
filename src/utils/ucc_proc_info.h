@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -57,6 +57,9 @@ typedef struct ucc_gpu_info {
     uint8_t  nvswitch_connected;
     /**< NVSwitch fabric clique ID (0 if unknown) */
     uint64_t fabric_clique_id;
+    /**< NVLink partition ID for GB200+ NVL sub-fabric partitions.
+     *   0 means single partition or not populated (NVML < r525). */
+    uint32_t fabric_partition_id;
     /**< Hash of GPU UUID for unique identification */
     uint64_t uuid;
 } ucc_gpu_info_t;
