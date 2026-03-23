@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -238,11 +238,14 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
     if (self->ids) {
         if (self->sync != (void*)-1) {
             for (i = 0; i < resource_num; i++) {
+                /* Remote event handles opened by this rank live in MY sync
+                 * block (slot MY_RANK), not in peer j's block.  Use the
+                 * correct base pointer outside the inner loop. */
+                sync = UCC_TL_CUDA_TEAM_SYNC(self, UCC_TL_TEAM_RANK(self), i);
                 for (j = 0; j < UCC_TL_TEAM_SIZE(self); j++) {
                     if (j == UCC_TL_TEAM_RANK(self)) {
                         continue;
                     }
-                    sync = UCC_TL_CUDA_TEAM_SYNC(self, j, i);
                     if (sync->data[j].ipc_event_remote) {
                         st = cudaEventDestroy(sync->data[j].ipc_event_remote);
                         if (st != cudaSuccess) {
