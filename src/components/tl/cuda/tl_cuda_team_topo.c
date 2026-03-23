@@ -1,11 +1,12 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
 
 #include "tl_cuda_team_topo.h"
 #include "tl_cuda.h"
+#include "core/ucc_team.h"
 
 #define UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE ((ucc_rank_t)(UCC_RANK_MAX))
 
@@ -341,27 +342,32 @@ static ucc_status_t
 ucc_tl_cuda_team_topo_init_matrix(const ucc_tl_cuda_team_t *team,
                                   ucc_rank_t *matrix)
 {
-    ucc_tl_cuda_topo_t *topo = UCC_TL_CUDA_TEAM_CTX(team)->topo;
-    int                 size = UCC_TL_TEAM_SIZE(team);
-    ucc_status_t status;
-    int i, j;
+    ucc_topo_t          *topo      = UCC_TL_CORE_TEAM(team)->topo;
+    ucc_proc_info_t     *procs     = topo->topo->procs;
+    ucc_device_id_t     *dev_ids   = topo->device_map.device_ids;
+    int                  size      = UCC_TL_TEAM_SIZE(team);
+    int                  i, j;
+    ucc_rank_t           ci, cj;
+    ucc_device_id_t      di, dj;
+    const ucc_host_info_t *host_i;
 
     for (i = 0; i < size; i++) {
-        matrix[i + i*size] = UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE;
+        matrix[i + i * size] = UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE;
+        ci     = ucc_ep_map_eval(topo->set.map, i);
+        di     = dev_ids[i];
+        host_i = &topo->topo->hosts[ci];
         for (j = i + 1; j < size; j++) {
-            if (ucc_tl_cuda_topo_device_id_equal(&team->ids[i].pci_id,
-                                                 &team->ids[j].pci_id)) {
-                matrix[i + j*size] = UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE;
+            cj = ucc_ep_map_eval(topo->set.map, j);
+            dj = dev_ids[j];
+            if (procs[ci].host_hash != procs[cj].host_hash) {
+                /* Cross-node pair: no intra-node NVLink */
+                matrix[i + j * size] = 0;
+            } else if (di == dj) {
+                matrix[i + j * size] = UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE;
             } else {
-                status = ucc_tl_cuda_topo_num_links(topo,
-                                                    &team->ids[i].pci_id,
-                                                    &team->ids[j].pci_id,
-                                                    &matrix[i + j*size]);
-                if (status != UCC_OK) {
-                    return status;
-                }
+                matrix[i + j * size] = host_i->nvlink_matrix[di][dj];
             }
-            matrix[j + i*size] = matrix[i +j*size];
+            matrix[j + i * size] = matrix[i + j * size];
         }
     }
 
@@ -394,12 +400,28 @@ ucc_status_t ucc_tl_cuda_team_topo_create(const ucc_tl_team_t *cuda_team,
         goto free_matrix;
     }
 
-    status = ucc_tl_cuda_team_topo_init_proxies(team, topo);
-    if (status != UCC_OK) {
-        if (status != UCC_ERR_NOT_SUPPORTED) {
-            tl_error(UCC_TL_TEAM_LIB(team), "failed to init cuda topo proxy");
+    /* Use the authoritative ucc_topo NVLink check to determine full
+     * connectivity. This handles NVSwitch, fabric clique, and direct NVLink
+     * connections consistently and avoids rescanning the matrix for zeros. */
+    {
+        ucc_topo_t *utopo   = UCC_TL_CORE_TEAM(team)->topo;
+        ucc_sbgp_t *node_sg = ucc_topo_get_sbgp(utopo, UCC_SBGP_NODE);
+        topo->is_fully_connected =
+            ucc_topo_is_nvlink_fully_connected(utopo, node_sg);
+    }
+
+    if (topo->is_fully_connected) {
+        topo->num_proxies  = 0;
+        topo->proxy_needed = 0;
+    } else {
+        status = ucc_tl_cuda_team_topo_init_proxies(team, topo);
+        if (status != UCC_OK) {
+            if (status != UCC_ERR_NOT_SUPPORTED) {
+                tl_error(UCC_TL_TEAM_LIB(team),
+                         "failed to init cuda topo proxy");
+            }
+            goto free_matrix;
         }
-        goto free_matrix;
     }
 
     status = ucc_tl_cuda_team_topo_init_rings(team, topo);
