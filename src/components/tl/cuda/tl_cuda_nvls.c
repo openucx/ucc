@@ -421,14 +421,16 @@ ucc_status_t ucc_tl_cuda_nvls_init(
                     "failed to create multicast object. status (%d) %s",
                     status,
                     ucc_status_string(status));
-                // goto cleanup;
-                // Store the error status to the caller
-                // We need to share invalid handle to unblock peers
-                // we will propagate the error status to the caller later
+                /* Keep going to unblock peers waiting in the allgather;
+                 * propagate the error via the status field of the shared
+                 * handle so non-root ranks detect the failure explicitly. */
                 nvls->status_supported = UCC_ERR_NOT_SUPPORTED;
             } else {
                 nvls->status_supported = UCC_OK;
             }
+            /* Embed the error status into the handle that will be allgathered
+             * so every non-root rank can detect rank-0 failure directly. */
+            nvls->local_handle.status = nvls->status_supported;
             // Store PID for POSIX handles
             if (!nvls->is_multinode) {
                 nvls->local_handle.data.posix.pid = getpid();
@@ -467,8 +469,17 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         team->state = UCC_TL_CUDA_NVLS_STATE_IMPORT_HANDLE;
         // fall through
     case UCC_TL_CUDA_NVLS_STATE_IMPORT_HANDLE:
-        // Import handle on non-root ranks
+        /* Non-root ranks check the status field broadcast by rank 0 before
+         * attempting to import a potentially garbage handle. */
         if (UCC_TL_TEAM_RANK(team) != 0) {
+            if (nvls->share_data[0].status != UCC_OK) {
+                tl_warn(UCC_TL_TEAM_LIB(team),
+                        "NVLS: rank 0 failed to create multicast object "
+                        "(status=%d); disabling NVLS for this team",
+                        nvls->share_data[0].status);
+                nvls->status_supported = nvls->share_data[0].status;
+                goto cleanup;
+            }
             if (nvls->is_multinode) {
                 status = ucc_tl_cuda_nvls_import_handle_fabric(
                     team, &nvls->share_data[0], &mc_handle);

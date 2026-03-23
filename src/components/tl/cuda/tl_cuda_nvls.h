@@ -22,6 +22,10 @@ typedef enum {
 
 typedef struct {
     ucc_tl_cuda_nvls_handle_type_t type;
+    /* Rank 0 sets this to UCC_ERR_NOT_SUPPORTED when cuMulticastCreate fails.
+     * Non-root ranks read share_data[0].status to propagate the error instead
+     * of relying on garbage-handle import failure. */
+    ucc_status_t status;
     union {
         struct {
             pid_t pid;
