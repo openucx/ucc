@@ -50,12 +50,15 @@ jobs:
         sudo dpkg -i cuda-keyring_1.1-1_all.deb
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends cuda-cudart-dev-${CUDA_VER} cuda-nvcc-${CUDA_VER} cuda-nvml-dev-${CUDA_VER}
+    - name: Resolve UCX HEAD commit
+      id: ucx-sha
+      run: echo "sha=$(git ls-remote ${OPEN_UCX_LINK} refs/heads/${OPEN_UCX_BRANCH} | cut -f1)" >> $GITHUB_OUTPUT
     - name: Cache UCX
       id: cache-ucx
       uses: actions/cache@v4
       with:
         path: /tmp/ucx/install
-        key: ucx-nvidia-${{ env.OPEN_UCX_BRANCH }}-${{ hashFiles('.github/workflows/clang-tidy-nvidia.yaml') }}
+        key: ucx-nvidia-${{ steps.ucx-sha.outputs.sha }}-${{ hashFiles('.github/workflows/clang-tidy-nvidia.yaml') }}
     - name: Get UCX
       if: steps.cache-ucx.outputs.cache-hit != 'true'
       run: |

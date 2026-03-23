@@ -17,12 +17,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+    - name: Resolve UCX HEAD commit
+      id: ucx-sha
+      run: echo "sha=$(git ls-remote ${OPEN_UCX_LINK} refs/heads/${OPEN_UCX_BRANCH} | cut -f1)" >> $GITHUB_OUTPUT
     - name: Cache UCX
       id: cache-ucx
       uses: actions/cache@v4
       with:
         path: /tmp/ucx/install
-        key: ucx-release-${{ env.OPEN_UCX_BRANCH }}-${{ hashFiles('.github/workflows/main.yaml') }}
+        key: ucx-release-${{ steps.ucx-sha.outputs.sha }}-${{ hashFiles('.github/workflows/main.yaml') }}
     - name: Get UCX
       if: steps.cache-ucx.outputs.cache-hit != 'true'
       run: |
@@ -202,12 +205,15 @@ jobs:
         path: /tmp
     - name: Unpack OMPI build artifacts
       run: tar xzf /tmp/ompi-build.tar.gz -C /tmp
+    - name: Resolve IMB HEAD commit
+      id: imb-sha
+      run: echo "sha=$(git ls-remote ${IMB_LINK} HEAD | cut -f1)" >> $GITHUB_OUTPUT
     - name: Cache IMB
       id: cache-imb
       uses: actions/cache@v4
       with:
         path: /tmp/imb
-        key: imb-${{ env.OPEN_MPI_BRANCH }}-${{ hashFiles('.github/workflows/main.yaml', 'configure.ac') }}
+        key: imb-${{ steps.imb-sha.outputs.sha }}-${{ hashFiles('.github/workflows/main.yaml', 'configure.ac') }}
     - name: Get IMB
       if: steps.cache-imb.outputs.cache-hit != 'true'
       run: |

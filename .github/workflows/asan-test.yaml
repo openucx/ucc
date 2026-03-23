@@ -24,12 +24,15 @@ jobs:
         echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-${CLANG_VER} main" | sudo tee /etc/apt/sources.list.d/llvm.list
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends clang-${CLANG_VER} clang++-${CLANG_VER} libclang-rt-${CLANG_VER}-dev
+    - name: Resolve UCX HEAD commit
+      id: ucx-sha
+      run: echo "sha=$(git ls-remote ${OPEN_UCX_LINK} refs/heads/${OPEN_UCX_BRANCH} | cut -f1)" >> $GITHUB_OUTPUT
     - name: Cache UCX
       id: cache-ucx
       uses: actions/cache@v4
       with:
         path: /tmp/ucx/install
-        key: ucx-asan-${{ env.OPEN_UCX_BRANCH }}-${{ hashFiles('.github/workflows/asan-test.yaml') }}
+        key: ucx-asan-${{ steps.ucx-sha.outputs.sha }}-${{ hashFiles('.github/workflows/asan-test.yaml') }}
     - name: Get UCX
       if: steps.cache-ucx.outputs.cache-hit != 'true'
       run: |
