@@ -70,8 +70,35 @@ static ucc_status_t ucc_sysinfo_cuda_set_visible_devices(
             cuGetErrorString(cu_st, &cu_err_str);
             ucc_debug("cuCtxGetCurrent failed: %d (%s)", cu_st,
                       cu_err_str ? cu_err_str : "unknown");
+            return UCC_OK;
         }
-        return UCC_OK;
+        {
+            int          num_devs = 0;
+            int          d;
+            unsigned int flags;
+            int          active;
+
+            cu_st = cuDeviceGetCount(&num_devs);
+            if (cu_st != CUDA_SUCCESS || num_devs == 0) {
+                ucc_debug("no CUDA context and cuDeviceGetCount=%d", num_devs);
+                return UCC_OK;
+            }
+            for (d = 0; d < num_devs; d++) {
+                CUdevice dev;
+
+                cu_st = cuDeviceGet(&dev, d);
+                if (cu_st != CUDA_SUCCESS) {
+                    continue;
+                }
+                cu_st = cuDevicePrimaryCtxGetState(dev, &flags, &active);
+                if (cu_st == CUDA_SUCCESS && active) {
+                    cu_dev = dev;
+                    goto have_device;
+                }
+            }
+            ucc_debug("no active CUDA primary context found on any device");
+            return UCC_OK;
+        }
     }
 
     cu_st = cuCtxGetDevice(&cu_dev);
@@ -84,6 +111,7 @@ static ucc_status_t ucc_sysinfo_cuda_set_visible_devices(
         return UCC_ERR_NO_MESSAGE;
     }
 
+have_device:
     cu_st = cuDeviceGetPCIBusId(pci_bus_id, sizeof(pci_bus_id), cu_dev);
     if (cu_st != CUDA_SUCCESS) {
         const char *cu_err_str = NULL;
@@ -114,6 +142,8 @@ static ucc_status_t ucc_sysinfo_cuda_set_visible_devices(
         }
     }
 
+    ucc_debug("set_visible_devices: pci=%s dev=%d visible_gpus=0x%x",
+              pci_bus_id, (int)cu_dev, *visible_devices);
     return UCC_OK;
 }
 
