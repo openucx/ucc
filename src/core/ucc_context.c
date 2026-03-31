@@ -1250,6 +1250,14 @@ ucc_status_t ucc_mem_map_import(ucc_context_h        context,
         return UCC_ERR_NO_MEMORY;
     }
 
+    /* Record the local process's address/len in dedicated import fields so TL
+     * mem_map implementations can access the local VA without overwriting the
+     * remote address/len that other TLs (e.g. UCP) rely on for RVA translation. */
+    local_memh->local_address = (params->n_segments > 0)
+                                    ? params->segments[0].address : NULL;
+    local_memh->local_len     = (params->n_segments > 0)
+                                    ? params->segments[0].len : 0;
+
     for (i = 0; i < ctx->n_tl_ctx; i++) {
         offset = 0;
         for (int j = 0; j < local_memh->num_tls; j++) {
