@@ -27,6 +27,8 @@ typedef struct ucc_global_config {
     /* Coll component libraries path */
     char *component_path;
     char *install_path;
+    /* Modules filter (allow/negate list) */
+    ucc_config_allow_list_t modules;
     int   initialized;
     /* Profiling mode */
     uint64_t                   profile_mode;

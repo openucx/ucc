@@ -29,7 +29,8 @@ ucc_global_config_t ucc_global_config = {
     .log_buffer_size  = 1024,
     .log_data_size    = 0,
     .log_print_enable = 0,
-    .log_level_trigger = UCC_LOG_LEVEL_FATAL};
+    .log_level_trigger = UCC_LOG_LEVEL_FATAL,
+    .modules           = {{NULL, 0}, 0}};
 
 ucc_config_field_t ucc_global_config_table[] = {
     {"LOG_LEVEL", "warn",
@@ -107,6 +108,18 @@ ucc_config_field_t ucc_global_config_table[] = {
     {"LOG_LEVEL_TRIGGER", "fatal",
      "Log level to trigger error handling.",
      ucc_offsetof(ucc_global_config_t, log_level_trigger), UCC_CONFIG_TYPE_ENUM(ucc_log_level_names)},
+
+    {"MODULES", "all",
+     "Comma-separated list of component modules to load.\n"
+     "Use <name> to match a component in any framework, or\n"
+     "<framework>_<name> for a specific framework (e.g. tl_cuda).\n"
+     "Prefix with '^' to negate.\n"
+     " - all              - load all available modules (default).\n"
+     " - ^cuda            - load all modules except cuda (any framework).\n"
+     " - ^tl_cuda,ec_cuda - load all modules except tl_cuda and ec_cuda.\n"
+     " - ucp,nccl         - load only ucp and nccl.",
+     ucc_offsetof(ucc_global_config_t, modules),
+     UCC_CONFIG_TYPE_ALLOW_LIST},
 
     {NULL}
 };
