@@ -496,8 +496,57 @@ static ucc_status_t ucc_sysinfo_cuda_get_info(void **info, int *n_info)
             goto free_gpu_info;
         }
 
-        gpu_info->gpus[i].fabric_capable   = 0;
-        gpu_info->gpus[i].fabric_clique_id = 0;
+#ifdef HAVE_NVLS
+        {
+#ifdef HAVE_NVML_GPU_FABRIC_INFO_V
+            /* Use the versioned API (NVML r525+) to query fabric info. */
+            nvmlGpuFabricInfoV_t fabric_info;
+            fabric_info.version = nvmlGpuFabricInfo_v2;
+            nvml_st = nvmlDeviceGetGpuFabricInfoV(nvml_dev, &fabric_info);
+            if (nvml_st == NVML_SUCCESS &&
+                fabric_info.state == NVML_GPU_FABRIC_STATE_COMPLETED) {
+                gpu_info->gpus[i].fabric_capable   = 1;
+                gpu_info->gpus[i].fabric_clique_id = fabric_info.cliqueId;
+#ifdef HAVE_NVML_FABRIC_PARTITION_ID
+                gpu_info->gpus[i].fabric_partition_id = fabric_info.partitionId;
+                ucc_debug("GPU %d: fabric_capable=1 clique=%u partition=%u",
+                          i, fabric_info.cliqueId, fabric_info.partitionId);
+#else
+                gpu_info->gpus[i].fabric_partition_id = 0;
+                ucc_debug("GPU %d: fabric_capable=1 clique=%u (no partitionId)",
+                          i, fabric_info.cliqueId);
+#endif
+            } else {
+                gpu_info->gpus[i].fabric_capable      = 0;
+                gpu_info->gpus[i].fabric_clique_id    = 0;
+                gpu_info->gpus[i].fabric_partition_id = 0;
+                ucc_debug("GPU %d: fabric not ready (nvml_st=%d state=%d)",
+                          i, (int)nvml_st,
+                          nvml_st == NVML_SUCCESS ? (int)fabric_info.state : -1);
+            }
+#else
+            /* Fall back to unversioned API (no partitionId field). */
+            nvmlGpuFabricInfo_t fabric_info;
+            nvml_st = nvmlDeviceGetGpuFabricInfo(nvml_dev, &fabric_info);
+            if (nvml_st == NVML_SUCCESS &&
+                fabric_info.state == NVML_GPU_FABRIC_STATE_COMPLETED) {
+                gpu_info->gpus[i].fabric_capable      = 1;
+                gpu_info->gpus[i].fabric_clique_id    = fabric_info.cliqueId;
+                gpu_info->gpus[i].fabric_partition_id = 0;
+                ucc_debug("GPU %d: fabric_capable=1 clique=%u (no partition info)",
+                          i, fabric_info.cliqueId);
+            } else {
+                gpu_info->gpus[i].fabric_capable      = 0;
+                gpu_info->gpus[i].fabric_clique_id    = 0;
+                gpu_info->gpus[i].fabric_partition_id = 0;
+            }
+#endif
+        }
+#else
+        gpu_info->gpus[i].fabric_capable      = 0;
+        gpu_info->gpus[i].fabric_clique_id    = 0;
+        gpu_info->gpus[i].fabric_partition_id = 0;
+#endif
     }
 
     if (num_gpus > UCC_MAX_HOST_GPUS) {

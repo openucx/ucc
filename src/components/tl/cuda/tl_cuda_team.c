@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -42,7 +42,7 @@ static uint64_t ucc_tl_cuda_get_supported_colls(const ucc_tl_cuda_team_t *team)
     // only if NVLS is supported.
     status = ucc_tl_cuda_nvls_check_support(
         ucc_derived_of(team->super.super.context->lib, ucc_tl_cuda_lib_t),
-        0 /* device */,
+        UCC_TL_CUDA_TEAM_CTX(team)->device,
         is_multinode);
     if (is_multinode) {
         return (status == UCC_OK) ? UCC_COLL_TYPE_ALLREDUCE : 0;
@@ -88,6 +88,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         self->scratch.rem[i] = NULL;
         memset(&self->scratch.rem_info[i], 0, sizeof(self->scratch.rem_info[i]));
     }
+#ifdef HAVE_NVLS
+    /* Zero the nvls struct so that ucc_tl_cuda_nvls_destroy() is safe even if
+       we return early below (before nvls_init()/team_create_test() can zero it
+       themselves).  All fields are guard-checked (if handle/ptr) in destroy. */
+    memset(&self->nvls, 0, sizeof(self->nvls));
+#endif
 
 #ifdef HAVE_NVLS
     self->state = UCC_TL_CUDA_NVLS_STATE_INIT;
@@ -102,6 +108,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NOT_SUPPORTED;
     }
 #endif
+
+    if (UCC_TL_TEAM_SIZE(self) > UCC_TL_CUDA_MAX_PEERS) {
+        tl_debug(tl_context->lib,
+                 "team size %u exceeds TL/CUDA max supported peers %d",
+                 UCC_TL_TEAM_SIZE(self), UCC_TL_CUDA_MAX_PEERS);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     self->ids = ucc_malloc((UCC_TL_TEAM_SIZE(self) + 1) * sizeof(*(self->ids)),
                             "ids");
@@ -225,11 +238,14 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
     if (self->ids) {
         if (self->sync != (void*)-1) {
             for (i = 0; i < resource_num; i++) {
+                /* Remote event handles opened by this rank live in MY sync
+                 * block (slot MY_RANK), not in peer j's block.  Use the
+                 * correct base pointer outside the inner loop. */
+                sync = UCC_TL_CUDA_TEAM_SYNC(self, UCC_TL_TEAM_RANK(self), i);
                 for (j = 0; j < UCC_TL_TEAM_SIZE(self); j++) {
                     if (j == UCC_TL_TEAM_RANK(self)) {
                         continue;
                     }
-                    sync = UCC_TL_CUDA_TEAM_SYNC(self, j, i);
                     if (sync->data[j].ipc_event_remote) {
                         st = cudaEventDestroy(sync->data[j].ipc_event_remote);
                         if (st != cudaSuccess) {
@@ -323,6 +339,14 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
 
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
         team->scratch.rem[i] = NULL;
+    }
+
+    if (!ucc_topo_has_device_info(UCC_TL_CORE_TEAM(team)->topo)) {
+        tl_debug(tl_team->context->lib,
+                 "not all ranks have visible GPU device info; "
+                 "skipping TL/CUDA team creation");
+        status = UCC_ERR_NOT_SUPPORTED;
+        goto exit_err;
     }
 
     status = ucc_tl_cuda_team_topo_create(&team->super, &team->topo);
@@ -435,7 +459,7 @@ nvls_init:
         tl_debug(lib, "NVLS is not supported");
         if (!ucc_team_map_is_single_node(team->super.super.params.team,
                                          team->super.super.params.map)) {
-            ucc_error("NVLS is not supported for multi-node team");
+            tl_debug(lib, "NVLS is not supported for multi-node team");
             return UCC_ERR_NOT_SUPPORTED;
         }
         break;
