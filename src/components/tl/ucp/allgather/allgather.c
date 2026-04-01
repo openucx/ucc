@@ -54,9 +54,7 @@ ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task)
 char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
 {
     int                   max_size = ALLGATHER_MAX_PATTERN_SIZE;
-    int                   algo_num = UCC_TL_TEAM_SIZE(team) % 2
-                                         ? UCC_TL_UCP_ALLGATHER_ALG_RING
-                                         : UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR;
+    int                   algo_num;
     char *                str      = ucc_malloc(max_size * sizeof(char));
     ucc_tl_ucp_context_t *ctx      = UCC_TL_UCP_TEAM_CTX(team);
     uint64_t              cuda_types =
@@ -66,6 +64,10 @@ char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
     ucc_sbgp_t *sbgp;
     char *      non_cuda_str;
     char *      cuda_str;
+
+    algo_num = UCC_TL_TEAM_SIZE(team) % 2
+                   ? UCC_TL_UCP_ALLGATHER_ALG_RING
+                   : UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR;
 
     if (team->cfg.use_reordering) {
         sbgp = ucc_topo_get_sbgp(team->topo, UCC_SBGP_FULL_HOST_ORDERED);
@@ -98,6 +100,30 @@ char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
             return str;
         }
     }
+
+    if (team->cuda_ring && cuda_types) {
+        cuda_str = ucc_malloc(max_size * sizeof(char));
+        ucc_mtype_map_to_str(cuda_types, ",", cuda_str, max_size);
+        if (non_cuda_types) {
+            non_cuda_str = ucc_malloc(max_size * sizeof(char));
+            ucc_mtype_map_to_str(non_cuda_types, ",", non_cuda_str, max_size);
+            ucc_snprintf_safe(str, max_size,
+                "allgather:0-4k:@0#allgather:4k-inf:%s:@%d"
+                "#allgather:4k-inf:%s:@%d",
+                cuda_str, UCC_TL_UCP_ALLGATHER_ALG_RING,
+                non_cuda_str, algo_num);
+            ucc_free(cuda_str);
+            ucc_free(non_cuda_str);
+            return str;
+        }
+        ucc_snprintf_safe(str, max_size,
+            "allgather:0-4k:@0#allgather:4k-inf:%s:@%d"
+            "#allgather:4k-inf:@%d",
+            cuda_str, UCC_TL_UCP_ALLGATHER_ALG_RING, algo_num);
+        ucc_free(cuda_str);
+        return str;
+    }
+
     ucc_snprintf_safe(str, max_size,
                       UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR, algo_num);
     return str;
