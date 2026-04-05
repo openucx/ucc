@@ -105,31 +105,38 @@ for MT in "" "-T"; do
         # disabled so far, need to fix current issues and re-enable for CI
         TG="--triggered 0"
     fi
+    # Common debug args applied to all runs: warn-level for UCC and UCX so errors are
+    # visible without flooding logs; escalate to debug/info per-test where needed.
+    common_debug_args="-x UCC_LOG_LEVEL=warn -x UCX_LOG_LEVEL=warn"
+
     echo "INFO: UCC MPI unit tests (default configuration) ..."
     # shellcheck disable=SC2086
     default_args="-x UCC_TL_NCCL_TUNE=0"
     # disable cuda_ipc transport of UCX in some cases since it's not compatible with UCC TL CUDA
     ucx_tls_no_cuda_ipc="-x UCX_TLS=^cuda_ipc"
 
-    mpirun $(mpi_params $PPN) $default_args $ucx_tls_no_cuda_ipc $EXE $MT $TG --mtypes host,cuda
+    mpirun $(mpi_params $PPN) $common_debug_args $default_args $ucx_tls_no_cuda_ipc $EXE $MT $TG --mtypes host,cuda -v
     echo "INFO: UCC MPI unit tests (default configuration) ... DONE"
 
 
     echo "INFO: UCC MPI unit tests (NCCL) ..."
     # shellcheck disable=SC2086
     # Configure NCCL to use the same IB device as UCX for bootstrap communication
+    # NCCL_DEBUG=INFO shows each collective starting/finishing - essential for hang diagnosis
     nccl_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp,nccl -x UCC_TL_NCCL_TUNE=cuda:inf "
-    nccl_args+=" -x NCCL_IB_HCA=${DEV} -x NCCL_DEBUG=WARN "
-    mpirun $(mpi_params $NGPUS) $nccl_args $EXE $MT $TG --mtypes cuda
+    nccl_args+=" -x NCCL_IB_HCA=${DEV} -x NCCL_DEBUG=INFO "
+    mpirun $(mpi_params $NGPUS) $common_debug_args $nccl_args $EXE $MT $TG --mtypes cuda -v
     echo "INFO: UCC MPI unit tests (NCCL) ... DONE"
 
 
     echo "INFO: UCC MPI unit tests (TL/UCP) ..."
     # shellcheck disable=SC2086
     tlucp_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp "
+    # UCX_LOG_LEVEL=info overrides the common warn level - UCP transport selection is
+    # useful to see for this specific test configuration
     tlucp_args+=" -x UCX_LOG_LEVEL=info "
     # Disable cuda_ipc - can cause hangs with UCC TL CUDA compatibility
-    mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $tlucp_args $EXE $MT $TG --mtypes host,cuda
+    mpirun $(mpi_params $PPN) $common_debug_args $ucx_tls_no_cuda_ipc $tlucp_args $EXE $MT $TG --mtypes host,cuda -v
     echo "INFO: UCC MPI unit tests (TL/UCP) ... DONE"
 
 
@@ -137,7 +144,7 @@ for MT in "" "-T"; do
     # shellcheck disable=SC2086
     tlcuda_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp,cuda -x UCC_TL_CUDA_TUNE=cuda:inf "
     tlcuda_colls="alltoall,alltoallv,allgather,allgatherv,reduce_scatter,reduce_scatterv"
-    mpirun $(mpi_params $PPN 1) $ucx_tls_no_cuda_ipc $tlcuda_args $EXE $MT $TG --mtypes cuda -c $tlcuda_colls
+    mpirun $(mpi_params $PPN 1) $common_debug_args $ucx_tls_no_cuda_ipc $tlcuda_args $EXE $MT $TG --mtypes cuda -c $tlcuda_colls -v
     echo "INFO: UCC MPI unit tests (TL/CUDA) ... DONE"
 
     echo "INFO: UCC MPI unit tests (TL/MLX5) ..."
@@ -151,7 +158,7 @@ for MT in "" "-T"; do
     else
         tlmlx5_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp,mlx5 -x UCC_TL_MLX5_NET_DEVICES=$CX7_DEV:1 -x UCC_TL_MLX5_TUNE=inf "
         tlmlx5_colls="alltoall"
-        mpirun $(mpi_params $PPN) $tlmlx5_args $EXE $MT $TG --mtypes host,cuda -c $tlmlx5_colls -t world -d uint8 -O 0 -m 1:128
+        mpirun $(mpi_params $PPN) $common_debug_args $tlmlx5_args $EXE $MT $TG --mtypes host,cuda -c $tlmlx5_colls -t world -d uint8 -O 0 -m 1:128 -v
         echo "INFO: UCC MPI unit tests (TL/MLX5) ... DONE"
     fi
 
@@ -159,7 +166,7 @@ for MT in "" "-T"; do
     # shellcheck disable=SC2086
     clhier_args=" -x UCC_CLS=basic,hier -x UCC_CL_HIER_TUNE=inf -x UCC_TL_NCCL_TUNE=0 "
     clhier_colls="alltoall,alltoallv,allreduce,barrier"
-    mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
+    mpirun $(mpi_params $PPN) $common_debug_args $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls -v
     echo "INFO: UCC MPI unit tests (CL/HIER) ... DONE"
 
 
@@ -167,7 +174,7 @@ for MT in "" "-T"; do
     # shellcheck disable=SC2086
     clhier_args=" -x UCC_CLS=basic,hier -x UCC_CL_HIER_TUNE=inf -x UCC_CL_HIER_TLS=ucp -x UCC_TL_NCCL_TUNE=0 "
     clhier_colls="alltoall,alltoallv,allreduce,barrier"
-    mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
+    mpirun $(mpi_params $PPN) $common_debug_args $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls -v
     echo "INFO: UCC MPI unit tests (CL/HIER+ucp) ... DONE"
 
 
@@ -175,7 +182,7 @@ for MT in "" "-T"; do
     # shellcheck disable=SC2086
     clhier_args=" -x UCC_CLS=basic,hier -x UCC_CL_HIER_TUNE=allreduce:@rab:inf -x UCC_CL_HIER_TLS=ucp -x UCC_TL_NCCL_TUNE=0 "
     clhier_colls="allreduce"
-    mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
+    mpirun $(mpi_params $PPN) $common_debug_args $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls -v
     echo "INFO: UCC MPI unit tests (CL/HIER+rab) ... DONE"
 
 
@@ -183,7 +190,7 @@ for MT in "" "-T"; do
     # shellcheck disable=SC2086
     clhier_args=" -x UCC_CLS=basic,hier -x UCC_CL_HIER_TUNE=allreduce:@split_rail:inf -x UCC_CL_HIER_TLS=ucp -x UCC_TL_NCCL_TUNE=0 "
     clhier_colls="allreduce"
-    mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
+    mpirun $(mpi_params $PPN) $common_debug_args $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls -v
     echo "INFO: UCC MPI unit tests (CL/HIER+split_rail) ... DONE"
 
     echo "INFO: UCC MPI unit tests (CL/HIER+split_rail+pipeline) ..."
@@ -191,7 +198,7 @@ for MT in "" "-T"; do
     clhier_args=" -x UCC_CLS=basic,hier -x UCC_CL_HIER_TUNE=allreduce:@split_rail:inf -x UCC_CL_HIER_TLS=ucp -x UCC_TL_NCCL_TUNE=0 "
     clhier_args+=" -x UCC_CL_HIER_ALLREDUCE_SPLIT_RAIL_PIPELINE=thresh=0:fragsize=256K "
     clhier_colls="allreduce"
-    mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
+    mpirun $(mpi_params $PPN) $common_debug_args $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls -v
     echo "INFO: UCC MPI unit tests (CL/HIER+split_rail+pipeline) ... DONE"
 done
 
