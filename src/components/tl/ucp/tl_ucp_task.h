@@ -89,16 +89,15 @@ typedef struct ucc_tl_ucp_task {
         } reduce_scatter_kn;
         struct {
             void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
             size_t                  max_block_count;
-            ucc_ep_map_t            inv_map;
-            int                     n_frags;
-            int                     frag;
             char                    s_scratch_busy[2];
             ucc_ee_executor_task_t *etask;
             ucc_ee_executor_t      *executor;
         } reduce_scatter_ring;
         struct {
             void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
             size_t                  max_block_count;
             ucc_ep_map_t            inv_map;
             int                     n_frags;

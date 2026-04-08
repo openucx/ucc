@@ -13,6 +13,7 @@ enum {
     UCC_TL_UCP_ALLREDUCE_ALG_SRA_KNOMIAL,
     UCC_TL_UCP_ALLREDUCE_ALG_SLIDING_WINDOW,
     UCC_TL_UCP_ALLREDUCE_ALG_DBT,
+    UCC_TL_UCP_ALLREDUCE_ALG_RING,
     UCC_TL_UCP_ALLREDUCE_ALG_LAST
 };
 
@@ -21,7 +22,9 @@ extern ucc_base_coll_alg_info_t
 ucc_status_t ucc_tl_ucp_allreduce_init(ucc_tl_ucp_task_t *task);
 
 #define UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR                            \
-    "allreduce:0-4k:@0#allreduce:4k-inf:@1"
+    "allreduce:0-4k:@0#allreduce:4k-inf:@%d"
+
+char *ucc_tl_ucp_allreduce_score_str_get(ucc_tl_ucp_team_t *team);
 
 #define CHECK_SAME_MEMTYPE(_args, _team)                                       \
     do {                                                                       \
@@ -76,6 +79,11 @@ ucc_status_t ucc_tl_ucp_allreduce_dbt_init(ucc_base_coll_args_t *coll_args,
 ucc_status_t ucc_tl_ucp_allreduce_dbt_start(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_ucp_allreduce_dbt_progress(ucc_coll_task_t *task);
+
+ucc_status_t
+ucc_tl_ucp_allreduce_ring_init(ucc_base_coll_args_t *coll_args,
+                               ucc_base_team_t      *team,
+                               ucc_coll_task_t     **task_h);
 
 static inline int ucc_tl_ucp_allreduce_alg_from_str(const char *str)
 {
