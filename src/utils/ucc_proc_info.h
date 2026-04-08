@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -15,10 +15,12 @@ typedef uint8_t  ucc_socket_id_t;
 typedef uint8_t  ucc_numa_id_t;
 typedef uint8_t  ucc_device_id_t;
 
-#define UCC_SOCKET_ID_INVALID ((ucc_socket_id_t)-1)
-#define UCC_NUMA_ID_INVALID   ((ucc_numa_id_t)-1)
-#define UCC_DEVICE_ID_INVALID ((ucc_device_id_t)-1)
-#define UCC_HOST_ID_INVALID   ((ucc_host_id_t)-1)
+#define UCC_SOCKET_ID_INVALID               ((ucc_socket_id_t)-1)
+#define UCC_NUMA_ID_INVALID                 ((ucc_numa_id_t)-1)
+#define UCC_DEVICE_ID_INVALID               ((ucc_device_id_t)-1)
+#define UCC_HOST_ID_INVALID                 ((ucc_host_id_t)-1)
+#define UCC_GPU_FABRIC_CLIQUE_ID_INVALID    ((uint64_t)0)
+#define UCC_GPU_FABRIC_PARTITION_ID_INVALID ((uint32_t)0)
 
 #define UCC_MAX_SOCKET_ID (UCC_SOCKET_ID_INVALID - 1)
 #define UCC_MAX_NUMA_ID   (UCC_NUMA_ID_INVALID - 1)
@@ -47,15 +49,23 @@ typedef struct ucc_pci_info {
     uint8_t  function;
 } ucc_pci_info_t;
 
+typedef enum ucc_gpu_cap {
+    UCC_GPU_CAP_NVLINK            = UCC_BIT(0),
+    UCC_GPU_CAP_NVSWITCH          = UCC_BIT(1),
+    UCC_GPU_CAP_FABRIC            = UCC_BIT(2),
+} ucc_gpu_cap_t;
+
+#define UCC_GPU_HAS_CAP(_gpu, _cap) ((_gpu)->caps & (_cap))
+
 typedef struct ucc_gpu_info {
     ucc_pci_info_t pci;
-    /**< 1 if GPU has NVLink hardware */
-    uint8_t  nvlink_capable;
-    /**< 1 if multi-node NVLink supported */
-    uint8_t  fabric_capable;
-    /**< NVSwitch fabric clique ID (0 if unknown) */
-    uint8_t  nvswitch_connected;
-    /**< NVSwitch fabric clique ID (0 if unknown) */
+    /**< Bitmask of ucc_gpu_cap_t flags */
+    uint32_t caps;
+    /**< NVLink partition ID for GB200+ NVL sub-fabric partitions.
+     *   UCC_GPU_FABRIC_PARTITION_ID_INVALID means single partition or
+     *   not populated (NVML < r525). */
+    uint32_t fabric_partition_id;
+    /**< NVSwitch fabric clique ID (UCC_GPU_FABRIC_CLIQUE_ID_INVALID if unknown) */
     uint64_t fabric_clique_id;
     /**< Hash of GPU UUID for unique identification */
     uint64_t uuid;

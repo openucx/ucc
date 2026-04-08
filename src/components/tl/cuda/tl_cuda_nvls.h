@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -22,6 +22,10 @@ typedef enum {
 
 typedef struct {
     ucc_tl_cuda_nvls_handle_type_t type;
+    /* Rank 0 sets this to UCC_ERR_NOT_SUPPORTED when cuMulticastCreate fails.
+     * Non-root ranks read share_data[0].status to propagate the error instead
+     * of relying on garbage-handle import failure. */
+    ucc_status_t status;
     union {
         struct {
             pid_t pid;
@@ -36,6 +40,7 @@ typedef enum {
     UCC_TL_CUDA_NVLS_STATE_SHARE_HANDLES,
     UCC_TL_CUDA_NVLS_STATE_IMPORT_HANDLE,
     UCC_TL_CUDA_NVLS_STATE_ADD_DEVICE,
+    UCC_TL_CUDA_NVLS_STATE_BARRIER,
 } ucc_tl_cuda_nvls_state_t;
 
 typedef struct ucc_tl_cuda_nvls {
@@ -67,6 +72,8 @@ typedef struct ucc_tl_cuda_nvls {
     size_t                       minGran;
     // Granularity
     size_t                       gran;
+    /* temporary buffer for STATE_BARRIER */
+    char                        *barrier_data;
 } ucc_tl_cuda_nvls_t;
 
 typedef struct ucc_tl_cuda_nvls_control {

@@ -311,10 +311,14 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
 int ucc_topo_has_device_info(const ucc_topo_t *topo);
 
 /**
- * @brief Checks if all ranks in a sub-group are fully NVLink-connected.
+ * @brief Checks if all ranks in a sub-group are fully NVLink-connected
+ *        within a single node.
  *
  * This function determines whether all ranks within the provided sub-group
  * (sbgp) are fully connected via NVLink within the given topology.
+ * It only considers intra-node NVLink links; cross-node pairs always
+ * return not-connected. Use ucc_topo_is_single_nvlink_domain() for
+ * multinode NVLink fabric (NVLS) eligibility checks.
  *
  * @param [in] topo   Pointer to the topology structure.
  * @param [in] sbgp   Pointer to the sub-group structure.
@@ -323,6 +327,22 @@ int ucc_topo_has_device_info(const ucc_topo_t *topo);
  */
 int ucc_topo_is_nvlink_fully_connected(
     const ucc_topo_t *topo, const ucc_sbgp_t *sbgp);
+
+/**
+ * @brief Checks if all ranks in the topology subset share the same
+ *        NVLink fabric domain (required for multinode NVLS/NVLink-SHARP).
+ *
+ * Iterates all ranks in topo->set and verifies that every rank has
+ * UCC_GPU_CAP_FABRIC set and an identical valid fabric_clique_id.
+ * A fabric_clique_id of UCC_GPU_FABRIC_CLIQUE_ID_INVALID is treated as
+ * "unknown / not populated" and
+ * causes the function to return 0 immediately.
+ *
+ * @param [in] topo   Pointer to the topology structure.
+ *
+ * @return 1 if all ranks are in the same NVLink fabric domain, 0 otherwise.
+ */
+int ucc_topo_is_single_nvlink_domain(const ucc_topo_t *topo);
 
 
 #endif
