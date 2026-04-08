@@ -513,12 +513,13 @@ static int ucc_topo_ranks_on_node_nvlink(const ucc_topo_t *topo, ucc_rank_t rank
     gpu1 = &host1->gpus[dev1];
     gpu2 = &host2->gpus[dev2];
 
-    if (gpu1->fabric_clique_id != 0 &&
+    if (gpu1->fabric_clique_id != UCC_GPU_FABRIC_CLIQUE_ID_INVALID &&
         gpu1->fabric_clique_id == gpu2->fabric_clique_id) {
         return 1;
     }
 
-    if (gpu1->nvswitch_connected && gpu2->nvswitch_connected) {
+    if (UCC_GPU_HAS_CAP(gpu1, UCC_GPU_CAP_NVSWITCH) &&
+        UCC_GPU_HAS_CAP(gpu2, UCC_GPU_CAP_NVSWITCH)) {
         return 1;
     }
 
@@ -549,6 +550,74 @@ int ucc_topo_is_nvlink_fully_connected(
             if (!ucc_topo_ranks_on_node_nvlink(topo, rank_i, rank_j)) {
                 return 0;
             }
+        }
+    }
+
+    return 1;
+}
+
+int ucc_topo_is_single_nvlink_domain(const ucc_topo_t *topo)
+{
+    ucc_rank_t             size = ucc_subset_size(&topo->set);
+    const ucc_host_info_t *host;
+    ucc_device_id_t        dev;
+    uint64_t               ref_clique_id;
+    uint32_t               ref_partition_id;
+    ucc_rank_t             i;
+
+    if (size == 0) {
+        return 0;
+    }
+
+    if (!ucc_topo_rank_device_info(topo, 0, &host, &dev)) {
+        ucc_debug("nvlink domain check: rank 0 has no device info");
+        return 0;
+    }
+
+    if (!UCC_GPU_HAS_CAP(&host->gpus[dev], UCC_GPU_CAP_FABRIC) ||
+        host->gpus[dev].fabric_clique_id == UCC_GPU_FABRIC_CLIQUE_ID_INVALID) {
+        ucc_debug("nvlink domain check: rank 0 GPU %u not fabric-capable "
+                  "or clique_id invalid (caps=0x%x clique_id=%llu)",
+                  (unsigned)dev,
+                  host->gpus[dev].caps,
+                  (unsigned long long)host->gpus[dev].fabric_clique_id);
+        return 0;
+    }
+
+    ref_clique_id    = host->gpus[dev].fabric_clique_id;
+    ref_partition_id = host->gpus[dev].fabric_partition_id;
+
+    for (i = 1; i < size; i++) {
+        if (!ucc_topo_rank_device_info(topo, i, &host, &dev)) {
+            ucc_debug("nvlink domain check: rank %u has no device info",
+                      (unsigned)i);
+            return 0;
+        }
+        if (!UCC_GPU_HAS_CAP(&host->gpus[dev], UCC_GPU_CAP_FABRIC)) {
+            ucc_debug("nvlink domain check: rank %u GPU %u not fabric-capable",
+                      (unsigned)i, (unsigned)dev);
+            return 0;
+        }
+        if (host->gpus[dev].fabric_clique_id != ref_clique_id) {
+            ucc_debug("nvlink domain check: rank %u clique_id=%llu differs "
+                      "from rank 0 clique_id=%llu",
+                      (unsigned)i,
+                      (unsigned long long)host->gpus[dev].fabric_clique_id,
+                      (unsigned long long)ref_clique_id);
+            return 0;
+        }
+        /* If partition IDs are populated (GB200+ NVL), require same partition.
+         * UCC_GPU_FABRIC_PARTITION_ID_INVALID means single-partition or
+         * unpopulated (pre-r525 NVML). */
+        if (ref_partition_id != UCC_GPU_FABRIC_PARTITION_ID_INVALID &&
+            host->gpus[dev].fabric_partition_id != ref_partition_id) {
+            ucc_debug("nvlink domain check: rank %u partition_id=%u differs "
+                      "from rank 0 partition_id=%u; "
+                      "ranks span different NVL partitions",
+                      (unsigned)i,
+                      (unsigned)host->gpus[dev].fabric_partition_id,
+                      (unsigned)ref_partition_id);
+            return 0;
         }
     }
 

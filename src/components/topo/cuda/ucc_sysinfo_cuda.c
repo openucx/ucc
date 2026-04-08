@@ -374,7 +374,7 @@ static unsigned int ucc_sysinfo_cuda_get_nvlink_count(nvmlDevice_t dev)
 static ucc_status_t
 ucc_sysinfo_cuda_get_nvswitch_connected(nvmlDevice_t dev,
                                         unsigned int num_nvlinks,
-                                        uint8_t *connected)
+                                        int *connected)
 {
     nvmlReturn_t nvml_st;
     int          link;
@@ -487,17 +487,49 @@ static ucc_status_t ucc_sysinfo_cuda_get_info(void **info, int *n_info)
             gpu_info->gpus[i].uuid = 0;
         }
 
-        num_nvlinks = ucc_sysinfo_cuda_get_nvlink_count(nvml_dev);
-        gpu_info->gpus[i].nvlink_capable = (num_nvlinks > 0);
+        gpu_info->gpus[i].caps                = 0;
+        gpu_info->gpus[i].fabric_clique_id    = UCC_GPU_FABRIC_CLIQUE_ID_INVALID;
+        gpu_info->gpus[i].fabric_partition_id = UCC_GPU_FABRIC_PARTITION_ID_INVALID;
 
-        status = ucc_sysinfo_cuda_get_nvswitch_connected(
-            nvml_dev, num_nvlinks, &gpu_info->gpus[i].nvswitch_connected);
-        if (status != UCC_OK) {
-            goto free_gpu_info;
+        num_nvlinks = ucc_sysinfo_cuda_get_nvlink_count(nvml_dev);
+        if (num_nvlinks > 0) {
+            int nvswitch = 0;
+
+            gpu_info->gpus[i].caps |= UCC_GPU_CAP_NVLINK;
+            status = ucc_sysinfo_cuda_get_nvswitch_connected(
+                nvml_dev, num_nvlinks, &nvswitch);
+            if (status != UCC_OK) {
+                goto free_gpu_info;
+            }
+            if (nvswitch) {
+                gpu_info->gpus[i].caps |= UCC_GPU_CAP_NVSWITCH;
+            }
         }
 
-        gpu_info->gpus[i].fabric_capable   = 0;
-        gpu_info->gpus[i].fabric_clique_id = 0;
+#if defined(HAVE_NVML_GPU_FABRIC_INFO_V) || defined(HAVE_NVML_GPU_FABRIC_INFO)
+        {
+#ifdef HAVE_NVML_GPU_FABRIC_INFO_V
+            nvmlGpuFabricInfoV_t fabric_info;
+            fabric_info.version = nvmlGpuFabricInfo_v2;
+            nvml_st = nvmlDeviceGetGpuFabricInfoV(nvml_dev, &fabric_info);
+#else
+            nvmlGpuFabricInfo_t fabric_info;
+            nvml_st = nvmlDeviceGetGpuFabricInfo(nvml_dev, &fabric_info);
+#endif
+            if (nvml_st == NVML_SUCCESS &&
+                fabric_info.state == NVML_GPU_FABRIC_STATE_COMPLETED) {
+                gpu_info->gpus[i].caps |= UCC_GPU_CAP_FABRIC;
+                gpu_info->gpus[i].fabric_clique_id = fabric_info.cliqueId;
+#if defined(HAVE_NVML_GPU_FABRIC_INFO_V) && defined(HAVE_NVML_FABRIC_PARTITION_ID)
+                gpu_info->gpus[i].fabric_partition_id = fabric_info.partitionId;
+#endif
+            }
+        }
+#endif
+        ucc_debug("GPU %d: caps=0x%x clique=%llu partition=%u",
+                  i, gpu_info->gpus[i].caps,
+                  (unsigned long long)gpu_info->gpus[i].fabric_clique_id,
+                  (unsigned)gpu_info->gpus[i].fabric_partition_id);
     }
 
     if (num_gpus > UCC_MAX_HOST_GPUS) {
