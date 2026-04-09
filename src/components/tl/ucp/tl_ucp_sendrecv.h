@@ -454,6 +454,7 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     ptrdiff_t             key_offset     = 0;
     const size_t          section_offset = sizeof(uint64_t) * ctx->n_rinfo_segs;
     int                   tl_index       = 0;
+    ucc_rank_t            team_peer      = peer; /* team rank, before ctx remap */
     ucc_rank_t            core_rank;
     uint64_t             *rvas;
     uint64_t             *key_sizes;
@@ -486,6 +487,19 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
         key_offset += key_sizes[i];
     }
     if (ucc_unlikely(0 > *segment)) {
+        /* Step 2: search team-level segments (eager-unpacked, no lazy check) */
+        for (int i = 0; i < (int)team->n_mem_segs; i++) {
+            uint64_t tbase = (uint64_t)team->mem_segs[i].va_base;
+            uint64_t tend  = tbase + team->mem_segs[i].len;
+            if ((uint64_t)va >= tbase && (uint64_t)va < tend) {
+                *rkey    = UCC_TL_UCP_TEAM_RKEY(team, team_peer, i);
+                *rva     = UCC_TL_UCP_TEAM_REMOTE_VA(team, team_peer, i) +
+                           ((uint64_t)va - tbase);
+                *segment = (int)(ctx->n_rinfo_segs + i);
+                return UCC_OK;
+            }
+        }
+        /* Step 3: per-collective dst_memh path (unchanged) */
         if (dst_memh) {
             /* check if segment is in src/dst memh */
             status = find_tl_index(dst_memh[grank], &tl_index);
