@@ -246,3 +246,11 @@ void ucc_tl_ucp_service_update_id(ucc_base_team_t *team, uint16_t id) {
 
     tl_team->super.super.params.id  = id;
 }
+
+ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task)
+{
+    if (task->status == UCC_INPROGRESS) {
+        task->progress(task);
+    }
+    return task->status;
+}
