@@ -9,6 +9,7 @@
 #include "alltoall.h"
 #include "core/ucc_progress_queue.h"
 #include "utils/ucc_math.h"
+#include "tl_ucp_coll.h"
 #include "tl_ucp_sendrecv.h"
 
 #define CONGESTION_THRESHOLD 8
@@ -71,8 +72,14 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_sched_finalize(ucc_coll_task_t *ctask)
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_finalize(ucc_coll_task_t *coll_task)
 {
-    ucc_status_t status;
+    ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_status_t       status;
 
+    status = ucc_tl_ucp_coll_dynamic_segment_destroy(task);
+    if (ucc_unlikely(UCC_OK != status)) {
+        tl_error(UCC_TASK_LIB(coll_task),
+                 "failed to destroy dynamic segment local handles");
+    }
     status = ucc_tl_ucp_coll_finalize(coll_task);
     if (ucc_unlikely(UCC_OK != status)) {
         tl_error(UCC_TASK_LIB(coll_task), "failed to finalize collective");
@@ -91,27 +98,43 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     ucc_rank_t         gsize     = UCC_TL_TEAM_SIZE(team);
     uint32_t           ntokens   = task->alltoall_onesided.tokens;
     int64_t            npolls    = task->alltoall_onesided.npolls;
-    /* To resolve remote virtual addresses, the dst_memh is the one that must
-     * have the rkey information. For this algorithm, we need to swap the
-     * src and dst handles to operate correctly */
-    ucc_mem_map_mem_h *dst_memh  = TASK_ARGS(task).src_memh.global_memh;
-    uint32_t          *posted    = &task->onesided.get_posted;
-    uint32_t          *completed = &task->onesided.get_completed;
-    ucc_rank_t         peer      = (grank + *posted + 1) % gsize;
-    ucc_mem_map_mem_h  src_memh;
+    /* For GET, we read from each peer's src buffer into our local dst buffer.
+     * remote_rkeys is the per-rank array of src rkeys (what we GET from);
+     * local_h is our own dst buffer registration (where data lands). */
+    ucc_mem_map_mem_h *remote_rkeys = TASK_ARGS(task).src_memh.global_memh;
+    uint32_t          *posted       = &task->onesided.get_posted;
+    uint32_t          *completed    = &task->onesided.get_completed;
+    ucc_rank_t         peer         = (grank + *posted + 1) % gsize;
+    ucc_mem_map_mem_h  local_h;
     size_t             nelems;
+    ucc_status_t       status;
+
+    if (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG) {
+        status = ucc_tl_ucp_test_dynamic_segment(task);
+        if (status == UCC_INPROGRESS) {
+            return;
+        }
+        if (UCC_OK != status) {
+            task->super.status = status;
+            tl_error(UCC_TL_TEAM_LIB(team),
+                     "failed to exchange dynamic segments");
+            return;
+        }
+        local_h      = task->dynamic_segments.dst_local;
+        remote_rkeys = (ucc_mem_map_mem_h *)task->dynamic_segments.src_global;
+    } else {
+        local_h = (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)
+                  ? TASK_ARGS(task).dst_memh.global_memh[grank]
+                  : TASK_ARGS(task).dst_memh.local_memh;
+    }
 
     nelems   = TASK_ARGS(task).src.info.count;
     nelems   = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
-    src_memh = (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)
-                   ? TASK_ARGS(task).dst_memh.global_memh[grank]
-                   : TASK_ARGS(task).dst_memh.local_memh;
-
     for (; *posted < gsize; peer = (peer + 1) % gsize) {
         UCPCHECK_GOTO(ucc_tl_ucp_get_nb(PTR_OFFSET(dest, peer * nelems),
                                         PTR_OFFSET(src, grank * nelems),
-                                        nelems, mtype, peer, src_memh, dst_memh,
-                                        team, task),
+                                        nelems, mtype, peer, local_h,
+                                        remote_rkeys, team, task),
                       task, out);
 
         if (!alltoall_onesided_handle_completion(task, posted, completed,
@@ -122,7 +145,10 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
 
     alltoall_onesided_wait_completion(task, npolls);
 out:
-    return;
+    if (task->super.status != UCC_INPROGRESS &&
+        (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
+        task->super.status = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
+    }
 }
 
 void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
@@ -142,12 +168,28 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
     ucc_rank_t         peer      = (grank + *posted + 1) % gsize;
     ucc_mem_map_mem_h  src_memh;
     size_t             nelems;
+    ucc_status_t       status;
 
     nelems   = TASK_ARGS(task).src.info.count;
     nelems   = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
-    src_memh = (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)
+    if (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG) {
+        status = ucc_tl_ucp_test_dynamic_segment(task);
+        if (status == UCC_INPROGRESS) {
+            return;
+        }
+        if (UCC_OK != status) {
+            task->super.status = status;
+            tl_error(UCC_TL_TEAM_LIB(team),
+                     "failed to exchange dynamic segments");
+            return;
+        }
+        src_memh = task->dynamic_segments.src_local;
+        dst_memh = (ucc_mem_map_mem_h *)task->dynamic_segments.dst_global;
+    } else {
+        src_memh = (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)
                    ? TASK_ARGS(task).src_memh.global_memh[grank]
                    : TASK_ARGS(task).src_memh.local_memh;
+    }
 
     for (; *posted < gsize; peer = (peer + 1) % gsize) {
         UCPCHECK_GOTO(
@@ -165,15 +207,30 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
 
     alltoall_onesided_wait_completion(task, npolls);
 out:
-    return;
+    if (task->super.status != UCC_INPROGRESS &&
+        (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
+        task->super.status = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
+    }
 }
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team = TASK_TEAM(task);
+    ucc_status_t       status;
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
+    if (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG) {
+        status = ucc_tl_ucp_coll_dynamic_segment_exchange_nb(task);
+        if (UCC_OK != status && UCC_INPROGRESS != status) {
+            task->super.status = status;
+            tl_error(UCC_TL_TEAM_LIB(team),
+                     "failed to exchange dynamic segments");
+            return task->super.status;
+        }
+    }
+
+    /* Start the onesided operations */
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
@@ -190,7 +247,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     };
     size_t                       perc_bw     =
         UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_percent_bw;
-    ucc_tl_ucp_alltoall_onesided_alg_t alg   =
+    ucc_tl_ucp_onesided_alg_type alg         =
         UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoall_onesided_alg;
     ucc_tl_ucp_schedule_t       *tl_schedule = NULL;
     ucc_rank_t                   group_size  = 1;
@@ -208,15 +265,6 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     ucc_sbgp_t                  *sbgp;
 
     ALLTOALL_TASK_CHECK(coll_args->args, tl_team);
-    if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) ||
-        (coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS &&
-            (!(coll_args->args.flags &
-               UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS)))) {
-        tl_error(UCC_TL_TEAM_LIB(tl_team),
-                 "non memory mapped buffers are not supported");
-        status = UCC_ERR_NOT_SUPPORTED;
-        return status;
-    }
 
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH)) {
         coll_args->args.src_memh.global_memh = NULL;
@@ -228,7 +276,6 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
             return status;
         }
     }
-
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH)) {
         coll_args->args.dst_memh.global_memh = NULL;
     } else {
@@ -239,6 +286,8 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
             return status;
         }
     }
+
+
     status = ucc_tl_ucp_get_schedule(tl_team, coll_args,
                                      (ucc_tl_ucp_schedule_t **)&tl_schedule);
     if (ucc_unlikely(UCC_OK != status)) {
@@ -260,12 +309,35 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
         group_size = sbgp->group_size;
     }
 
-    task                 = ucc_tl_ucp_init_task(coll_args, team);
+    task = ucc_tl_ucp_init_task(coll_args, team);
+    if (ucc_unlikely(!task)) {
+        status = UCC_ERR_NO_MEMORY;
+        goto out;
+    }
     task->super.finalize = ucc_tl_ucp_alltoall_onesided_finalize;
     a2a_task             = &task->super;
 
+    /* initialize dynamic segments */
+    if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET ||
+       (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO &&
+        sbgp->group_size >= CONGESTION_THRESHOLD)) {
+        alg = UCC_TL_UCP_ALLTOALL_ONESIDED_GET;
+    } else if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO) {
+        alg = UCC_TL_UCP_ALLTOALL_ONESIDED_PUT;
+    }
+    status = ucc_tl_ucp_coll_dynamic_segment_init(&coll_args->args, alg, task);
+    if (UCC_OK != status) {
+        if (status != UCC_ERR_NOT_SUPPORTED) {
+            tl_error(UCC_TL_TEAM_LIB(tl_team),
+                     "failed to initialize dynamic segments");
+        }
+        ucc_tl_ucp_coll_finalize(&task->super);
+        goto out;
+    }
+
     status = ucc_tl_ucp_coll_init(&barrier_coll_args, team, &barrier_task);
     if (status != UCC_OK) {
+        task->super.finalize(&task->super);
         goto out;
     }
     if (perc_bw > 100) {
@@ -278,23 +350,25 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     nelems             = nelems / UCC_TL_TEAM_SIZE(tl_team);
     param.field_mask   = UCP_EP_PERF_PARAM_FIELD_MESSAGE_SIZE;
     attr.field_mask    = UCP_EP_PERF_ATTR_FIELD_ESTIMATED_TIME;
-    param.message_size = nelems * ucc_dt_size(TASK_ARGS(task).src.info.datatype);;
+    param.message_size = nelems * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
     ucc_tl_ucp_get_ep(
         tl_team, (UCC_TL_TEAM_RANK(tl_team) + 1) % UCC_TL_TEAM_SIZE(tl_team),
         &ep);
     ucp_ep_evaluate_perf(ep, &param, &attr);
 
-    rate  = (1 / attr.estimated_time) * (double)(perc_bw / 100.0);
-    ratio = (nelems > 0) ? nelems * group_size : 1;
-    task->alltoall_onesided.tokens = rate / ratio;
+    if (attr.estimated_time > 0) {
+        rate  = (1 / attr.estimated_time) * (double)(perc_bw / 100.0);
+        ratio = (nelems > 0) ? nelems * group_size : 1;
+        task->alltoall_onesided.tokens = rate / ratio;
+    } else {
+        task->alltoall_onesided.tokens = 0;
+    }
     if (task->alltoall_onesided.tokens < 1) {
         task->alltoall_onesided.tokens = 1;
     }
     task->super.post = ucc_tl_ucp_alltoall_onesided_start;
     npolls           = task->n_polls;
-    if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET ||
-       (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO &&
-                                    group_size >= CONGESTION_THRESHOLD)) {
+    if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET) {
         npolls = nelems * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
         if (npolls < task->n_polls) {
             npolls = task->n_polls;
@@ -313,6 +387,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     ucc_task_subscribe_dep(a2a_task, barrier_task,
                            UCC_EVENT_COMPLETED);
     *task_h = &schedule->super;
+
     return status;
 out:
     if (tl_schedule) {
