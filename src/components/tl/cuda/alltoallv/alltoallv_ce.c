@@ -673,21 +673,20 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_setup_copy_engine(
     return UCC_OK;
 }
 
-// NOLINTNEXTLINE: task is unused
 size_t ucc_tl_cuda_alltoallv_get_size(
     const ucc_tl_cuda_task_t *task, size_t *sizes, ucc_rank_t block)
 {
+    (void)task; /* Unused parameter */
     return sizes[block];
 }
 
-// NOLINTNEXTLINE: task is unused
 size_t ucc_tl_cuda_alltoallv_get_offset(
     const ucc_tl_cuda_task_t *task, size_t *displ, ucc_rank_t block)
 {
+    (void)task; /* Unused parameter */
     return displ[block];
 }
 
-// NOLINTNEXTLINE(misc-unused-parameters): ev parameter unused as it's not needed for this implementation
 ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(
     ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task)
 {
@@ -695,6 +694,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(
     ucc_status_t        status;
     ucc_ev_t            post_event;
 
+    (void)ev; /* Unused parameter */
     ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
     coll_task->ee = ee;
     tl_trace(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
