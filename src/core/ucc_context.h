@@ -108,8 +108,10 @@ typedef struct ucc_mem_map_tl_t {
 typedef struct ucc_mem_map_memh_t {
     ucc_mem_map_mode_t mode;
     ucc_context_h      context;
-    void              *address;
+    void              *address;        /* exporter's (remote) VA */
     size_t             len;
+    void              *local_address;  /* importer's local VA; set on import, NULL on export */
+    size_t             local_len;      /* importer's local length; set on import, 0 on export */
     ucc_mem_map_tl_t  *tl_h;
     int                num_tls;
     char               pack_buffer[0];
