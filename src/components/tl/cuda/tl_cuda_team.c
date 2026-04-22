@@ -13,6 +13,7 @@
 #endif
 #include "core/ucc_team.h"
 #include "coll_score/ucc_coll_score.h"
+#include "utils/ucc_math.h"
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 #include "utils/ucc_sys.h"
@@ -274,7 +275,8 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
                     st, cudaGetErrorName(st));
         }
     }
-    for (i = 0; i < UCC_TL_TEAM_SIZE(self); i++) {
+    for (i = 0; i < ucc_min(UCC_TL_TEAM_SIZE(self), UCC_TL_CUDA_MAX_PEERS);
+         i++) {
         if (self->scratch.rem[i] && self->scratch.rem_info[i].ptr) {
             ucc_tl_cuda_unmap_memhandle((uintptr_t)self->scratch.rem_info[i].ptr,
                                         self->scratch.rem[i],
@@ -543,7 +545,8 @@ exit_err:
     }
 
     // Clean up mapped scratch memory
-    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
+    for (i = 0; i < ucc_min(UCC_TL_TEAM_SIZE(team), UCC_TL_CUDA_MAX_PEERS);
+         i++) {
         if (team->scratch.rem[i] && team->scratch.rem_info[i].ptr) {
             ucc_tl_cuda_unmap_memhandle(
                 (uintptr_t)team->scratch.rem_info[i].ptr,
