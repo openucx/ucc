@@ -108,6 +108,7 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     ucc_mem_map_mem_h  local_h;
     size_t             nelems;
     ucc_status_t       status;
+    ucc_status_t       st;
 
     if (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG) {
         status = ucc_tl_ucp_test_dynamic_segment(task);
@@ -144,8 +145,8 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
     }
 
     alltoall_onesided_wait_completion(task, npolls);
-out: {
-    ucc_status_t st = task->super.status;
+out:
+    st = task->super.status;
     if (st != UCC_INPROGRESS &&
         (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
         ucc_status_t fin = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
@@ -171,9 +172,10 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
     ucc_mem_map_mem_h  src_memh;
     size_t             nelems;
     ucc_status_t       status;
+    ucc_status_t       st;
 
-    nelems   = TASK_ARGS(task).src.info.count;
-    nelems   = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
+    nelems = TASK_ARGS(task).src.info.count;
+    nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
     if (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG) {
         status = ucc_tl_ucp_test_dynamic_segment(task);
         if (status == UCC_INPROGRESS) {
@@ -208,8 +210,8 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
     }
 
     alltoall_onesided_wait_completion(task, npolls);
-out: {
-    ucc_status_t st = task->super.status;
+out:
+    st = task->super.status;
     if (st != UCC_INPROGRESS &&
         (task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
         ucc_status_t fin = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
@@ -290,7 +292,6 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
             return status;
         }
     }
-
 
     status = ucc_tl_ucp_get_schedule(tl_team, coll_args,
                                      (ucc_tl_ucp_schedule_t **)&tl_schedule);
