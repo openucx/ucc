@@ -40,6 +40,9 @@ typedef struct ucc_context_id {
 enum {
     /* all ranks have identical set of TLs*/
     UCC_ADDR_STORAGE_FLAG_TLS_SYMMETRIC = UCC_BIT(0),
+    /* addr_storage holds ctx_id+host_info prefix rows (ucc_core_ctx_id_exchange);
+       use ucc_core_addr_exchange_after_ctx_id instead of ucc_core_addr_exchange */
+    UCC_ADDR_STORAGE_FLAG_CTX_ID_PREFIX = UCC_BIT(1),
 };
 
 typedef struct ucc_addr_storage {
@@ -151,6 +154,12 @@ ucc_status_t ucc_context_progress_deregister(ucc_context_t *ctx,
 */
 ucc_status_t ucc_core_addr_exchange(ucc_context_t *context, ucc_oob_coll_t *oob,
                                     ucc_addr_storage_t *addr_storage);
+
+/* Same outcome as ucc_core_addr_exchange, but skips re-gathering the ctx_id+host
+   prefix when addr_storage already holds that layout from ucc_core_ctx_id_exchange
+   (UCC_ADDR_STORAGE_FLAG_CTX_ID_PREFIX, stride addr_len == prefix size). */
+ucc_status_t ucc_core_addr_exchange_after_ctx_id(
+    ucc_context_t *context, ucc_oob_coll_t *oob, ucc_addr_storage_t *addr_storage);
 
 /* Performs context id address exchange between the processes group defined by OOB.
    This function is used to exchange the context ids between the processes in order

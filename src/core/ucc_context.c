@@ -494,6 +494,13 @@ poll:
         addr_storage->oob_req = NULL;
     }
 
+    if (addr_storage->flags & UCC_ADDR_STORAGE_FLAG_CTX_ID_PREFIX) {
+        ucc_error(
+            "addr_storage has ctx_id prefix layout; use "
+            "ucc_core_addr_exchange_after_ctx_id");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
     if (0 == addr_storage->addr_len) {
         if (NULL == addr_storage->storage) {
             addr_storage->size = oob->n_oob_eps;
@@ -607,6 +614,68 @@ poll:
     return UCC_OK;
 }
 
+ucc_status_t ucc_core_addr_exchange_after_ctx_id(
+    ucc_context_t *context, ucc_oob_coll_t *oob, ucc_addr_storage_t *addr_storage)
+{
+    const size_t ctx_addr_prefix_len =
+        offsetof(ucc_context_addr_header_t, n_components);
+    ucc_context_attr_t attr;
+    ucc_status_t       status;
+
+poll:
+    if (addr_storage->oob_req) {
+        status = oob->req_test(addr_storage->oob_req);
+        if (status < 0) {
+            oob->req_free(addr_storage->oob_req);
+            ucc_error("oob req test failed during team addr exchange");
+            return status;
+        } else if (UCC_INPROGRESS == status) {
+            return status;
+        }
+        oob->req_free(addr_storage->oob_req);
+        addr_storage->oob_req = NULL;
+    }
+
+    if ((addr_storage->flags & UCC_ADDR_STORAGE_FLAG_CTX_ID_PREFIX) &&
+        (addr_storage->addr_len == ctx_addr_prefix_len) &&
+        (addr_storage->storage != NULL)) {
+        if (addr_storage->size != (ucc_rank_t)oob->n_oob_eps) {
+            ucc_error("addr_storage size %d does not match OOB eps %u",
+                      addr_storage->size, oob->n_oob_eps);
+            return UCC_ERR_INVALID_PARAM;
+        }
+        attr.mask = UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
+                    UCC_CONTEXT_ATTR_FIELD_CTX_ADDR;
+        status    = ucc_context_get_attr(context, &attr);
+        if (UCC_OK != status) {
+            ucc_error("failed to query ctx address");
+            return status;
+        }
+        ucc_free(addr_storage->storage);
+        addr_storage->storage = ucc_malloc(
+            addr_storage->size * sizeof(size_t), "max_addrlen_tmp");
+        if (!addr_storage->storage) {
+            ucc_error(
+                "failed to allocate %zd bytes for max_addrlen tmp storage",
+                addr_storage->size * sizeof(size_t));
+            return UCC_ERR_NO_MEMORY;
+        }
+        addr_storage->addr_len = 0;
+        addr_storage->flags &= ~UCC_ADDR_STORAGE_FLAG_CTX_ID_PREFIX;
+
+        status = oob->allgather(
+            &context->attr.ctx_addr_len, addr_storage->storage, sizeof(size_t),
+            oob->coll_info, &addr_storage->oob_req);
+        if (UCC_OK != status) {
+            ucc_error("failed to start oob allgather");
+            return status;
+        }
+        goto poll;
+    }
+
+    return ucc_core_addr_exchange(context, oob, addr_storage);
+}
+
 ucc_status_t ucc_core_ctx_id_exchange(ucc_context_t *context, ucc_oob_coll_t *oob,
                                       ucc_addr_storage_t *addr_storage)
 {
@@ -693,8 +762,8 @@ poll:
             }
         }
 
-        addr_storage->flags = 0;
-        addr_storage->rank = r;
+        addr_storage->flags = UCC_ADDR_STORAGE_FLAG_CTX_ID_PREFIX;
+        addr_storage->rank  = r;
     }
     return UCC_OK;
 }
@@ -824,6 +893,7 @@ ucc_status_t ucc_context_create_proc_info(
     ucc_status_t              status;
     uint64_t                  i, j, n_tl_ctx;
     int                       num_cls;
+    int                       ctx_prefix_for_addr_exchange = 0;
 
     num_cls = config->n_cl_cfg;
     ctx     = ucc_calloc(1, sizeof(ucc_context_t), "ucc_context");
@@ -933,18 +1003,9 @@ ucc_status_t ucc_context_create_proc_info(
                 ucc_topo_cleanup(topo);
             }
 
-            /* clean up addr_storage */
-            ucc_free(ctx->addr_storage.storage);
-            ctx->addr_storage.storage = NULL;
-            ctx->addr_storage.addr_len = 0;
-            ctx->addr_storage.size = 0;
-            ctx->addr_storage.rank = UCC_RANK_MAX;
-            ctx->addr_storage.flags = 0;
-            ctx->addr_storage.oob_req = NULL;
-
-            /* clean up topo */
-            ucc_context_topo_cleanup(ctx->topo);
-            ctx->topo = NULL;
+            /* Keep addr_storage prefix rows and ctx->topo for
+             * ucc_core_addr_exchange_after_ctx_id after TL contexts exist. */
+            ctx_prefix_for_addr_exchange = 1;
         } else if (!(params->mask & UCC_CONTEXT_PARAM_FIELD_OOB)) {
             /* No OOB: cannot run topo exchange; sole implicit rank on the node. */
             b_params.node_local_id = 0;
@@ -1036,8 +1097,13 @@ ucc_status_t ucc_context_create_proc_info(
         do {
             /* UCC context create is blocking fn, so we can wait here for the
                completion of addr exchange */
-            status = ucc_core_addr_exchange(ctx, &ctx->params.oob,
-                                            &ctx->addr_storage);
+            if (ctx_prefix_for_addr_exchange) {
+                status = ucc_core_addr_exchange_after_ctx_id(
+                    ctx, &ctx->params.oob, &ctx->addr_storage);
+            } else {
+                status = ucc_core_addr_exchange(ctx, &ctx->params.oob,
+                                                &ctx->addr_storage);
+            }
             if (status < 0) {
                 ucc_error("failed to exchange addresses during context "
                           "creation with status: %s",
