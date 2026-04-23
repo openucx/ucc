@@ -7,7 +7,6 @@
 #include "ucc_service_coll.h"
 #include "ucc_team.h"
 #include "ucc_global_opts.h"
-#include "schedule/ucc_schedule.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_coll_utils.h"
 
@@ -72,6 +71,7 @@ ucc_status_t ucc_service_allreduce(ucc_team_t *team, void *sbuf, void *rbuf,
                                        subset, &(*req)->task);
     if (status < 0) {
         ucc_free(*req);
+        *req = NULL;
         ucc_error("failed to start service allreduce for team %p: %s", team,
                   ucc_status_string(status));
         return status;
@@ -98,7 +98,8 @@ ucc_status_t ucc_service_allgather(ucc_team_t *team, void *sbuf, void *rbuf,
                                        subset, &(*req)->task);
     if (status < 0) {
         ucc_free(*req);
-        ucc_error("failed to start service allreduce for team %p: %s", team,
+        *req = NULL;
+        ucc_error("failed to start service allgather for team %p: %s", team,
                   ucc_status_string(status));
         return status;
     }
@@ -124,6 +125,7 @@ ucc_status_t ucc_service_bcast(ucc_team_t *team, void *buf, size_t msgsize,
                                    root, subset, &(*req)->task);
     if (status < 0) {
         ucc_free(*req);
+        *req = NULL;
         ucc_error("failed to start service bcast for team %p: %s", team,
                   ucc_status_string(status));
         return status;
@@ -219,87 +221,70 @@ void ucc_internal_oob_finalize(ucc_team_oob_coll_t *oob)
 #define UCC_DT_CHECK_FROM_TASK(_task) \
     (&UCC_DT_CHECK_SCHEDULE(_task)->dt_check)
 
-/**
- * Validate allreduced datatype values using min/max trick
- *
- * After MIN allreduce on [dt, -dt, mem, -mem]:
- *   - values[0] contains min(dt) across all ranks
- *   - values[1] contains min(-dt) = -max(dt) across all ranks
- *   - If values[0] == -values[1], all ranks have identical dt
- *   - Same logic applies to memory type with values[2] and values[3]
- */
 static ucc_status_t ucc_dt_validate_results(ucc_dt_check_state_t *dt_check)
 {
     int16_t *values;
 
-    /* Safety checks */
     if (!dt_check) {
         return UCC_ERR_INVALID_PARAM;
     }
     values = dt_check->values;
-    /* Check if any rank has non-contiguous datatype */
     if (values[0] == (int16_t) UCC_ERR_NOT_SUPPORTED) {
         return UCC_ERR_NOT_SUPPORTED;
     }
-    /* Check if all ranks have the same datatype using min/max trick */
     if (values[0] != -values[1]) {
         return UCC_ERR_INVALID_PARAM;
     }
-    /* Check if all ranks have the same memory type */
     if (values[2] != -values[3]) {
         return UCC_ERR_INVALID_PARAM;
     }
     return UCC_OK;
 }
 
-/**
- * Post function for allreduce wrapper task using service allreduce
- *
- * Starts the service allreduce (MIN) to detect datatype mismatches across all ranks.
- */
 static ucc_status_t ucc_dt_check_allreduce_post(ucc_coll_task_t *allreduce_wrapper)
 {
     ucc_dt_check_state_t *dt_check = UCC_DT_CHECK_FROM_TASK(allreduce_wrapper);
     ucc_team_t           *team     = allreduce_wrapper->bargs.team;
     ucc_status_t          status;
 
-    /* Safety check */
     if (!dt_check) {
         allreduce_wrapper->status = UCC_ERR_INVALID_PARAM;
         return UCC_ERR_INVALID_PARAM;
     }
 
-    /* Start in-place service allreduce with MIN operation on 4 int16_t values */
     status = ucc_service_allreduce(team, dt_check->values, dt_check->values,
                                    UCC_DT_INT16, 4, UCC_OP_MIN,
                                    dt_check->subset, &dt_check->check_req);
     if (status != UCC_OK) {
+        ucc_schedule_t *schedule = allreduce_wrapper->schedule;
+
         allreduce_wrapper->status = status;
-        return status;
+        /* ucc_schedule_start already set the schedule to UCC_INPROGRESS before
+         * firing SCHEDULE_STARTED.  Fail the whole schedule now so that
+         * ucc_collective_finalize_internal will not refuse to run because the
+         * top-level request is still UCC_INPROGRESS. */
+        if (schedule) {
+            schedule->n_completed_tasks = schedule->n_tasks;
+            schedule->super.status      = status;
+            ucc_task_complete(&schedule->super);
+        }
+        return UCC_OK;
     }
     allreduce_wrapper->status = UCC_INPROGRESS;
-    /* Enqueue wrapper task for progress */
     return ucc_progress_queue_enqueue(team->contexts[0]->pq, allreduce_wrapper);
 }
 
-/**
- * Progress function for allreduce wrapper task using service allreduce
- *
- * Progresses service allreduce, and when complete, validates the reduced datatypes.
- */
 static void ucc_dt_check_allreduce_progress(ucc_coll_task_t *allreduce_wrapper)
 {
     ucc_dt_check_state_t *dt_check = UCC_DT_CHECK_FROM_TASK(allreduce_wrapper);
     ucc_coll_task_t      *ar_task;
     ucc_status_t          status;
 
-    /* Safety check */
     if (!dt_check || !dt_check->check_req) {
         allreduce_wrapper->status = UCC_ERR_INVALID_PARAM;
         return;
     }
 
-    /* Check status of the service allreduce */
     ar_task = dt_check->check_req->task;
     status  = ar_task->super.status;
     if (status == UCC_INPROGRESS) {
@@ -307,47 +292,33 @@ static void ucc_dt_check_allreduce_progress(ucc_coll_task_t *allreduce_wrapper)
         return;
     }
 
-    /* Service allreduce completed (or failed) - finalize it */
     ucc_service_coll_finalize(dt_check->check_req);
     dt_check->check_req = NULL;
 
-    /* If service allreduce failed, mark validation as failed */
     if (status != UCC_OK) {
-        dt_check->validated = 0;
+        dt_check->ar_status       = status;
+        dt_check->validated       = 0;
         allreduce_wrapper->status = UCC_OK;
         return;
     }
 
-    /* Service allreduce succeeded - validate using min/max check */
     status = ucc_dt_validate_results(dt_check);
-    dt_check->validated = (status == UCC_OK);
-    /* Completes with UCC_OK so schedule continues to actual wrapper */
+    dt_check->validated       = (status == UCC_OK);
     allreduce_wrapper->status = UCC_OK;
 }
 
-/**
- * Finalize function for allreduce wrapper task
- */
 static ucc_status_t ucc_dt_check_allreduce_finalize(ucc_coll_task_t *allreduce_wrapper)
 {
     ucc_dt_check_state_t *dt_check = UCC_DT_CHECK_FROM_TASK(allreduce_wrapper);
 
-    /* Clean up check_req if it wasn't finalized in progress */
     if (dt_check && dt_check->check_req) {
         ucc_service_coll_finalize(dt_check->check_req);
         dt_check->check_req = NULL;
     }
-    /* dt_check is embedded in schedule, no need to free */
-    /* Return wrapper task to memory pool */
     ucc_mpool_put(allreduce_wrapper);
     return UCC_OK;
 }
 
-/**
- * Post function for actual task wrapper
- *
- * Checks validation result and only posts actual task if validation succeeded.
- */
 static ucc_status_t ucc_dt_check_actual_wrapper_post(ucc_coll_task_t *wrapper)
 {
     ucc_dt_check_state_t *dt_check    = UCC_DT_CHECK_FROM_TASK(wrapper);
@@ -355,167 +326,197 @@ static ucc_status_t ucc_dt_check_actual_wrapper_post(ucc_coll_task_t *wrapper)
     ucc_schedule_t       *schedule    = wrapper->schedule;
     ucc_status_t          status;
 
-    /* Check if validation succeeded */
     if (!dt_check->validated) {
-        /* Validation failed - propagate error to schedule and complete wrapper */
-        wrapper->status = UCC_ERR_NOT_SUPPORTED;
+        ucc_status_t err;
+        /* Use the real error when init failed for non-DT reasons, or when
+         * the service allreduce itself failed.  Otherwise it is a genuine
+         * datatype-consistency mismatch across ranks. */
+        if (dt_check->init_status != UCC_OK) {
+            err = dt_check->init_status;
+        } else if (dt_check->ar_status != UCC_OK) {
+            err = dt_check->ar_status;
+        } else {
+            err = UCC_ERR_NOT_SUPPORTED;
+        }
+        wrapper->status = err;
         if (schedule) {
-            schedule->super.status = UCC_ERR_NOT_SUPPORTED;
-            schedule->super.super.status = UCC_ERR_NOT_SUPPORTED;
+            /* Prevent ucc_schedule_completed_handler from calling
+             * ucc_task_complete a second time after allreduce_wrapper
+             * fires UCC_EVENT_COMPLETED_SCHEDULE. */
+            schedule->n_completed_tasks = schedule->n_tasks;
+            schedule->super.status      = err;
+            ucc_task_complete(&schedule->super);
         }
         return UCC_OK;
     }
-    /* Validation succeeded - post the actual task */
+
+    /* validated=1 implies local init succeeded, so actual_task must be set */
+    ucc_assert(actual_task != NULL);
+
+    /* Transfer executor from schedule to actual_task before posting */
+    if (actual_task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
+        ucc_coll_task_t *sched_task = &schedule->super;
+        actual_task->executor       = sched_task->executor;
+        actual_task->flags         |= UCC_COLL_TASK_FLAG_EXECUTOR_STOP;
+        sched_task->flags          &= ~((uint32_t)UCC_COLL_TASK_FLAG_EXECUTOR_STOP);
+    }
+
     status = actual_task->post(actual_task);
     if (status < 0) {
         wrapper->status = status;
         if (schedule) {
-            schedule->super.status = status;
-            schedule->super.super.status = status;
+            /* EXECUTOR_STOP was transferred from the schedule to actual_task
+             * above.  Since actual_task never ran, the executor was started
+             * (in ucc_collective_post) but is still owned by the schedule.
+             * Return the stop responsibility to the schedule so that
+             * ucc_task_complete can stop it. */
+            if (actual_task->flags & UCC_COLL_TASK_FLAG_EXECUTOR_STOP) {
+                ucc_coll_task_t *sched_task = &schedule->super;
+
+                sched_task->executor = actual_task->executor;
+                sched_task->flags   |= UCC_COLL_TASK_FLAG_EXECUTOR_STOP;
+                actual_task->flags  &= ~(uint32_t)UCC_COLL_TASK_FLAG_EXECUTOR_STOP;
+            }
+            schedule->n_completed_tasks = schedule->n_tasks;
+            schedule->super.status      = status;
+            ucc_task_complete(&schedule->super);
         }
-        return status;
+        return UCC_OK;
     }
     wrapper->status = UCC_INPROGRESS;
     return ucc_progress_queue_enqueue(wrapper->bargs.team->contexts[0]->pq, wrapper);
 }
 
-/**
- * Progress function for actual task wrapper
- *
- * Checks the actual task status. The actual task progresses itself via its own
- * progress queue enqueued by its post() function.
- */
 static void ucc_dt_check_actual_wrapper_progress(ucc_coll_task_t *wrapper)
 {
     ucc_dt_check_state_t *dt_check    = UCC_DT_CHECK_FROM_TASK(wrapper);
     ucc_coll_task_t      *actual_task = dt_check->actual_task;
 
-    /* Just copy status from actual task to wrapper
-     * The actual task progresses itself since it was enqueued by its post() */
+    if (ucc_unlikely(!actual_task)) {
+        wrapper->status = UCC_ERR_NOT_SUPPORTED;
+        return;
+    }
     wrapper->status = actual_task->status;
 }
 
-/**
- * Finalize function for actual task wrapper
- */
 static ucc_status_t ucc_dt_check_actual_wrapper_finalize(ucc_coll_task_t *wrapper)
 {
     ucc_dt_check_state_t *dt_check    = UCC_DT_CHECK_FROM_TASK(wrapper);
     ucc_coll_task_t      *actual_task = dt_check->actual_task;
     ucc_status_t          status      = UCC_OK;
 
-    /* Finalize the actual task */
     if (actual_task && actual_task->finalize) {
         status = actual_task->finalize(actual_task);
     }
-    /* dt_check is embedded in schedule, will be freed with schedule */
-    /* Wrapper is from memory pool */
     ucc_mpool_put(wrapper);
     return status;
 }
 
-/**
- * Finalize function for dt_check schedule
- *
- * Finalizes all tasks in the schedule and frees the schedule itself.
- */
 static ucc_status_t ucc_dt_check_schedule_finalize(ucc_coll_task_t *task)
 {
     ucc_dt_check_schedule_t *dt_schedule =
         ucc_derived_of(task, ucc_dt_check_schedule_t);
     ucc_status_t             status;
 
-    /* Finalize all tasks in the schedule */
     status = ucc_schedule_finalize(task);
-    /* Destruct and free the schedule itself (including embedded dt_check) */
     ucc_coll_task_destruct(&dt_schedule->super.super);
     ucc_free(dt_schedule);
     return status;
 }
 
-ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task,
-                                      ucc_status_t *status_out)
+ucc_coll_task_t* ucc_service_dt_check(ucc_team_t            *team,
+                                      const ucc_coll_args_t *coll_args,
+                                      ucc_status_t           local_status,
+                                      ucc_coll_task_t       *task,
+                                      ucc_status_t          *status_out)
 {
-    ucc_dt_check_schedule_t  *dt_schedule;
-    ucc_dt_check_state_t     *dt_check;
-    ucc_coll_task_t          *allreduce_wrapper;
-    ucc_coll_task_t          *actual_wrapper;
-    ucc_base_coll_args_t      empty_bargs;
-    const ucc_coll_args_t    *args      = &task->bargs.args;
-    ucc_rank_t                rank      = team->rank;
-    ucc_rank_t                root      = args->root;
-    ucc_coll_type_t           coll_type = args->coll_type;
-    ucc_datatype_t            local_dt       = UCC_DT_INT8;
-    ucc_memory_type_t         local_mem_type = UCC_MEMORY_TYPE_UNKNOWN;
-    ucc_status_t              status;
+    ucc_rank_t               rank           = team->rank;
+    ucc_rank_t               root           = coll_args->root;
+    ucc_coll_type_t          coll_type      = coll_args->coll_type;
+    ucc_datatype_t           local_dt       = UCC_DT_INT8;
+    ucc_memory_type_t        local_mem_type = UCC_MEMORY_TYPE_UNKNOWN;
+    ucc_dt_check_schedule_t *dt_schedule;
+    ucc_dt_check_state_t    *dt_check;
+    ucc_coll_task_t         *allreduce_wrapper;
+    ucc_coll_task_t         *actual_wrapper;
+    ucc_base_coll_args_t     schedule_bargs;
+    ucc_base_coll_args_t     empty_bargs;
+    ucc_base_team_t         *base_team;
+    ucc_status_t             status;
 
-    /* If check is disabled, return original task */
-    if (!ucc_global_config.check_asymmetric_dt) {
-        return task;
-    }
-
-    /* Determine which datatype and memory type to check based on operation and rank */
+    /* Read the local signature from coll_args (valid even when task is NULL) */
     if (rank == root) {
         switch (coll_type) {
         case UCC_COLL_TYPE_GATHER:
-            if (UCC_IS_INPLACE(*args)) {
-                local_dt = args->dst.info.datatype;
-                local_mem_type = args->dst.info.mem_type;
+            if (UCC_IS_INPLACE(*coll_args)) {
+                local_dt       = coll_args->dst.info.datatype;
+                local_mem_type = coll_args->dst.info.mem_type;
             } else {
-                local_dt = args->src.info.datatype;
-                local_mem_type = args->src.info.mem_type;
+                local_dt       = coll_args->src.info.datatype;
+                local_mem_type = coll_args->src.info.mem_type;
             }
             break;
         case UCC_COLL_TYPE_GATHERV:
-            if (UCC_IS_INPLACE(*args)) {
-                local_dt = args->dst.info_v.datatype;
-                local_mem_type = args->dst.info_v.mem_type;
+            if (UCC_IS_INPLACE(*coll_args)) {
+                local_dt       = coll_args->dst.info_v.datatype;
+                local_mem_type = coll_args->dst.info_v.mem_type;
             } else {
-                local_dt = args->src.info.datatype;
-                local_mem_type = args->src.info.mem_type;
+                local_dt       = coll_args->src.info.datatype;
+                local_mem_type = coll_args->src.info.mem_type;
             }
             break;
         case UCC_COLL_TYPE_SCATTER:
-            if (UCC_IS_INPLACE(*args)) {
-                local_dt = args->src.info.datatype;
-                local_mem_type = args->src.info.mem_type;
+            if (UCC_IS_INPLACE(*coll_args)) {
+                local_dt       = coll_args->src.info.datatype;
+                local_mem_type = coll_args->src.info.mem_type;
             } else {
-                local_dt = args->dst.info.datatype;
-                local_mem_type = args->dst.info.mem_type;
+                local_dt       = coll_args->dst.info.datatype;
+                local_mem_type = coll_args->dst.info.mem_type;
             }
             break;
         case UCC_COLL_TYPE_SCATTERV:
-            if (UCC_IS_INPLACE(*args)) {
-                local_dt = args->src.info_v.datatype;
-                local_mem_type = args->src.info_v.mem_type;
+            if (UCC_IS_INPLACE(*coll_args)) {
+                local_dt       = coll_args->src.info_v.datatype;
+                local_mem_type = coll_args->src.info_v.mem_type;
             } else {
-                local_dt = args->dst.info.datatype;
-                local_mem_type = args->dst.info.mem_type;
+                local_dt       = coll_args->dst.info.datatype;
+                local_mem_type = coll_args->dst.info.mem_type;
             }
             break;
         default:
-            /* Not a rooted collective, no validation needed */
-            return task;
+            break;
         }
     } else {
         switch (coll_type) {
         case UCC_COLL_TYPE_GATHER:
         case UCC_COLL_TYPE_GATHERV:
-            local_dt = args->src.info.datatype;
-            local_mem_type = args->src.info.mem_type;
+            local_dt       = coll_args->src.info.datatype;
+            local_mem_type = coll_args->src.info.mem_type;
             break;
         case UCC_COLL_TYPE_SCATTER:
         case UCC_COLL_TYPE_SCATTERV:
-            local_dt = args->dst.info.datatype;
-            local_mem_type = args->dst.info.mem_type;
+            local_dt       = coll_args->dst.info.datatype;
+            local_mem_type = coll_args->dst.info.mem_type;
             break;
         default:
-            /* Not a rooted collective, no validation needed */
-            return task;
+            break;
         }
     }
 
-    /* Allocate schedule with embedded dt_check */
+    /* Build bargs for the schedule.  When task is NULL (local init failed),
+     * construct minimal bargs from coll_args; scratch was freed by the caller
+     * before this call.  When task is valid, reuse its bargs so the schedule
+     * inherits the scratch pointer and other fields set during init. */
+    if (task != NULL) {
+        schedule_bargs = task->bargs;
+        base_team      = task->team;
+    } else {
+        memset(&schedule_bargs, 0, sizeof(schedule_bargs));
+        schedule_bargs.team = team;
+        memcpy(&schedule_bargs.args, coll_args, sizeof(*coll_args));
+        base_team = NULL;
+    }
+
     dt_schedule = (ucc_dt_check_schedule_t *)ucc_malloc(sizeof(*dt_schedule),
                                                          "dt_check_schedule");
     if (!dt_schedule) {
@@ -527,9 +528,22 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task,
     }
     memset(dt_schedule, 0, sizeof(*dt_schedule));
 
-    /* Initialize schedule with task's bargs and TL/CL team */
     ucc_coll_task_construct(&dt_schedule->super.super);
-    status = ucc_schedule_init(&dt_schedule->super, &task->bargs, task->team);
+    if (base_team != NULL) {
+        status = ucc_schedule_init(&dt_schedule->super, &schedule_bargs,
+                                   base_team);
+    } else {
+        /* base_team is NULL (local init failed): manually init the schedule
+         * to avoid dereferencing NULL in ucc_schedule_init → team->context. */
+        status = ucc_coll_task_init(&dt_schedule->super.super,
+                                    &schedule_bargs, NULL);
+        if (status == UCC_OK) {
+            dt_schedule->super.super.flags |= UCC_COLL_TASK_FLAG_IS_SCHEDULE;
+            dt_schedule->super.ctx          = team->contexts[0];
+            dt_schedule->super.n_tasks      = 0;
+            dt_schedule->super.n_completed_tasks = 0;
+        }
+    }
     if (status != UCC_OK) {
         ucc_error("failed to initialize dt_check schedule: %s",
                   ucc_status_string(status));
@@ -540,52 +554,55 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task,
         return NULL;
     }
 
-    /* Setup embedded dt_check state */
     dt_check = &dt_schedule->dt_check;
-    /* Setup values for min/max trick: [dt, -dt, mem, -mem] */
-    if (!UCC_DT_IS_PREDEFINED(local_dt)) {
-        /* Generic or invalid datatype - reject to prevent int16 overflow */
-        dt_check->values[0] = (int16_t) UCC_ERR_NOT_SUPPORTED;
-        dt_check->values[1] = -(int16_t) UCC_ERR_NOT_SUPPORTED;
+    /* Use the failure sentinel when local init failed OR the DT is
+     * non-predefined.  A rank that failed init must still participate in
+     * the allreduce so that all ranks get a uniform result and none hang.
+     * Save the real error for non-DT init failures (OOM, invalid args,
+     * etc.) so the failure path can propagate the accurate status. */
+    if (local_status != UCC_OK || !UCC_DT_IS_PREDEFINED(local_dt)) {
+        dt_check->values[0]  = (int16_t) UCC_ERR_NOT_SUPPORTED;
+        dt_check->values[1]  = -(int16_t) UCC_ERR_NOT_SUPPORTED;
+        /* Record the actual init failure only for non-DT errors so the
+         * actual_wrapper_post can surface the right status code. */
+        dt_check->init_status = (local_status != UCC_OK &&
+                                  UCC_DT_IS_PREDEFINED(local_dt))
+                                 ? local_status : UCC_OK;
     } else {
-        /* Predefined datatypes are always contiguous - safe to cast to int16 */
-        dt_check->values[0] = (int16_t) local_dt;
-        dt_check->values[1] = -(int16_t) local_dt;
+        dt_check->values[0]   = (int16_t) local_dt;
+        dt_check->values[1]   = -(int16_t) local_dt;
+        dt_check->init_status = UCC_OK;
     }
-    dt_check->values[2] = (int16_t) local_mem_type;
-    dt_check->values[3] = -(int16_t) local_mem_type;
-    /* Setup subset for full team */
-    dt_check->subset.myrank = team->rank;
-    dt_check->subset.map.type = UCC_EP_MAP_FULL;
+    dt_check->values[2]         = (int16_t) local_mem_type;
+    dt_check->values[3]         = -(int16_t) local_mem_type;
+    dt_check->subset.myrank     = team->rank;
+    dt_check->subset.map.type   = UCC_EP_MAP_FULL;
     dt_check->subset.map.ep_num = team->size;
-    /* Initialize check_req to NULL */
-    dt_check->check_req = NULL;
-    dt_check->validated = 0;
-    dt_check->actual_task = task;
+    dt_check->check_req         = NULL;
+    dt_check->validated         = 0;
+    dt_check->ar_status         = UCC_OK;
+    dt_check->actual_task       = task;   /* may be NULL when local init failed */
 
-    /* Create allreduce wrapper task from memory pool */
-    allreduce_wrapper = ucc_mpool_get(&task->bargs.team->contexts[0]->lib->stub_tasks_mp);
+    memset(&empty_bargs, 0, sizeof(empty_bargs));
+    empty_bargs.team = team;
+
+    allreduce_wrapper = ucc_mpool_get(&team->contexts[0]->lib->stub_tasks_mp);
     if (!allreduce_wrapper) {
         ucc_error("failed to allocate allreduce wrapper task from mpool");
         status = UCC_ERR_NO_MEMORY;
         goto error_schedule;
     }
-    /* Initialize allreduce wrapper task with minimal bargs (only needs team) */
-    memset(&empty_bargs, 0, sizeof(empty_bargs));
-    empty_bargs.team = task->bargs.team;
-    status = ucc_coll_task_init(allreduce_wrapper, &empty_bargs, task->team);
+    status = ucc_coll_task_init(allreduce_wrapper, &empty_bargs, base_team);
     if (status != UCC_OK) {
         ucc_error("failed to init allreduce wrapper task: %s",
                   ucc_status_string(status));
         ucc_mpool_put(allreduce_wrapper);
         goto error_schedule;
     }
-    /* Set allreduce wrapper functions */
     allreduce_wrapper->post     = ucc_dt_check_allreduce_post;
     allreduce_wrapper->progress = ucc_dt_check_allreduce_progress;
     allreduce_wrapper->finalize = ucc_dt_check_allreduce_finalize;
     allreduce_wrapper->status   = UCC_OPERATION_INITIALIZED;
-    /* Add allreduce wrapper to schedule - starts when schedule starts */
     status = ucc_task_subscribe_dep(&dt_schedule->super.super, allreduce_wrapper,
                                     UCC_EVENT_SCHEDULE_STARTED);
     if (status != UCC_OK) {
@@ -600,27 +617,25 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task,
         goto error_allreduce_wrapper;
     }
 
-    /* Create actual task wrapper that conditionally posts the actual task */
-    actual_wrapper = ucc_mpool_get(&task->bargs.team->contexts[0]->lib->stub_tasks_mp);
+    actual_wrapper = ucc_mpool_get(&team->contexts[0]->lib->stub_tasks_mp);
     if (!actual_wrapper) {
         ucc_error("failed to allocate actual wrapper task from mpool");
         status = UCC_ERR_NO_MEMORY;
         goto error_allreduce_wrapper;
     }
-    status = ucc_coll_task_init(actual_wrapper, &empty_bargs, task->team);
+    status = ucc_coll_task_init(actual_wrapper, &empty_bargs, base_team);
     if (status != UCC_OK) {
         ucc_error("failed to init actual wrapper task: %s",
                   ucc_status_string(status));
         ucc_mpool_put(actual_wrapper);
         goto error_allreduce_wrapper;
     }
-    /* Set actual wrapper functions */
     actual_wrapper->post     = ucc_dt_check_actual_wrapper_post;
     actual_wrapper->progress = ucc_dt_check_actual_wrapper_progress;
     actual_wrapper->finalize = ucc_dt_check_actual_wrapper_finalize;
     actual_wrapper->status   = UCC_OPERATION_INITIALIZED;
-    /* Add actual wrapper to schedule - depends on allreduce completing */
-    status = ucc_task_subscribe_dep(allreduce_wrapper, actual_wrapper, UCC_EVENT_COMPLETED);
+    status = ucc_task_subscribe_dep(allreduce_wrapper, actual_wrapper,
+                                    UCC_EVENT_COMPLETED);
     if (status != UCC_OK) {
         ucc_error("failed to subscribe actual wrapper dependency: %s",
                   ucc_status_string(status));
@@ -635,14 +650,12 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task,
         goto error_allreduce_wrapper;
     }
 
-    /* Propagate executor requirement from actual_task to schedule */
-    if (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
+    if (task != NULL && (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR)) {
         dt_schedule->super.super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
 
-    /* Set schedule functions */
     dt_schedule->super.super.post     = ucc_schedule_start;
-    dt_schedule->super.super.progress = NULL; /* Sub-tasks have their own progress functions */
+    dt_schedule->super.super.progress = NULL;
     dt_schedule->super.super.finalize = ucc_dt_check_schedule_finalize;
     return &dt_schedule->super.super;
 
