@@ -210,6 +210,9 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_init,
             return UCC_OK;
         }
     }
+    if (coll_args->src.info.count == 0) {
+        return UCC_OK;
+    }
     /* Register both local buffers for RDMA.  Only the remotely-accessed side
      * (src for GET, dst for PUT) is exported to peers during exchange; the
      * other side is kept as the local UCP memh for the RDMA operation. */
@@ -858,18 +861,22 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_destroy(ucc_tl_ucp_task_t *task)
     ucc_tl_ucp_team_t    *team   = UCC_TL_UCP_TASK_TEAM(task);
     ucc_tl_ucp_context_t *ctx    = UCC_TL_UCP_TEAM_CTX(team);
     ucc_status_t          status = UCC_OK;
+    ucc_status_t          tmp;
 
     if (!(task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
         return UCC_OK;
     }
     if (task->dynamic_segments.src_local) {
         if (task->dynamic_segments.src_local->tl_h) {
-            status =
-                ucc_tl_ucp_mem_unmap(&ctx->super.super, UCC_MEM_MAP_MODE_EXPORT,
-                                     task->dynamic_segments.src_local->tl_h);
-            if (status != UCC_OK) {
+            tmp = ucc_tl_ucp_mem_unmap(&ctx->super.super,
+                                       UCC_MEM_MAP_MODE_EXPORT,
+                                       task->dynamic_segments.src_local->tl_h);
+            if (tmp != UCC_OK) {
                 tl_error(UCC_TASK_LIB(task),
                          "failed to unmap src local memory handle");
+                if (status == UCC_OK) {
+                    status = tmp;
+                }
             }
             ucc_free(task->dynamic_segments.src_local->tl_h);
             task->dynamic_segments.src_local->tl_h = NULL;
@@ -879,12 +886,15 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_destroy(ucc_tl_ucp_task_t *task)
     }
     if (task->dynamic_segments.dst_local) {
         if (task->dynamic_segments.dst_local->tl_h) {
-            status =
-                ucc_tl_ucp_mem_unmap(&ctx->super.super, UCC_MEM_MAP_MODE_EXPORT,
-                                     task->dynamic_segments.dst_local->tl_h);
-            if (status != UCC_OK) {
+            tmp = ucc_tl_ucp_mem_unmap(&ctx->super.super,
+                                       UCC_MEM_MAP_MODE_EXPORT,
+                                       task->dynamic_segments.dst_local->tl_h);
+            if (tmp != UCC_OK) {
                 tl_error(UCC_TASK_LIB(task),
                          "failed to unmap dst local memory handle");
+                if (status == UCC_OK) {
+                    status = tmp;
+                }
             }
             ucc_free(task->dynamic_segments.dst_local->tl_h);
             task->dynamic_segments.dst_local->tl_h = NULL;

@@ -73,10 +73,11 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_sched_finalize(ucc_coll_task_t *ctask)
 ucc_status_t ucc_tl_ucp_alltoall_onesided_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_status_t       destroy_status;
     ucc_status_t       status;
 
-    status = ucc_tl_ucp_coll_dynamic_segment_destroy(task);
-    if (ucc_unlikely(UCC_OK != status)) {
+    destroy_status = ucc_tl_ucp_coll_dynamic_segment_destroy(task);
+    if (ucc_unlikely(UCC_OK != destroy_status)) {
         tl_error(UCC_TASK_LIB(coll_task),
                  "failed to destroy dynamic segment local handles");
     }
@@ -84,7 +85,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_finalize(ucc_coll_task_t *coll_task)
     if (ucc_unlikely(UCC_OK != status)) {
         tl_error(UCC_TASK_LIB(coll_task), "failed to finalize collective");
     }
-    return status;
+    return (destroy_status != UCC_OK) ? destroy_status : status;
 }
 
 void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
@@ -131,6 +132,10 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
 
     nelems   = TASK_ARGS(task).src.info.count;
     nelems   = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
+    if (nelems == 0) {
+        task->super.status = UCC_OK;
+        goto out;
+    }
     for (; *posted < gsize; peer = (peer + 1) % gsize) {
         UCPCHECK_GOTO(ucc_tl_ucp_get_nb(PTR_OFFSET(dest, peer * nelems),
                                         PTR_OFFSET(src, grank * nelems),
@@ -195,6 +200,10 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
                    : TASK_ARGS(task).src_memh.local_memh;
     }
 
+    if (nelems == 0) {
+        task->super.status = UCC_OK;
+        goto out;
+    }
     for (; *posted < gsize; peer = (peer + 1) % gsize) {
         UCPCHECK_GOTO(
             ucc_tl_ucp_put_nb(PTR_OFFSET(src, peer * nelems),
