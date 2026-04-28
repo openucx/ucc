@@ -419,7 +419,8 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
                       max_ag_counter;
         if (ag_counter == (req->ag_counter % max_ag_counter)) {
             ucc_list_del(&pp->super);
-            status = ucc_tl_mlx5_mcast_process_packet_collective(comm, req, pp, coll_type);
+            status = ucc_tl_mlx5_mcast_process_packet_collective(comm, req,
+                                                                 pp, coll_type, 1);
             if (UCC_OK != status) {
                 tl_error(comm->lib, "process mcast packet failed, status %d",
                          status);
@@ -469,7 +470,8 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
                                  coll_type, pp->psn, pp->length, req->num_packets,
                                  req->to_send, req->to_recv, num_left);
 
-            status = ucc_tl_mlx5_mcast_process_packet_collective(comm, req, pp, coll_type);
+            status = ucc_tl_mlx5_mcast_process_packet_collective(comm, req,
+                                                                 pp, coll_type, 0);
             if (UCC_OK != status) {
                 tl_error(comm->lib, "process mcast packet failed, status %d",
                          status);
