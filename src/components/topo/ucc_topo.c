@@ -563,6 +563,7 @@ int ucc_topo_is_single_nvlink_domain(const ucc_topo_t *topo)
     ucc_device_id_t        dev;
     uint64_t               ref_clique_id;
     uint32_t               ref_partition_id;
+    const uint8_t         *ref_cluster_uuid;
     ucc_rank_t             i;
 
     if (size == 0) {
@@ -584,8 +585,21 @@ int ucc_topo_is_single_nvlink_domain(const ucc_topo_t *topo)
         return 0;
     }
 
+    /* clusterUuid: globally-unique fabric identity. cliqueId/partitionId
+     * are unique only within a fabric cluster, so two unrelated DGX nodes
+     * can collide there; clusterUuid is the reliable cross-node check. */
+    if (!ucc_gpu_fabric_cluster_uuid_is_valid(
+            host->gpus[dev].fabric_cluster_uuid)) {
+        ucc_debug(
+            "nvlink domain check: rank 0 GPU %u has no valid fabric "
+            "cluster UUID",
+            (unsigned)dev);
+        return 0;
+    }
+
     ref_clique_id    = host->gpus[dev].fabric_clique_id;
     ref_partition_id = host->gpus[dev].fabric_partition_id;
+    ref_cluster_uuid = host->gpus[dev].fabric_cluster_uuid;
 
     for (i = 1; i < size; i++) {
         if (!ucc_topo_rank_device_info(topo, i, &host, &dev)) {
@@ -596,6 +610,26 @@ int ucc_topo_is_single_nvlink_domain(const ucc_topo_t *topo)
         if (!UCC_GPU_HAS_CAP(&host->gpus[dev], UCC_GPU_CAP_FABRIC)) {
             ucc_debug("nvlink domain check: rank %u GPU %u not fabric-capable",
                       (unsigned)i, (unsigned)dev);
+            return 0;
+        }
+        if (!ucc_gpu_fabric_cluster_uuid_is_valid(
+                host->gpus[dev].fabric_cluster_uuid)) {
+            ucc_debug(
+                "nvlink domain check: rank %u GPU %u has no valid "
+                "fabric cluster UUID",
+                (unsigned)i,
+                (unsigned)dev);
+            return 0;
+        }
+        if (memcmp(
+                host->gpus[dev].fabric_cluster_uuid,
+                ref_cluster_uuid,
+                UCC_GPU_FABRIC_CLUSTER_UUID_LEN) != 0) {
+            ucc_debug(
+                "nvlink domain check: rank %u GPU %u cluster_uuid "
+                "differs from rank 0",
+                (unsigned)i,
+                (unsigned)dev);
             return 0;
         }
         if (host->gpus[dev].fabric_clique_id != ref_clique_id) {

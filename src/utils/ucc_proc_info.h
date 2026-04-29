@@ -28,6 +28,9 @@ typedef uint8_t  ucc_device_id_t;
 #define UCC_MAX_HOST_GPUS 16
 #define UCC_MAX_HOST_NICS 16
 
+/* Length of NVML clusterUuid (NVML_GPU_FABRIC_UUID_LEN). */
+#define UCC_GPU_FABRIC_CLUSTER_UUID_LEN 16
+
 typedef struct ucc_proc_info {
     ucc_host_id_t   host_hash;
     ucc_socket_id_t socket_id;
@@ -60,16 +63,31 @@ typedef enum ucc_gpu_cap {
 typedef struct ucc_gpu_info {
     ucc_pci_info_t pci;
     /**< Bitmask of ucc_gpu_cap_t flags */
-    uint32_t caps;
+    uint32_t       caps;
     /**< NVLink partition ID for GB200+ NVL sub-fabric partitions.
      *   UCC_GPU_FABRIC_PARTITION_ID_INVALID means single partition or
      *   not populated (NVML < r525). */
-    uint32_t fabric_partition_id;
+    uint32_t       fabric_partition_id;
     /**< NVSwitch fabric clique ID (UCC_GPU_FABRIC_CLIQUE_ID_INVALID if unknown) */
-    uint64_t fabric_clique_id;
+    uint64_t       fabric_clique_id;
+    /**< Globally-unique NVLink fabric cluster UUID (NVML clusterUuid).
+     *   All-zero means fabric info unavailable. */
+    uint8_t        fabric_cluster_uuid[UCC_GPU_FABRIC_CLUSTER_UUID_LEN];
     /**< Hash of GPU UUID for unique identification */
-    uint64_t uuid;
+    uint64_t       uuid;
 } ucc_gpu_info_t;
+
+/* Returns 1 if uuid is non-all-zero (i.e., real fabric info). */
+static inline int ucc_gpu_fabric_cluster_uuid_is_valid(const uint8_t *uuid)
+{
+    int i;
+    for (i = 0; i < UCC_GPU_FABRIC_CLUSTER_UUID_LEN; i++) {
+        if (uuid[i] != 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
 
  typedef struct ucc_nic_info {
     ucc_pci_info_t pci;
