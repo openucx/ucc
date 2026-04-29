@@ -30,6 +30,12 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
 
     task->allreduce_nvls.buf_size_bytes = args->dst.info.count *
                                           ucc_dt_size(task->allreduce_nvls.dt);
+    /* Pad up to one uint4 (16 B); the NVLS kernels' 16 B vector quantum is
+     * the only alignment we need. Padding bytes are uninitialized — the
+     * MC LD-SUM over them produces a fault-free arbitrary value that we
+     * never copy back to the user buffer. */
+    task->allreduce_nvls.kernel_size_bytes = ucc_align_up(
+        task->allreduce_nvls.buf_size_bytes, 16);
     task->allreduce_nvls.rbuf = args->dst.info.buffer;
     task->allreduce_nvls.sbuf = UCC_IS_INPLACE(*args) ? args->dst.info.buffer
                                                       : args->src.info.buffer;
@@ -72,7 +78,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
 
     switch (task->allreduce_nvls.stage) {
     case STAGE_KERNEL:
-        // copy src buffer to symmetric memory first
+        /* Copy the user source into the symmetric buffer. */
         status = CUDA_FUNC(cudaMemcpyAsync(
             (void *)uc_va,
             task->allreduce_nvls.sbuf,
@@ -89,7 +95,7 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             sm_count,
             threads,
             mc_va,
-            task->allreduce_nvls.buf_size_bytes,
+            task->allreduce_nvls.kernel_size_bytes,
             TASK_NVLS_CONTROL_MC(task),
             TASK_NVLS_CONTROL_UC(task),
             task->allreduce_nvls.coll_id,
@@ -101,6 +107,8 @@ void ucc_tl_cuda_allreduce_nvls_progress(ucc_coll_task_t *coll_task)
             task->super.status = status;
             return;
         }
+        /* Copy back only the user data range; padding stays in the
+         * symmetric buffer and is overwritten on the next collective. */
         status = CUDA_FUNC(cudaMemcpyAsync(
             (void *)task->allreduce_nvls.rbuf,
             (void *)uc_va,
@@ -182,26 +190,31 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(
     ucc_tl_cuda_team_t *team     = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
     size_t              buf_size = coll_args->args.dst.info.count *
                       ucc_dt_size(coll_args->args.dst.info.datatype);
+    size_t              kernel_size = ucc_align_up(buf_size, 16);
     ucc_tl_cuda_task_t *task;
     ucc_status_t        status;
 
-    if (buf_size < 1024 || coll_args->args.op != UCC_OP_SUM ||
+    /* The kernels operate on 16-byte vector units (uint4 / 4xu32 / 2xu64),
+     * so the only size constraint is 16 B alignment. The tail is left
+     * uninitialized and only buf_size bytes are copied back after the
+     * kernel. */
+    if (buf_size == 0 || coll_args->args.op != UCC_OP_SUM ||
         !ucc_tl_cuda_allreduce_nvls_dt_supported(
             coll_args->args.dst.info.datatype)) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
             "NVLS allreduce is supported only with SUM operation "
             "and float32, bfloat16, int32, uint32, int64, or uint64 "
-            "datatype, with message size >= 1024 bytes");
+            "datatype, with non-zero message size");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if (ucc_unlikely(
-            buf_size > UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_symmetric_size)) {
+    if (ucc_unlikely(kernel_size >
+                     UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_symmetric_size)) {
         tl_debug(
             UCC_TL_TEAM_LIB(team),
-            "NVLS allreduce buffer size %zu bytes exceeds symmetric buffer "
-            "size %zu bytes",
-            buf_size,
+            "NVLS allreduce padded buffer size %zu bytes exceeds "
+            "symmetric buffer size %zu bytes",
+            kernel_size,
             UCC_TL_CUDA_TEAM_LIB(team)->cfg.nvls_symmetric_size);
         return UCC_ERR_NOT_SUPPORTED;
     }

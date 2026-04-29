@@ -322,6 +322,11 @@ struct ucc_tl_cuda_task {
             void          *sbuf;
             void          *rbuf;
             size_t         buf_size_bytes;
+            /* Padded size launched on the NVLS kernel; >= buf_size_bytes,
+             * rounded up so each rank gets a full vec/scalar unit. The
+             * tail is zero-filled before the kernel; SUM with zeros is
+             * a no-op so user data is unaffected. */
+            size_t         kernel_size_bytes;
             /* Memory handle for MC symmetric memory */
             CUdeviceptr    mc_va;
             /* Memory handle for UC symmetric memory */
