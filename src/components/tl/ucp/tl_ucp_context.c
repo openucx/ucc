@@ -716,8 +716,7 @@ ucc_status_t ucc_tl_ucp_mem_map_offload_import(ucc_tl_ucp_context_t *ctx,
         if (strncmp(tl_h->tl_name, name, UCC_MEM_MAP_TL_NAME_LEN - 1) == 0) {
             break;
         }
-        /* this is not the index, skip this section of buffer if exists */
-        offset += *packed_size;
+        offset += UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t) + *packed_size;
     }
     if (i == l_memh->num_tls) {
         tl_error(ctx->super.super.lib, "unable to find TL UCP in memory handle");
@@ -785,6 +784,9 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
     }
 
     data = (ucc_tl_ucp_memh_data_t *)memh->tl_data;
+    if (!data) {
+        return UCC_OK;
+    }
     if (mode == UCC_MEM_MAP_MODE_EXPORT || mode == UCC_MEM_MAP_MODE_EXPORT_OFFLOAD) {
         status = ucp_mem_unmap(ctx->worker.ucp_context, data->rinfo.mem_h);
         if (status != UCS_OK) {
@@ -802,7 +804,14 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
             data->rinfo.packed_key = NULL;
         }
     } else if (mode == UCC_MEM_MAP_MODE_IMPORT || mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
-        // need to free rkeys (data->rkey) , packed memh (data->packed_memh)
+        if (mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD && data->rinfo.mem_h) {
+            ucs_status_t ucs_st = ucp_mem_unmap(ctx->worker.ucp_context,
+                                                 data->rinfo.mem_h);
+            if (ucs_st != UCS_OK) {
+                tl_error(ctx->super.super.lib,
+                         "ucp_mem_unmap (import offload) failed: %d", ucs_st);
+            }
+        }
         if (data->packed_memh) {
             ucp_memh_buffer_release(data->packed_memh, NULL);
         }
@@ -872,7 +881,7 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
      *
      * packed_key_size | packed_memh_size | packed_key | packed_memh
      */
-    packed_buffer = ucc_malloc(sizeof(size_t) * 2 + data->packed_memh_len +
+    packed_buffer = ucc_malloc(UCC_TL_UCP_MEMH_TL_HEADER_SIZE + data->packed_memh_len +
                                    data->rinfo.packed_key_len,
                                "packed buffer");
     if (!packed_buffer) {
@@ -899,9 +908,11 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
 
 failed_alloc_buffer:
     ucp_rkey_buffer_release(data->rinfo.packed_key);
+    data->rinfo.packed_key = NULL;
 failed_rkey_pack:
     if (data->packed_memh) {
         ucp_memh_buffer_release(data->packed_memh, NULL);
+        data->packed_memh = NULL;
     }
     return ucc_status;
 }

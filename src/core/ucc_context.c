@@ -17,9 +17,6 @@
 #include "utils/ucc_debug.h"
 #include "ucc_progress_queue.h"
 
-_Static_assert(UCC_MEM_MAP_TL_NAME_LEN == sizeof(size_t),
-               "UCC_MEM_MAP_TL_NAME_LEN must equal sizeof(size_t) for pack layout");
-
 static uint32_t ucc_context_seq_num = 0;
 static ucc_config_field_t ucc_context_config_table[] = {
     {"ESTIMATED_NUM_EPS", "0",
