@@ -11,14 +11,12 @@
 #include "components/tl/ucc_tl.h"
 #include "components/topo/ucc_sysinfo.h"
 #include "utils/ucc_malloc.h"
+#include "utils/ucc_math.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_list.h"
 #include "utils/ucc_string.h"
 #include "utils/ucc_debug.h"
 #include "ucc_progress_queue.h"
-
-_Static_assert(UCC_MEM_MAP_TL_NAME_LEN == sizeof(size_t),
-               "UCC_MEM_MAP_TL_NAME_LEN must equal sizeof(size_t) for pack layout");
 
 static uint32_t ucc_context_seq_num = 0;
 static ucc_config_field_t ucc_context_config_table[] = {
@@ -1246,6 +1244,7 @@ ucc_status_t ucc_mem_map_import(ucc_context_h        context,
 
     if (ctx->n_tl_ctx == 0) {
         ucc_debug("No TL contexts available for import");
+        local_memh->tl_h    = NULL;
         local_memh->mode    = mode;
         local_memh->context = ctx;
         *memh_size          = 0;
@@ -1328,7 +1327,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     int                       tls;
     int                       tlh_index;
 
-    if (!params) {
+    if (mode != UCC_MEM_MAP_MODE_EXPORT_OFFLOAD && !params) {
         ucc_error("params cannot be NULL");
         return UCC_ERR_INVALID_PARAM;
     }
@@ -1433,8 +1432,8 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
         if (mode == UCC_MEM_MAP_MODE_EXPORT) {
             ucc_free(local_memh->tl_h);
             ucc_free(local_memh);
+            *memh = NULL;
         }
-        *memh      = NULL;
         *memh_size = 0;
         return UCC_OK;
     }
@@ -1478,14 +1477,20 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
             }
         }
     } else {
-        exported_memh->tl_h = local_memh->tl_h;
+        exported_memh->tl_h = (ucc_mem_map_tl_t *)ucc_calloc(
+            packed_tls, sizeof(ucc_mem_map_tl_t), "packed tl memh");
+        if (!exported_memh->tl_h) {
+            ucc_error("failed to allocate handle for exported buffers' tl handles");
+            status = UCC_ERR_NO_MEMORY;
+            ucc_free(exported_memh);
+            goto failed_pack;
+        }
 
-        for (i = 0; i < local_memh->num_tls; i++) {
+        for (i = 0, offset = 0, tls = 0; i < (int)local_memh->num_tls; i++) {
             if (!local_memh->tl_h[i].packed_size) {
                 ucc_free(packed_buffers[i]);
                 continue;
             }
-            /* these are already packed in order */
             strncpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
                    local_memh->tl_h[i].tl_name, UCC_MEM_MAP_TL_NAME_LEN);
             offset += UCC_MEM_MAP_TL_NAME_LEN;
@@ -1496,6 +1501,8 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
                    packed_buffers[i], local_memh->tl_h[i].packed_size);
             ucc_free(packed_buffers[i]);
             offset += local_memh->tl_h[i].packed_size;
+            memcpy(&exported_memh->tl_h[tls++], &local_memh->tl_h[i],
+                   sizeof(ucc_mem_map_tl_t));
         }
     }
 
@@ -1506,9 +1513,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     exported_memh->num_tls     = packed_tls;
     *memh                      = exported_memh;
     *memh_size                 = sizeof(ucc_mem_map_memh_t) + offset;
-    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
-        ucc_free(local_memh->tl_h);
-    }
+    ucc_free(local_memh->tl_h);
     ucc_free(local_memh);
     ucc_free(packed_buffers);
     return UCC_OK;
