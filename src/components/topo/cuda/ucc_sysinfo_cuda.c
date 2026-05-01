@@ -62,7 +62,13 @@ static void *ucc_sysinfo_cuda_nvml_get_handle(void)
     }
 #endif
 
-    return handle ? handle : RTLD_DEFAULT;
+    if (!handle) {
+        ucc_debug("could not obtain dedicated NVML handle; "
+                  "falling back to RTLD_DEFAULT");
+        return RTLD_DEFAULT;
+    }
+
+    return handle;
 }
 
 static void *ucc_sysinfo_cuda_nvml_get_symbol(const char *symbol)
