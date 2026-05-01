@@ -173,13 +173,15 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
                       (coll_args, request, team), ucc_coll_args_t *coll_args,
                       ucc_coll_req_h *request, ucc_team_h team)
 {
-    ucc_base_coll_args_t      op_args = {0};
-    ucc_coll_task_t          *task;
-    ucc_status_t              status;
-    ucc_ee_executor_params_t  params;
-    ucc_memory_type_t         coll_mem_type;
-    ucc_ee_type_t             coll_ee_type;
-    size_t                    coll_size;
+    ucc_base_coll_args_t     op_args = {0};
+    ucc_coll_task_t         *task    = NULL;
+    ucc_status_t             status;
+    ucc_ee_executor_params_t params;
+    ucc_memory_type_t        coll_mem_type;
+    ucc_ee_type_t            coll_ee_type;
+    size_t                   coll_size;
+    ucc_coll_task_t         *task_wrap;
+    ucc_status_t             wrap_err;
 
     if (ucc_unlikely(team->state != UCC_TEAM_ACTIVE)) {
         ucc_error("team %p is used before team create is completed", team);
@@ -246,47 +248,41 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     }
 
     status = ucc_coll_init(team->score_map, &op_args, &task);
-    if (UCC_ERR_NOT_SUPPORTED == status) {
-        ucc_debug("failed to init collective: not supported");
-        goto free_scratch;
-    } else if (ucc_unlikely(status < 0)) {
-        char coll_args_str[256] = {0};
-        ucc_coll_args_str(&op_args.args, team->rank, team->size, coll_args_str,
-                          sizeof(coll_args_str));
-        ucc_error("failed to init collective: %s, err: (%d) %s", coll_args_str,
-                  status, ucc_status_string(status));
-        goto free_scratch;
-    }
 
-    /* Setup non-blocking datatype check for rooted collectives
-     *
-     * This implements transparent validation using a schedule with two tasks:
-     * 1. Allreduce validation task: uses MIN reduction with min/max trick to detect mismatches
-     * 2. Actual collective task: the real gather/scatter operation
-     *
-     * Validation uses allreduce (MIN) on [dt, -dt, mem, -mem]:
-     *   - Message size: 8 bytes (4 × int16_t, doesn't scale with number of ranks)
-     *   - After reduction: min(dt) == -min(-dt) means all ranks have same datatype
-     *
-     * Dependencies: allreduce validation → actual task
-     * If validation fails, the dependency mechanism prevents the actual task from posting.
-     */
-    if (coll_args->coll_type == UCC_COLL_TYPE_GATHER ||
-        coll_args->coll_type == UCC_COLL_TYPE_GATHERV ||
-        coll_args->coll_type == UCC_COLL_TYPE_SCATTER ||
-        coll_args->coll_type == UCC_COLL_TYPE_SCATTERV) {
-        /* Check if datatype validation is needed and create schedule if so */
-        ucc_coll_task_t *validated_task;
+    if (ucc_global_config.check_asymmetric_dt &&
+        (coll_args->coll_type == UCC_COLL_TYPE_GATHER  ||
+         coll_args->coll_type == UCC_COLL_TYPE_GATHERV ||
+         coll_args->coll_type == UCC_COLL_TYPE_SCATTER  ||
+         coll_args->coll_type == UCC_COLL_TYPE_SCATTERV)) {
 
-        validated_task = ucc_service_dt_check(team, task, &status);
-        if (!validated_task) {
-            ucc_error("failed to create dt_check schedule: %s",
-                      ucc_status_string(status));
-            goto coll_finalize;
+        if (task == NULL && op_args.asymmetric_save_info.scratch != NULL) {
+            ucc_mc_free(op_args.asymmetric_save_info.scratch);
+            op_args.asymmetric_save_info.scratch = NULL;
         }
-        /* Return schedule if validation was needed, or original task if not */
-        task = validated_task;
+        task_wrap = ucc_service_dt_check(team, coll_args, status, task,
+                                         &wrap_err);
+        if (ucc_unlikely(!task_wrap)) {
+            status = wrap_err;
+            if (task) {
+                goto coll_finalize;
+            }
+            goto free_scratch;
+        }
+        task = task_wrap;
+    } else {
+        if (UCC_ERR_NOT_SUPPORTED == status) {
+            ucc_debug("failed to init collective: not supported");
+            goto free_scratch;
+        } else if (ucc_unlikely(status < 0)) {
+            char coll_args_str[256] = {0};
+            ucc_coll_args_str(&op_args.args, team->rank, team->size,
+                              coll_args_str, sizeof(coll_args_str));
+            ucc_error("failed to init collective: %s, err: (%d) %s",
+                      coll_args_str, status, ucc_status_string(status));
+            goto free_scratch;
+        }
     }
+
     /* Setup top-level task (actual task or schedule) */
     task->flags |= UCC_COLL_TASK_FLAG_TOP_LEVEL;
     if (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
