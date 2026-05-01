@@ -17,35 +17,43 @@ extern "C" {
 
 #include "nvls.cuh"
 
-
 // vectorized allreduce kernel for 32-bit lanes
 template <typename NvlsOps>
 __global__ void __launch_bounds__(UCC_TL_CUDA_MAX_NVLS_THREADS)
-    allreduce_kernel_vec32(ucc_tl_cuda_nvls_control_t *mc_bar,
-                           ucc_tl_cuda_nvls_control_t *uc_bar,
-                           const uint32_t total_blocks, // block count per gpu * num gpus in Multicast group
-                           uint64_t launch_counter,
-                           uint32_t *base_u32, size_t count_u32, uint32_t rank,
-                           uint32_t tsize)
+    allreduce_kernel_vec32(
+        ucc_tl_cuda_nvls_control_t *mc_bar, ucc_tl_cuda_nvls_control_t *uc_bar,
+        const uint32_t total_blocks, uint64_t launch_counter,
+        uint32_t *base_u32, size_t count_u32, uint32_t rank, uint32_t tsize)
 {
-    // pre barrier
-    nvls_bar(&(mc_bar->arrival_counter), &(uc_bar->arrival_counter), total_blocks * (launch_counter * 2 + 1));
-
-    // Kernel execution
-    size_t chunk_start = ((int64_t)count_u32 * (int64_t)rank) / (int64_t)tsize;
-    size_t chunk_end   = ((int64_t)count_u32 * (int64_t)(rank + 1)) / (int64_t)tsize;
-
     size_t thread_offset = (threadIdx.x + blockIdx.x * blockDim.x) * 4;
     size_t stride        = blockDim.x * gridDim.x * 4;
+    size_t chunk_start;
+    size_t chunk_end;
+    uint4  val;
 
-    for (size_t idx = chunk_start + thread_offset; idx < chunk_end; idx += stride) {
-        uint4 val;
+    nvls_bar(
+        &(mc_bar->arrival_counter),
+        &(uc_bar->arrival_counter),
+        total_blocks * (launch_counter * 2 + 1));
+
+    if (count_u32 >= 4 * tsize) {
+        chunk_start = ((int64_t)count_u32 * (int64_t)rank) / (int64_t)tsize;
+        chunk_end = ((int64_t)count_u32 * (int64_t)(rank + 1)) / (int64_t)tsize;
+    } else {
+        chunk_start = 0;
+        chunk_end   = (rank == 0) ? count_u32 : 0;
+    }
+
+    for (size_t idx = chunk_start + thread_offset; idx < chunk_end;
+         idx += stride) {
         NvlsOps::ld(val, base_u32 + idx);
         NvlsOps::st(val, base_u32 + idx);
     }
 
-    // post barrier
-    nvls_bar(&(mc_bar->arrival_counter), &(uc_bar->arrival_counter), total_blocks * (launch_counter * 2 + 2));
+    nvls_bar(
+        &(mc_bar->arrival_counter),
+        &(uc_bar->arrival_counter),
+        total_blocks * (launch_counter * 2 + 2));
 }
 
 template <typename NvlsOps>
@@ -55,23 +63,27 @@ __global__ void __launch_bounds__(UCC_TL_CUDA_MAX_NVLS_THREADS)
         const uint32_t total_blocks, uint64_t launch_counter,
         uint32_t *base_u32, size_t count_u32, uint32_t rank, uint32_t tsize)
 {
-    // pre barrier
+    size_t thread_offset = (threadIdx.x + blockIdx.x * blockDim.x) * 4;
+    size_t stride        = blockDim.x * gridDim.x * 4;
+    size_t chunk_start;
+    size_t chunk_end;
+    typename NvlsOps::value_type v0, v1, v2, v3;
+
     nvls_bar(
         &(mc_bar->arrival_counter),
         &(uc_bar->arrival_counter),
         total_blocks * (launch_counter * 2 + 1));
 
-    // Kernel execution
-    size_t chunk_start = ((int64_t)count_u32 * (int64_t)rank) / (int64_t)tsize;
-    size_t chunk_end   = ((int64_t)count_u32 * (int64_t)(rank + 1)) /
-                       (int64_t)tsize;
-
-    size_t thread_offset = (threadIdx.x + blockIdx.x * blockDim.x) * 4;
-    size_t stride        = blockDim.x * gridDim.x * 4;
+    if (count_u32 >= 4 * tsize) {
+        chunk_start = ((int64_t)count_u32 * (int64_t)rank) / (int64_t)tsize;
+        chunk_end = ((int64_t)count_u32 * (int64_t)(rank + 1)) / (int64_t)tsize;
+    } else {
+        chunk_start = 0;
+        chunk_end   = (rank == 0) ? count_u32 : 0;
+    }
 
     for (size_t idx = chunk_start + thread_offset; idx < chunk_end;
          idx += stride) {
-        typename NvlsOps::value_type v0, v1, v2, v3;
         NvlsOps::ld(v0, base_u32 + idx + 0);
         NvlsOps::ld(v1, base_u32 + idx + 1);
         NvlsOps::ld(v2, base_u32 + idx + 2);
@@ -82,7 +94,6 @@ __global__ void __launch_bounds__(UCC_TL_CUDA_MAX_NVLS_THREADS)
         NvlsOps::st(v3, base_u32 + idx + 3);
     }
 
-    // post barrier
     nvls_bar(
         &(mc_bar->arrival_counter),
         &(uc_bar->arrival_counter),
@@ -96,30 +107,33 @@ __global__ void __launch_bounds__(UCC_TL_CUDA_MAX_NVLS_THREADS)
         const uint32_t total_blocks, uint64_t launch_counter,
         uint64_t *base_u64, size_t count_u64, uint32_t rank, uint32_t tsize)
 {
-    // pre barrier
+    size_t thread_offset = (threadIdx.x + blockIdx.x * blockDim.x) * 2;
+    size_t stride        = blockDim.x * gridDim.x * 2;
+    size_t chunk_start;
+    size_t chunk_end;
+    typename NvlsOps::value_type v0, v1;
+
     nvls_bar(
         &(mc_bar->arrival_counter),
         &(uc_bar->arrival_counter),
         total_blocks * (launch_counter * 2 + 1));
 
-    // Kernel execution
-    size_t chunk_start = ((int64_t)count_u64 * (int64_t)rank) / (int64_t)tsize;
-    size_t chunk_end   = ((int64_t)count_u64 * (int64_t)(rank + 1)) /
-                       (int64_t)tsize;
-
-    size_t thread_offset = (threadIdx.x + blockIdx.x * blockDim.x) * 2;
-    size_t stride        = blockDim.x * gridDim.x * 2;
+    if (count_u64 >= 2 * tsize) {
+        chunk_start = ((int64_t)count_u64 * (int64_t)rank) / (int64_t)tsize;
+        chunk_end = ((int64_t)count_u64 * (int64_t)(rank + 1)) / (int64_t)tsize;
+    } else {
+        chunk_start = 0;
+        chunk_end   = (rank == 0) ? count_u64 : 0;
+    }
 
     for (size_t idx = chunk_start + thread_offset; idx < chunk_end;
          idx += stride) {
-        typename NvlsOps::value_type v0, v1;
         NvlsOps::ld(v0, base_u64 + idx + 0);
         NvlsOps::ld(v1, base_u64 + idx + 1);
         NvlsOps::st(v0, base_u64 + idx + 0);
         NvlsOps::st(v1, base_u64 + idx + 1);
     }
 
-    // post barrier
     nvls_bar(
         &(mc_bar->arrival_counter),
         &(uc_bar->arrival_counter),
