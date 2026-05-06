@@ -67,12 +67,11 @@ typedef struct ucc_service_coll_req ucc_service_coll_req_t;
 
 typedef struct ucc_dt_check_state {
     ucc_service_coll_req_t *check_req;
-    int16_t                 values[4];
+    int16_t                 values[6]; /* [dt,-dt, mem,-mem, status,-status] */
     ucc_subset_t            subset;
     int                     validated;
     struct ucc_coll_task   *actual_task;
-    ucc_status_t            init_status; /* real error when local init failed for non-DT reasons */
-    ucc_status_t            ar_status;   /* real error when the service allreduce itself failed */
+    ucc_status_t            ar_status; /* set when the service allreduce itself fails */
 } ucc_dt_check_state_t;
 
 enum {

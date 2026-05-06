@@ -229,6 +229,11 @@ static ucc_status_t ucc_dt_validate_results(ucc_dt_check_state_t *dt_check)
         return UCC_ERR_INVALID_PARAM;
     }
     values = dt_check->values;
+    /* Check global init status: values[4,5] encode [status, -status] via MIN.
+     * If any rank's init failed, values[4] holds the most-negative error code. */
+    if (values[4] != -values[5] || (ucc_status_t)values[4] != UCC_OK) {
+        return (ucc_status_t)values[4];
+    }
     if (values[0] == (int16_t) UCC_ERR_NOT_SUPPORTED) {
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -253,7 +258,7 @@ static ucc_status_t ucc_dt_check_allreduce_post(ucc_coll_task_t *allreduce_wrapp
     }
 
     status = ucc_service_allreduce(team, dt_check->values, dt_check->values,
-                                   UCC_DT_INT16, 4, UCC_OP_MIN,
+                                   UCC_DT_INT16, 6, UCC_OP_MIN,
                                    dt_check->subset, &dt_check->check_req);
     if (status != UCC_OK) {
         ucc_schedule_t *schedule = allreduce_wrapper->schedule;
@@ -332,15 +337,16 @@ static ucc_status_t ucc_dt_check_actual_wrapper_post(ucc_coll_task_t *wrapper)
 
     if (!dt_check->validated) {
         ucc_status_t err;
-        /* Use the real error when init failed for non-DT reasons, or when
-         * the service allreduce itself failed.  Otherwise it is a genuine
-         * datatype-consistency mismatch across ranks. */
-        if (dt_check->init_status != UCC_OK) {
-            err = dt_check->init_status;
-        } else if (dt_check->ar_status != UCC_OK) {
+        if (dt_check->ar_status != UCC_OK) {
+            /* service allreduce itself failed - rank-local infra error */
             err = dt_check->ar_status;
         } else {
-            err = UCC_ERR_NOT_SUPPORTED;
+            /* values[4] holds the global min init status after allreduce;
+             * non-zero means at least one rank's init failed */
+            err = (ucc_status_t) dt_check->values[4];
+            if (err == UCC_OK) {
+                err = UCC_ERR_NOT_SUPPORTED;
+            }
         }
         wrapper->status = err;
         ucc_task_complete(wrapper);
@@ -566,24 +572,19 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t            *team,
      * the allreduce so that all ranks get a uniform result and none hang.
      * Save the real error for non-DT init failures (OOM, invalid args,
      * etc.) so the failure path can propagate the accurate status. */
-    if (local_status != UCC_OK || !UCC_DT_IS_PREDEFINED(local_dt)) {
-        dt_check->values[0]  = (int16_t) UCC_ERR_NOT_SUPPORTED;
-        dt_check->values[1]  = -(int16_t) UCC_ERR_NOT_SUPPORTED;
-        /* Record any hard init error (not UCC_ERR_NOT_SUPPORTED, which is the
-         * normal DT-mismatch sentinel) so actual_wrapper_post can surface the
-         * right status code.  This is independent of whether the DT is
-         * predefined: a rank that fails with OOM on a non-predefined DT must
-         * still report OOM, not UCC_ERR_NOT_SUPPORTED. */
-        dt_check->init_status = (local_status != UCC_OK &&
-                                  local_status != UCC_ERR_NOT_SUPPORTED)
-                                 ? local_status : UCC_OK;
+    if (!UCC_DT_IS_PREDEFINED(local_dt)) {
+        dt_check->values[0] = (int16_t) UCC_ERR_NOT_SUPPORTED;
+        dt_check->values[1] = -(int16_t) UCC_ERR_NOT_SUPPORTED;
     } else {
-        dt_check->values[0]   = (int16_t) local_dt;
-        dt_check->values[1]   = -(int16_t) local_dt;
-        dt_check->init_status = UCC_OK;
+        dt_check->values[0] = (int16_t) local_dt;
+        dt_check->values[1] = -(int16_t) local_dt;
     }
-    dt_check->values[2]         = (int16_t) local_mem_type;
-    dt_check->values[3]         = -(int16_t) local_mem_type;
+    dt_check->values[2] = (int16_t) local_mem_type;
+    dt_check->values[3] = -(int16_t) local_mem_type;
+    /* Encode local init status so all ranks collectively agree on the outcome.
+     * After MIN allreduce, values[4] holds the globally worst error code. */
+    dt_check->values[4] = (int16_t) local_status;
+    dt_check->values[5] = -(int16_t) local_status;
     dt_check->subset.myrank     = team->rank;
     dt_check->subset.map.type   = UCC_EP_MAP_FULL;
     dt_check->subset.map.ep_num = team->size;
