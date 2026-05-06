@@ -259,16 +259,20 @@ static ucc_status_t ucc_dt_check_allreduce_post(ucc_coll_task_t *allreduce_wrapp
         ucc_schedule_t *schedule = allreduce_wrapper->schedule;
 
         allreduce_wrapper->status = status;
+        ucc_task_complete(allreduce_wrapper);
         /* ucc_schedule_start already set the schedule to UCC_INPROGRESS before
          * firing SCHEDULE_STARTED.  Fail the whole schedule now so that
          * ucc_collective_finalize_internal will not refuse to run because the
-         * top-level request is still UCC_INPROGRESS. */
+         * top-level request is still UCC_INPROGRESS.
+         * Note: ucc_task_complete above does not emit UCC_EVENT_COMPLETED_SCHEDULE
+         * on error (status < 0), so the schedule counter is not incremented and
+         * the schedule must be force-completed here. */
         if (schedule) {
             schedule->n_completed_tasks = schedule->n_tasks;
             schedule->super.status      = status;
             ucc_task_complete(&schedule->super);
         }
-        return UCC_OK;
+        return status;
     }
     allreduce_wrapper->status = UCC_INPROGRESS;
     return ucc_progress_queue_enqueue(team->contexts[0]->pq, allreduce_wrapper);
@@ -339,6 +343,7 @@ static ucc_status_t ucc_dt_check_actual_wrapper_post(ucc_coll_task_t *wrapper)
             err = UCC_ERR_NOT_SUPPORTED;
         }
         wrapper->status = err;
+        ucc_task_complete(wrapper);
         if (schedule) {
             /* Prevent ucc_schedule_completed_handler from calling
              * ucc_task_complete a second time after allreduce_wrapper
@@ -377,11 +382,12 @@ static ucc_status_t ucc_dt_check_actual_wrapper_post(ucc_coll_task_t *wrapper)
                 sched_task->flags   |= UCC_COLL_TASK_FLAG_EXECUTOR_STOP;
                 actual_task->flags  &= ~(uint32_t)UCC_COLL_TASK_FLAG_EXECUTOR_STOP;
             }
+            ucc_task_complete(wrapper);
             schedule->n_completed_tasks = schedule->n_tasks;
             schedule->super.status      = status;
             ucc_task_complete(&schedule->super);
         }
-        return UCC_OK;
+        return status;
     }
     wrapper->status = UCC_INPROGRESS;
     return ucc_progress_queue_enqueue(wrapper->bargs.team->contexts[0]->pq, wrapper);
@@ -563,10 +569,13 @@ ucc_coll_task_t* ucc_service_dt_check(ucc_team_t            *team,
     if (local_status != UCC_OK || !UCC_DT_IS_PREDEFINED(local_dt)) {
         dt_check->values[0]  = (int16_t) UCC_ERR_NOT_SUPPORTED;
         dt_check->values[1]  = -(int16_t) UCC_ERR_NOT_SUPPORTED;
-        /* Record the actual init failure only for non-DT errors so the
-         * actual_wrapper_post can surface the right status code. */
+        /* Record any hard init error (not UCC_ERR_NOT_SUPPORTED, which is the
+         * normal DT-mismatch sentinel) so actual_wrapper_post can surface the
+         * right status code.  This is independent of whether the DT is
+         * predefined: a rank that fails with OOM on a non-predefined DT must
+         * still report OOM, not UCC_ERR_NOT_SUPPORTED. */
         dt_check->init_status = (local_status != UCC_OK &&
-                                  UCC_DT_IS_PREDEFINED(local_dt))
+                                  local_status != UCC_ERR_NOT_SUPPORTED)
                                  ? local_status : UCC_OK;
     } else {
         dt_check->values[0]   = (int16_t) local_dt;

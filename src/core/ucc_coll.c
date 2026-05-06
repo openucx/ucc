@@ -259,6 +259,18 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
             ucc_mc_free(op_args.asymmetric_save_info.scratch);
             op_args.asymmetric_save_info.scratch = NULL;
         }
+        if (task == NULL && status < 0 && status != UCC_ERR_NOT_SUPPORTED) {
+            char coll_args_str[256] = {0};
+            ucc_coll_args_str(&op_args.args, team->rank, team->size,
+                              coll_args_str, sizeof(coll_args_str));
+            ucc_error("failed to init collective: %s, err: (%d) %s",
+                      coll_args_str, status, ucc_status_string(status));
+            goto free_scratch;
+        }
+        if (status != UCC_OK) {
+            ucc_debug("collective init returned %s, proceeding with "
+                      "asymmetric DT check", ucc_status_string(status));
+        }
         task_wrap = ucc_service_dt_check(team, coll_args, status, task,
                                          &wrap_err);
         if (ucc_unlikely(!task_wrap)) {
