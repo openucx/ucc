@@ -110,12 +110,13 @@ static int ucc_topo_ranks_on_node_nvlink(ucc_rank_t rank1, ucc_rank_t rank2,
     gpu1 = &host1->gpus[dev1];
     gpu2 = &host2->gpus[dev2];
 
-    if (gpu1->fabric_clique_id != 0 &&
+    if (gpu1->fabric_clique_id != UCC_GPU_FABRIC_CLIQUE_ID_INVALID &&
         gpu1->fabric_clique_id == gpu2->fabric_clique_id) {
         return 1;
     }
 
-    if (gpu1->nvswitch_connected && gpu2->nvswitch_connected) {
+    if (UCC_GPU_HAS_CAP(gpu1, UCC_GPU_CAP_NVSWITCH) &&
+        UCC_GPU_HAS_CAP(gpu2, UCC_GPU_CAP_NVSWITCH)) {
         return 1;
     }
 

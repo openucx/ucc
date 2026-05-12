@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -32,7 +32,7 @@
 #define UCC_TL_CUDA_MAX_RING_CHUNKS 8
 
 #ifdef HAVE_NVLS
-#define UCC_TL_CUDA_MAX_NVLS_PEERS 144
+#define UCC_TL_CUDA_MAX_NVLS_PEERS (72 * 8)
 #define UCC_TL_CUDA_MAX_NVLS_SM_COUNT 32
 #define UCC_TL_CUDA_MAX_NVLS_THREADS 1024
 
@@ -215,6 +215,8 @@ struct ucc_tl_cuda_task {
             ucc_tl_cuda_mem_info_t mem_info_dst;
             void                  *peer_map_addr_src[UCC_TL_CUDA_MAX_PEERS];
             void                  *peer_map_addr_dst[UCC_TL_CUDA_MAX_PEERS];
+            uintptr_t              peer_src_d_ptr[UCC_TL_CUDA_MAX_PEERS];
+            uintptr_t              peer_dst_d_ptr[UCC_TL_CUDA_MAX_PEERS];
             int                    num_posted;
             ucc_datatype_t         sdt;
             ucc_datatype_t         rdt;
@@ -320,6 +322,11 @@ struct ucc_tl_cuda_task {
             void          *sbuf;
             void          *rbuf;
             size_t         buf_size_bytes;
+            /* Padded size launched on the NVLS kernel; >= buf_size_bytes,
+             * rounded up so each rank gets a full vec/scalar unit. The
+             * tail is zero-filled before the kernel; SUM with zeros is
+             * a no-op so user data is unaffected. */
+            size_t         kernel_size_bytes;
             /* Memory handle for MC symmetric memory */
             CUdeviceptr    mc_va;
             /* Memory handle for UC symmetric memory */
