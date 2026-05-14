@@ -161,7 +161,10 @@ ucc_status_t post_allreduce_kernel(cudaStream_t stream, uint32_t sm_count,
     ucc_tl_cuda_nvls_control_t *uc_bar = reinterpret_cast<ucc_tl_cuda_nvls_control_t *>(uc_control_addr);
     uint32_t expected_blocks = sm_count * tsize; // total num of blocks in the multicast group, num gpus * num blocks per gpu, used for barrier synchronization
 
-    assert(((uintptr_t)(mc_base_addr) % 8) == 0);
+    assert(((uintptr_t)(mc_base_addr) % 16) == 0);
+    if (datatype == UCC_DT_FLOAT32 || datatype == UCC_DT_BFLOAT16) {
+        assert(count_u32 % (4 * tsize) == 0);
+    }
     switch (datatype) {
     case UCC_DT_FLOAT32:
         allreduce_kernel_vec32<NvlsFp32Ops><<<sm_count, threads, 0, stream>>>(

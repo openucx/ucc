@@ -30,12 +30,11 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_start(ucc_coll_task_t *coll_task)
 
     task->allreduce_nvls.buf_size_bytes = args->dst.info.count *
                                           ucc_dt_size(task->allreduce_nvls.dt);
-    /* Pad up to one uint4 (16 B); the NVLS kernels' 16 B vector quantum is
-     * the only alignment we need. Padding bytes are uninitialized — the
-     * MC LD-SUM over them produces a fault-free arbitrary value that we
-     * never copy back to the user buffer. */
+    /* Pad to 16*tsize so chunk_start = count_u32*rank/tsize is 4-aligned for
+     * the MULTIMEM v4.f32 16-byte accesses in vec32 kernels. Padding bytes are
+     * uninitialized and never copied back to the user buffer. */
     task->allreduce_nvls.kernel_size_bytes = ucc_align_up(
-        task->allreduce_nvls.buf_size_bytes, 16);
+        task->allreduce_nvls.buf_size_bytes, 16 * UCC_TL_TEAM_SIZE(team));
     task->allreduce_nvls.rbuf = args->dst.info.buffer;
     task->allreduce_nvls.sbuf = UCC_IS_INPLACE(*args) ? args->dst.info.buffer
                                                       : args->src.info.buffer;
@@ -190,14 +189,12 @@ ucc_status_t ucc_tl_cuda_allreduce_nvls_init(
     ucc_tl_cuda_team_t *team     = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
     size_t              buf_size = coll_args->args.dst.info.count *
                       ucc_dt_size(coll_args->args.dst.info.datatype);
-    size_t              kernel_size = ucc_align_up(buf_size, 16);
+    size_t              tsize       = UCC_TL_TEAM_SIZE(team);
+    size_t              kernel_size = ucc_align_up(buf_size, 16 * tsize);
     ucc_tl_cuda_task_t *task;
     ucc_status_t        status;
 
-    /* The kernels operate on 16-byte vector units (uint4 / 4xu32 / 2xu64),
-     * so the only size constraint is 16 B alignment. The tail is left
-     * uninitialized and only buf_size bytes are copied back after the
-     * kernel. */
+    /* kernel_size must be a multiple of 16*tsize; see allreduce_nvls_start. */
     if (buf_size == 0 || coll_args->args.op != UCC_OP_SUM ||
         !ucc_tl_cuda_allreduce_nvls_dt_supported(
             coll_args->args.dst.info.datatype)) {
