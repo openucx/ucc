@@ -323,7 +323,10 @@ void ucc_tl_ucp_team_mem_map_destroy(ucc_tl_ucp_team_t *team)
     /* Clean up any in-flight allgather task on error path.
      * If the task is still queued (UCC_INPROGRESS), remove it from the
      * progress queue's linked list before freeing to prevent the next
-     * ucc_context_progress() from walking freed memory. */
+     * ucc_context_progress() from walking freed memory.
+     * Pre-condition: caller serialises ucc_context_progress and
+     * ucc_team_create_test (UCC_THREAD_SINGLE contract); manipulating
+     * list_elem without the MT progress-queue lock is safe here. */
     if (team->mem_map_task != NULL) {
         if (team->mem_map_task->status == UCC_INPROGRESS) {
             ucc_list_del(&team->mem_map_task->list_elem);
