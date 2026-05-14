@@ -49,9 +49,9 @@ public:
                                    rank_size);
             }
             if (is_onesided) {
-                sbuf        = team->procs[i].p->onesided_buf[0];
-                rbuf        = team->procs[i].p->onesided_buf[1];
-                work_buf    = (long *)team->procs[i].p->onesided_buf[2];
+                sbuf        = team->onesided_buf(i, 0);
+                rbuf        = team->onesided_buf(i, 1);
+                work_buf    = (long *)team->onesided_buf(i, 2);
                 coll->mask  = UCC_COLL_ARGS_FIELD_FLAGS |
                              UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
                 coll->flags = UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
@@ -236,6 +236,42 @@ UCC_TEST_P(test_alltoall_0, single_onesided)
         }
     }
     team = job.create_team(reference_ranks, true, is_contig, true);
+    this->set_inplace(inplace);
+    SET_MEM_TYPE(mem_type);
+    data_init(size, dtype, count, ctxs, team, false);
+    UccReq req(team, ctxs);
+    req.start();
+    req.wait();
+    EXPECT_EQ(true, data_validate(ctxs));
+    data_fini_onesided(ctxs);
+}
+
+UCC_TEST_P(test_alltoall_0, single_team_onesided)
+{
+    const int            team_id        = std::get<0>(GetParam());
+    const ucc_datatype_t dtype          = std::get<1>(GetParam());
+    ucc_memory_type_t    mem_type       = std::get<2>(GetParam());
+    gtest_ucc_inplace_t  inplace        = std::get<3>(GetParam());
+    const int            count          = std::get<4>(GetParam());
+    UccTeam_h            reference_team = UccJob::getStaticTeams()[team_id];
+    int                  size           = reference_team->procs.size();
+    ucc_job_env_t        env       = {{"UCC_TL_UCP_TUNE", "alltoall:0-inf:@1"}};
+    bool                 is_contig = true;
+    UccJob               job(size, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h            team;
+    std::vector<int>     reference_ranks;
+    UccCollCtxVec        ctxs;
+
+    for (auto i = 0; i < reference_team->n_procs; i++) {
+        int rank = reference_team->procs[i].p->job_rank;
+        reference_ranks.push_back(rank);
+        if (is_contig && i > 0 &&
+            (rank - reference_ranks[i - 1] > 1 ||
+             reference_ranks[i - 1] - rank > 1)) {
+            is_contig = false;
+        }
+    }
+    team = job.create_team(reference_ranks, true, is_contig, false, true);
     this->set_inplace(inplace);
     SET_MEM_TYPE(mem_type);
     data_init(size, dtype, count, ctxs, team, false);
