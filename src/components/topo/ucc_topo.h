@@ -332,11 +332,19 @@ int ucc_topo_is_nvlink_fully_connected(
  * @brief Checks if all ranks in the topology subset share the same
  *        NVLink fabric domain (required for multinode NVLS/NVLink-SHARP).
  *
- * Iterates all ranks in topo->set and verifies that every rank has
- * UCC_GPU_CAP_FABRIC set and an identical valid fabric_clique_id.
- * A fabric_clique_id of UCC_GPU_FABRIC_CLIQUE_ID_INVALID is treated as
- * "unknown / not populated" and
- * causes the function to return 0 immediately.
+ * Iterates all ranks in topo->set and verifies that every rank has:
+ *   - UCC_GPU_CAP_FABRIC set
+ *   - a non-all-zero fabric_cluster_uuid that matches rank 0's
+ *   - identical valid fabric_clique_id
+ *   - matching fabric_partition_id when populated (GB200+ NVL)
+ *
+ * Any of the following causes the function to return 0:
+ *   - fabric_clique_id == UCC_GPU_FABRIC_CLIQUE_ID_INVALID ("unknown /
+ *     not populated", e.g. NVML reports state != COMPLETED)
+ *   - all-zero fabric_cluster_uuid (NVML reports clusterUuid as zero
+ *     even with state == COMPLETED on standalone fabric-capable nodes;
+ *     the cliqueId/partitionId pair is not globally unique in that case
+ *     and could falsely match across unrelated clusters)
  *
  * @param [in] topo   Pointer to the topology structure.
  *
