@@ -125,7 +125,9 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
         local_h      = task->dynamic_segments.dst_local;
         remote_rkeys = (ucc_mem_map_mem_h *)task->dynamic_segments.src_global;
     } else {
-        local_h = (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)
+        local_h = ((TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
+                   (TASK_ARGS(task).flags &
+                    UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL))
                   ? TASK_ARGS(task).dst_memh.global_memh[grank]
                   : TASK_ARGS(task).dst_memh.local_memh;
     }
@@ -195,7 +197,9 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
         src_memh = task->dynamic_segments.src_local;
         dst_memh = (ucc_mem_map_mem_h *)task->dynamic_segments.dst_global;
     } else {
-        src_memh = (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)
+        src_memh = ((TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
+                    (TASK_ARGS(task).flags &
+                     UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL))
                    ? TASK_ARGS(task).src_memh.global_memh[grank]
                    : TASK_ARGS(task).src_memh.local_memh;
     }
@@ -284,7 +288,8 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH)) {
         coll_args->args.src_memh.global_memh = NULL;
     } else {
-        if (!(coll_args->args.flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)) {
+        if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) ||
+            !(coll_args->args.flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)) {
             tl_error(UCC_TL_TEAM_LIB(tl_team),
                 "onesided alltoall requires global memory handles for src buffers");
             status = UCC_ERR_INVALID_PARAM;
@@ -294,7 +299,8 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH)) {
         coll_args->args.dst_memh.global_memh = NULL;
     } else {
-        if (!(coll_args->args.flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)) {
+        if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) ||
+            !(coll_args->args.flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)) {
             tl_error(UCC_TL_TEAM_LIB(tl_team),
                 "onesided alltoall requires global memory handles for dst buffers");
             status = UCC_ERR_INVALID_PARAM;

@@ -34,7 +34,8 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_start(ucc_coll_task_t *ctask)
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
-    if (TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH) {
+    if ((TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH) &&
+        (TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_FLAGS)) {
         if (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL) {
             src_memh = TASK_ARGS(task).src_memh.global_memh[grank];
         }
@@ -113,7 +114,8 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH)) {
         coll_args->args.dst_memh.global_memh = NULL;
     } else {
-        if (!(coll_args->args.flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)) {
+        if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) ||
+            !(coll_args->args.flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)) {
             tl_error(UCC_TL_TEAM_LIB(tl_team),
                      "onesided alltoallv requires global memory handles for dst "
                      "buffers");

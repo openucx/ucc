@@ -180,6 +180,7 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_init,
     ucc_status_t          status  = UCC_OK;
     ucc_mem_map_memh_t   *src_memh;
     ucc_mem_map_memh_t   *dst_memh;
+    uint64_t              flags;
 
     if ((coll_args->coll_type == UCC_COLL_TYPE_ALLTOALLV) ||
         (coll_args->coll_type == UCC_COLL_TYPE_ALLGATHERV) ||
@@ -190,23 +191,25 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_init,
                  ucc_coll_type_str(coll_args->coll_type));
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((coll_args->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-        (coll_args->flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS)) {
+    /* coll_args->flags is only valid when FIELD_FLAGS is set in the mask;
+     * treat it as zero otherwise to avoid reading indeterminate bits. */
+    flags = (coll_args->mask & UCC_COLL_ARGS_FIELD_FLAGS) ? coll_args->flags
+                                                          : 0;
+    if (flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS) {
         return UCC_OK;
     }
     /* Skip dynamic mapping when the user has already provided the handle that
      * this algorithm needs: src for GET (peers pull from it), dst for PUT
-     * (peers push into it).  The non-DYN_SEG progress path will use it. */
+     * (peers push into it).  The non-DYN_SEG progress path will use it.
+     * This is independent of the MEM_MAPPED_BUFFERS bail-out above. */
     if (alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET) {
         if ((coll_args->mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH) &&
-            (coll_args->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-            (coll_args->flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)) {
+            (flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)) {
             return UCC_OK;
         }
     } else {
         if ((coll_args->mask & UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH) &&
-            (coll_args->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-            (coll_args->flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)) {
+            (flags & UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL)) {
             return UCC_OK;
         }
     }
@@ -222,8 +225,18 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_init,
     }
     status = dynamic_segment_map_memh(&dst_memh, coll_args, DYN_SEG_DST, task);
     if (UCC_OK != status) {
-        ucc_tl_ucp_mem_unmap(&ctx->super.super, UCC_MEM_MAP_MODE_EXPORT,
-                             src_memh->tl_h);
+        /* Preserve the original mapping error: a failure of the cleanup
+         * unmap must not mask the root cause reported to the caller. */
+        ucc_status_t unmap_status;
+
+        unmap_status = ucc_tl_ucp_mem_unmap(&ctx->super.super,
+                                            UCC_MEM_MAP_MODE_EXPORT,
+                                            src_memh->tl_h);
+        if (UCC_OK != unmap_status) {
+            tl_warn(UCC_TASK_LIB(task),
+                    "failed to unmap src_memh during cleanup: %s",
+                    ucc_status_string(unmap_status));
+        }
         ucc_free(src_memh->tl_h);
         ucc_free(src_memh);
         return status;
