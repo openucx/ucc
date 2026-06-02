@@ -76,13 +76,11 @@ void ucc_host_info_print(const ucc_host_info_t *info)
     for (i = 0; i < info->n_gpus; i++) {
         const ucc_gpu_info_t *gpu = &info->gpus[i];
 
-        ucc_debug("gpu_info: pci=%04x:%02x:%02x.%u nvlink=%u fabric=%u "
-                  "nvswitch=%u clique=%" PRIu64 " uuid=0x%016" PRIx64,
+        ucc_debug("gpu_info: pci=%04x:%02x:%02x.%u caps=0x%x "
+                  "clique=%" PRIu64 " uuid=0x%016" PRIx64,
                   (unsigned)gpu->pci.domain, (unsigned)gpu->pci.bus,
                   (unsigned)gpu->pci.device, (unsigned)gpu->pci.function,
-                  (unsigned)gpu->nvlink_capable, (unsigned)gpu->fabric_capable,
-                  (unsigned)gpu->nvswitch_connected, gpu->fabric_clique_id,
-                  gpu->uuid);
+                  gpu->caps, gpu->fabric_clique_id, gpu->uuid);
     }
 
     if (info->n_gpus > 0) {

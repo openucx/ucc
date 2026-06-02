@@ -38,6 +38,7 @@ typedef struct ucc_global_config {
     size_t                     profile_log_size;
     char                      *cfg_filename;
     ucc_file_config_t         *file_cfg;
+
     /* Log file */
     char                       *log_file;
 
@@ -58,6 +59,9 @@ typedef struct ucc_global_config {
 
     /* Log level to trigger error handling */
     ucc_log_level_t            log_level_trigger;
+
+    /* Check for asymmetric datatypes in rooted collectives */
+    int                        check_asymmetric_dt;
 } ucc_global_config_t;
 
 extern ucc_global_config_t ucc_global_config;

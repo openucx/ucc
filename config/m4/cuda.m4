@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2001-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2001-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # See file LICENSE for terms.
 #
 
@@ -85,6 +85,24 @@ AS_IF([test "x$cuda_checked" != "xyes"],
               [AC_CHECK_LIB([nvidia-ml], [nvmlInit_v2],
                             [NVML_LIBS="-lnvidia-ml"],
                             [nvml_happy="no"])])
+        AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
+              [AC_CHECK_DECL([nvmlDeviceGetGpuFabricInfoV],
+                             [AC_DEFINE([HAVE_NVML_GPU_FABRIC_INFO_V], 1,
+                                        ["nvmlDeviceGetGpuFabricInfoV (versioned) is available"])],
+                             [],
+                             [[#include <nvml.h>]])])
+        AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
+              [AC_CHECK_DECL([nvmlDeviceGetGpuFabricInfo],
+                             [AC_DEFINE([HAVE_NVML_GPU_FABRIC_INFO], 1,
+                                        ["nvmlDeviceGetGpuFabricInfo is available"])],
+                             [],
+                             [[#include <nvml.h>]])])
+        AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
+              [AC_CHECK_MEMBER([nvmlGpuFabricInfoV_t.partitionId],
+                               [AC_DEFINE([HAVE_NVML_FABRIC_PARTITION_ID], 1,
+                                          ["nvmlGpuFabricInfoV_t has partitionId field"])],
+                               [],
+                               [[#include <nvml.h>]])])
         AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
               [AC_CHECK_DECL([nvmlDeviceGetNvLinkRemoteDeviceType],
                              [AC_CHECK_LIB([nvidia-ml], [nvmlDeviceGetNvLinkRemoteDeviceType],

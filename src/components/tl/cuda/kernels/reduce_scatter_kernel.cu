@@ -133,6 +133,7 @@ ucc_status_t post_reduce_scatter_kernel(
     ucc_assert(count % 4 == 0);
     ucc_assert(mc_base_addr % 16 == 0);
     ucc_assert(mc_control_addr % 16 == 0);
+    ucc_assert(dst_ptr % 16 == 0);
 
     uint32_t *base_u32 = reinterpret_cast<uint32_t *>(mc_base_addr);
     ucc_tl_cuda_nvls_control_t

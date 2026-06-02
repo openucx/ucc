@@ -86,6 +86,7 @@ static inline const char* ucc_pt_op_type_str(ucc_pt_op_type_t op)
 }
 struct ucc_pt_gen_traffic_matrix_config {
     int    kind;
+    int    shuffle;
     int    token_size_KB_mean;
     int    token_size_KB_std;
     int    tgt_group_size_mean;

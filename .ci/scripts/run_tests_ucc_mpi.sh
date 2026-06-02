@@ -193,6 +193,13 @@ for MT in "" "-T"; do
     clhier_colls="allreduce"
     mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
     echo "INFO: UCC MPI unit tests (CL/HIER+split_rail+pipeline) ... DONE"
+
+
+    echo "INFO: UCC MPI unit tests (CL/HIER+2step bcast) ..."
+    # shellcheck disable=SC2086
+    clhier_args=" -x UCC_CLS=all -x UCC_TLS=^sharp -x UCC_CL_HIER_TUNE=bcast:0-inf:@2step "
+    mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $clhier_args $EXE $MT $TG --mtypes host,cuda -c bcast
+    echo "INFO: UCC MPI unit tests (CL/HIER+2step bcast) ... DONE"
 done
 
 end=`date +%s`

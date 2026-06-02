@@ -13,14 +13,11 @@ kubernetes:
   limits: "{memory: 16Gi, cpu: 16000m}"
   requests: "{memory: 8Gi, cpu: 8000m}"
 
-volumes:
-  - { mountPath: "/labhome/svcnbu-swx-hpcx", hostPath: "/labhome/svcnbu-swx-hpcx" }
+pvc_volumes:
+  - {claimName: hpcx-pvc, mountPath: /mnt/pvc, readOnly: false}
 
-credentials:
-  - {
-      credentialsId: "svcnbu-swx-hpcx-corporate-user-pass",
-      usernameVariable: 'SERVICE_USER_USERNAME', passwordVariable: 'SERVICE_USER_PASSWORD',
-    }
+empty_volumes:
+  - {mountPath: /root, memory: false}
 
 env:
   CUDA_VER: 13.1.1
@@ -31,11 +28,13 @@ env:
   SLURM_PARTITION: 'funk'
   SLURM_GRES: 'gpu:1'  # request GPU so CUDA tests (e.g. test_asymmetric_memory) can run
   SLURM_HEAD_NODE: 'scctl'
-  SLURM_JOB_NAME: 'ucc-ci-gtest-${BUILD_NUMBER}'
-  SLURM_CONTAINER_NAME: "ucc-ci-gtest-${BUILD_NUMBER}"
+  SLURM_JOB_NAME: "${BUILD_TAG}"
+  SLURM_CONTAINER_NAME: "${BUILD_TAG}"
   SLURM_JOB_TIMEOUT: '2:00:00'
   SLURM_IMMEDIATE_TIMEOUT: 3600 # 1 hour
   TEST_TIMEOUT_MINUTES: 90
+  JOB_ID_FILE: "/mnt/pvc/job-id-${BUILD_TAG}.txt"
+  SCCTL_CREDENTIALS_ID: 'svcnbu-swx-hpcx-corporate-user-pass'
 
 # cloud pod to build the shared docker image
 runs_on_dockers:
@@ -61,33 +60,63 @@ runs_on_dockers:
       tag: "gtest",
       arch: "x86_64",
       uri: "$arch/$name",
-      build_args: "--no-cache \
-                   --build-arg _UID=149917 \
-                   --build-arg _GID=30 \
-                   --build-arg _LOGIN=svcnbu-swx-hpcx \
-                   --build-arg _GROUP=svcnbu-swx-hpcx \
-                   --build-arg _HOME=/labhome/svcnbu-swx-hpcx",
+      build_args: "--no-cache",
     }
 
 timeout_minutes: 180
 
 steps:
-  - name: Allocate Environment
+  - name: Allocate Slurm job
     containerSelector: "{name: 'build_helper'}"
-    credentialsId: 'svcnbu-swx-hpcx-corporate-user-pass'
-    run: |
-      set -x
-      touch job_id.txt && chown svcnbu-swx-hpcx job_id.txt
-      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_slurm_allocation.sh
+    timeout: 30
+    parallel: false
+    shell: action
+    module: slurmCI
+    run: allocation
+    args:
+      partition: "${SLURM_PARTITION}"
+      headNode: "${SLURM_HEAD_NODE}"
+      nodes: "${SLURM_NODES}"
+      jobTimeout: "${SLURM_JOB_TIMEOUT}"
+      immediateTimeout: "${SLURM_IMMEDIATE_TIMEOUT}"
+      jobName: "${SLURM_JOB_NAME}"
+      jobIdFile: "${JOB_ID_FILE}"
+      credentialsId: "${SCCTL_CREDENTIALS_ID}"
+      extraArgs: [
+        "--gres=${SLURM_GRES}",
+      ]
+
+  - name: Read Slurm job ID
+    containerSelector: "{name: 'build_helper'}"
+    parallel: false
+    shell: action
+    module: groovy
+    run: env.SLURM_JOB_ID = readFile(JOB_ID_FILE).trim()
 
   - name: Run UCC gtest tests
     containerSelector: "{name: 'build_helper'}"
     timeout: "${TEST_TIMEOUT_MINUTES}"
-    run: |
-      set -x
-      export DOCKER_IMAGE_NAME="${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
-      export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
-      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/run_tests_slurm.sh "${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
-    always: |
-      export SLURM_JOB_ID=$(cat ${WORKSPACE}/job_id.txt)
-      sudo -E -u svcnbu-swx-hpcx ${WORKSPACE}/.ci/scripts/stop_slurm_allocation.sh
+    parallel: false
+    shell: action
+    module: slurmCI
+    run: run
+    args:
+      jobId: "${SLURM_JOB_ID}"
+      testScript: "${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
+      headNode: "${SLURM_HEAD_NODE}"
+      dockerImage: "${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
+      credentialsId: "${SCCTL_CREDENTIALS_ID}"
+      containerName: "${SLURM_CONTAINER_NAME}"
+      extraArgs: [
+        "--ntasks-per-node=1",
+      ]
+
+pipeline_stop:
+  containerSelector: "{name: 'build_helper'}"
+  shell: action
+  module: slurmCI
+  run: stop
+  args:
+    credentialsId: "${SCCTL_CREDENTIALS_ID}"
+    headNode: "${SLURM_HEAD_NODE}"
+    jobId: "${SLURM_JOB_ID}"
