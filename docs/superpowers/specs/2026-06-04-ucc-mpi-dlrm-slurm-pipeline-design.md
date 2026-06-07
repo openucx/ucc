@@ -188,10 +188,27 @@ Validated directly on the cluster using image
   prolog). After that TL/CUDA is deterministic. The leading
   `failed to create tl context for cuda` log line is benign (initial UCC context
   before the test sets a CUDA device). See [[funk-tlcuda-ptrace-scope]].
-- **Not yet validated:** multi-node (2-node) PMIx + IB fabric, the NCCL group
-  (needs 2 nodes), and DLRM — funk had only the single reserved node `funk32`
-  available; the rest of the partition was fully allocated. These remain for the
-  real 2-node CI run (Tasks 7, 10).
+- **2-node validation (funk[06,20], preempting MTT jobs):**
+  - Multi-node PMIx + UCX fabric — bulk default (host,cuda) at 8 ranks across 2
+    nodes: 4164/4164 passed.
+  - **NCCL group** (2 nodes x 1 rank, NCCL 2.26.5 over IB): 1742/1742 passed.
+  - **DLRM** (2 nodes x 1 rank, `--dist-backend=ucc --use-gpu`): trains 10/10
+    iterations, exit 0 — after two fixes below.
+- **Two DLRM fixes required (found during 2-node validation):**
+  1. `MASTER_ADDR` must be derived from `SLURM_NODELIST` (first node), NOT each
+     rank's own hostname. `scontrol` is absent in the image, so the original
+     hostname fallback made the two ranks disagree → torch rendezvous hung
+     forever. `run_dlrm_slurm.sh` now parses `SLURM_NODELIST` (handles
+     `funk[06,20]` / `funk[06-08]` forms).
+  2. The DLRM step needs `srun --container-writable`: DLRM writes a tensorboard
+     logdir into its CWD, but enroot mounts the rootfs read-only (bare-metal
+     docker rootfs was writable). Added to the DLRM step's `extraArgs`.
+- **Benign noise:** the image's `cudaCheck` prints `_CUDA_COMPAT_STATUS ...
+  MISMATCH cuInit()=803`, but CUDA works (all cuda MPI tests + DLRM GPU training
+  pass) — it is a non-fatal compat-layer check.
+- **Still for the real CI run:** the full bulk group's CL/HIER variants and
+  TL/MLX5 across 2 nodes (TL/MLX5 self-skips without CX7) were not each run
+  end-to-end here — representative configs passed, the rest run in CI.
 
 ## Success criteria
 
