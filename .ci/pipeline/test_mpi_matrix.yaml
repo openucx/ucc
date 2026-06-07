@@ -93,7 +93,7 @@ steps:
     module: groovy
     run: env.SLURM_JOB_ID = readFile(JOB_ID_FILE).trim()
 
-  - name: Run UCC MPI smoke
+  - name: Run UCC MPI tests (bulk)
     containerSelector: "{name: 'build_helper'}"
     timeout: "${TEST_TIMEOUT_MINUTES}"
     parallel: false
@@ -102,12 +102,49 @@ steps:
     run: run
     args:
       jobId: "${SLURM_JOB_ID}"
-      testScript: "${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc_mpi_slurm_smoke.sh"
+      testScript: "${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc_mpi_slurm_bulk.sh"
       headNode: "${SLURM_HEAD_NODE}"
       dockerImage: "${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
       credentialsId: "${SCCTL_CREDENTIALS_ID}"
       containerName: "${SLURM_CONTAINER_NAME}"
       extraArgs: [
+        "--ntasks-per-node=${MPI_BULK_PPN}",
+      ]
+
+  - name: Run UCC MPI tests (NCCL)
+    containerSelector: "{name: 'build_helper'}"
+    timeout: "${TEST_TIMEOUT_MINUTES}"
+    parallel: false
+    shell: action
+    module: slurmCI
+    run: run
+    args:
+      jobId: "${SLURM_JOB_ID}"
+      testScript: "${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc_mpi_slurm_nccl.sh"
+      headNode: "${SLURM_HEAD_NODE}"
+      dockerImage: "${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
+      credentialsId: "${SCCTL_CREDENTIALS_ID}"
+      containerName: "${SLURM_CONTAINER_NAME}"
+      extraArgs: [
+        "--ntasks-per-node=${MPI_NCCL_PPN}",
+      ]
+
+  - name: Run UCC MPI tests (TL/CUDA, single node)
+    containerSelector: "{name: 'build_helper'}"
+    timeout: "${TEST_TIMEOUT_MINUTES}"
+    parallel: false
+    shell: action
+    module: slurmCI
+    run: run
+    args:
+      jobId: "${SLURM_JOB_ID}"
+      testScript: "${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc_mpi_slurm_tlcuda.sh"
+      headNode: "${SLURM_HEAD_NODE}"
+      dockerImage: "${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
+      credentialsId: "${SCCTL_CREDENTIALS_ID}"
+      containerName: "${SLURM_CONTAINER_NAME}"
+      extraArgs: [
+        "--nodes=1",
         "--ntasks-per-node=${MPI_BULK_PPN}",
       ]
 
