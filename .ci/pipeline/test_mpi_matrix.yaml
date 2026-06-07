@@ -148,6 +148,24 @@ steps:
         "--ntasks-per-node=${MPI_BULK_PPN}",
       ]
 
+  - name: Run DLRM tests (UCC/GPU)
+    containerSelector: "{name: 'build_helper'}"
+    timeout: "${TEST_TIMEOUT_MINUTES}"
+    parallel: false
+    shell: action
+    module: slurmCI
+    run: run
+    args:
+      jobId: "${SLURM_JOB_ID}"
+      testScript: "${SRC_DIR}/ucc/.ci/scripts/run_dlrm_slurm.sh"
+      headNode: "${SLURM_HEAD_NODE}"
+      dockerImage: "${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
+      credentialsId: "${SCCTL_CREDENTIALS_ID}"
+      containerName: "${SLURM_CONTAINER_NAME}"
+      extraArgs: [
+        "--ntasks-per-node=1",
+      ]
+
 pipeline_stop:
   containerSelector: "{name: 'build_helper'}"
   shell: action
