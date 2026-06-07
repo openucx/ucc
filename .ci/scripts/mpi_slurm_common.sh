@@ -10,8 +10,10 @@ UCC_SRC_DIR="/opt/nvidia/src/ucc"
 EXE="${UCC_SRC_DIR}/build/test/mpi/ucc_test_mpi"
 EXE_ARGS="--inplace 2 --set_device 2 --root random:2 --count_bits 32,64 --displ_bits 32,64"
 
-# DEV is set by mpi_slurm_setup and used by the run_* functions.
+# DEV (first Active IB device) and CX7_DEV (first Active ConnectX-7 / MT4129
+# device, which TL/MLX5 requires) are set by mpi_slurm_setup, used by run_*.
 DEV=""
+CX7_DEV=""
 
 mpi_slurm_setup() {
     export UCX_WARN_UNUSED_ENV_VARS=n
@@ -24,17 +26,22 @@ mpi_slurm_setup() {
         nvidia-smi --query-gpu=index,name,driver_version --format=csv,noheader 2>&1 || echo "nvidia-smi failed"
     fi
 
-    # Local IB device discovery (no ssh): first Active device.
+    # Local IB device discovery (no ssh): DEV = first Active device; CX7_DEV =
+    # first Active ConnectX-7 (CA type MT4129), which TL/MLX5 requires.
     DEV=""
+    CX7_DEV=""
     if command -v ibstat >/dev/null 2>&1; then
         for d in $(ibstat -l 2>/dev/null); do
             state=$(ibstat "$d" 2>/dev/null | awk '/State:/{print $2; exit}')
-            if [ "$state" = "Active" ]; then DEV="$d"; break; fi
+            [ "$state" = "Active" ] || continue
+            [ -z "$DEV" ] && DEV="$d"
+            ca_type=$(ibstat "$d" 2>/dev/null | awk '/CA type:/{print $3; exit}')
+            if [ "$ca_type" = "MT4129" ]; then CX7_DEV="$d"; break; fi
         done
     fi
     if [ -n "$DEV" ]; then
         export UCX_NET_DEVICES="${DEV}:1"
-        echo "INFO: using IB device ${DEV}"
+        echo "INFO: using IB device ${DEV} (CX7=${CX7_DEV:-none})"
     else
         echo "WARNING: no Active IB device found; UCX will auto-select"
     fi
@@ -96,14 +103,15 @@ mpi_slurm_run_bulk() {
             $EXE $EXE_ARGS $MT $TG --mtypes host,cuda -c bcast
         echo "INFO: CL/HIER+2step bcast ... DONE"
 
-        if [ "${SLURM_NNODES:-1}" -ge 2 ] && [ -n "$DEV" ]; then
+        # TL/MLX5 requires a ConnectX-7 (MT4129) NIC and >=2 nodes; skip otherwise.
+        if [ "${SLURM_NNODES:-1}" -ge 2 ] && [ -n "$CX7_DEV" ]; then
             echo "INFO: TL/MLX5 ..."
             # shellcheck disable=SC2086
-            UCC_CLS=basic UCC_CL_BASIC_TLS=ucp,mlx5 UCC_TL_MLX5_NET_DEVICES="${DEV}:1" UCC_TL_MLX5_TUNE=inf \
+            UCC_CLS=basic UCC_CL_BASIC_TLS=ucp,mlx5 UCC_TL_MLX5_NET_DEVICES="${CX7_DEV}:1" UCC_TL_MLX5_TUNE=inf \
                 $EXE $EXE_ARGS $MT $TG --mtypes host,cuda -c alltoall -t world -d uint8 -O 0 -m 1:128
             echo "INFO: TL/MLX5 ... DONE"
         else
-            echo "INFO: TL/MLX5 ... SKIPPED (needs >=2 nodes + Active IB device)"
+            echo "INFO: TL/MLX5 ... SKIPPED (needs >=2 nodes + ConnectX-7 / MT4129)"
         fi
     done
 }
