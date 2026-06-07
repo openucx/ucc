@@ -167,6 +167,32 @@ container).
 5. **DLRM torch distributed init under srun** — env var mapping and that the
    ucc backend initializes with 2 ranks across nodes.
 
+## Validation results (2026-06-07, on funk32 via reservation BF3_tests)
+
+Validated directly on the cluster using image
+`harbor.mellanox.com/torch-ucc/ucc/1.0.0/x86_64/centos8/cuda12.9:1460`:
+
+- **Risk #1 (srun/PMIx) — RESOLVED.** The centos8/CUDA-12.9 image ships HPC-X
+  OpenMPI (`/opt/hpcx/ompi`, PMIx-capable). `srun --mpi=pmix` launches it in
+  pyxis with CUDA working; a 4-rank smoke (barrier+allreduce, host+cuda) passed
+  3524/3524.
+- **funk topology:** nodes have **1 A100 80GB GPU each**, 64 CPUs → confirms
+  `SLURM_GRES=gpu:1` and `MPI_NCCL_PPN=1`. The bulk group runs 4 ranks sharing
+  the single GPU for cuda mtype (same geometry the bare-metal job used).
+- **bulk default (host,cuda) + TL/CUDA — pass** (3948/0 repeatably).
+- **TL/CUDA node prerequisite — `kernel.yama.ptrace_scope=0`.** TL/CUDA uses
+  CUDA IPC between the same-GPU ranks; rootless enroot has no effective
+  CAP_SYS_PTRACE, so with `ptrace_scope=1` the IPC fails (flaky exit-137 /
+  fallback). `--container-remap-root` grants caps but breaks PMIx, so it is NOT
+  usable. Fix is node-side: `ptrace_scope=0` (set by cluster admin via sysctl/
+  prolog). After that TL/CUDA is deterministic. The leading
+  `failed to create tl context for cuda` log line is benign (initial UCC context
+  before the test sets a CUDA device). See [[funk-tlcuda-ptrace-scope]].
+- **Not yet validated:** multi-node (2-node) PMIx + IB fabric, the NCCL group
+  (needs 2 nodes), and DLRM — funk had only the single reserved node `funk32`
+  available; the rest of the partition was fully allocated. These remain for the
+  real 2-node CI run (Tasks 7, 10).
+
 ## Success criteria
 
 - `ucc-test-mpi` runs from the dispatcher, builds both images, allocates a
