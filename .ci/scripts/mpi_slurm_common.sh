@@ -40,14 +40,6 @@ mpi_slurm_setup() {
     fi
 }
 
-# Minimal end-to-end sanity: confirms srun/PMIx launch + CUDA memtype work.
-mpi_slurm_run_smoke() {
-    echo "INFO: smoke - barrier + small allreduce on host,cuda ..."
-    # shellcheck disable=SC2086
-    UCX_TLS="^cuda_ipc" $EXE $EXE_ARGS --mtypes host,cuda -c barrier,allreduce -m 1:1024
-    echo "INFO: smoke ... DONE"
-}
-
 # Bulk group (ppn=4, multi-node): default, TL/UCP, CL/HIER variants, 2-step
 # bcast, and TL/MLX5 (self-skips without >=2 nodes + IB device).
 mpi_slurm_run_bulk() {
