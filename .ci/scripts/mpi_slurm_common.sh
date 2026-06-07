@@ -47,3 +47,99 @@ mpi_slurm_run_smoke() {
     UCX_TLS="^cuda_ipc" $EXE $EXE_ARGS --mtypes host,cuda -c barrier,allreduce -m 1:1024
     echo "INFO: smoke ... DONE"
 }
+
+# Bulk group (ppn=4, multi-node): default, TL/UCP, CL/HIER variants, 2-step
+# bcast, and TL/MLX5 (self-skips without >=2 nodes + IB device).
+mpi_slurm_run_bulk() {
+    local MT TG
+    for MT in "" "-T"; do
+        TG="--triggered 0"
+
+        echo "INFO: default configuration ..."
+        # shellcheck disable=SC2086
+        UCC_TL_NCCL_TUNE=0 UCX_TLS="^cuda_ipc" \
+            $EXE $EXE_ARGS $MT $TG --mtypes host,cuda
+        echo "INFO: default configuration ... DONE"
+
+        echo "INFO: TL/UCP ..."
+        # shellcheck disable=SC2086
+        UCC_CLS=basic UCC_CL_BASIC_TLS=ucp UCX_LOG_LEVEL=info UCX_TLS="^cuda_ipc" \
+            $EXE $EXE_ARGS $MT $TG --mtypes host,cuda
+        echo "INFO: TL/UCP ... DONE"
+
+        echo "INFO: CL/HIER ..."
+        # shellcheck disable=SC2086
+        UCC_CLS=basic,hier UCC_CL_HIER_TUNE=inf UCC_TL_NCCL_TUNE=0 UCX_TLS="^cuda_ipc" \
+            $EXE $EXE_ARGS $MT $TG --mtypes host,cuda -c alltoall,alltoallv,allreduce,barrier
+        echo "INFO: CL/HIER ... DONE"
+
+        echo "INFO: CL/HIER+ucp ..."
+        # shellcheck disable=SC2086
+        UCC_CLS=basic,hier UCC_CL_HIER_TUNE=inf UCC_CL_HIER_TLS=ucp UCC_TL_NCCL_TUNE=0 UCX_TLS="^cuda_ipc" \
+            $EXE $EXE_ARGS $MT $TG --mtypes host,cuda -c alltoall,alltoallv,allreduce,barrier
+        echo "INFO: CL/HIER+ucp ... DONE"
+
+        echo "INFO: CL/HIER+rab ..."
+        # shellcheck disable=SC2086
+        UCC_CLS=basic,hier UCC_CL_HIER_TUNE=allreduce:@rab:inf UCC_CL_HIER_TLS=ucp UCC_TL_NCCL_TUNE=0 UCX_TLS="^cuda_ipc" \
+            $EXE $EXE_ARGS $MT $TG --mtypes host,cuda -c allreduce
+        echo "INFO: CL/HIER+rab ... DONE"
+
+        echo "INFO: CL/HIER+split_rail ..."
+        # shellcheck disable=SC2086
+        UCC_CLS=basic,hier UCC_CL_HIER_TUNE=allreduce:@split_rail:inf UCC_CL_HIER_TLS=ucp UCC_TL_NCCL_TUNE=0 UCX_TLS="^cuda_ipc" \
+            $EXE $EXE_ARGS $MT $TG --mtypes host,cuda -c allreduce
+        echo "INFO: CL/HIER+split_rail ... DONE"
+
+        echo "INFO: CL/HIER+split_rail+pipeline ..."
+        # shellcheck disable=SC2086
+        UCC_CLS=basic,hier UCC_CL_HIER_TUNE=allreduce:@split_rail:inf UCC_CL_HIER_TLS=ucp UCC_TL_NCCL_TUNE=0 \
+            UCC_CL_HIER_ALLREDUCE_SPLIT_RAIL_PIPELINE=thresh=0:fragsize=256K UCX_TLS="^cuda_ipc" \
+            $EXE $EXE_ARGS $MT $TG --mtypes host,cuda -c allreduce
+        echo "INFO: CL/HIER+split_rail+pipeline ... DONE"
+
+        echo "INFO: CL/HIER+2step bcast ..."
+        # shellcheck disable=SC2086
+        UCC_CLS=all UCC_TLS="^sharp" UCC_CL_HIER_TUNE="bcast:0-inf:@2step" UCX_TLS="^cuda_ipc" \
+            $EXE $EXE_ARGS $MT $TG --mtypes host,cuda -c bcast
+        echo "INFO: CL/HIER+2step bcast ... DONE"
+
+        if [ "${SLURM_NNODES:-1}" -ge 2 ] && [ -n "$DEV" ]; then
+            echo "INFO: TL/MLX5 ..."
+            # shellcheck disable=SC2086
+            UCC_CLS=basic UCC_CL_BASIC_TLS=ucp,mlx5 UCC_TL_MLX5_NET_DEVICES="${DEV}:1" UCC_TL_MLX5_TUNE=inf \
+                $EXE $EXE_ARGS $MT $TG --mtypes host,cuda -c alltoall -t world -d uint8 -O 0 -m 1:128
+            echo "INFO: TL/MLX5 ... DONE"
+        else
+            echo "INFO: TL/MLX5 ... SKIPPED (needs >=2 nodes + Active IB device)"
+        fi
+    done
+}
+
+# NCCL group (ppn = GPUs per node): cuda-only collectives over TL/NCCL.
+mpi_slurm_run_nccl() {
+    local MT TG
+    for MT in "" "-T"; do
+        TG="--triggered 0"
+        echo "INFO: NCCL ..."
+        # shellcheck disable=SC2086
+        UCC_CLS=basic UCC_CL_BASIC_TLS=ucp,nccl UCC_TL_NCCL_TUNE=cuda:inf \
+            NCCL_IB_HCA="${DEV}" NCCL_DEBUG=WARN \
+            $EXE $EXE_ARGS $MT $TG --mtypes cuda
+        echo "INFO: NCCL ... DONE"
+    done
+}
+
+# TL/CUDA group (single node): cuda collectives over TL/CUDA.
+mpi_slurm_run_tlcuda() {
+    local MT TG
+    for MT in "" "-T"; do
+        TG="--triggered 0"
+        echo "INFO: TL/CUDA ..."
+        # shellcheck disable=SC2086
+        UCC_CLS=basic UCC_CL_BASIC_TLS=ucp,cuda UCC_TL_CUDA_TUNE=cuda:inf UCX_TLS="^cuda_ipc" \
+            $EXE $EXE_ARGS $MT $TG --mtypes cuda \
+            -c alltoall,alltoallv,allgather,allgatherv,reduce_scatter,reduce_scatterv
+        echo "INFO: TL/CUDA ... DONE"
+    done
+}
