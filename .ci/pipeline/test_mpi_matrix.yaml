@@ -164,9 +164,6 @@ steps:
       containerName: "${SLURM_CONTAINER_NAME}"
       extraArgs: [
         "--ntasks-per-node=1",
-        # DLRM writes a tensorboard logdir into its CWD; enroot's rootfs is
-        # read-only by default (bare-metal docker rootfs was writable).
-        "--container-writable",
       ]
 
 pipeline_stop:

@@ -200,9 +200,11 @@ Validated directly on the cluster using image
      hostname fallback made the two ranks disagree → torch rendezvous hung
      forever. `run_dlrm_slurm.sh` now parses `SLURM_NODELIST` (handles
      `funk[06,20]` / `funk[06-08]` forms).
-  2. The DLRM step needs `srun --container-writable`: DLRM writes a tensorboard
-     logdir into its CWD, but enroot mounts the rootfs read-only (bare-metal
-     docker rootfs was writable). Added to the DLRM step's `extraArgs`.
+  2. DLRM writes a tensorboard logdir into its CWD, which fails on a read-only
+     rootfs. This surfaced under manual `srun` (which mounts the rootfs
+     read-only — `--container-writable` fixed it there), but the Jenkins
+     `slurmCI` lib launches containers **writable by default**, so the pipeline
+     needs no extra flag.
 - **Benign noise:** the image's `cudaCheck` prints `_CUDA_COMPAT_STATUS ...
   MISMATCH cuInit()=803`, but CUDA works (all cuda MPI tests + DLRM GPU training
   pass) — it is a non-fatal compat-layer check.
