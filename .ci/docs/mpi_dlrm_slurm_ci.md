@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-04
 **Author:** Daniel Pressler
-**Status:** Approved (design); pending implementation plan
+**Status:** Implemented and validated on funk (see "Validation results" below)
 
 ## Summary
 
