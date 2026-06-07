@@ -35,7 +35,7 @@ env:
   TEST_TIMEOUT_MINUTES: 15
   MPI_BULK_PPN: 4      # ranks per node for the bulk/tlcuda groups
   MPI_NCCL_PPN: 1      # ranks per node for the NCCL group = GPUs per node
-  JOB_ID_FILE: "/mnt/pvc/job-id-${BUILD_TAG}.txt"
+  JOB_ID_FILE: "/mnt/pvc/${JOB_BASE_NAME}/job-id-${BUILD_NUMBER}.txt"
   SCCTL_CREDENTIALS_ID: 'svcnbu-swx-hpcx-corporate-user-pass'
 
 # cloud pod to build the shared docker image
@@ -86,13 +86,6 @@ steps:
         "--gres=${SLURM_GRES}",
       ]
 
-  - name: Read Slurm job ID
-    containerSelector: "{name: 'build_helper'}"
-    parallel: false
-    shell: action
-    module: groovy
-    run: env.SLURM_JOB_ID = readFile(JOB_ID_FILE).trim()
-
   - name: Run UCC MPI tests (bulk)
     containerSelector: "{name: 'build_helper'}"
     timeout: "${TEST_TIMEOUT_MINUTES}"
@@ -101,7 +94,7 @@ steps:
     module: slurmCI
     run: run
     args:
-      jobId: "${SLURM_JOB_ID}"
+      jobIdFile: "${JOB_ID_FILE}"
       testScript: "${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc_mpi_slurm_bulk.sh"
       headNode: "${SLURM_HEAD_NODE}"
       dockerImage: "${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
@@ -119,7 +112,7 @@ steps:
     module: slurmCI
     run: run
     args:
-      jobId: "${SLURM_JOB_ID}"
+      jobIdFile: "${JOB_ID_FILE}"
       testScript: "${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc_mpi_slurm_nccl.sh"
       headNode: "${SLURM_HEAD_NODE}"
       dockerImage: "${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
@@ -137,7 +130,7 @@ steps:
     module: slurmCI
     run: run
     args:
-      jobId: "${SLURM_JOB_ID}"
+      jobIdFile: "${JOB_ID_FILE}"
       testScript: "${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc_mpi_slurm_tlcuda.sh"
       headNode: "${SLURM_HEAD_NODE}"
       dockerImage: "${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
@@ -156,7 +149,7 @@ steps:
     module: slurmCI
     run: run
     args:
-      jobId: "${SLURM_JOB_ID}"
+      jobIdFile: "${JOB_ID_FILE}"
       testScript: "${SRC_DIR}/ucc/.ci/scripts/run_dlrm_slurm.sh"
       headNode: "${SLURM_HEAD_NODE}"
       dockerImage: "${registry_host}#torch-ucc/${UCC_URI_SUFFIX}:${DOCKER_IMAGE_TAG}"
@@ -174,4 +167,4 @@ pipeline_stop:
   args:
     credentialsId: "${SCCTL_CREDENTIALS_ID}"
     headNode: "${SLURM_HEAD_NODE}"
-    jobId: "${SLURM_JOB_ID}"
+    jobIdFile: "${JOB_ID_FILE}"
