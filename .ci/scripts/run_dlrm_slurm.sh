@@ -7,12 +7,28 @@ set -o pipefail
 
 UCC_SRC_DIR="/opt/nvidia/src/ucc"
 
-# Master address = first node of the Slurm allocation.
-if command -v scontrol >/dev/null 2>&1 && [ -n "${SLURM_JOB_NODELIST:-}" ]; then
-    MASTER_ADDR=$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n1)
-else
-    MASTER_ADDR=$(hostname -s)
-fi
+# Master address = first node of the Slurm allocation. This MUST be identical
+# on every rank, so derive it from the allocation node list -- never from each
+# rank's own hostname (that makes ranks disagree and torch rendezvous hangs).
+# `scontrol` is not present in this container image, so parse SLURM_NODELIST
+# directly, handling compact forms like "funk[06,20]" and "funk[06-08]".
+first_slurm_node() {
+    local nl="${SLURM_JOB_NODELIST:-${SLURM_NODELIST:-}}"
+    [ -z "$nl" ] && return 1
+    if command -v scontrol >/dev/null 2>&1; then
+        scontrol show hostnames "$nl" | head -n1
+        return 0
+    fi
+    if [[ "$nl" == *"["* ]]; then
+        local prefix="${nl%%[*}"                      # e.g. funk
+        local range="${nl#*[}"; range="${range%%]*}"  # e.g. 06,20 or 06-08
+        printf '%s%s\n' "$prefix" "${range%%[,-]*}"    # e.g. funk06
+    else
+        printf '%s\n' "${nl%%,*}"                      # e.g. funk06
+    fi
+}
+
+MASTER_ADDR="$(first_slurm_node || hostname -s)"
 export MASTER_ADDR
 export MASTER_PORT="${MASTER_PORT:-12346}"
 export RANK="${SLURM_PROCID:-0}"
