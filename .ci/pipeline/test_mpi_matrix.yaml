@@ -101,6 +101,7 @@ steps:
       credentialsId: "${SCCTL_CREDENTIALS_ID}"
       containerName: "${SLURM_CONTAINER_NAME}"
       extraArgs: [
+        "--nodes=2",
         "--ntasks-per-node=${MPI_BULK_PPN}",
       ]
 
@@ -119,6 +120,7 @@ steps:
       credentialsId: "${SCCTL_CREDENTIALS_ID}"
       containerName: "${SLURM_CONTAINER_NAME}"
       extraArgs: [
+        "--nodes=2",
         "--ntasks-per-node=${MPI_NCCL_PPN}",
       ]
 
@@ -156,6 +158,7 @@ steps:
       credentialsId: "${SCCTL_CREDENTIALS_ID}"
       containerName: "${SLURM_CONTAINER_NAME}"
       extraArgs: [
+        "--nodes=2",
         "--ntasks-per-node=1",
       ]
 
