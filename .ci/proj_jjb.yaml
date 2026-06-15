@@ -1,63 +1,4 @@
 - job-template:
-    name: "{jjb_proj}"
-    folder: "{jjb_folder}"
-    project-type: pipeline
-    properties:
-      - github:
-          url: "{jjb_git_web}"
-      - build-discarder:
-          days-to-keep: 30
-          num-to-keep: 20
-      - inject:
-          keep-system-variables: true
-          properties-content: |
-            jjb_proj={jjb_proj}
-    description: Do NOT edit this job through the Web GUI !
-    concurrent: true
-    sandbox: true
-    parameters:
-      - string:
-          name: "sha1"
-          default: "{jjb_branch}"
-          description: "Commit to be checked, set by PR"
-      - bool:
-          name: "build_dockers"
-          default: true
-          description: "Rebuild docker containers"
-      - string:
-          name: "conf_file"
-          default: ".ci/job_matrix.yaml"
-          description: "Regex to select job config file"
-      - string:
-          name: "script"
-          default: "{jjb_jenkinsfile}"
-          description: "Jenkinsfile to load on trigger"
-      - string:
-          name: "DEBUG"
-          default: 0
-          description: "Enable debug prints and traces, valid values are 0-9"
-      - string:
-          name: "UCC_VERSION"
-          default: "1.0.0"
-          description: "UCC version"
-      - string:
-          name: "githubData"
-          default: ""
-          description: "Variables from post"
-    pipeline-scm:
-      scm:
-        - git:
-            url: "{jjb_git}"
-            credentials-id: "{jjb_gh_auth_id}"
-            branches: [ '$sha1' ]
-            shallow-clone: true
-            depth: 10
-            refspec: "+refs/heads/*:refs/remotes/origin/* +refs/pull/*:refs/remotes/origin/pr/*"
-            browser: githubweb
-            browser-url: "{jjb_git}"
-      script-path: "$script"
-
-- job-template:
     name: "{jjb_proj}-test-nvls"
     project-type: pipeline
     folder: "{jjb_folder}"
@@ -218,7 +159,7 @@
         def currentBuildNum = env.BUILD_NUMBER as int
         def folderName = "{jjb_folder}"
         def dispatcherJobName = "ucc-ci-dispatcher"
-        def childJobNames = ["ucc", "ucc-build-hpcsdk", "ucc-test-nvls", "ucc-run-coverity", "ucc-test-gtest", "ucc-test-mpi"]
+        def childJobNames = ["ucc-build-hpcsdk", "ucc-test-nvls", "ucc-run-coverity", "ucc-test-gtest", "ucc-test-mpi"]
         ([dispatcherJobName] + childJobNames).each {{ jobName ->
           def job = jenkins.getItemByFullName("${{folderName}}/${{jobName}}")
           if (job) {{
@@ -246,13 +187,7 @@
       githubHelper.updateCommitStatus(blueOceanUrl, "Blossom CI started", GitHubCommitState.PENDING)
       currentBuild.description = githubHelper.getBuildDescription()
       try {{
-        parallel 'ucc': {{
-            def jobName = 'ucc'
-            build job: jobName, parameters: [
-                string(name: 'sha1', value: githubHelper.getMergedSHA()),
-                string(name: 'githubData', value: VARIABLE_FROM_POST)
-            ], propagate: false, wait: true
-        }}, 'ucc-build-hpcsdk': {{
+        parallel 'ucc-build-hpcsdk': {{
             def jobName = 'ucc-build-hpcsdk'
             build job: jobName, parameters: [
                 string(name: 'sha1', value: githubHelper.getMergedSHA()),
@@ -462,7 +397,6 @@
     jjb_jenkinsfile: '.ci/Jenkinsfile.shlib'
     jjb_gh_auth_id: 'svcnbu-swx-hpcx_ssh_with_key'
     jobs:
-      - "{jjb_proj}"
       - "{jjb_proj}-build-hpcsdk"
       - "{jjb_proj}-ci-dispatcher"
       - "{jjb_proj}-test-nvls"
