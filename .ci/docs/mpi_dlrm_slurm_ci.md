@@ -1,4 +1,4 @@
-# Design: UCC MPI + DLRM CI on Slurm
+# Design: UCC MPI CI on Slurm
 
 **Date:** 2026-06-04
 **Author:** Daniel Pressler
@@ -7,8 +7,8 @@
 ## Summary
 
 Convert the bare-metal `ucc` CI job — which today builds the `ngc_pytorch`
-image and runs the UCC MPI unit-test matrix plus the DLRM/torch_ucc GPU test on
-two bare-metal agents (`swx-clx01`, `swx-clx02`) — into a Slurm-based pipeline
+image and runs the UCC MPI unit-test matrix on two bare-metal agents
+(`swx-clx01`, `swx-clx02`) — into a Slurm-based pipeline
 modeled on the existing `test_gtest_matrix.yaml` / `test_nvls_matrix.yaml`
 pipelines.
 
@@ -20,9 +20,9 @@ follow-up.
 
 ## Goals
 
-- Run the existing MPI unit-test matrix and the DLRM test under Slurm on the
-  `funk` partition (head node `scctl`), with **2 nodes** for genuine multi-node
-  coverage (parity with today's 2-node bare-metal run).
+- Run the existing MPI unit-test matrix under Slurm on the `funk` partition
+  (head node `scctl`), with **2 nodes** for genuine multi-node coverage (parity
+  with today's 2-node bare-metal run).
 - Reuse the proven Slurm plumbing from `test_gtest_matrix.yaml` /
   `test_nvls_matrix.yaml`: `runs_on_dockers` image build, `build_helper` driver
   container, and the `slurmCI` allocate → run → stop lifecycle.
@@ -36,6 +36,7 @@ follow-up.
 - Changing which collectives / transports are exercised (coverage parity is the
   target, not expansion).
 - Multi-node coverage beyond 2 nodes.
+- DLRM / torch_ucc GPU workload testing (removed from this pipeline).
 
 ## Current state (bare-metal)
 
@@ -111,7 +112,6 @@ Structured like `test_gtest_matrix.yaml`:
 | MPI tests (bulk) | `run` | 4 | 2 | default, TL/UCP, all CL/HIER variants, 2-step bcast, TL/MLX5 (self-skips without CX7) |
 | MPI tests (NCCL) | `run` | `<NGPUS>` | 2 | NCCL block |
 | MPI tests (TL/CUDA) | `run` | 4 | 1 | the current `mpi_params $PPN 1` single-node case |
-| DLRM test | `run` | 1 | 2 | one rank per node, torch + ucc backend |
 | pipeline_stop | `stop` | — | — | deallocate |
 
 Rationale for grouping: under one `srun` step `--ntasks-per-node` is fixed, so
@@ -139,11 +139,6 @@ Add new wrappers (bare-metal scripts stay untouched):
     by per-node discovery guarded on `SLURM_LOCALID==0`, or a fixed
     `UCX_NET_DEVICES` / UCX auto-detection. No ssh, no `DOCKER_SSH_PORT`,
     no hostfile.
-- `.ci/scripts/run_dlrm_slurm.sh` — runs `run_dlrm_s_pytorch.sh` directly under
-  srun (`--ntasks-per-node=1`), mapping `SLURM_PROCID`/`SLURM_NTASKS`/first node
-  → torch `RANK`/`WORLD_SIZE`/`MASTER_ADDR` (+ `MASTER_PORT`), with the same
-  `UCC_CLS=basic UCC_CL_BASIC_TLS=nccl,ucp` env the bare-metal path sets.
-
 `run_docker.sh` / `stop_docker.sh` / `clean_docker.sh` and the `_docker.sh`
 wrappers are **not** used by the Slurm pipeline (pyxis/enroot provides the
 container).
@@ -192,19 +187,6 @@ Validated directly on the cluster using image
   - Multi-node PMIx + UCX fabric — bulk default (host,cuda) at 8 ranks across 2
     nodes: 4164/4164 passed.
   - **NCCL group** (2 nodes x 1 rank, NCCL 2.26.5 over IB): 1742/1742 passed.
-  - **DLRM** (2 nodes x 1 rank, `--dist-backend=ucc --use-gpu`): trains 10/10
-    iterations, exit 0 — after two fixes below.
-- **Two DLRM fixes required (found during 2-node validation):**
-  1. `MASTER_ADDR` must be derived from `SLURM_NODELIST` (first node), NOT each
-     rank's own hostname. `scontrol` is absent in the image, so the original
-     hostname fallback made the two ranks disagree → torch rendezvous hung
-     forever. `run_dlrm_slurm.sh` now parses `SLURM_NODELIST` (handles
-     `funk[06,20]` / `funk[06-08]` forms).
-  2. DLRM writes a tensorboard logdir into its CWD, which fails on a read-only
-     rootfs. This surfaced under manual `srun` (which mounts the rootfs
-     read-only — `--container-writable` fixed it there), but the Jenkins
-     `slurmCI` lib launches containers **writable by default**, so the pipeline
-     needs no extra flag.
 - **Benign noise:** the image's `cudaCheck` prints `_CUDA_COMPAT_STATUS ...
   MISMATCH cuInit()=803`, but CUDA works (all cuda MPI tests + DLRM GPU training
   pass) — it is a non-fatal compat-layer check.
@@ -215,11 +197,9 @@ Validated directly on the cluster using image
 ## Success criteria
 
 - `ucc-test-mpi` runs from the dispatcher, builds both images, allocates a
-  2-node funk job, runs all MPI groups + DLRM, and deallocates cleanly.
+  2-node funk job, runs all MPI groups, and deallocates cleanly.
 - The MPI collective/transport coverage matches the bare-metal matrix (modulo
   TL/MLX5 when CX7 is unavailable, which already self-skips).
-- The DLRM test completes its 10 batches with `--dist-backend=ucc` across 2
-  ranks.
 - The bare-metal `ucc` job continues to run unchanged in parallel.
 
 ## Follow-ups (out of scope here)
