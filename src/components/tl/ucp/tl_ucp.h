@@ -179,6 +179,16 @@ typedef struct ucc_tl_ucp_team {
     ucc_rank_t                 opt_radix; /* generic opt radix */
     ucc_rank_t                 opt_radix_host; /* host specific opt radix */
     ucc_ring_pattern_t         *cuda_ring;
+    /* Team-scoped memory segment registration */
+    ucc_tl_ucp_remote_info_t  *mem_segs;              /* local seg metadata, n_mem_segs entries */
+    uint64_t                   n_mem_segs;             /* total registered segs (user + scratch) */
+    uint64_t                  *team_remote_va;         /* [rank * n_mem_segs + seg]               */
+    size_t                    *team_remote_len;        /* [rank * n_mem_segs + seg]               */
+    ucp_rkey_h                *team_rkeys;             /* [rank * n_mem_segs + seg], eager unpack */
+    ucc_coll_task_t           *mem_map_task;           /* in-flight service allgather task        */
+    void                      *mem_map_allgather_rbuf; /* receive buffer for allgather            */
+    uint8_t                    mem_map_phase;          /* 0=idle, 1=size_exch in flight, 2=data_exch */
+    uint64_t                   mem_map_max_key_len;    /* max packed_key_len from phase 1         */
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
@@ -280,6 +290,15 @@ extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 #define UCC_TL_UCP_REMOTE_RKEY(_ctx, _rank, _seg)                              \
     ((_ctx)->rkeys[_rank * _ctx->n_rinfo_segs + _seg])
 
+#define UCC_TL_UCP_TEAM_RKEY(_team, _rank, _seg) \
+    ((_team)->team_rkeys[(_rank) * (_team)->n_mem_segs + (_seg)])
+
+#define UCC_TL_UCP_TEAM_REMOTE_VA(_team, _rank, _seg) \
+    ((_team)->team_remote_va[(_rank) * (_team)->n_mem_segs + (_seg)])
+
+#define UCC_TL_UCP_TEAM_REMOTE_LEN(_team, _rank, _seg) \
+    ((_team)->team_remote_len[(_rank) * (_team)->n_mem_segs + (_seg)])
+
 /*
  * For context, the data order of the MEMH Headers / Packed Headers
  *
@@ -315,4 +334,9 @@ void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
 ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t *ctx,
                                             ucc_mem_map_params_t  map,
                                             ucc_team_oob_coll_t   oob);
+
+ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
+                                          void *rbuf, size_t msgsize,
+                                          ucc_subset_t      subset,
+                                          ucc_coll_task_t **task_p);
 #endif

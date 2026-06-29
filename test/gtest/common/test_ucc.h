@@ -150,12 +150,21 @@ typedef std::shared_ptr<UccProcess> UccProcess_h;
 /* Ucc team that consists of several processes. The team
    is created from UccJob environment */
 class UccTeam {
+public:
     struct proc {
         UccProcess_h p;
-        ucc_team_h     team;
-        proc(){};
-        proc(UccProcess_h _p) : p(_p) {};
+        ucc_team_h   team;
+        void *       onesided_buf[3];
+        proc()
+        {
+            onesided_buf[0] = onesided_buf[1] = onesided_buf[2] = NULL;
+        };
+        proc(UccProcess_h _p) : p(_p)
+        {
+            onesided_buf[0] = onesided_buf[1] = onesided_buf[2] = NULL;
+        };
     };
+private:
     typedef enum {
         AG_INIT,
         AG_READY,
@@ -173,7 +182,8 @@ class UccTeam {
         UccTeam *self;
     } allgather_coll_info_t;
     std::vector<struct allgather_data> ag;
-    void init_team(bool use_team_ep_map, bool use_ep_range, bool is_onesided);
+    void init_team(bool use_team_ep_map, bool use_ep_range, bool is_onesided,
+                   bool is_team_onesided);
     void destroy_team();
     void test_allgather(size_t msglen);
     static ucc_status_t allgather(void *src_buf, void *recv_buf, size_t size,
@@ -185,9 +195,12 @@ public:
     int n_procs;
     void progress();
     std::vector<proc> procs;
+    bool is_team_onesided;
     UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map = false,
-            bool use_ep_range = true, bool is_onesided = false);
+            bool use_ep_range = true, bool is_onesided = false,
+            bool is_team_onesided = false);
     ~UccTeam();
+    void *onesided_buf(int rank, int seg);
 };
 typedef std::shared_ptr<UccTeam> UccTeam_h;
 typedef std::pair<std::string, std::string> ucc_env_var_t;
@@ -216,9 +229,11 @@ public:
     ~UccJob();
     std::vector<UccProcess_h> procs;
     UccTeam_h create_team(int n_procs, bool use_team_ep_map = false,
-                          bool use_ep_range = true, bool is_onesided = false);
+                          bool use_ep_range = true, bool is_onesided = false,
+                          bool is_team_onesided = false);
     UccTeam_h create_team(std::vector<int> &ranks, bool use_team_ep_map = false,
-                          bool use_ep_range = true, bool is_onesided = false);
+                          bool use_ep_range = true, bool is_onesided = false,
+                          bool is_team_onesided = false);
     void create_context();
     ucc_job_ctx_mode_t ctx_mode;
 };

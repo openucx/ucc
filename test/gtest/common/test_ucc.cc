@@ -3,6 +3,7 @@
  * See file LICENSE for terms.
  */
 #include "test_ucc.h"
+#include <array>
 extern "C" {
 #include "core/ucc_team.h"
 #include "components/tl/ucc_tl.h"
@@ -164,11 +165,25 @@ uint64_t rank_map_cb(uint64_t ep, void *cb_ctx) {
 }
 
 void UccTeam::init_team(bool use_team_ep_map, bool use_ep_range,
-                        bool is_onesided)
+                        bool is_onesided, bool is_team_onesided)
 {
     ucc_team_params_t                    team_params;
     std::vector<allgather_coll_info_t *> cis;
     ucc_status_t                         status;
+    std::vector<std::array<ucc_mem_map_t, UCC_TEST_N_MEM_SEGMENTS>> seg_maps(
+        n_procs);
+    if (is_team_onesided) {
+        for (int i = 0; i < n_procs; i++) {
+            for (int s = 0; s < UCC_TEST_N_MEM_SEGMENTS; s++) {
+                procs[i].onesided_buf[s] =
+                    ucc_calloc(UCC_TEST_MEM_SEGMENT_SIZE, 1,
+                               "team_onesided_buffer");
+                EXPECT_NE(procs[i].onesided_buf[s], nullptr);
+                seg_maps[i][s].address = procs[i].onesided_buf[s];
+                seg_maps[i][s].len     = UCC_TEST_MEM_SEGMENT_SIZE;
+            }
+        }
+    }
     for (int i = 0; i < n_procs; i++) {
         cis.push_back(new allgather_coll_info);
         cis.back()->self     = this;
@@ -199,6 +214,13 @@ void UccTeam::init_team(bool use_team_ep_map, bool use_ep_range,
         if (is_onesided) {
             team_params.mask |= UCC_TEAM_PARAM_FIELD_FLAGS;
             team_params.flags = UCC_TEAM_FLAG_COLL_WORK_BUFFER;
+        }
+        if (is_team_onesided) {
+            team_params.mask |= UCC_TEAM_PARAM_FIELD_FLAGS |
+                                UCC_TEAM_PARAM_FIELD_MEM_PARAMS;
+            team_params.flags = UCC_TEAM_FLAG_COLL_WORK_BUFFER;
+            team_params.mem_params.segments   = seg_maps[i].data();
+            team_params.mem_params.n_segments = UCC_TEST_N_MEM_SEGMENTS;
         }
         EXPECT_EQ(UCC_OK,
                   ucc_team_create_post(&(procs[i].p.get()->ctx_h), 1, &team_params,
@@ -251,9 +273,10 @@ void UccTeam::progress()
 }
 
 UccTeam::UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map,
-                 bool use_ep_range, bool is_onesided)
+                 bool use_ep_range, bool is_onesided, bool _is_team_onesided)
 {
-    n_procs = _procs.size();
+    n_procs           = _procs.size();
+    is_team_onesided  = _is_team_onesided;
     ag.resize(n_procs);
     for (auto &p : _procs) {
         procs.push_back(proc(p));
@@ -262,13 +285,31 @@ UccTeam::UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map,
         a.phase = AG_INIT;
     }
     copy_complete_count = 0;
-    init_team(use_team_ep_map, use_ep_range, is_onesided);
+    init_team(use_team_ep_map, use_ep_range, is_onesided, is_team_onesided);
     // test_allgather(128);
 }
 
 UccTeam::~UccTeam()
 {
     destroy_team();
+    if (is_team_onesided) {
+        for (int i = 0; i < n_procs; i++) {
+            for (int s = 0; s < UCC_TEST_N_MEM_SEGMENTS; s++) {
+                if (procs[i].onesided_buf[s]) {
+                    ucc_free(procs[i].onesided_buf[s]);
+                    procs[i].onesided_buf[s] = NULL;
+                }
+            }
+        }
+    }
+}
+
+void *UccTeam::onesided_buf(int rank, int seg)
+{
+    if (is_team_onesided) {
+        return procs[rank].onesided_buf[seg];
+    }
+    return procs[rank].p->onesided_buf[seg];
 }
 
 UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
@@ -554,7 +595,8 @@ void UccJob::cleanup()
 }
 
 UccTeam_h UccJob::create_team(int _n_procs, bool use_team_ep_map,
-                              bool use_ep_range, bool is_onesided)
+                              bool use_ep_range, bool is_onesided,
+                              bool is_team_onesided)
 {
     EXPECT_GE(n_procs, _n_procs);
     std::vector<UccProcess_h> team_procs;
@@ -562,11 +604,12 @@ UccTeam_h UccJob::create_team(int _n_procs, bool use_team_ep_map,
         team_procs.push_back(procs[i]);
     }
     return std::make_shared<UccTeam>(team_procs, use_team_ep_map, use_ep_range,
-                                     is_onesided);
+                                     is_onesided, is_team_onesided);
 }
 
 UccTeam_h UccJob::create_team(std::vector<int> &ranks, bool use_team_ep_map,
-                              bool use_ep_range, bool is_onesided)
+                              bool use_ep_range, bool is_onesided,
+                              bool is_team_onesided)
 {
     EXPECT_GE(n_procs, ranks.size());
     std::vector<UccProcess_h> team_procs;
@@ -574,7 +617,7 @@ UccTeam_h UccJob::create_team(std::vector<int> &ranks, bool use_team_ep_map,
         team_procs.push_back(procs[ranks[i]]);
     }
     return std::make_shared<UccTeam>(team_procs, use_team_ep_map, use_ep_range,
-                                     is_onesided);
+                                     is_onesided, is_team_onesided);
 }
 
 UccReq::UccReq(UccTeam_h _team, ucc_coll_args_t *args) :

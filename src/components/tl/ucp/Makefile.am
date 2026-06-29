@@ -113,6 +113,8 @@ sources =                 \
 	tl_ucp_lib.c          \
 	tl_ucp_context.c      \
 	tl_ucp_team.c         \
+	tl_ucp_team_mem.h     \
+	tl_ucp_team_mem.c     \
 	tl_ucp_ep.h           \
 	tl_ucp_ep.c           \
 	tl_ucp_coll.c         \

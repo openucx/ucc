@@ -350,17 +350,10 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           ucc_subset_t      subset,
                                           ucc_coll_task_t **task);
 
-ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
-                                          void *rbuf, size_t msgsize,
-                                          ucc_subset_t      subset,
-                                          ucc_coll_task_t **task_p);
-
 ucc_status_t ucc_tl_ucp_service_bcast(ucc_base_team_t *team, void *buf,
                                       size_t msgsize, ucc_rank_t root,
                                       ucc_subset_t      subset,
                                       ucc_coll_task_t **task_p);
-
-ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_ucp_service_cleanup(ucc_coll_task_t *task);
 

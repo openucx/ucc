@@ -8,6 +8,7 @@
 #include "tl_ucp_ep.h"
 #include "tl_ucp_coll.h"
 #include "tl_ucp_sendrecv.h"
+#include "tl_ucp_team_mem.h"
 #include "utils/ucc_parser.h"
 #include "coll_score/ucc_coll_score.h"
 #include "coll_patterns/ring.h"
@@ -56,14 +57,23 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     /* TODO: init based on ctx settings and on params: need to check
              if all the necessary ranks mappings are provided */
-    self->preconnect_task = NULL;
-    self->seq_num         = 0;
-    self->status          = UCC_INPROGRESS;
-    self->tuning_str      = "";
-    self->topo            = NULL;
-    self->opt_radix       = UCC_UUNITS_AUTO_RADIX;
-    self->opt_radix_host  = UCC_UUNITS_AUTO_RADIX;
-    self->cuda_ring       = NULL;
+    self->preconnect_task        = NULL;
+    self->seq_num                = 0;
+    self->status                 = UCC_INPROGRESS;
+    self->tuning_str             = "";
+    self->topo                   = NULL;
+    self->opt_radix              = UCC_UUNITS_AUTO_RADIX;
+    self->opt_radix_host         = UCC_UUNITS_AUTO_RADIX;
+    self->cuda_ring              = NULL;
+    self->mem_segs               = NULL;
+    self->n_mem_segs             = 0;
+    self->team_remote_va         = NULL;
+    self->team_remote_len        = NULL;
+    self->team_rkeys             = NULL;
+    self->mem_map_task           = NULL;
+    self->mem_map_allgather_rbuf = NULL;
+    self->mem_map_phase          = 0;
+    self->mem_map_max_key_len    = 0;
 
     status = ucc_config_clone_table(&UCC_TL_UCP_TEAM_LIB(self)->cfg, &self->cfg,
                                     ucc_tl_ucp_lib_config_table);
@@ -157,6 +167,8 @@ ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 {
     ucc_tl_ucp_team_t *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
 
+    ucc_tl_ucp_team_mem_map_destroy(team);
+
     if (team->cuda_ring) {
         ucc_ring_pattern_destroy(team->cuda_ring);
         ucc_free(team->cuda_ring);
@@ -242,6 +254,55 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
         for (i = 0; i < ctx->n_rinfo_segs; i++) {
             team->va_base[i]     = ctx->remote_info[i].va_base;
             team->base_length[i] = ctx->remote_info[i].len;
+        }
+    }
+
+    if ((team->super.super.params.params.mask & UCC_TEAM_PARAM_FIELD_MEM_PARAMS) &&
+        team->super.super.params.params.mem_params.n_segments > 0 &&
+        !UCC_TL_IS_SERVICE_TEAM(team)) {
+        if (team->mem_map_phase == 0) {
+            status = ucc_tl_ucp_team_mem_map_size_exch(team);
+            if (status != UCC_INPROGRESS) {
+                goto err_preconnect;
+            }
+            return UCC_INPROGRESS;
+        }
+        /* The allgather ring task is driven by the context progress queue;
+         * never call task->progress directly here -- doing so risks completing
+         * the task while it is still in the queue, which corrupts the queue
+         * when the task is subsequently freed. */
+        if (team->mem_map_phase == 1) {
+            status = team->mem_map_task->status;
+            if (status == UCC_INPROGRESS) {
+                return UCC_INPROGRESS;
+            }
+            if (status != UCC_OK) {
+                tl_error(UCC_TL_TEAM_LIB(team),
+                         "team mem_map size exchange allgather failed: %s",
+                         ucc_status_string(status));
+                goto err_preconnect;
+            }
+            status = ucc_tl_ucp_team_mem_map_data_exch(team);
+            if (status != UCC_INPROGRESS) {
+                goto err_preconnect;
+            }
+            return UCC_INPROGRESS;
+        }
+        if (team->mem_map_phase == 2) {
+            status = team->mem_map_task->status;
+            if (status == UCC_INPROGRESS) {
+                return UCC_INPROGRESS;
+            }
+            if (status != UCC_OK) {
+                tl_error(UCC_TL_TEAM_LIB(team),
+                         "team mem_map data exchange allgather failed: %s",
+                         ucc_status_string(status));
+                goto err_preconnect;
+            }
+            status = ucc_tl_ucp_team_mem_map_finalize(team);
+            if (status != UCC_OK) {
+                goto err_preconnect;
+            }
         }
     }
 
