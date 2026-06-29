@@ -255,6 +255,16 @@ ucc_status_t ucc_tl_cuda_alltoall_push_init(ucc_base_coll_args_t *coll_args,
         goto err;
     }
 
+    /* Push writes directly to peer rbuf and has no proxy path. On a topology
+     * where any peer is not directly reachable, that peer's chunk would be
+     * silently skipped (both here and in progress) while the final barrier
+     * still returns UCC_OK, leaving its receive block stale. Only support
+     * fully-connected CUDA topologies. */
+    if (!ucc_tl_cuda_team_topo_is_fully_connected(team->topo)) {
+        status = UCC_ERR_NOT_SUPPORTED;
+        goto err;
+    }
+
     task->alltoall_push.stage           = ALLTOALL_PUSH_STAGE_SYNC;
     task->alltoall_push.sbuf            = args->src.info.buffer;
     task->alltoall_push.rbuf            = args->dst.info.buffer;
