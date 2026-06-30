@@ -89,7 +89,7 @@ static inline int ucc_gpu_fabric_cluster_uuid_is_valid(const uint8_t *uuid)
     return 0;
 }
 
- typedef struct ucc_nic_info {
+typedef struct ucc_nic_info {
     ucc_pci_info_t pci;
     /**< IB port number */
     uint8_t  port;
