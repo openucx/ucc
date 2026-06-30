@@ -1,38 +1,133 @@
 /**
-* Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+* Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 * See file LICENSE for terms.
 */
+#include "config.h"
 
-#include "ucc_proc_info.h"
-#include "ucc_log.h"
-#include "utils/ucc_malloc.h"
-#include "utils/ucc_math.h"
+#include <dlfcn.h>
 #include <errno.h>
 #include <sched.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <stdint.h>
-#include "config.h"
+#include <stdlib.h>
+#include <string.h>
+#include "ucc_proc_info.h"
+#include "utils/ucc_malloc.h"
+#include "utils/ucc_math.h"
+#include "utils/ucc_sys.h"
 #ifdef HAVE_UCS_GET_SYSTEM_ID
 #include <ucs/sys/uid.h>
 #endif
-#include <dlfcn.h>
 
 ucc_proc_info_t ucc_local_proc;
-static char ucc_local_hostname[HOST_NAME_MAX];
-
-const char*  ucc_hostname()
-{
-    return ucc_local_hostname;
-}
+ucc_host_info_t ucc_local_host;
 
 uint64_t ucc_get_system_id()
 {
 #ifdef HAVE_UCS_GET_SYSTEM_ID
     return ucs_get_system_id();
 #else
-    return ucc_str_hash_djb2(ucc_local_hostname);
+    return ucc_str_hash_djb2(ucc_get_host_name());
 #endif
+}
+
+void ucc_proc_info_print(const ucc_proc_info_t *info)
+{
+    char socket_str[16];
+    char numa_str[16];
+
+    if (!info) {
+        return;
+    }
+
+    if (info->socket_id == UCC_SOCKET_ID_INVALID) {
+        ucc_snprintf_safe(socket_str, sizeof(socket_str), "n/a");
+    } else {
+        ucc_snprintf_safe(socket_str, sizeof(socket_str), "%u",
+                          (unsigned)info->socket_id);
+    }
+
+    if (info->numa_id == UCC_NUMA_ID_INVALID) {
+        ucc_snprintf_safe(numa_str, sizeof(numa_str), "n/a");
+    } else {
+        ucc_snprintf_safe(numa_str, sizeof(numa_str), "%u",
+                          (unsigned)info->numa_id);
+    }
+
+    ucc_debug("proc_info: host_hash=%" PRIu64 " host_id=%" PRIu64
+              " pid=%d socket=%s numa=%s",
+              info->host_hash, info->host_id, info->pid, socket_str, numa_str);
+}
+
+void ucc_host_info_print(const ucc_host_info_t *info)
+{
+    int i;
+
+    if (!info) {
+        return;
+    }
+
+    ucc_debug("host_info: host_id=%" PRIu64 " n_gpus=%u n_nics=%u",
+              info->host_id, (unsigned)info->n_gpus,
+              (unsigned)info->n_nics);
+
+    for (i = 0; i < info->n_gpus; i++) {
+        const ucc_gpu_info_t *gpu = &info->gpus[i];
+
+        ucc_debug("gpu_info: pci=%04x:%02x:%02x.%u caps=0x%x "
+                  "clique=%" PRIu64 " uuid=0x%016" PRIx64,
+                  (unsigned)gpu->pci.domain, (unsigned)gpu->pci.bus,
+                  (unsigned)gpu->pci.device, (unsigned)gpu->pci.function,
+                  gpu->caps, gpu->fabric_clique_id, gpu->uuid);
+    }
+
+    if (info->n_gpus > 0) {
+        size_t buf_size = 64 +
+                          (size_t)info->n_gpus * info->n_gpus * 4 +
+                          (size_t)info->n_gpus * 16;
+        char  *line = ucc_malloc(buf_size, "nvlink_matrix_line");
+
+        if (line) {
+            int offset = 0;
+
+            offset += snprintf(line + offset, buf_size - offset,
+                               "nvlink_matrix cols:");
+            for (i = 0; i < info->n_gpus && offset < (int)buf_size; i++) {
+                offset += snprintf(line + offset, buf_size - offset,
+                                   " %u", (unsigned)i);
+            }
+
+            offset += snprintf(line + offset, buf_size - offset, " rows:");
+            for (i = 0; i < info->n_gpus && offset < (int)buf_size; i++) {
+                int j;
+
+                offset += snprintf(line + offset, buf_size - offset,
+                                   " gpu%u[", (unsigned)i);
+                for (j = 0; j < info->n_gpus && offset < (int)buf_size; j++) {
+                    offset += snprintf(
+                        line + offset, buf_size - offset, "%u%s",
+                        (unsigned)info->nvlink_matrix[i][j],
+                        (j + 1 < info->n_gpus) ? "," : "");
+                }
+                offset += snprintf(line + offset, buf_size - offset, "]");
+            }
+
+            ucc_debug("%s", line);
+            ucc_free(line);
+        }
+    }
+
+    for (i = 0; i < info->n_nics; i++) {
+        const ucc_nic_info_t *nic = &info->nics[i];
+
+        ucc_debug("nic_info: pci=%04x:%02x:%02x.%u port=%u guid=0x%016" PRIx64
+                  " name=%s",
+                  (unsigned)nic->pci.domain, (unsigned)nic->pci.bus,
+                  (unsigned)nic->pci.device, (unsigned)nic->pci.function,
+                  (unsigned)nic->port, nic->guid, nic->name);
+    }
 }
 
 typedef unsigned long int cpu_mask_t;
@@ -285,15 +380,7 @@ error:
 
 ucc_status_t ucc_local_proc_info_init()
 {
-    ucc_local_proc.host_hash = gethostid();
-    if (gethostname(ucc_local_hostname, sizeof(ucc_local_hostname))) {
-        ucc_warn("couldn't get local hostname");
-        ucc_local_hostname[0] = '\0';
-    } else {
-        strtok(ucc_local_hostname, ".");
-        ucc_assert(sizeof(ucc_host_id_t) >= sizeof(unsigned long));
-        ucc_local_proc.host_hash = ucc_get_system_id();
-    }
+    ucc_local_proc.host_hash = ucc_get_system_id();
     ucc_local_proc.pid       = getpid();
     ucc_local_proc.socket_id = UCC_SOCKET_ID_INVALID;
     ucc_local_proc.numa_id   = UCC_NUMA_ID_INVALID;
@@ -306,9 +393,13 @@ ucc_status_t ucc_local_proc_info_init()
         ucc_debug("failed to get bound numa id");
     }
 
-    ucc_debug("proc pid %d, host %s, host_hash %lu, sockid %d, numaid %d",
-              ucc_local_proc.pid, ucc_local_hostname, ucc_local_proc.host_hash,
-              (int)ucc_local_proc.socket_id, (int)ucc_local_proc.numa_id);
+    ucc_debug(
+        "proc pid %d, host %s, host_hash %lu, sockid %d, numaid %d",
+        ucc_local_proc.pid,
+        ucc_get_host_name(),
+        ucc_local_proc.host_hash,
+        (int)ucc_local_proc.socket_id,
+        (int)ucc_local_proc.numa_id);
 
     return UCC_OK;
 }

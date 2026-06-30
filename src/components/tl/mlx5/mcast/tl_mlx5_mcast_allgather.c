@@ -520,9 +520,15 @@ ucc_tl_mlx5_mcast_do_zero_copy_pipelined_allgather(void *req_handle)
     ucc_tl_mlx5_mcast_coll_comm_t             *comm  = req->comm;
     const int                                  zcopy = req->proto != MCAST_PROTO_EAGER;
     ucc_tl_mlx5_mcast_pipelined_ag_schedule_t *sched = req->ag_schedule;
-    int                                        num_recvd, root, to_send_left,
-                                               j, group_id, num_packets, count;
-    size_t                                     offset, offset_left;
+    int                                        root         = 0;
+    int                                        num_recvd    = 0;
+    int                                        to_send_left = 0;
+    int                                        j            = 0;
+    int                                        group_id     = 0;
+    int                                        num_packets  = 0;
+    int                                        count        = 0;
+    size_t                                     offset       = 0;
+    size_t                                     offset_left  = 0;
     ucc_status_t                               status;
 
     status = ucc_tl_mlx5_mcast_allgather_reliability_ready(req);

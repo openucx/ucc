@@ -10,7 +10,7 @@
 #include "utils/ucc_log.h"
 
 #define ucc_log_component_ec(_ec, _level, fmt, ...)                      \
-    ucc_log_component(_level, ((_ec)->config)->log_component,            \
+    ucc_log_component(_level, &((_ec)->config)->log_component,           \
                       fmt, ##__VA_ARGS__)
 
 #define ec_error(_ec, _fmt, ...)                                         \

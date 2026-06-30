@@ -38,12 +38,23 @@
 #define UCC_STATIC_ASSERT(_cond)                                               \
      switch(0) {case 0:case (_cond):;}
 
+/* Maximal allocation size for on-stack buffers */
+#define UCC_ALLOCA_MAX_SIZE  1200
+
+/**
+ * alloca which makes sure the size is small enough.
+ */
+ #define ucc_alloca(_size) \
+ ({ \
+     ucc_assert((_size) <= UCC_ALLOCA_MAX_SIZE); \
+     alloca(_size); \
+ })
+
 /**
  * Prevent compiler from reordering instructions
  */
 #define ucc_compiler_fence()       asm volatile(""::: "memory")
 
-typedef ucs_log_component_config_t ucc_log_component_config_t;
 typedef int                        ucc_score_t;
 
 #define _UCC_PP_MAKE_STRING(x) #x
@@ -58,6 +69,14 @@ typedef int                        ucc_score_t;
  * suppress unaligned pointer warning
  */
 #define ucc_unaligned_ptr(_ptr) ({void *_p = (void*)(_ptr); _p;})
+
+/*
+ * Enable compiler checks for printf-like formatting.
+ *
+ * @param fmtargN number of formatting argument
+ * @param vargN   number of variadic argument
+ */
+ #define UCC_F_PRINTF(fmtargN, vargN) __attribute__((format(printf, fmtargN, vargN)))
 
 /* A function which should not be optimized */
 #if defined(HAVE_ATTRIBUTE_NOOPTIMIZE) && (HAVE_ATTRIBUTE_NOOPTIMIZE == 1)
@@ -139,6 +158,6 @@ static inline ucs_status_t ucc_status_to_ucs_status(ucc_status_t status)
     #endif
 #else
     #define ucc_assume(x) do {} while (0)  /* No-op for unsupported compilers */
-#endif    
+#endif
 
 #endif

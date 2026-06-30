@@ -566,6 +566,7 @@ static inline ucc_status_t ucc_tl_ucp_ep_flush(ucc_rank_t dest_group_rank,
 
 static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
                                              size_t             msglen,
+                                             ucc_memory_type_t  mtype,
                                              ucc_rank_t         dest_group_rank,
                                              ucc_mem_map_mem_h  src_memh,
                                              ucc_mem_map_mem_h *dest_memh,
@@ -600,9 +601,11 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
     }
 
     req_param.op_attr_mask =
-        UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA;
-    req_param.cb.send   = ucc_tl_ucp_put_completion_cb;
-    req_param.user_data = (void *)task;
+        UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA |
+        UCP_OP_ATTR_FIELD_MEMORY_TYPE;
+    req_param.cb.send     = ucc_tl_ucp_put_completion_cb;
+    req_param.user_data   = (void *)task;
+    req_param.memory_type = ucc_memtype_to_ucs[mtype];
     if (ucp_memh) {
         req_param.op_attr_mask |= UCP_OP_ATTR_FIELD_MEMH;
         req_param.memh = ucp_memh;
@@ -623,6 +626,7 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
 
 static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
                                              size_t             msglen,
+                                             ucc_memory_type_t  mtype,
                                              ucc_rank_t         dest_group_rank,
                                              ucc_mem_map_mem_h  src_memh,
                                              ucc_mem_map_mem_h *dest_memh,
@@ -657,9 +661,11 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
     }
 
     req_param.op_attr_mask =
-        UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA;
-    req_param.cb.send   = ucc_tl_ucp_get_completion_cb;
-    req_param.user_data = (void *)task;
+        UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA |
+        UCP_OP_ATTR_FIELD_MEMORY_TYPE;
+    req_param.cb.send     = ucc_tl_ucp_get_completion_cb;
+    req_param.user_data   = (void *)task;
+    req_param.memory_type = ucc_memtype_to_ucs[mtype];
     if (ucp_memh) {
         req_param.op_attr_mask |= UCP_OP_ATTR_FIELD_MEMH;
         req_param.memh = ucp_memh;

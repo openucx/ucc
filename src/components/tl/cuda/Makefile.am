@@ -52,8 +52,9 @@ allreduce =                    \
 
 if TL_CUDA_NVLS_ENABLED
 reduce_scatter += reduce_scatter/reduce_scatter_nvls.c
-
+reduce_scatterv += reduce_scatterv/reduce_scatterv_nvls.c
 allreduce += allreduce/allreduce_nvls.c
+allgatherv += allgatherv/allgatherv_nvls.c
 endif
 
 sources =               \
@@ -83,7 +84,7 @@ module_LTLIBRARIES = libucc_tl_cuda.la
 libucc_tl_cuda_la_SOURCES  = $(sources)
 libucc_tl_cuda_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS) $(CUDA_CPPFLAGS)
 libucc_tl_cuda_la_CFLAGS   = $(BASE_CFLAGS)
-libucc_tl_cuda_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(CUDA_LDFLAGS)
+libucc_tl_cuda_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(CUDA_LDFLAGS) -lstdc++
 libucc_tl_cuda_la_LIBADD   = $(CUDA_LIBS) $(NVML_LIBS) $(UCC_TOP_BUILDDIR)/src/libucc.la kernels/libucc_tl_cuda_kernels.la
 
 include $(top_srcdir)/config/module.am

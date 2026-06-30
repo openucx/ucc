@@ -432,9 +432,14 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_zero_copy_pipelined_bcast(void *
     const int                                  zcopy = req->proto != MCAST_PROTO_EAGER;
     ucc_tl_mlx5_mcast_pipelined_ag_schedule_t *sched = req->ag_schedule;
     int                                        root  = req->root;
-    int                                        num_recvd, to_send_left,
-                                               j, group_id, num_packets, count;
-    size_t                                     offset, offset_left;
+    int                                        num_recvd    = 0;
+    int                                        to_send_left = 0;
+    int                                        j            = 0;
+    int                                        group_id     = 0;
+    int                                        num_packets  = 0;
+    int                                        count        = 0;
+    size_t                                     offset       = 0;
+    size_t                                     offset_left  = 0;
     ucc_status_t                               status;
 
     if (req->ag_counter != req->comm->bcast_comm.under_progress_counter) {

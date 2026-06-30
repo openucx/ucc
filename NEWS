@@ -6,6 +6,56 @@
 
 ## Current
 
+## New Features and Enhancements
+
+### Core
+- Ported UCS logger from libucs to UCC, enabling file filtering and log-to-file features {PR #1191}
+
+### TL/CUDA
+- Added multinode NVLS support using CUDA fabric handles for cross-node allreduce {PR #1185}
+- Added NVLS reduce_scatterv with BF16 datatype support and kernel-based synchronization {PR #1211}
+- Added ptrace permissions for NVLS POSIX handle sharing via pidfd_getfd {PR #1218}
+- Added NVLS allgatherv using multimem.st instructions with 16-byte alignment {PR #1240}
+
+### TL/UCP
+- Added memory type parameter to tl_ucp_put/get for GPU memory in onesided collectives {PR #1253}
+- Fixed crashes in inplace mode for allgather, alltoall, and alltoallv {PR #1254}
+- Fixed onesided alltoall algorithm selection to default to PUT for 1 PPN {PR #1247}
+
+### TL/NCCL
+- Added native ncclAlltoAll support for NCCL 2.28.3+ {PR #1244}
+
+### Build and Test
+- Bumped version to v1.7 {PR #1225}
+- Updated clang-format rules for function wrapping and comment reflow {PR #1192}
+- Added Greptile AI code review configuration {PR #1208}
+- Improved configure status reporting for CUDA/NVML detection {PR #1239}
+- Fixed m4 configuration syntax for CUDA {PR #1252}
+- Fixed uninitialized variable warning in MLX5 UMR WQE test {PR #1195}
+- Added multinode NVLS tests on GB300 Slurm clusters {PR #1235}
+- Added timeout to MPI and DLRM tests to prevent hung jobs {PR #1226}
+- Added 90-minute timeout to torch UCC tests {PR #1204}
+- Added Blossom CI Jenkins dispatcher job for /build trigger {PR #1229}
+- Added GitHub Action workflow for Blossom pipeline initialization {PR #1227}
+- Migrated Jenkins credentials to swx-hpcx service account for SSH key rotation {PR #1233}
+- Added separate GitHub UI checks for each Jenkins job via Blossom {PR #1237}
+- Added Blossom CI separated checks and job output upload to GitHub {PR #1238}
+- Fixed Jenkins job folder name and email in CI configuration {PR #1236}
+- Fixed clang-format command to use git-clang-format-21 for Ubuntu 22.04 {PR #1212}
+- Migrated hpcsdk build from GitHub workflow to Jenkins + CI-DEMO {PR #1215}
+- Set Coverity aggressiveness level to medium for better issue detection {PR #1207}
+- Fixed parallel GPU tests with CUDA context creation and IB port validation {PR #1209}
+- Enabled parallel UCC test execution in CI {PR #1206}
+- Fixed Jenkins JJB YAML variable syntax for check separation {PR #1246}
+
+### Documentation
+- Fixed various typos throughout comments and outputs {PR #1228}
+
+### Tools
+- Added matrix generator for alltoallv traffic patterns (uniform, biased, random) {PR #1220}
+- Fixed segfault in scatterv perftest inplace mode due to early memory free {PR #1234}
+- Optimized perftest traffic matrix to reuse displacements for same-size messages {PR #1250}
+
 ## 1.6.0 (November 14th, 2025)
 
 ## New Features and Enhancements

@@ -15,8 +15,6 @@
 #include "utils/ucc_list.h"
 #include "utils/arch/cpu.h"
 #include "khash.h"
-#include "components/topo/ucc_topo.h"
-
 #include <ucs/config/parser.h>
 #include <ucs/sys/preprocessor.h>
 #include <ucs/sys/compiler_def.h>
@@ -28,6 +26,7 @@ typedef ucs_config_names_array_t       ucc_config_names_array_t;
 typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 typedef ucs_config_allow_list_t        ucc_config_allow_list_t;
 
+typedef struct ucc_topo ucc_topo_t;
 typedef struct ucc_file_config ucc_file_config_t;
 
 #if UCS_HAVE_CONFIG_GLOBAL_LIST_ENTRY_FLAGS
@@ -59,6 +58,8 @@ typedef struct ucc_file_config ucc_file_config_t;
     ucs_config_parser_print_opts((_stream), (_title), (_opts), (_fields), (_tprefix), (_prefix), (_flags))
 #endif
 
+#define UCC_MEMUNITS_AUTO        ((size_t)-2)
+
 #define UCC_CONFIG_GET_TABLE(_table)    &_table##_config_entry
 #define UCC_CONFIG_TYPE_LOG_COMP        UCS_CONFIG_TYPE_LOG_COMP
 #define UCC_CONFIG_REGISTER_TABLE       UCS_CONFIG_REGISTER_TABLE
@@ -72,11 +73,11 @@ typedef struct ucc_file_config ucc_file_config_t;
 #define UCC_CONFIG_TYPE_ARRAY           UCS_CONFIG_TYPE_ARRAY
 #define UCC_CONFIG_TYPE_TABLE           UCS_CONFIG_TYPE_TABLE
 #define UCC_CONFIG_TYPE_ULUNITS         UCS_CONFIG_TYPE_ULUNITS
+#define UCC_CONFIG_TYPE_ULONG           UCS_CONFIG_TYPE_ULONG
 #define UCC_CONFIG_TYPE_ENUM            UCS_CONFIG_TYPE_ENUM
 #define UCC_CONFIG_TYPE_MEMUNITS        UCS_CONFIG_TYPE_MEMUNITS
 #define UCC_ULUNITS_AUTO                UCS_ULUNITS_AUTO
 #define UCC_CONFIG_TYPE_BITMAP          UCS_CONFIG_TYPE_BITMAP
-#define UCC_CONFIG_TYPE_MEMUNITS        UCS_CONFIG_TYPE_MEMUNITS
 #define UCC_CONFIG_TYPE_BOOL            UCS_CONFIG_TYPE_BOOL
 #define UCC_CONFIG_ALLOW_LIST_NEGATE    UCS_CONFIG_ALLOW_LIST_NEGATE
 #define UCC_CONFIG_ALLOW_LIST_ALLOW_ALL UCS_CONFIG_ALLOW_LIST_ALLOW_ALL
@@ -282,6 +283,16 @@ ucs_status_t ucc_config_clone_uint_ranged(const void *src, void *dest,
                                           const void *arg);
 
 void ucc_config_release_uint_ranged(void *ptr, const void *arg);
+
+/**
+ * Translate configuration value of "MEMUNITS" type to actual value.
+ *
+ * @param config_size  Size specified by configuration.
+ * @param auto_size    Default size when configured to 'auto'.
+ * @param max_size     Maximal size to trim "inf".
+ */
+ size_t ucc_config_memunits_get(size_t config_size, size_t auto_size,
+                                size_t max_size);
 
 #ifdef UCS_HAVE_PARSER_CONFIG_DOC
 #define UCC_CONFIG_TYPE_UINT_RANGED                                            \

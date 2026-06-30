@@ -19,7 +19,7 @@ typedef struct ucc_subset {
     ucc_rank_t   myrank;
 } ucc_subset_t;
 
-static inline ucc_rank_t ucc_subset_size(ucc_subset_t *set)
+static inline ucc_rank_t ucc_subset_size(const ucc_subset_t *set)
 {
     return (ucc_rank_t)set->map.ep_num;
 }
@@ -42,9 +42,8 @@ ucc_status_t ucc_mrange_uint_copy(ucc_mrange_uint_t       *dst,
 
 void ucc_mrange_uint_destroy(ucc_mrange_uint_t *param);
 
-static inline unsigned ucc_mrange_uint_get(ucc_mrange_uint_t *param,
-                                           size_t             range_value,
-                                           ucc_memory_type_t  mem_type)
+static inline unsigned ucc_mrange_uint_get(
+    ucc_mrange_uint_t *param, size_t range_value, ucc_memory_type_t mem_type)
 {
     ucc_mrange_t *r;
 

@@ -39,10 +39,13 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
     coll_args.coll_type         = UCC_COLL_TYPE_ALLTOALL;
     coll_args.src.info.datatype = dt;
     coll_args.src.info.mem_type = mt;
-    coll_args.src.info.buffer   = src_header->addr;
     coll_args.dst.info.datatype = dt;
     coll_args.dst.info.mem_type = mt;
     coll_args.dst.info.buffer   = dst_header->addr;
+
+    if (!is_inplace) {
+        coll_args.src.info.buffer = src_header->addr;
+    }
 
     if (map_type == UCC_PT_MAP_TYPE_LOCAL) {
         ucc_context_h        ctx = comm->get_context();
@@ -144,8 +147,8 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
     coll_args.mask |= UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
 
     if (is_inplace) {
-        coll_args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
-        coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+        coll_args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 
     if (is_persistent) {

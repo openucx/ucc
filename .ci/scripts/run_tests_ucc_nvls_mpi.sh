@@ -1,0 +1,22 @@
+#!/bin/bash -xe
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+source "${SCRIPT_DIR}/env.sh"
+
+if [ "${SLURM_LOCALID:-0}" = "0" ]; then
+    "${SCRIPT_DIR}/check_nvls_fabric.sh"
+fi
+
+export OMPI_MCA_coll=^hcoll
+export OMPI_MCA_coll_ucc_enable=0
+export UCC_TLS=cuda,ucp
+export UCC_LOG_LEVEL=info
+export UCC_TL_CUDA_NVLS_SM_COUNT=4
+
+EXE="/opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi"
+EXE+=" --set_device 2 --mtypes cuda"
+DTYPES="float32,int32,uint32,int64,uint64"
+
+echo "INFO: NVLS MPI tests (allreduce) ..."
+UCC_TL_CUDA_TUNE="allreduce:cuda:@0" $EXE -c allreduce -d ${DTYPES} -o sum -m 1024:33554432
+echo "INFO: NVLS MPI tests (allreduce) ... DONE"

@@ -12,7 +12,7 @@
 
 AC_PREREQ([2.63])
 define([ucc_ver_major], 1)
-define([ucc_ver_minor], 7)
+define([ucc_ver_minor], 9)
 define([ucc_ver_patch], 0)
 define([ucc_ver_micro], esyscmd([sh -c "git rev-list HEAD | wc -l | sed -e 's/ *//g' | xargs -n1 printf"]))
 define([ucc_git_sha], esyscmd([sh -c "git rev-parse --short HEAD"]))
@@ -244,6 +244,8 @@ AC_CONFIG_FILES([
                  src/components/cl/doca_urom/Makefile
                  src/components/mc/cpu/Makefile
                  src/components/mc/cuda/Makefile
+                 src/components/topo/cuda/Makefile
+                 src/components/topo/ib/Makefile
                  src/components/ec/cpu/Makefile
                  src/components/ec/cuda/Makefile
                  src/components/ec/cuda/kernel/Makefile
@@ -282,7 +284,8 @@ AC_MSG_NOTICE([     NVCC gencodes:   ${NVCC_ARCH}])
 ])
 AC_MSG_NOTICE([ DOCA UROM enabled:   ${doca_urom_happy}])
 AS_IF([test "x$nvls_happy" = "xyes"],[
-AC_MSG_NOTICE([ NVLS (NVLINK SHARP):   enabled])
+AC_MSG_NOTICE([NVLS (NVLINK SHARP):   enabled])
+AC_MSG_NOTICE([NVCC NVLS gencodes:   ${NVCC_ARCH_NVLS}])
 ])
 AS_IF([test "x$rocm_happy" = xyes],[
 AC_MSG_NOTICE([ROCM architectures:   ${ROCM_ARCH}])

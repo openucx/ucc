@@ -14,15 +14,17 @@ NVCCFLAGS =                                      \
 LINK = $(LIBTOOL) --mode=link $(CC) -o $@
 
 .cu.o:
-	$(NVCC) -c $< -o $@  $(NVCCFLAGS) $(NVCC_ARCH)
+	$(NVCC) -c $< -o $@  $(NVCCFLAGS) $(NVCC_ARCH_NVLS)
 
 .cu.lo:
-	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS) $(NVCC_ARCH)
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS) $(NVCC_ARCH_NVLS)
 
 comp_noinst = libucc_tl_cuda_kernels.la
 
 if TL_CUDA_NVLS_ENABLED
-libucc_tl_cuda_kernels_la_SOURCES  = reduce_scatter_kernel.cu allreduce_kernel.cu
+libucc_tl_cuda_kernels_la_SOURCES  = reduce_scatter_kernel.cu \
+    allreduce_kernel.cu \
+    allgatherv_kernel.cu
 else
 libucc_tl_cuda_kernels_la_SOURCES  =
 endif
@@ -34,3 +36,4 @@ noinst_LTLIBRARIES = $(comp_noinst)
 # Ensure kernels rebuild when helper header changes
 reduce_scatter_kernel.lo: nvls.cuh
 allreduce_kernel.lo: nvls.cuh
+allgatherv_kernel.lo: nvls.cuh

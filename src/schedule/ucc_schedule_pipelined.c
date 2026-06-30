@@ -41,7 +41,13 @@ static ucc_status_t ucc_frag_start_handler(ucc_coll_task_t *parent,
                   schedule->next_frag_to_post);
     schedule->n_frags_started++;
     schedule->n_frags_in_pipeline++;
-    return task->post(task);
+
+    st = task->post(task);
+    if (ucc_unlikely(st < 0)) {
+        ucc_error("failed to post fragment %d of pipelined schedule",
+                  schedule->n_frags_started - 1);
+    }
+    return st;
 }
 
 static ucc_status_t
@@ -59,6 +65,12 @@ ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task,
 
     schedule->super.n_completed_tasks += 1;
     schedule->n_frags_in_pipeline--;
+
+    /* Mark this fragment as needing restart. Using this flag instead of
+       checking frag->super.status avoids a race condition where another
+       handler could see status==OK before ucc_task_complete reads it. */
+    frag->super.flags |= UCC_COLL_TASK_FLAG_RESTART_PENDING;
+
     ucc_trace_req(
         "sched %p completed frag %p, n_completed %d, n_started %d, n_total %d",
         schedule, frag, schedule->super.n_completed_tasks,
@@ -71,26 +83,39 @@ ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task,
         ucc_task_complete(task);
         return UCC_OK;
     }
-    while ((schedule->super.n_completed_tasks + schedule->n_frags_in_pipeline <
-            schedule->super.n_tasks) &&
-           (frag->super.status == UCC_OK)) {
-        /* need to post more frags*/
-        if (frag == schedule->frags[schedule->next_frag_to_post]) {
-            ucc_trace_req("sched %p restarting frag %d %p", schedule,
-                          schedule->next_frag_to_post, frag);
-            frag->super.status = UCC_OPERATION_INITIALIZED;
-            frag->n_completed_tasks  = 0;
-            for (i = 0; i < frag->n_tasks; i++) {
-                frag->tasks[i]->n_deps += frag->tasks[i]->n_deps_base;
-                frag->tasks[i]->status = UCC_OPERATION_INITIALIZED;
-            }
-            ucc_frag_start_handler(&schedule->super.super, &frag->super);
-        }
+
+    /* Restart fragments in order, starting from next_frag_to_post.
+       Only restart fragments that have the restart_pending flag set. */
+    while (schedule->super.n_completed_tasks + schedule->n_frags_in_pipeline <
+           schedule->super.n_tasks) {
+        ucc_status_t st;
+
         frag = schedule->frags[schedule->next_frag_to_post];
-        if (&frag->super == parent_task) {
+        if (!(frag->super.flags & UCC_COLL_TASK_FLAG_RESTART_PENDING)) {
+            /* The next fragment hasn't completed yet, stop here.
+               It will trigger its own handler when it completes. */
             break;
         }
+        ucc_trace_req("sched %p restarting frag %d %p", schedule,
+                      schedule->next_frag_to_post, frag);
+        frag->super.flags          &= ~UCC_COLL_TASK_FLAG_RESTART_PENDING;
+        frag->super.status          = UCC_OPERATION_INITIALIZED;
+        frag->n_completed_tasks     = 0;
+        for (i = 0; i < frag->n_tasks; i++) {
+            frag->tasks[i]->n_deps += frag->tasks[i]->n_deps_base;
+            frag->tasks[i]->status = UCC_OPERATION_INITIALIZED;
+        }
+        st = ucc_frag_start_handler(&schedule->super.super, &frag->super);
+        if (ucc_unlikely(st < 0)) {
+            schedule->super.super.status = st;
+            if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
+                ucc_recursive_spin_unlock(&schedule->lock);
+            }
+            ucc_task_complete(task);
+            return st;
+        }
     }
+
     if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
         ucc_recursive_spin_unlock(&schedule->lock);
     }
@@ -131,8 +156,9 @@ ucc_status_t ucc_schedule_pipelined_post(ucc_coll_task_t *task)
 
     for (i = 0; i < schedule_p->n_frags; i++) {
         frags[i]->n_completed_tasks  = 0;
+        frags[i]->super.flags       &= ~UCC_COLL_TASK_FLAG_RESTART_PENDING;
         frags[i]->super.super.status = UCC_OPERATION_INITIALIZED;
-        for (j = 0; j < frags[0]->n_tasks; j++) {
+        for (j = 0; j < frags[i]->n_tasks; j++) {
             frags[i]->tasks[j]->n_deps = frags[i]->tasks[j]->n_deps_base;
             frags[i]->tasks[j]->n_deps_satisfied = 0;
             frags[i]->tasks[j]->super.status     = UCC_OPERATION_INITIALIZED;

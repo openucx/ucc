@@ -7,8 +7,10 @@
 #include "ucc_parser.h"
 #include "ucc_malloc.h"
 #include "ucc_log.h"
+#include "ucc_mem_type.h"
 #include "ucc_string.h"
 #include "ini.h"
+#include "components/topo/ucc_topo.h"
 #include "schedule/ucc_schedule.h"
 #include "schedule/ucc_schedule_pipelined.h"
 
@@ -1000,4 +1002,14 @@ ucs_status_t ucc_config_clone_uint_ranged(const void *src, void *dest,
 void ucc_config_release_uint_ranged(void *ptr, const void *arg) //NOLINT
 {
     ucc_mrange_uint_destroy(ptr);
+}
+
+size_t ucc_config_memunits_get(size_t config_size, size_t auto_size,
+                               size_t max_size)
+{
+    if (config_size == UCC_MEMUNITS_AUTO) {
+        return auto_size;
+    } else {
+        return ucs_min(config_size, max_size);
+    }
 }

@@ -39,11 +39,11 @@ $cmd
 
 if [[ "$tmpcmd" == *"amdclang"* ]]; then
   cmd="${@:3:2} -x hip -target x86_64-unknown-linux-gnu ${@:5} -O3 -o ${npic_filepath}"
+  echo $cmd
+  $cmd
 else
-  cmd="${@:3} -o ${npic_filepath}"
+  cp -f "${pic_filepath}" "${npic_filepath}"
 fi
-echo $cmd
-$cmd
 
 libtool_version="$(${libtool_file} --version | sed 's/^/#/g')"
 

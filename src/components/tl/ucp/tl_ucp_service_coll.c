@@ -79,13 +79,15 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
 {
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t *task    = ucc_tl_ucp_get_task(tl_team);
+    int                in_place = (sbuf == rbuf);
     ucc_status_t       status;
 
     ucc_base_coll_args_t bargs   = {
         .args = {
-            .mask         = 0,
+            .mask         = in_place ? UCC_COLL_ARGS_FIELD_FLAGS : 0,
             .coll_type    = UCC_COLL_TYPE_ALLREDUCE,
             .op           = op,
+            .flags        = in_place ? UCC_COLL_ARGS_FLAG_IN_PLACE : 0,
             .src.info = {
                 .buffer   = sbuf,
                 .count    = count,

@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "ucc_global_opts.h"
+#include "utils/debug/log_def.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_component.h"
 #include "utils/ucc_log.h"
@@ -108,14 +109,19 @@ ucc_status_t ucc_constructor(void)
         goto exit_unlock_mutex;
     }
 
-    cfg->initialized = 1;
-    status = ucc_config_parser_fill_opts(
-        &ucc_global_config, UCC_CONFIG_GET_TABLE(ucc_global_config_table),
-        "UCC_", 1);
+    ucc_log_early_init();
+
+    status = ucc_config_parser_fill_opts(&ucc_global_config,
+        UCC_CONFIG_GET_TABLE(ucc_global_config_table),
+    "UCC_", 1);
     if (UCC_OK != status) {
         ucc_error("failed to parse global options");
         goto exit_unlock_mutex;
     }
+
+    ucc_log_init();
+
+    cfg->initialized = 1;
 
     if (UCC_OK != (status = init_lib_paths())) {
         ucc_error("failed to init ucc components path");
@@ -170,6 +176,21 @@ ucc_status_t ucc_constructor(void)
         }
     }
 
+    status = ucc_components_load("sysinfo", &cfg->sysinfo_framework);
+    if (status != UCC_OK) {
+        if (status == UCC_ERR_NOT_FOUND) {
+            ucc_info("no sysinfo components were found in the "
+                     "ucc modules dir: %s. "
+                     "some sysinfo features will be disabled",
+                     cfg->component_path);
+            status = UCC_OK;
+        } else {
+            ucc_error("failed to load sysinfo components %d (%s)",
+                      status, ucc_status_string(status));
+            goto exit_unlock_mutex;
+        }
+    }
+
     if (UCC_OK != ucc_local_proc_info_init()) {
         ucc_error("failed to initialize local proc info");
         goto exit_unlock_mutex;
@@ -199,6 +220,7 @@ exit_unlock_mutex:
 __attribute__((destructor)) static void ucc_destructor(void)
 {
     if (ucc_global_config.initialized) {
+        ucc_log_cleanup();
 #ifdef HAVE_PROFILING
         ucc_profile_cleanup();
 #endif

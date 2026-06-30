@@ -5,7 +5,7 @@
  */
 
 #include "ucc_mc_base.h"
-#include "utils/ucc_coll_utils.h"
+#include "utils/ucc_mem_type.h"
 
 ucc_config_field_t ucc_mc_config_table[] = {
     {"LOG_LEVEL", "warn",

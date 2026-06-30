@@ -6,8 +6,10 @@
 
 #include "config.h"
 #include "ucc_context.h"
+#include "utils/ucc_proc_info.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
+#include "components/topo/ucc_sysinfo.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_list.h"
@@ -460,8 +462,9 @@ err:
     return status;
 }
 
-ucc_status_t ucc_core_addr_exchange(ucc_context_t *context, ucc_oob_coll_t *oob,
-                                    ucc_addr_storage_t *addr_storage)
+ucc_status_t ucc_core_addr_exchange(
+    ucc_context_t *context, ucc_oob_coll_t *oob,
+    ucc_addr_storage_t *addr_storage)
 {
     size_t             *addr_lens;
     ucc_context_attr_t  attr;
@@ -482,6 +485,7 @@ poll:
         oob->req_free(addr_storage->oob_req);
         addr_storage->oob_req = NULL;
     }
+
     if (0 == addr_storage->addr_len) {
         if (NULL == addr_storage->storage) {
             addr_storage->size = oob->n_oob_eps;
@@ -492,6 +496,7 @@ poll:
                 ucc_error("failed to query ctx address");
                 return status;
             }
+
             addr_storage->storage = ucc_malloc(
                 addr_storage->size * sizeof(size_t), "max_addrlen_tmp");
             if (!addr_storage->storage) {
@@ -501,9 +506,12 @@ poll:
                 return UCC_ERR_NO_MEMORY;
             }
 
-            status = oob->allgather(&context->attr.ctx_addr_len,
-                                    addr_storage->storage, sizeof(size_t),
-                                    oob->coll_info, &addr_storage->oob_req);
+            status = oob->allgather(
+                &context->attr.ctx_addr_len,
+                addr_storage->storage,
+                sizeof(size_t),
+                oob->coll_info,
+                &addr_storage->oob_req);
             if (UCC_OK != status) {
                 ucc_error("failed to start oob allgather");
                 return status;
@@ -517,26 +525,34 @@ poll:
                 addr_storage->addr_len = addr_lens[i];
             }
         }
-        if (addr_storage->addr_len == 0 ) {
+
+        if (addr_storage->addr_len == 0) {
             ucc_free(addr_storage->storage);
             addr_storage->storage = NULL;
             return UCC_OK;
         }
-        max_addrlen = addr_storage->addr_len;
-        addr_storage->storage =
-            ucc_realloc(addr_storage->storage,
-                        (addr_storage->size + 1) * max_addrlen, "addr_storage");
+
+        max_addrlen           = addr_storage->addr_len;
+        addr_storage->storage = ucc_realloc(
+            addr_storage->storage,
+            (addr_storage->size + 1) * max_addrlen,
+            "addr_storage");
         if (!addr_storage->storage) {
-            ucc_error("failed to allocate %zd bytes for addr storage",
-                      addr_storage->size * max_addrlen);
+            ucc_error(
+                "failed to allocate %zd bytes for addr storage",
+                addr_storage->size * max_addrlen);
             return UCC_ERR_NO_MEMORY;
         }
+
         memcpy(
             PTR_OFFSET(addr_storage->storage, max_addrlen * addr_storage->size),
-            context->attr.ctx_addr, context->attr.ctx_addr_len);
+            context->attr.ctx_addr,
+            context->attr.ctx_addr_len);
         status = oob->allgather(
             PTR_OFFSET(addr_storage->storage, max_addrlen * addr_storage->size),
-            addr_storage->storage, max_addrlen, oob->coll_info,
+            addr_storage->storage,
+            max_addrlen,
+            oob->coll_info,
             &addr_storage->oob_req);
         if (UCC_OK != status) {
             ucc_error("failed to start oob allgather");
@@ -548,12 +564,12 @@ poll:
 
     {
         /* Compute storage rank and check proc info uniqeness */
-        ucc_rank_t r = UCC_RANK_MAX;
-        int j;
+        ucc_rank_t                 r = UCC_RANK_MAX;
+        int                        j;
         ucc_context_addr_header_t *h, *h0;
 
         addr_storage->flags = UCC_ADDR_STORAGE_FLAG_TLS_SYMMETRIC;
-        h0 = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, 0);
+        h0                  = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, 0);
         for (i = 0; i < addr_storage->size; i++) {
             h = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, i);
             if (UCC_CTX_ID_EQUAL(context->id, h->ctx_id)) {
@@ -604,25 +620,24 @@ static void remove_tl_ctx_from_array(ucc_tl_context_t **array, unsigned *size,
     }
 }
 
-ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
-                                          const ucc_context_params_t *params,
-                                          const ucc_context_config_h  config,
-                                          ucc_context_h              *context,
-                                          ucc_proc_info_t            *proc_info)
+ucc_status_t ucc_context_create_proc_info(
+    ucc_lib_h lib, const ucc_context_params_t *params,
+    const ucc_context_config_h config, ucc_context_h *context,
+    ucc_proc_info_t *proc_info)
 {
-    uint32_t                   topo_required       = 0;
-    uint64_t                   created_ctx_counter = 0;
-    ucc_base_context_params_t  b_params;
-    ucc_base_context_t        *b_ctx;
-    ucc_base_ctx_attr_t        c_attr;
-    ucc_cl_lib_attr_t          l_attr;
-    ucc_cl_lib_t              *cl_lib;
-    ucc_tl_context_t          *tl_ctx;
-    ucc_tl_lib_t              *tl_lib;
-    ucc_context_t             *ctx;
-    ucc_status_t               status;
-    uint64_t                   i, j, n_tl_ctx;
-    int                        num_cls;
+    uint32_t                  topo_required       = 0;
+    uint64_t                  created_ctx_counter = 0;
+    ucc_base_context_params_t b_params;
+    ucc_base_context_t       *b_ctx;
+    ucc_base_ctx_attr_t       c_attr;
+    ucc_cl_lib_attr_t         l_attr;
+    ucc_cl_lib_t             *cl_lib;
+    ucc_tl_context_t         *tl_ctx;
+    ucc_tl_lib_t             *tl_lib;
+    ucc_context_t            *ctx;
+    ucc_status_t              status;
+    uint64_t                  i, j, n_tl_ctx;
+    int                       num_cls;
 
     num_cls = config->n_cl_cfg;
     ctx     = ucc_calloc(1, sizeof(ucc_context_t), "ucc_context");
@@ -754,8 +769,8 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
             /* At least one available CL context reported it needs topo info */
             status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
             if (UCC_OK != status) {
-                ucc_free(ctx->addr_storage.storage);
                 ucc_error("failed to init ctx topo");
+                ucc_free(ctx->addr_storage.storage);
                 goto error_ctx_create;
             }
         }
@@ -1106,11 +1121,13 @@ static ucc_status_t ucc_context_pack_addr(ucc_context_t             *context,
     return UCC_OK;
 }
 
-ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
-                                  ucc_context_attr_t *context_attr)
+ucc_status_t ucc_context_get_attr(
+    ucc_context_t *context, ucc_context_attr_t *context_attr)
 {
-    ucc_status_t               status   = UCC_OK;
+    ucc_status_t               status     = UCC_OK;
+    ucc_status_t               vis_status = UCC_OK;
     ucc_context_addr_header_t *h;
+
     if (context_attr->mask & (UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
                               UCC_CONTEXT_ATTR_FIELD_CTX_ADDR)) {
         if (!(context->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN)) {
@@ -1136,9 +1153,24 @@ ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
                           context->attr.ctx_addr_len);
                 return UCC_ERR_NO_MEMORY;
             }
-            h->ctx_id       = context->id;
+            h->ctx_id    = context->id;
+            h->host_info = ucc_local_host;
+
+            vis_status = ucc_sysinfo_set_visible_devices(
+                &h->host_info, UCC_SYSINFO_TYPE_NVLINK, NULL);
+            if (vis_status != UCC_OK) {
+                ucc_debug("failed to set visible GPU devices: %d",
+                          vis_status);
+            }
+
+            vis_status = ucc_sysinfo_set_visible_devices(
+                &h->host_info, UCC_SYSINFO_TYPE_IB, &context->net_devices);
+            if (vis_status != UCC_OK) {
+                ucc_debug("failed to set visible IB devices: %d",
+                          vis_status);
+            }
             h->n_components = context->n_addr_packed;
-            status          = ucc_context_pack_addr(context, NULL, NULL, h);
+            status = ucc_context_pack_addr(context, NULL, NULL, h);
             if (UCC_OK != status) {
                 ucc_error("failed to calc ucc context address length");
                 return status;

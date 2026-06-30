@@ -77,8 +77,9 @@ ucc_status_t ucc_pt_coll_scatterv::init_args(ucc_pt_test_args_t &test_args)
             }
         }
         args.dst.info.buffer = dst_header->addr;
-        return UCC_OK;
     }
+
+    return UCC_OK;
 free_src:
     ucc_pt_free(src_header);
 exit:

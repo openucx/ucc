@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -32,7 +32,7 @@
 #define UCC_TL_CUDA_MAX_RING_CHUNKS 8
 
 #ifdef HAVE_NVLS
-#define UCC_TL_CUDA_MAX_NVLS_PEERS 144
+#define UCC_TL_CUDA_MAX_NVLS_PEERS (72 * 8)
 #define UCC_TL_CUDA_MAX_NVLS_SM_COUNT 32
 #define UCC_TL_CUDA_MAX_NVLS_THREADS 1024
 
@@ -215,6 +215,8 @@ struct ucc_tl_cuda_task {
             ucc_tl_cuda_mem_info_t mem_info_dst;
             void                  *peer_map_addr_src[UCC_TL_CUDA_MAX_PEERS];
             void                  *peer_map_addr_dst[UCC_TL_CUDA_MAX_PEERS];
+            uintptr_t              peer_src_d_ptr[UCC_TL_CUDA_MAX_PEERS];
+            uintptr_t              peer_dst_d_ptr[UCC_TL_CUDA_MAX_PEERS];
             int                    num_posted;
             ucc_datatype_t         sdt;
             ucc_datatype_t         rdt;
@@ -301,19 +303,18 @@ struct ucc_tl_cuda_task {
         } reduce_scatterv_linear;
 #ifdef HAVE_NVLS
         struct {
-            int                     stage;
-            int                     num_frags;
-            ucc_datatype_t          dt;
-            void *                  sbuf;
-            void *                  rbuf;
-            size_t                  src_size_bytes;
-            size_t                  dst_size_bytes;
-            size_t (*get_count)(const ucc_tl_cuda_task_t *task,
-                                ucc_rank_t                block);
-            size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
-                                 ucc_rank_t                block);
-            cudaEvent_t             evt_copy;
-            cudaEvent_t             evt_completion;
+            ucc_datatype_t dt;
+            /* Offset of the current rank in the src buffer */
+            size_t         offset;
+            /* Count of the current rank in the src buffer */
+            size_t         count;
+            void          *evt_completion;
+            /* Memory handle for MC symmetric memory */
+            CUdeviceptr    mc_va;
+            /* Memory handle for UC symmetric memory */
+            CUdeviceptr    uc_va;
+            /* Coll id for the NVLS task in flight slot */
+            size_t         coll_id;
         } reduce_scatterv_nvls;
         struct {
             int            stage;
@@ -321,11 +322,34 @@ struct ucc_tl_cuda_task {
             void          *sbuf;
             void          *rbuf;
             size_t         buf_size_bytes;
-            CUdeviceptr    mc_va; // Memory handle for MC symmetric memory
-            CUdeviceptr    uc_va; // Memory handle for UC symmetric memory
+            /* Padded size launched on the NVLS kernel; >= buf_size_bytes,
+             * rounded up so each rank gets a full vec/scalar unit. The
+             * tail is zero-filled before the kernel; SUM with zeros is
+             * a no-op so user data is unaffected. */
+            size_t         kernel_size_bytes;
+            /* Memory handle for MC symmetric memory */
+            CUdeviceptr    mc_va;
+            /* Memory handle for UC symmetric memory */
+            CUdeviceptr    uc_va;
             void          *evt_completion;
-            size_t         coll_id; // Coll id for the NVLS task in flight slot
+            /* Coll id for the NVLS task in flight slot */
+            size_t         coll_id;
         } allreduce_nvls;
+        struct {
+            /* Offset of the current rank in the dst buffer */
+            size_t offset;
+            /* Count of the current rank's data */
+            size_t count;
+            /* Total count of all data (sum of all ranks) */
+            size_t total_count;
+            void  *evt_completion;
+            /* Memory handle for MC symmetric memory */
+            CUdeviceptr mc_va;
+            /* Memory handle for UC symmetric memory */
+            CUdeviceptr uc_va;
+            /* Coll id for the NVLS task in flight slot */
+            size_t      coll_id;
+        } allgatherv_nvls;
 #endif
     };
 };

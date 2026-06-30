@@ -6,22 +6,8 @@
 
 #include "ucc_assert.h"
 #include "ucc_log.h"
+#include "ucc_string.h"
 #include <stdio.h>
-
-/**
- * Get pointer to file name in path, same as basename but do not
- * modify source string.
- *
- * @param path Path to parse.
- *
- * @return file name
- */
-static const char* ucc_basename(const char *path)
-{
-    const char *name = strrchr(path, '/');
-
-    return (name == NULL) ? path : name + 1;
-}
 
 void ucc_fatal_error_message(const char *file, unsigned line,
                              const char *function, char *message_buf) //NOLINT: function is unused
