@@ -39,6 +39,7 @@ typedef enum {
     UCC_TL_CUDA_NVLS_STATE_INIT,
     UCC_TL_CUDA_NVLS_STATE_SHARE_HANDLES,
     UCC_TL_CUDA_NVLS_STATE_IMPORT_HANDLE,
+    UCC_TL_CUDA_NVLS_STATE_SYNC_STATUS,
     UCC_TL_CUDA_NVLS_STATE_ADD_DEVICE,
     UCC_TL_CUDA_NVLS_STATE_BARRIER,
 } ucc_tl_cuda_nvls_state_t;
@@ -74,6 +75,13 @@ typedef struct ucc_tl_cuda_nvls {
     size_t                       gran;
     /* temporary buffer for STATE_BARRIER */
     char                        *barrier_data;
+    /* Whether this rank locally succeeded in importing the multicast handle.
+     * Exchanged across ranks in STATE_SYNC_STATUS so a per-rank import failure
+     * (e.g. pidfd_getfd EPERM) disables NVLS on the whole team instead of
+     * deadlocking the ranks that succeeded in cuMulticastBindAddr. */
+    int                          init_ready;
+    /* temporary buffer for STATE_SYNC_STATUS allgather */
+    char                        *init_sync_data;
 } ucc_tl_cuda_nvls_t;
 
 typedef struct ucc_tl_cuda_nvls_control {

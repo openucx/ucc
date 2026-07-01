@@ -470,8 +470,14 @@ nvls_init:
     case UCC_OK:
         break;
     default:
-        tl_error(lib,
-            "failed to initialize NVLS with status (%d) %s",
+        /* NVLS init failure is a supported fallback condition (the team is
+         * marked NOT_SUPPORTED below so the CL retries another TL). Log at
+         * debug level to avoid emitting an error when a fallback exists,
+         * mirroring how TL/SHARP reports failed SHARP initialization. */
+        tl_debug(
+            lib,
+            "failed to initialize NVLS with status (%d) %s; "
+            "falling back to another transport",
             status,
             ucc_status_string(status));
         // For multi-node teams in NVLS-only mode, no IPC resources were allocated
