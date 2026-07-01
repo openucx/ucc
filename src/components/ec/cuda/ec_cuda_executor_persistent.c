@@ -70,7 +70,12 @@ ucc_cuda_executor_persistent_task_post(ucc_ee_executor_t *executor,
         memcpy(ee_task->subtasks[0], task_args,
                sizeof(ucc_ee_executor_task_args_t));
     }
-    ucc_memory_cpu_store_fence();
+    /* tasks[] and pidx live in device-mapped (zero-copy) host memory shared
+     * with the persistent kernel. Use the bus (outer-shareable) store fence so
+     * the task args are guaranteed visible to the GPU before the updated pidx
+     * that publishes them; the inner-shareable CPU fence does not order stores
+     * against the GPU's shareability domain on weakly-ordered CPUs (aarch64). */
+    ucc_memory_bus_store_fence();
     eee->pidx += ee_task->num_subtasks;
     if (ucc_ec_cuda.thread_mode == UCC_THREAD_MULTIPLE) {
         ucc_spin_unlock(&eee->tasks_lock);
