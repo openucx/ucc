@@ -781,6 +781,9 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         ucc_free(nvls->barrier_data);
         nvls->barrier_data = NULL;
 
+        /* NVLS is fully initialized for this team; only now may collectives be
+         * routed to the NVLS algorithms (see ucc_tl_cuda_get_supported_colls). */
+        nvls->enabled      = 1;
         tl_debug(UCC_TL_TEAM_LIB(team),
                  "NVLS init: rank %d OOB barrier complete — team ready",
                  UCC_TL_TEAM_RANK(team));

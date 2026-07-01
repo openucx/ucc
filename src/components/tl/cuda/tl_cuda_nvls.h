@@ -82,6 +82,11 @@ typedef struct ucc_tl_cuda_nvls {
     int                          init_ready;
     /* temporary buffer for STATE_SYNC_STATUS allgather */
     char                        *init_sync_data;
+    /* Set to 1 only when NVLS initialization fully succeeded for this team.
+     * Gates advertising the NVLS collectives: the hardware may support
+     * multicast while NVLS init fell back (e.g. peer fd import denied), and in
+     * that case collectives must not be routed to the NVLS algorithms. */
+    int                          enabled;
 } ucc_tl_cuda_nvls_t;
 
 typedef struct ucc_tl_cuda_nvls_control {
