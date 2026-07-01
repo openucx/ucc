@@ -15,6 +15,8 @@
 #include <sys/syscall.h> // for pidfd_open and pidfd_getfd
 #include <sys/prctl.h>   // for prctl()
 #include <unistd.h>      // for close()
+#include <errno.h>       // for EPERM/EACCES
+#include <string.h>      // for strerror()
 
 /* RHEL 8 glibc headers (kernel 4.18) don't define pidfd syscall numbers */
 #ifndef SYS_pidfd_open
@@ -195,6 +197,41 @@ cleanup_on_error:
     return status;
 }
 
+/* Log a peer-fd import failure. Always emits a debug line with the details;
+ * when the failure is a permission denial (the common single-node case: Yama
+ * ptrace_scope, missing CAP_SYS_PTRACE, or a seccomp filter blocking
+ * pidfd_getfd) it additionally emits a single, actionable warning (once per
+ * process) telling the user how to enable NVLS instead of silently losing it. */
+static void ucc_tl_cuda_nvls_report_peer_import_denied(
+    ucc_tl_cuda_team_t *team, const char *what, int err)
+{
+    static volatile int warned = 0;
+
+    tl_debug(
+        UCC_TL_TEAM_LIB(team),
+        "%s: %s (errno=%d); NVLS not available, falling back",
+        what,
+        strerror(err),
+        err);
+
+    if ((err != EPERM && err != EACCES) || warned) {
+        return;
+    }
+    warned = 1;
+    tl_warn(
+        UCC_TL_TEAM_LIB(team),
+        "NVLS disabled: importing a peer process file descriptor was denied "
+        "(%s). Single-node NVLS needs permission to access peer GPU memory "
+        "handles across processes. To enable NVLS, relax ptrace "
+        "restrictions on the host/container, e.g. host: "
+        "'sysctl -w kernel.yama.ptrace_scope=0'; docker: add "
+        "'--cap-add=SYS_PTRACE' (and if pidfd_getfd is blocked by seccomp, "
+        "'--security-opt seccomp=unconfined'); enroot: run with "
+        "'--container-remap-root' or set 'kernel.yama.ptrace_scope=0' on the "
+        "host. Collectives fall back to another transport in the meantime.",
+        strerror(err));
+}
+
 static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
     struct ucc_tl_cuda_team *team, ucc_tl_cuda_nvls_handle_t *share_data,
     CUmemGenericAllocationHandle *mc_handle)
@@ -218,15 +255,10 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
     pid_fd        = syscall(SYS_pidfd_open, target_pid, 0);
     if (pid_fd < 0) {
         /* Expected fallback condition (e.g. restricted ptrace/seccomp in a
-         * container): log at debug level and let the team fall back to
-         * another transport instead of emitting a scary error. */
-        tl_debug(
-            UCC_TL_TEAM_LIB(team),
-            "failed to open pidfd for pid %d: %s (errno=%d); "
-            "NVLS not available, falling back",
-            target_pid,
-            strerror(errno),
-            errno);
+         * container): report and let the team fall back to another transport
+         * instead of emitting a scary error. */
+        ucc_tl_cuda_nvls_report_peer_import_denied(
+            team, "failed to open peer pidfd", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
@@ -234,14 +266,9 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
     if (peer_fd < 0) {
         /* EPERM here typically means the container lacks the permissions to
          * import a peer's fd (Yama ptrace_scope, missing CAP_SYS_PTRACE, or a
-         * seccomp filter). This is a supported fallback condition, so log at
-         * debug level rather than error. */
-        tl_debug(
-            UCC_TL_TEAM_LIB(team),
-            "failed to get peer fd: %s (errno=%d); "
-            "NVLS not available, falling back",
-            strerror(errno),
-            errno);
+         * seccomp filter). Supported fallback condition. */
+        ucc_tl_cuda_nvls_report_peer_import_denied(
+            team, "failed to get peer fd", errno);
         close(pid_fd);
         return UCC_ERR_NO_RESOURCE;
     }
