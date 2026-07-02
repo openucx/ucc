@@ -24,9 +24,6 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
     ucp_ep_params_t ep_params;
     ucs_status_t    status;
 
-    printf("[ucc_tl_ucp_connect_ep] ctx=%p, is_service=%d, ep_traffic_class=%u\n",
-           ctx, is_service, ep_traffic_class);
-
     if (*ep) {
         /* Already connected */
         return UCC_OK;
@@ -34,13 +31,10 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
     ep_params.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
     ep_params.address    = (ucp_address_t *)ucp_address;
 
-    if (ep_traffic_class != UCP_EP_NO_TCLASS) {
-        ep_params.field_mask |= UCP_TEAM_PARAM_FIELD_EP_TRAFFIC_CLASS;
+    if (ep_traffic_class != UCC_TL_UCP_NO_TCLASS) {
+        ep_params.field_mask |= UCP_EP_PARAM_FIELD_EP_TRAFFIC_CLASS;
         ep_params.ep_traffic_class = ep_traffic_class;
     }
-
-    printf("[ucc_tl_ucp_connect_ep] ep_traffic_class = %u\n", ep_traffic_class);
-    printf("[ucc_tl_ucp_connect_ep] ep_params.ep_traffic_class = %u\n", ep_params.ep_traffic_class);
 
     if (!UCC_TL_CTX_HAS_OOB(ctx)) {
         ep_params.err_mode        = UCP_ERR_HANDLING_MODE_PEER;
@@ -72,17 +66,6 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
     addr = use_service_worker ? TL_UCP_EP_ADDR_WORKER_SERVICE(addr)
                               : TL_UCP_EP_ADDR_WORKER(addr);
 
-    printf("[ucc_tl_ucp_connect_team_ep] team=%p, core_rank=%d\n", 
-           team, core_rank);
-    printf("[ucc_tl_ucp_connect_team_ep] team->ep_traffic_class = %u\n", team->ep_traffic_class);
-    printf("[ucc_tl_ucp_connect_team_ep] team->super.super.params.params.mask = 0x%lx\n", 
-           team->super.super.params.params.mask);
-    printf("[ucc_tl_ucp_connect_team_ep] is_service_team = %d\n", 
-           UCC_TL_IS_SERVICE_TEAM(team));
-    printf("[ucc_tl_ucp_connect_team_ep] use_service_worker = %d\n", 
-           use_service_worker);
-
-    
     return ucc_tl_ucp_connect_ep(ctx, use_service_worker, ep, addr, team->ep_traffic_class);
 
 }

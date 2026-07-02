@@ -89,13 +89,6 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
     team->last_team_create_posted = -1;
     team->bp.ep_traffic_class     = team->ep_traffic_class;
 
-    // printf("[ucc_team_create_post_single]: team->ep_traffic_class = %u\n", team->ep_traffic_class);
-    // printf("[ucc_team_create_post_single]: team->bp.ep_traffic_class = %u\n", team->bp.ep_traffic_class);
-    // printf("[ucc_team_create_post_single]: team->bp.params.ep_traffic_class = %u\n", team->bp.params.ep_traffic_class);
-
-    printf("[ucc_team_create_post_single]: final ep_traffic_class = %u\n",
-        team->bp.ep_traffic_class);
-        
     return UCC_OK;
 }
 
@@ -107,9 +100,6 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     uint64_t     team_rank = UINT64_MAX;
     ucc_team_t  *team;
     ucc_status_t status;
-
-    printf("[ucc_team_create_post] Initial params->ep_traffic_class = %u\n", params->ep_traffic_class);
-    printf("[ucc_team_create_post] Initial params->mask = 0x%lx\n", params->mask);
 
     if (num_contexts < 1) {
         return UCC_ERR_INVALID_PARAM;
@@ -202,18 +192,11 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     team->contexts     = ucc_malloc(sizeof(ucc_context_t *) * num_contexts,
                                     "ucc_team_ctx");
 
-    printf("[ucc_team_create_post]: mask = 0x%lx, ep_traffic_class = %u\n",
-        params->mask, params->ep_traffic_class);
-
     if (params->mask & UCC_TEAM_PARAM_FIELD_EP_TRAFFIC_CLASS) {
-        printf("[ucc_team_create_post] Inside if statement\n");
         team->ep_traffic_class = (uint8_t)params->ep_traffic_class;
     } else {
-        printf("[ucc_team_create_post] Inside else statement\n");
-        team->ep_traffic_class = UCP_EP_NO_TCLASS;
+        team->ep_traffic_class = UCC_TL_UCP_NO_TCLASS;
     }
-
-    printf("[ucc_team_create_post]: team->ep_traffic_class = %u\n", team->ep_traffic_class);
 
     if (!team->contexts) {
         ucc_error("failed to allocate %zd bytes for ucc team contexts array",
@@ -318,7 +301,6 @@ static ucc_status_t ucc_team_create_cls(ucc_context_t *context,
 
     for (i = team->last_team_create_posted + 1; i < context->n_cl_ctx; i++) {
         cl_iface = UCC_CL_CTX_IFACE(context->cl_ctx[i]);
-        printf("[ucc_team_create_cls] The bp.ep_traffic_class is = %u\n", team->bp.ep_traffic_class);
         status   = cl_iface->team.create_post(&context->cl_ctx[i]->super,
                                               &team->bp, &b_team);
         if (status != UCC_OK) {
@@ -344,7 +326,6 @@ static ucc_status_t ucc_team_create_cls(ucc_context_t *context,
         ucc_error("no CL teams were created");
         return UCC_ERR_NO_MESSAGE;
     }
-    printf("[ucc_team_create_cls] The bp.ep_traffic_class is after create_cls = %u\n", team->bp.ep_traffic_class);
     return UCC_OK;
 }
 
@@ -405,8 +386,6 @@ static ucc_status_t ucc_team_build_score_map(ucc_team_t *team)
     ucc_coll_score_t *score, *score_merge, *score_next;
     ucc_status_t      status;
     int               i;
-
-    printf("[ucc_team_build_score_map] The bp.ep_traffic_class is = %u\n", team->bp.ep_traffic_class);
 
     ucc_assert(team->n_cl_teams > 0);
     status = UCC_CL_TEAM_IFACE(team->cl_teams[0])

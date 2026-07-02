@@ -6,7 +6,7 @@
 
 #ifndef UCC_TEAM_H_
 #define UCC_TEAM_H_
-#define UCP_EP_NO_TCLASS ((uint8_t)-1)
+#define UCC_TL_UCP_NO_TCLASS ((uint8_t)-1)
 
 #include "ucc/api/ucc.h"
 #include "utils/ucc_datastruct.h"
