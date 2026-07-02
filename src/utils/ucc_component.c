@@ -47,6 +47,26 @@ static int ucc_modules_list_search(const ucc_config_names_array_t *names,
     return -1;
 }
 
+/* Returns 1 if the allow list has at least one qualified entry targeting
+   this framework (e.g. "tl_ucp" targets "tl"). Bare names like "ucp" do
+   not target any specific framework, so ALLOW mode ignores frameworks
+   that have no qualified entries — preventing required frameworks (cl, mc)
+   from being accidentally excluded when the user writes e.g. "tl_ucp". */
+static int ucc_framework_is_targeted(const ucc_config_names_array_t *names,
+                                     const char *framework_name)
+{
+    char     prefix[UCC_MAX_FRAMEWORK_NAME_LEN + 2];
+    unsigned i;
+
+    ucc_snprintf_safe(prefix, sizeof(prefix), "%s_", framework_name);
+    for (i = 0; i < names->count; i++) {
+        if (strncmp(names->names[i], prefix, strlen(prefix)) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int ucc_component_is_enabled(const char *framework_name,
                                     const char *component_name)
 {
@@ -59,8 +79,13 @@ static int ucc_component_is_enabled(const char *framework_name,
 
     found = ucc_modules_list_search(&modules->array, framework_name,
                                     component_name) >= 0;
-    return ((modules->mode == UCC_CONFIG_ALLOW_LIST_ALLOW) && found) ||
-           ((modules->mode == UCC_CONFIG_ALLOW_LIST_NEGATE) && !found);
+    if (modules->mode == UCC_CONFIG_ALLOW_LIST_ALLOW) {
+        if (!ucc_framework_is_targeted(&modules->array, framework_name)) {
+            return 1;
+        }
+        return found;
+    }
+    return !found; /* NEGATE mode */
 }
 
 static ucc_status_t ucc_component_load_one(const char *so_path,
@@ -96,7 +121,7 @@ static ucc_status_t ucc_component_load_one(const char *so_path,
         ucc_debug("component '%s_%s' is disabled by UCC_MODULES configuration",
                   framework_name, iface_struct + strlen(framework_pattern));
         *c_iface = NULL;
-        return UCC_ERR_NO_MESSAGE;
+        return UCC_OK;
     }
 
     handle = dlopen(so_path, RTLD_LAZY);
@@ -205,7 +230,7 @@ ucc_status_t ucc_components_load(const char *framework_name,
     for (i = 0; i < globbuf.gl_pathc; i++) {
         status = ucc_component_load_one(globbuf.gl_pathv[i], framework_name,
                                         &ifaces[n_loaded]);
-        if (status != UCC_OK) {
+        if (status != UCC_OK || ifaces[n_loaded] == NULL) {
             continue;
         }
         n_loaded++;
@@ -249,6 +274,27 @@ ucc_status_t ucc_components_load(const char *framework_name,
     for (i = 0; i < n_loaded; i++) {
         framework->names.names[i] = strdup(framework->components[i]->name);
     }
+
+    /* Warn about qualified allow-list entries that matched no component in
+       this framework — most likely a typo in UCC_MODULES. */
+    if (ucc_global_config.modules.mode != UCC_CONFIG_ALLOW_LIST_ALLOW_ALL) {
+        const ucc_config_names_array_t *mnames = &ucc_global_config.modules.array;
+        char prefix[UCC_MAX_FRAMEWORK_NAME_LEN + 2];
+
+        ucc_snprintf_safe(prefix, sizeof(prefix), "%s_", framework_name);
+        for (i = 0; i < (int)mnames->count; i++) {
+            if (strncmp(mnames->names[i], prefix, strlen(prefix)) != 0) {
+                continue;
+            }
+            /* This entry targets our framework; check if it matched anything. */
+            if (ucc_modules_list_search(&framework->names, framework_name,
+                                        mnames->names[i] + strlen(prefix)) < 0) {
+                ucc_warn("UCC_MODULES entry '%s' did not match any component "
+                         "in framework '%s'", mnames->names[i], framework_name);
+            }
+        }
+    }
+
     return UCC_OK;
 err:
     ucc_free(framework->components);
