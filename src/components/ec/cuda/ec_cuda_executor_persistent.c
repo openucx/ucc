@@ -163,7 +163,21 @@ ucc_status_t ucc_cuda_executor_persistent_stop(ucc_ee_executor_t *executor)
                (*st != UCC_EC_CUDA_EXECUTOR_SHUTDOWN));
     *st = UCC_EC_CUDA_EXECUTOR_SHUTDOWN;
     eee->pidx = -1;
-    while(*st != UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK) { }
+    /* state/pidx live in device-mapped (zero-copy) host memory the persistent
+     * kernel polls. Publish these stores to the GPU before spinning: on
+     * weakly-ordered CPUs (aarch64/Grace) the store to pidx may sit in the CPU
+     * store buffer while this loop spins, and the cheaper inner-shareable CPU
+     * store fence only orders against other CPUs, not the GPU. The bus
+     * (outer-shareable) store fence drains/orders the store to the domain the
+     * GPU observes; without it the kernel never sees pidx == -1, never writes
+     * SHUTDOWN_ACK, and this loop hangs forever. */
+    ucc_memory_bus_store_fence();
+    /* No load fence here: st is volatile (re-read every iteration) and points
+     * to coherent device-mapped memory, so the kernel's SHUTDOWN_ACK write
+     * becomes visible on its own. A fence would only order accesses, not force
+     * a cache re-read, and there is no dependent load after the poll. */
+    while (*st != UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK) {
+    }
     eee->super.ee_context = NULL;
     eee->state = UCC_EC_CUDA_EXECUTOR_INITIALIZED;
 
