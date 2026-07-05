@@ -25,9 +25,6 @@ static uint64_t ucc_tl_cuda_get_supported_colls(const ucc_tl_cuda_team_t *team)
 {
     const int is_multinode = !ucc_team_map_is_single_node(
         team->super.super.params.team, team->super.super.params.map);
-#ifdef HAVE_NVLS
-    ucc_status_t status;
-#endif
     // Base TL/CUDA collectives that are supported without NVLS
     uint64_t base_tl_cuda_colls =
         (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |
@@ -36,19 +33,17 @@ static uint64_t ucc_tl_cuda_get_supported_colls(const ucc_tl_cuda_team_t *team)
          UCC_COLL_TYPE_REDUCE_SCATTERV);
 
 #ifdef HAVE_NVLS
-    // With NVLS compiled in, ALLREDUCE may be supported via NVLS.
-    // For multi-node teams, advertise ONLY NVLS ALLREDUCE if supported;
-    // otherwise advertise nothing for TL/CUDA (prevent non-NVLS colls).
-    // For single-node teams, advertise base TL/CUDA colls and add ALLREDUCE
-    // only if NVLS is supported.
-    status = ucc_tl_cuda_nvls_check_support(
-        ucc_derived_of(team->super.super.context->lib, ucc_tl_cuda_lib_t),
-        UCC_TL_CUDA_TEAM_CTX(team)->device,
-        is_multinode);
+    // ALLREDUCE is served by the NVLS algorithms, so advertise it only when
+    // NVLS actually initialized for this team (team->nvls.enabled). The device
+    // may support multicast while NVLS init fell back (e.g. peer fd import
+    // denied in a restricted container); in that case allreduce must NOT be
+    // routed to the NVLS path.
+    // For multi-node teams TL/CUDA supports ONLY NVLS ALLREDUCE, so without a
+    // working NVLS it advertises nothing.
     if (is_multinode) {
-        return (status == UCC_OK) ? UCC_COLL_TYPE_ALLREDUCE : 0;
+        return team->nvls.enabled ? UCC_COLL_TYPE_ALLREDUCE : 0;
     }
-    return (status == UCC_OK) ? (base_tl_cuda_colls | UCC_COLL_TYPE_ALLREDUCE)
+    return team->nvls.enabled ? (base_tl_cuda_colls | UCC_COLL_TYPE_ALLREDUCE)
                               : base_tl_cuda_colls;
 #else
     if (is_multinode) {
@@ -470,8 +465,14 @@ nvls_init:
     case UCC_OK:
         break;
     default:
-        tl_error(lib,
-            "failed to initialize NVLS with status (%d) %s",
+        /* NVLS init failure is a supported fallback condition (the team is
+         * marked NOT_SUPPORTED below so the CL retries another TL). Log at
+         * debug level to avoid emitting an error when a fallback exists,
+         * mirroring how TL/SHARP reports failed SHARP initialization. */
+        tl_debug(
+            lib,
+            "failed to initialize NVLS with status (%d) %s; "
+            "falling back to another transport",
             status,
             ucc_status_string(status));
         // For multi-node teams in NVLS-only mode, no IPC resources were allocated

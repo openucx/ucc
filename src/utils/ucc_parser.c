@@ -890,14 +890,16 @@ int ucc_config_sscanf_uint_ranged(const char *buf, void *dest,
     for (i = 0; i < n_ranges; i++) {
         tokens = ucc_str_split(ranges[i], ":");
         if (!tokens) {
-            goto err_ranges;
+            goto err_tokens;
         }
+
         n_tokens = ucc_str_split_count(tokens);
-        if (n_tokens > 3 ||
+        if (n_tokens == 0 || n_tokens > 3 ||
             (UCC_OK != ucc_str_is_number(tokens[n_tokens - 1]) &&
              strcasecmp(tokens[n_tokens - 1], UCS_VALUE_AUTO_STR) != 0)) {
             goto err_tokens;
         }
+
         if (n_tokens == 1) {
             if (!strcasecmp(tokens[n_tokens - 1], UCS_VALUE_AUTO_STR)) {
             /* Special value: auto */
@@ -912,6 +914,7 @@ int ucc_config_sscanf_uint_ranged(const char *buf, void *dest,
                 goto err_tokens;
             }
             r->mtypes = UCC_MEM_TYPE_MASK_FULL;
+            r->value  = 0;
             r->start  = 0;
             r->end    = SIZE_MAX;
 
@@ -945,8 +948,8 @@ int ucc_config_sscanf_uint_ranged(const char *buf, void *dest,
 
 err_tokens:
     ucc_str_split_free(tokens);
-err_ranges:
     ucc_str_split_free(ranges);
+    ucc_mrange_uint_destroy(p);
     return 0;
 }
 

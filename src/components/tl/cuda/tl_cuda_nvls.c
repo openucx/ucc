@@ -15,6 +15,8 @@
 #include <sys/syscall.h> // for pidfd_open and pidfd_getfd
 #include <sys/prctl.h>   // for prctl()
 #include <unistd.h>      // for close()
+#include <errno.h>       // for EPERM/EACCES
+#include <string.h>      // for strerror()
 
 /* RHEL 8 glibc headers (kernel 4.18) don't define pidfd syscall numbers */
 #ifndef SYS_pidfd_open
@@ -195,6 +197,41 @@ cleanup_on_error:
     return status;
 }
 
+/* Log a peer-fd import failure. Always emits a debug line with the details;
+ * when the failure is a permission denial (the common single-node case: Yama
+ * ptrace_scope, missing CAP_SYS_PTRACE, or a seccomp filter blocking
+ * pidfd_getfd) it additionally emits a single, actionable warning (once per
+ * process) telling the user how to enable NVLS instead of silently losing it. */
+static void ucc_tl_cuda_nvls_report_peer_import_denied(
+    ucc_tl_cuda_team_t *team, const char *what, int err)
+{
+    static volatile int warned = 0;
+
+    tl_debug(
+        UCC_TL_TEAM_LIB(team),
+        "%s: %s (errno=%d); NVLS not available, falling back",
+        what,
+        strerror(err),
+        err);
+
+    if ((err != EPERM && err != EACCES) || warned) {
+        return;
+    }
+    warned = 1;
+    tl_warn(
+        UCC_TL_TEAM_LIB(team),
+        "NVLS disabled: importing a peer process file descriptor was denied "
+        "(%s). Single-node NVLS needs permission to access peer GPU memory "
+        "handles across processes. To enable NVLS, relax ptrace "
+        "restrictions on the host/container, e.g. host: "
+        "'sysctl -w kernel.yama.ptrace_scope=0'; docker: add "
+        "'--cap-add=SYS_PTRACE' (and if pidfd_getfd is blocked by seccomp, "
+        "'--security-opt seccomp=unconfined'); enroot: run with "
+        "'--container-remap-root' or set 'kernel.yama.ptrace_scope=0' on the "
+        "host. Collectives fall back to another transport in the meantime.",
+        strerror(err));
+}
+
 static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
     struct ucc_tl_cuda_team *team, ucc_tl_cuda_nvls_handle_t *share_data,
     CUmemGenericAllocationHandle *mc_handle)
@@ -217,20 +254,21 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
 
     pid_fd        = syscall(SYS_pidfd_open, target_pid, 0);
     if (pid_fd < 0) {
-        tl_error(
-            UCC_TL_TEAM_LIB(team),
-            "failed to open pidfd for pid %d",
-            target_pid);
+        /* Expected fallback condition (e.g. restricted ptrace/seccomp in a
+         * container): report and let the team fall back to another transport
+         * instead of emitting a scary error. */
+        ucc_tl_cuda_nvls_report_peer_import_denied(
+            team, "failed to open peer pidfd", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
     peer_fd = syscall(SYS_pidfd_getfd, pid_fd, export_handle, 0);
     if (peer_fd < 0) {
-        tl_error(
-            UCC_TL_TEAM_LIB(team),
-            "failed to get peer fd: %s (errno=%d)",
-            strerror(errno),
-            errno);
+        /* EPERM here typically means the container lacks the permissions to
+         * import a peer's fd (Yama ptrace_scope, missing CAP_SYS_PTRACE, or a
+         * seccomp filter). Supported fallback condition. */
+        ucc_tl_cuda_nvls_report_peer_import_denied(
+            team, "failed to get peer fd", errno);
         close(pid_fd);
         return UCC_ERR_NO_RESOURCE;
     }
@@ -255,9 +293,10 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_posix(
     }
 
     if (status != UCC_OK) {
-        tl_error(
+        tl_debug(
             UCC_TL_TEAM_LIB(team),
-            "failed to import POSIX file descriptor handle from rank 0");
+            "failed to import POSIX file descriptor handle from rank 0; "
+            "NVLS not available, falling back");
         return status;
     }
 
@@ -281,9 +320,10 @@ static ucc_status_t ucc_tl_cuda_nvls_import_handle_fabric(
         mc_handle, &share_data->data.fabric, CU_MEM_HANDLE_TYPE_FABRIC));
 
     if (status != UCC_OK) {
-        tl_error(
+        tl_debug(
             UCC_TL_TEAM_LIB(team),
-            "failed to import fabric handle from rank 0. status (%d) %s",
+            "failed to import fabric handle from rank 0. status (%d) %s; "
+            "NVLS not available, falling back",
             status,
             ucc_status_string(status));
         return status;
@@ -427,9 +467,10 @@ ucc_status_t ucc_tl_cuda_nvls_init(
                     &nvls->local_handle.data.posix.handle);
             }
             if (status != UCC_OK) {
-                tl_error(
+                tl_debug(
                     UCC_TL_TEAM_LIB(team),
-                    "failed to create multicast object. status (%d) %s",
+                    "failed to create multicast object. status (%d) %s; "
+                    "NVLS not available, falling back",
                     status,
                     ucc_status_string(status));
                 /* Keep going to unblock peers waiting in the allgather;
@@ -480,14 +521,22 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         team->state = UCC_TL_CUDA_NVLS_STATE_IMPORT_HANDLE;
         // fall through
     case UCC_TL_CUDA_NVLS_STATE_IMPORT_HANDLE:
+        /* Optimistically assume this rank is ready; cleared below on any local
+         * import failure so STATE_SYNC_STATUS can disable NVLS team-wide. */
+        nvls->init_ready = 1;
         /* Non-root ranks check the status field broadcast by rank 0 before
          * attempting to import a potentially garbage handle. */
         if (UCC_TL_TEAM_RANK(team) != 0) {
             if (nvls->share_data[0].status != UCC_OK) {
-                tl_warn(UCC_TL_TEAM_LIB(team),
-                        "NVLS: rank 0 failed to create multicast object "
-                        "(status=%d); disabling NVLS for this team",
-                        nvls->share_data[0].status);
+                /* Rank 0 failed to create the multicast object. Every non-root
+                 * rank observes this via the broadcast status, and rank 0 bails
+                 * out below through status_supported, so the failure is already
+                 * symmetric and it is safe to clean up directly. */
+                tl_debug(
+                    UCC_TL_TEAM_LIB(team),
+                    "NVLS: rank 0 failed to create multicast object "
+                    "(status=%d); disabling NVLS for this team",
+                    nvls->share_data[0].status);
                 status = nvls->share_data[0].status;
                 nvls->status_supported = status;
                 goto cleanup;
@@ -500,17 +549,90 @@ ucc_status_t ucc_tl_cuda_nvls_init(
                     team, &nvls->share_data[0], &mc_handle);
             }
             if (status != UCC_OK) {
-                goto cleanup;
+                /* Import failed on this rank only (e.g. pidfd_getfd EPERM in a
+                 * restricted container). Do NOT clean up directly: rank 0 and
+                 * the ranks that imported successfully would block forever in
+                 * the collective cuMulticastBindAddr barrier. Record the local
+                 * failure and let STATE_SYNC_STATUS propagate it so all ranks
+                 * disable NVLS together. */
+                nvls->init_ready = 0;
+            } else {
+                nvls->mc_handle = mc_handle;
             }
-            nvls->mc_handle = mc_handle;
         }
         if (nvls->status_supported != UCC_OK) {
-            // Propagate the supported status to the caller
+            /* Rank 0 local creation failure: non-root ranks already saw this via
+             * the broadcast status, so cleaning up here keeps the team
+             * symmetric. */
             status = nvls->status_supported;
             goto cleanup;
         }
+        team->state = UCC_TL_CUDA_NVLS_STATE_SYNC_STATUS;
+        // fall through
+    case UCC_TL_CUDA_NVLS_STATE_SYNC_STATUS:
+    {
+        /* Collectively agree on whether every rank imported the multicast
+         * handle. If any rank failed, all ranks skip the multicast binding and
+         * fall back together; otherwise the ranks that succeeded would deadlock
+         * in cuMulticastBindAddr waiting for the failed rank to call
+         * cuMulticastAddDevice. */
+        ucc_rank_t r;
+
+        if (nvls->init_sync_data == NULL) {
+            nvls->init_sync_data = (char *)ucc_malloc(
+                UCC_TL_TEAM_SIZE(team), "nvls_init_sync");
+            if (!nvls->init_sync_data) {
+                status = UCC_ERR_NO_MEMORY;
+                goto cleanup;
+            }
+            nvls->init_sync_data[UCC_TL_TEAM_RANK(team)] = (char)
+                                                               nvls->init_ready;
+        }
+
+        if (team->oob_req == NULL) {
+            status = team->oob.allgather(
+                &nvls->init_sync_data[UCC_TL_TEAM_RANK(team)],
+                nvls->init_sync_data,
+                1,
+                team->oob.coll_info,
+                &team->oob_req);
+            if (status != UCC_OK) {
+                tl_error(
+                    UCC_TL_TEAM_LIB(team),
+                    "failed to initiate NVLS init status exchange");
+                goto cleanup;
+            }
+        }
+
+        status = team->oob.req_test(team->oob_req);
+        if (status > 0) {
+            return UCC_INPROGRESS;
+        }
+        if (status < 0) {
+            tl_error(UCC_TL_TEAM_LIB(team), "NVLS init status exchange failed");
+            team->oob.req_free(team->oob_req);
+            team->oob_req = NULL;
+            goto cleanup;
+        }
+        team->oob.req_free(team->oob_req);
+        team->oob_req = NULL;
+
+        for (r = 0; r < UCC_TL_TEAM_SIZE(team); r++) {
+            if (nvls->init_sync_data[r] == 0) {
+                tl_debug(
+                    UCC_TL_TEAM_LIB(team),
+                    "NVLS: rank %u could not initialize NVLS; disabling "
+                    "NVLS for the whole team and falling back",
+                    r);
+                status = UCC_ERR_NOT_SUPPORTED;
+                goto cleanup;
+            }
+        }
+        ucc_free(nvls->init_sync_data);
+        nvls->init_sync_data = NULL;
         team->state = UCC_TL_CUDA_NVLS_STATE_ADD_DEVICE;
         // fall through
+    }
     case UCC_TL_CUDA_NVLS_STATE_ADD_DEVICE:
     {
         // Allocate physical memory
@@ -686,6 +808,9 @@ ucc_status_t ucc_tl_cuda_nvls_init(
         ucc_free(nvls->barrier_data);
         nvls->barrier_data = NULL;
 
+        /* NVLS is fully initialized for this team; only now may collectives be
+         * routed to the NVLS algorithms (see ucc_tl_cuda_get_supported_colls). */
+        nvls->enabled      = 1;
         tl_debug(UCC_TL_TEAM_LIB(team),
                  "NVLS init: rank %d OOB barrier complete — team ready",
                  UCC_TL_TEAM_RANK(team));
@@ -706,6 +831,10 @@ cleanup:
     if (nvls->barrier_data) {
         ucc_free(nvls->barrier_data);
         nvls->barrier_data = NULL;
+    }
+    if (nvls->init_sync_data) {
+        ucc_free(nvls->init_sync_data);
+        nvls->init_sync_data = NULL;
     }
 
     // Clean up CUDA resources - check local variables for partial allocations
@@ -806,6 +935,10 @@ ucc_status_t ucc_tl_cuda_nvls_destroy(ucc_tl_cuda_team_t *team)
     if (team->nvls.barrier_data) {
         ucc_free(team->nvls.barrier_data);
         team->nvls.barrier_data = NULL;
+    }
+    if (team->nvls.init_sync_data) {
+        ucc_free(team->nvls.init_sync_data);
+        team->nvls.init_sync_data = NULL;
     }
     return UCC_OK;
 }

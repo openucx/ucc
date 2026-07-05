@@ -31,6 +31,15 @@ ucc_status_t ucc_tl_cuda_allreduce_init(ucc_base_coll_args_t *coll_args,
 {
     ucc_status_t        status  = UCC_ERR_NOT_IMPLEMENTED;
 #ifdef HAVE_NVLS
+    ucc_tl_cuda_team_t *cuda_team = ucc_derived_of(team, ucc_tl_cuda_team_t);
+
+    /* NVLS is the only allreduce algorithm in TL/CUDA. If NVLS did not
+     * initialize for this team (e.g. it fell back because the peer fd import
+     * was denied), report NOT_SUPPORTED so the collective is served by another
+     * transport instead of dispatching to uninitialized NVLS resources. */
+    if (!cuda_team->nvls.enabled) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     /* Use NVLS algorithm as default */
     status = ucc_tl_cuda_allreduce_nvls_init(coll_args, team, task_h);
 #else
