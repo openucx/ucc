@@ -177,7 +177,7 @@ jobs:
         fi
         echo "${output}"
         case "${output}" in
-          *"Invalid format for --gen exp:min=N[[]@max=M]"*) ;;
+          *"Invalid format for --gen exp:min=N[@max=M]"*) ;;
           *)
             echo "ucc_perftest did not report the parse error"
             exit 1
