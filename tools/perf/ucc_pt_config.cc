@@ -34,6 +34,7 @@ ucc_pt_config::ucc_pt_config() {
     bench.root_shift     = 0;
     bench.mult_factor    = 2;
     bench.seed           = 0;
+    bench.gen.type       = UCC_PT_GEN_TYPE_EXP;
     comm.mt              = bench.mt;
 }
 
