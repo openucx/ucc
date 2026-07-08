@@ -34,50 +34,18 @@ static pthread_mutex_t ucc_sysinfo_cuda_nvml_lock = PTHREAD_MUTEX_INITIALIZER;
  * headers while users run against an older libnvidia-ml.so.1, so resolve these
  * symbols lazily and leave fabric metadata unset when they are unavailable.
  */
-static void *ucc_sysinfo_cuda_nvml_get_handle(void)
-{
-    static int    resolved;
-    static void  *handle;
-    Dl_info       dl_info;
-
-    if (resolved) {
-        return handle ? handle : RTLD_DEFAULT;
-    }
-
-    resolved = 1;
-    if (dladdr((void *)nvmlInit_v2, &dl_info) && dl_info.dli_fname) {
-#ifdef RTLD_NOLOAD
-        handle = dlopen(dl_info.dli_fname,
-                        RTLD_LAZY | RTLD_LOCAL | RTLD_NOLOAD);
-#endif
-        if (!handle) {
-            handle = dlopen(dl_info.dli_fname, RTLD_LAZY | RTLD_LOCAL);
-        }
-    }
-
-#ifdef RTLD_NOLOAD
-    if (!handle) {
-        handle = dlopen("libnvidia-ml.so.1",
-                        RTLD_LAZY | RTLD_LOCAL | RTLD_NOLOAD);
-    }
-#endif
-
-    if (!handle) {
-        ucc_debug("could not obtain dedicated NVML handle; "
-                  "falling back to RTLD_DEFAULT");
-        return RTLD_DEFAULT;
-    }
-
-    return handle;
-}
-
 static void *ucc_sysinfo_cuda_nvml_get_symbol(const char *symbol)
 {
     void *sym;
     char *error;
 
+    /*
+     * libnvidia-ml.so.1 is already mapped (the component links it and calls
+     * nvmlInit_v2), so RTLD_DEFAULT resolves whatever fabric symbols the
+     * running driver exports without an explicit dlopen.
+     */
     dlerror();
-    sym = dlsym(ucc_sysinfo_cuda_nvml_get_handle(), symbol);
+    sym = dlsym(RTLD_DEFAULT, symbol);
     error = dlerror();
     if (error) {
         ucc_debug("NVML symbol %s is unavailable: %s", symbol, error);
@@ -87,44 +55,33 @@ static void *ucc_sysinfo_cuda_nvml_get_symbol(const char *symbol)
     return sym;
 }
 
+#define UCC_NVML_SYMBOL_LOADER(_fn, _type, _sym)                               \
+    static _type _fn(void)                                                     \
+    {                                                                          \
+        static int   resolved;                                                 \
+        static _type fn;                                                       \
+                                                                               \
+        if (!resolved) {                                                       \
+            fn       = (_type)ucc_sysinfo_cuda_nvml_get_symbol(_sym);          \
+            resolved = 1;                                                      \
+        }                                                                      \
+        return fn;                                                             \
+    }
+
 #ifdef HAVE_NVML_GPU_FABRIC_INFO_V
 typedef nvmlReturn_t (*ucc_nvmlDeviceGetGpuFabricInfoV_t)(
     nvmlDevice_t device, nvmlGpuFabricInfoV_t *gpuFabricInfo);
-
-static ucc_nvmlDeviceGetGpuFabricInfoV_t
-ucc_sysinfo_cuda_nvml_get_gpu_fabric_info_v_fn(void)
-{
-    static int                               resolved;
-    static ucc_nvmlDeviceGetGpuFabricInfoV_t fn;
-
-    if (!resolved) {
-        fn = (ucc_nvmlDeviceGetGpuFabricInfoV_t)
-            ucc_sysinfo_cuda_nvml_get_symbol("nvmlDeviceGetGpuFabricInfoV");
-        resolved = 1;
-    }
-
-    return fn;
-}
+UCC_NVML_SYMBOL_LOADER(ucc_sysinfo_cuda_nvml_get_gpu_fabric_info_v_fn,
+                       ucc_nvmlDeviceGetGpuFabricInfoV_t,
+                       "nvmlDeviceGetGpuFabricInfoV")
 #endif
 
 #ifdef HAVE_NVML_GPU_FABRIC_INFO
 typedef nvmlReturn_t (*ucc_nvmlDeviceGetGpuFabricInfo_t)(
     nvmlDevice_t device, nvmlGpuFabricInfo_t *gpuFabricInfo);
-
-static ucc_nvmlDeviceGetGpuFabricInfo_t
-ucc_sysinfo_cuda_nvml_get_gpu_fabric_info_fn(void)
-{
-    static int                              resolved;
-    static ucc_nvmlDeviceGetGpuFabricInfo_t fn;
-
-    if (!resolved) {
-        fn = (ucc_nvmlDeviceGetGpuFabricInfo_t)
-            ucc_sysinfo_cuda_nvml_get_symbol("nvmlDeviceGetGpuFabricInfo");
-        resolved = 1;
-    }
-
-    return fn;
-}
+UCC_NVML_SYMBOL_LOADER(ucc_sysinfo_cuda_nvml_get_gpu_fabric_info_fn,
+                       ucc_nvmlDeviceGetGpuFabricInfo_t,
+                       "nvmlDeviceGetGpuFabricInfo")
 #endif
 
 static void ucc_sysinfo_cuda_update_fabric_info(nvmlDevice_t nvml_dev,
@@ -159,10 +116,13 @@ static void ucc_sysinfo_cuda_update_fabric_info(nvmlDevice_t nvml_dev,
                 memcpy(gpu->fabric_cluster_uuid, fabric_info_v.clusterUuid,
                        UCC_GPU_FABRIC_CLUSTER_UUID_LEN);
             }
-            return;
+        } else {
+            ucc_debug("nvmlDeviceGetGpuFabricInfoV failed: %s",
+                      nvmlErrorString(nvml_st));
         }
-        ucc_debug("nvmlDeviceGetGpuFabricInfoV failed: %s",
-                  nvmlErrorString(nvml_st));
+        /* The versioned API is present and authoritative; the legacy API is
+         * only a fallback for drivers that lack the versioned symbol. */
+        return;
     }
 #endif
 
