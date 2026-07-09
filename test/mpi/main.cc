@@ -629,7 +629,9 @@ int main(int argc, char *argv[])
 
     if (!err.empty() || show_help) {
         if (rank == 0) {
-            std::cerr << "ParseArgs error:" << err << "\n\n";
+            if (!err.empty()) {
+                std::cerr << "ParseArgs error:" << err << "\n\n";
+            }
             print_help();
         }
         goto mpi_exit;
