@@ -183,13 +183,11 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
 
     status = ucc_tl_ucp_allgather_ring_start(&task->super);
     if (status != UCC_OK) {
-        goto finalize_coll;
+        goto free_task;
     }
 
     *task_p = &task->super;
     return status;
-finalize_coll:
-    ucc_tl_ucp_coll_finalize(*task_p);
 free_task:
     ucc_tl_ucp_put_task(task);
     return status;
@@ -229,13 +227,11 @@ ucc_status_t ucc_tl_ucp_service_bcast(ucc_base_team_t *team, void *buf,
     task->bcast_kn.radix = 2;
     status = ucc_tl_ucp_bcast_knomial_start(&task->super);
     if (status != UCC_OK) {
-        goto finalize_coll;
+        goto free_task;
     }
 
     *task_p = &task->super;
     return status;
-finalize_coll:
-    ucc_tl_ucp_coll_finalize(*task_p);
 free_task:
     ucc_tl_ucp_put_task(task);
     return status;

@@ -310,6 +310,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     self->remote_info  = NULL;
     self->n_rinfo_segs = 0;
     self->rkeys        = NULL;
+    self->n_teams      = 0;
     if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS &&
         params->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         ucc_status = ucc_tl_ucp_ctx_remote_populate(
@@ -488,9 +489,14 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
     if (self->cfg.service_worker != 0) {
         ucc_tl_ucp_eps_cleanup(&self->service_worker, self);
     }
-    if (UCC_TL_CTX_HAS_OOB(self)) {
+
+    if (UCC_TL_CTX_HAS_OOB(self) && self->n_teams > 0) {
+        /* Only barrier if at least one team was created on this context. If
+           none was, no cross-rank UCP communication happened, so the barrier
+           is unnecessary. */
         ucc_tl_ucp_context_barrier(self, &UCC_TL_CTX_OOB(self));
     }
+
     ucc_tl_ucp_worker_cleanup(self->worker);
     if (self->cfg.service_worker != 0) {
         ucc_tl_ucp_worker_cleanup(self->service_worker);

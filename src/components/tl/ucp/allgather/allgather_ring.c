@@ -47,6 +47,7 @@ void ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         return;
     }
+
     sendto   = ucc_ep_map_eval(task->subset.map, (trank + 1) % tsize);
     recvfrom = ucc_ep_map_eval(task->subset.map, (trank - 1 + tsize) % tsize);
 

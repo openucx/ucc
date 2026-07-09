@@ -4,10 +4,12 @@
  * See file LICENSE for terms.
  */
 
+#include "core/ucc_team.h"
 #include "tl_ucp.h"
 #include "tl_ucp_ep.h"
 #include "tl_ucp_coll.h"
 #include "tl_ucp_sendrecv.h"
+#include "ucc/api/ucc_status.h"
 #include "utils/ucc_parser.h"
 #include "coll_score/ucc_coll_score.h"
 #include "coll_patterns/ring.h"
@@ -47,15 +49,34 @@ err_topo_init:
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
-    ucc_tl_ucp_context_t *ctx = ucc_derived_of(tl_context,
-                                               ucc_tl_ucp_context_t);
+    ucc_tl_ucp_context_t *ctx = ucc_derived_of(
+        tl_context, ucc_tl_ucp_context_t);
     ucc_kn_radix_t max_radix, min_radix;
-    ucc_rank_t            tsize;
+    ucc_rank_t     tsize;
     ucc_status_t   status;
+    ucc_rank_t     i;
+    void          *addr;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     /* TODO: init based on ctx settings and on params: need to check
              if all the necessary ranks mappings are provided */
+
+    for (i = 0; i < UCC_TL_TEAM_SIZE(self); i++) {
+        addr = ucc_get_team_ep_addr(
+            UCC_TL_CORE_CTX(self),
+            UCC_TL_CORE_TEAM(self),
+            ucc_ep_map_eval(UCC_TL_TEAM_MAP(self), i),
+            ucc_tl_ucp.super.super.id);
+        if (addr == NULL) {
+            tl_debug(
+                tl_context->lib,
+                "context address for rank %d is not available, team cannot be "
+                "created",
+                i);
+            return UCC_ERR_NO_RESOURCE;
+        }
+    }
+
     self->preconnect_task = NULL;
     self->seq_num         = 0;
     self->status          = UCC_INPROGRESS;
@@ -139,6 +160,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
             }
         }
     }
+
+    ctx->n_teams++;
 
     tl_debug(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;

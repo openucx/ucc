@@ -469,6 +469,13 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
 
     offset = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),
                                   core_rank, ucc_tl_ucp.super.super.id);
+    if (ucc_unlikely(NULL == offset)) {
+        /* Peer has no tl/ucp component in its packed address */
+        tl_error(UCC_TL_TEAM_LIB(team),
+                 "no tl/ucp address for rank %d: peer ucp context unavailable",
+                 core_rank);
+        return UCC_ERR_NOT_FOUND;
+    }
 
     base_offset = (ptrdiff_t)(TL_UCP_EP_ADDR_ONESIDED_INFO(offset, ctx));
     rvas        = (uint64_t *)base_offset;

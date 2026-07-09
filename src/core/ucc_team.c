@@ -73,6 +73,18 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
         team->bp.params.mask |= UCC_TEAM_PARAM_FIELD_OOB;
     }
 
+    /* A team of size > 1 needs an OOB to bootstrap its TL teams (address
+       exchange, etc.). It comes either from the
+       context service team (above) or from a user-provided team OOB. If
+       neither is available - e.g. the service team could not be created
+       because tl/ucp failed on some ranks - the team cannot be created. */
+    if (team->size > 1 && !(team->bp.params.mask & UCC_TEAM_PARAM_FIELD_OOB)) {
+        ucc_error("cannot create team of size %d: no OOB available (context "
+                  "service team unavailable and no team OOB provided)",
+                  team->size);
+        return UCC_ERR_NO_RESOURCE;
+    }
+
     team->cl_teams = ucc_malloc(sizeof(ucc_cl_team_t *) * context->n_cl_ctx);
     if (!team->cl_teams) {
         ucc_error("failed to allocate %zd bytes for cl teams array",
