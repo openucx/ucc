@@ -12,6 +12,10 @@
 #include <nvml.h>
 #include <pthread.h>
 #include <string.h>
+#if defined(HAVE_NVML_GPU_FABRIC_INFO_V) || \
+    defined(HAVE_NVML_GPU_FABRIC_INFO)
+#include <dlfcn.h>
+#endif
 #endif
 
 static ucc_config_field_t ucc_sysinfo_cuda_config_table[] = {
@@ -20,6 +24,129 @@ static ucc_config_field_t ucc_sysinfo_cuda_config_table[] = {
 
 #ifdef HAVE_NVML_H
 static pthread_mutex_t ucc_sysinfo_cuda_nvml_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
+#if defined(HAVE_NVML_H) && \
+    (defined(HAVE_NVML_GPU_FABRIC_INFO_V) || \
+     defined(HAVE_NVML_GPU_FABRIC_INFO))
+/*
+ * NVML fabric-info APIs are optional at runtime. Builds may use newer NVML
+ * headers while users run against an older libnvidia-ml.so.1, so resolve these
+ * symbols lazily and leave fabric metadata unset when they are unavailable.
+ */
+static void *ucc_sysinfo_cuda_nvml_get_symbol(const char *symbol)
+{
+    void *sym;
+    char *error;
+
+    /*
+     * libnvidia-ml.so.1 is already mapped (the component links it and calls
+     * nvmlInit_v2), so RTLD_DEFAULT resolves whatever fabric symbols the
+     * running driver exports without an explicit dlopen.
+     */
+    dlerror();
+    sym = dlsym(RTLD_DEFAULT, symbol);
+    error = dlerror();
+    if (error) {
+        ucc_debug("NVML symbol %s is unavailable: %s", symbol, error);
+        return NULL;
+    }
+
+    return sym;
+}
+
+#define UCC_NVML_SYMBOL_LOADER(_fn, _type, _sym)                               \
+    static _type _fn(void)                                                     \
+    {                                                                          \
+        static int   resolved;                                                 \
+        static _type fn;                                                       \
+                                                                               \
+        if (!resolved) {                                                       \
+            fn       = (_type)ucc_sysinfo_cuda_nvml_get_symbol(_sym);          \
+            resolved = 1;                                                      \
+        }                                                                      \
+        return fn;                                                             \
+    }
+
+#ifdef HAVE_NVML_GPU_FABRIC_INFO_V
+typedef nvmlReturn_t (*ucc_nvmlDeviceGetGpuFabricInfoV_t)(
+    nvmlDevice_t device, nvmlGpuFabricInfoV_t *gpuFabricInfo);
+UCC_NVML_SYMBOL_LOADER(ucc_sysinfo_cuda_nvml_get_gpu_fabric_info_v_fn,
+                       ucc_nvmlDeviceGetGpuFabricInfoV_t,
+                       "nvmlDeviceGetGpuFabricInfoV")
+#endif
+
+#ifdef HAVE_NVML_GPU_FABRIC_INFO
+typedef nvmlReturn_t (*ucc_nvmlDeviceGetGpuFabricInfo_t)(
+    nvmlDevice_t device, nvmlGpuFabricInfo_t *gpuFabricInfo);
+UCC_NVML_SYMBOL_LOADER(ucc_sysinfo_cuda_nvml_get_gpu_fabric_info_fn,
+                       ucc_nvmlDeviceGetGpuFabricInfo_t,
+                       "nvmlDeviceGetGpuFabricInfo")
+#endif
+
+static void ucc_sysinfo_cuda_update_fabric_info(nvmlDevice_t nvml_dev,
+                                                ucc_gpu_info_t *gpu)
+{
+    nvmlReturn_t nvml_st;
+#ifdef HAVE_NVML_GPU_FABRIC_INFO_V
+    ucc_nvmlDeviceGetGpuFabricInfoV_t get_fabric_info_v;
+    nvmlGpuFabricInfoV_t              fabric_info_v;
+#endif
+#ifdef HAVE_NVML_GPU_FABRIC_INFO
+    ucc_nvmlDeviceGetGpuFabricInfo_t get_fabric_info;
+    nvmlGpuFabricInfo_t              fabric_info;
+#endif
+
+#ifdef HAVE_NVML_GPU_FABRIC_INFO_V
+    get_fabric_info_v = ucc_sysinfo_cuda_nvml_get_gpu_fabric_info_v_fn();
+    if (get_fabric_info_v) {
+        memset(&fabric_info_v, 0, sizeof(fabric_info_v));
+        fabric_info_v.version = nvmlGpuFabricInfo_v2;
+        nvml_st = get_fabric_info_v(nvml_dev, &fabric_info_v);
+        UCC_STATIC_ASSERT(sizeof(fabric_info_v.clusterUuid) ==
+                          UCC_GPU_FABRIC_CLUSTER_UUID_LEN);
+        if (nvml_st == NVML_SUCCESS) {
+            if (fabric_info_v.state == NVML_GPU_FABRIC_STATE_COMPLETED) {
+                gpu->caps |= UCC_GPU_CAP_FABRIC;
+                gpu->fabric_clique_id = fabric_info_v.cliqueId;
+#ifdef HAVE_NVML_FABRIC_PARTITION_ID
+                gpu->fabric_partition_id = fabric_info_v.partitionId;
+#endif
+                /* Globally-unique fabric id; needed for cross-node match. */
+                memcpy(gpu->fabric_cluster_uuid, fabric_info_v.clusterUuid,
+                       UCC_GPU_FABRIC_CLUSTER_UUID_LEN);
+            }
+        } else {
+            ucc_debug("nvmlDeviceGetGpuFabricInfoV failed: %s",
+                      nvmlErrorString(nvml_st));
+        }
+        /* The versioned API is present and authoritative; the legacy API is
+         * only a fallback for drivers that lack the versioned symbol. */
+        return;
+    }
+#endif
+
+#ifdef HAVE_NVML_GPU_FABRIC_INFO
+    get_fabric_info = ucc_sysinfo_cuda_nvml_get_gpu_fabric_info_fn();
+    if (get_fabric_info) {
+        memset(&fabric_info, 0, sizeof(fabric_info));
+        nvml_st = get_fabric_info(nvml_dev, &fabric_info);
+        UCC_STATIC_ASSERT(sizeof(fabric_info.clusterUuid) ==
+                          UCC_GPU_FABRIC_CLUSTER_UUID_LEN);
+        if (nvml_st == NVML_SUCCESS &&
+            fabric_info.state == NVML_GPU_FABRIC_STATE_COMPLETED) {
+            gpu->caps |= UCC_GPU_CAP_FABRIC;
+            gpu->fabric_clique_id = fabric_info.cliqueId;
+            /* Globally-unique fabric id; needed for cross-node match. */
+            memcpy(gpu->fabric_cluster_uuid, fabric_info.clusterUuid,
+                   UCC_GPU_FABRIC_CLUSTER_UUID_LEN);
+        } else if (nvml_st != NVML_SUCCESS) {
+            ucc_debug("nvmlDeviceGetGpuFabricInfo failed: %s",
+                      nvmlErrorString(nvml_st));
+        }
+    }
+#endif
+}
 #endif
 
 static ucc_status_t ucc_sysinfo_cuda_init(const ucc_sysinfo_params_t *params)
@@ -510,35 +637,9 @@ static ucc_status_t ucc_sysinfo_cuda_get_info(void **info, int *n_info)
             }
         }
 
-#if defined(HAVE_NVML_GPU_FABRIC_INFO_V) || defined(HAVE_NVML_GPU_FABRIC_INFO)
-        {
-#ifdef HAVE_NVML_GPU_FABRIC_INFO_V
-            nvmlGpuFabricInfoV_t fabric_info;
-
-            fabric_info.version = nvmlGpuFabricInfo_v2;
-            nvml_st = nvmlDeviceGetGpuFabricInfoV(nvml_dev, &fabric_info);
-#else
-            nvmlGpuFabricInfo_t fabric_info;
-
-            nvml_st = nvmlDeviceGetGpuFabricInfo(nvml_dev, &fabric_info);
-#endif
-            UCC_STATIC_ASSERT(
-                sizeof(fabric_info.clusterUuid) ==
-                UCC_GPU_FABRIC_CLUSTER_UUID_LEN);
-            if (nvml_st == NVML_SUCCESS &&
-                fabric_info.state == NVML_GPU_FABRIC_STATE_COMPLETED) {
-                gpu_info->gpus[i].caps |= UCC_GPU_CAP_FABRIC;
-                gpu_info->gpus[i].fabric_clique_id = fabric_info.cliqueId;
-#if defined(HAVE_NVML_GPU_FABRIC_INFO_V) && defined(HAVE_NVML_FABRIC_PARTITION_ID)
-                gpu_info->gpus[i].fabric_partition_id = fabric_info.partitionId;
-#endif
-                /* Globally-unique fabric id; needed for cross-node match. */
-                memcpy(
-                    gpu_info->gpus[i].fabric_cluster_uuid,
-                    fabric_info.clusterUuid,
-                    UCC_GPU_FABRIC_CLUSTER_UUID_LEN);
-            }
-        }
+#if defined(HAVE_NVML_GPU_FABRIC_INFO_V) || \
+    defined(HAVE_NVML_GPU_FABRIC_INFO)
+        ucc_sysinfo_cuda_update_fabric_info(nvml_dev, &gpu_info->gpus[i]);
 #endif
         u = gpu_info->gpus[i].fabric_cluster_uuid;
         ucc_debug(
