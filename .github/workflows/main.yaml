@@ -191,6 +191,8 @@ jobs:
           /tmp/ompi/install/bin/mpirun "${MPI_ARGS[@]}" \
             /tmp/ucc/install/bin/ucc_perftest -c "${c}" "${PERFTEST_ARGS[@]}" -i
         done
+        # Single process, no launcher
+        /tmp/ucc/install/bin/ucc_perftest -c allreduce "${PERFTEST_ARGS[@]}"
 
   ompi-imb:
     runs-on: ubuntu-latest
