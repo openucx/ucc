@@ -29,7 +29,8 @@ ucc_global_config_t ucc_global_config = {
     .log_buffer_size  = 1024,
     .log_data_size    = 0,
     .log_print_enable = 0,
-    .log_level_trigger = UCC_LOG_LEVEL_FATAL};
+    .log_level_trigger = UCC_LOG_LEVEL_FATAL,
+    .modules           = {{NULL, 0}, UCC_CONFIG_ALLOW_LIST_ALLOW_ALL}};
 
 ucc_config_field_t ucc_global_config_table[] = {
     {"LOG_LEVEL", "warn",
@@ -116,6 +117,21 @@ ucc_config_field_t ucc_global_config_table[] = {
      "datatypes for proper fallback behavior.",
      ucc_offsetof(ucc_global_config_t, check_asymmetric_dt),
      UCC_CONFIG_TYPE_BOOL},
+
+    {"MODULES", "all",
+     "Comma-separated list of component modules to load.\n"
+     "Use <framework>_<name> to target a specific component (e.g. tl_cuda),\n"
+     "or a bare <name> to match that component in any framework.\n"
+     "Prefix with '^' to negate (exclude matching components).\n"
+     "In ALLOW mode (no '^'), only frameworks that have at least one\n"
+     "qualified entry (e.g. tl_*) are filtered; other frameworks load all\n"
+     "their components, so required frameworks (cl, mc) are never excluded.\n"
+     " - all                  - load all available modules (default).\n"
+     " - ^cuda                - load all modules except cuda (any framework).\n"
+     " - ^tl_cuda,ec_cuda     - load all modules except tl_cuda and ec_cuda.\n"
+     " - tl_ucp,tl_nccl       - load only ucp and nccl from the tl framework.",
+     ucc_offsetof(ucc_global_config_t, modules),
+     UCC_CONFIG_TYPE_ALLOW_LIST},
 
     {NULL}
 };
