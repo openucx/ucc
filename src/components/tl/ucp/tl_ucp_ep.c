@@ -56,6 +56,12 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
 
     addr = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),
                                 core_rank, ucc_tl_ucp.super.super.id);
+    if (ucc_unlikely(NULL == addr)) {
+        tl_error(ctx->super.super.lib,
+                 "no tl/ucp address for rank %d: peer ucp context unavailable",
+                 core_rank);
+        return UCC_ERR_NOT_FOUND;
+    }
     addr = use_service_worker ? TL_UCP_EP_ADDR_WORKER_SERVICE(addr)
                               : TL_UCP_EP_ADDR_WORKER(addr);
 

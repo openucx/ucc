@@ -81,7 +81,9 @@ ucc_get_team_ep_header(ucc_context_t *context, ucc_team_t *team,
 
 /* Gets the component specific address of rank in a team.
    First we get the header, and then find the component address
-   by offset */
+   by offset.
+   Returns NULL if the requested component is not present in the peer's
+   packed address. */
 static inline void *ucc_get_team_ep_addr(ucc_context_t *context,
                                          ucc_team_t *team, ucc_rank_t rank,
                                          unsigned long component_id)
@@ -96,7 +98,6 @@ static inline void *ucc_get_team_ep_addr(ucc_context_t *context,
             break;
         }
     }
-    ucc_assert(NULL != addr);
     return addr;
 }
 

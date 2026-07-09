@@ -620,6 +620,92 @@ static void remove_tl_ctx_from_array(ucc_tl_context_t **array, unsigned *size,
     }
 }
 
+static ucc_status_t ucc_context_create_service_team(
+    const ucc_context_params_t *params, ucc_context_t *ctx)
+{
+    ucc_status_t           status;
+    ucc_status_t           destroy_status;
+    ucc_base_team_params_t t_params;
+    ucc_base_team_t       *b_team;
+
+    if (!(params->mask & UCC_CONTEXT_PARAM_FIELD_OOB)) {
+        ucc_debug("service team cannot be created without context oob");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (params->oob.n_oob_eps <= 1) {
+        ucc_debug("service team cannot be created for communicator of size 1");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    status = ucc_tl_context_get(ctx, "ucp", &ctx->service_ctx);
+    if (status != UCC_OK) {
+        ucc_debug(
+            "service team cannot be created, TL UCP context is not available");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    memset(&t_params.map, 0, sizeof(ucc_ep_map_t));
+    memset(&t_params.params, 0, sizeof(ucc_team_params_t));
+
+    t_params.params.mask = UCC_TEAM_PARAM_FIELD_EP |
+                           UCC_TEAM_PARAM_FIELD_EP_RANGE |
+                           UCC_TEAM_PARAM_FIELD_OOB;
+    t_params.params.oob.allgather = ctx->params.oob.allgather;
+    t_params.params.oob.req_test  = ctx->params.oob.req_test;
+    t_params.params.oob.req_free  = ctx->params.oob.req_free;
+    t_params.params.oob.coll_info = ctx->params.oob.coll_info;
+    t_params.params.oob.n_oob_eps = ctx->params.oob.n_oob_eps;
+    t_params.params.ep_range      = UCC_COLLECTIVE_EP_RANGE_CONTIG;
+    t_params.params.ep            = ctx->rank;
+    t_params.rank                 = ctx->rank;
+    t_params.size                 = ctx->params.oob.n_oob_eps;
+    /* CORE scope id - never overlaps with CL type */
+    t_params.scope                = UCC_CL_LAST + 1;
+    t_params.scope_id             = 0;
+    t_params.id                   = 0;
+    t_params.team                 = NULL;
+    t_params.map.type             = UCC_EP_MAP_FULL;
+    t_params.map.ep_num           = t_params.size;
+    status                        = UCC_TL_CTX_IFACE(ctx->service_ctx)
+                 ->team.create_post(
+                     &ctx->service_ctx->super, &t_params, &b_team);
+    if (UCC_OK != status) {
+        ucc_debug(
+            "context service team create post failed with status: %s",
+            ucc_status_string(status));
+        goto exit_err;
+    }
+    do {
+        status = UCC_TL_CTX_IFACE(ctx->service_ctx)->team.create_test(b_team);
+    } while (UCC_INPROGRESS == status);
+
+    if (status < 0) {
+        ucc_debug(
+            "failed to create context service team with status: %s",
+            ucc_status_string(status));
+        while (UCC_INPROGRESS ==
+               (destroy_status =
+                    UCC_TL_CTX_IFACE(ctx->service_ctx)->team.destroy(b_team))) {
+        }
+        if (destroy_status < 0) {
+            ucc_debug("failed to destroy context service team after create "
+                      "failure with status: %s",
+                      ucc_status_string(destroy_status));
+        }
+        goto exit_err;
+    }
+    ctx->service_team = ucc_derived_of(b_team, ucc_tl_team_t);
+
+    return UCC_OK;
+
+exit_err:
+    ucc_tl_context_put(ctx->service_ctx);
+    ctx->service_ctx  = NULL;
+    ctx->service_team = NULL;
+    return status;
+}
+
 ucc_status_t ucc_context_create_proc_info(
     ucc_lib_h lib, const ucc_context_params_t *params,
     const ucc_context_config_h config, ucc_context_h *context,
@@ -776,66 +862,18 @@ ucc_status_t ucc_context_create_proc_info(
         }
         ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
     }
+
     if (config->internal_oob) {
-        if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
-            params->oob.n_oob_eps > 1) {
-            ucc_base_team_params_t t_params;
-            ucc_base_team_t *      b_team;
-            status = ucc_tl_context_get(ctx, "ucp", &ctx->service_ctx);
-            if (UCC_OK != status) {
-                if (config->internal_oob == 2) {
-                    ucc_error(
-                        "TL UCP context is not available, service team can "
-                        "not be created but was force requested");
-                    goto error_ctx_create;
-                }
-                ucc_debug("TL UCP context is not available, "
-                          "service team can not be created");
+        status = ucc_context_create_service_team(params, ctx);
+        if (status != UCC_OK) {
+            if (config->internal_oob == 2) {
+                ucc_error(
+                    "UCC_INTERNAL_OOB was force requested but "
+                    "service team cannot be created");
+                goto error_ctx_create;
             } else {
-                memset(&t_params.map, 0, sizeof(ucc_ep_map_t));
-                memset(&t_params.params, 0, sizeof(ucc_team_params_t));
-                t_params.params.mask = UCC_TEAM_PARAM_FIELD_EP |
-                                       UCC_TEAM_PARAM_FIELD_EP_RANGE |
-                                       UCC_TEAM_PARAM_FIELD_OOB;
-                t_params.params.oob.allgather    = ctx->params.oob.allgather;
-                t_params.params.oob.req_test     = ctx->params.oob.req_test;
-                t_params.params.oob.req_free     = ctx->params.oob.req_free;
-                t_params.params.oob.coll_info    = ctx->params.oob.coll_info;
-                t_params.params.oob.n_oob_eps    = ctx->params.oob.n_oob_eps;
-                t_params.params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
-                t_params.params.ep       = ctx->rank;
-                t_params.rank            = ctx->rank;
-                t_params.size            = ctx->params.oob.n_oob_eps;
-                /* CORE scope id - never overlaps with CL type */
-                t_params.scope      = UCC_CL_LAST + 1;
-                t_params.scope_id   = 0;
-                t_params.id         = 0;
-                t_params.team       = NULL;
-                t_params.map.type   = UCC_EP_MAP_FULL;
-                t_params.map.ep_num = t_params.size;
-                status            = UCC_TL_CTX_IFACE(ctx->service_ctx)
-                             ->team.create_post(&ctx->service_ctx->super,
-                                                &t_params, &b_team);
-                if (UCC_OK != status) {
-                    ucc_error("ctx service team create post failed with status: %s",
-                              ucc_status_string(status));
-                    goto error_ctx_create;
-                }
-                do {
-                    status = UCC_TL_CTX_IFACE(ctx->service_ctx)
-                                 ->team.create_test(b_team);
-                } while (UCC_INPROGRESS == status);
-                if (status < 0) {
-                    ucc_error("failed to create ctx service team with status: %s",
-                              ucc_status_string(status));
-                    goto error_ctx_create;
-                }
-                ctx->service_team = ucc_derived_of(b_team, ucc_tl_team_t);
+                ucc_debug("context service team cannot be created");
             }
-        } else if (config->internal_oob == 2) {
-            ucc_error("UCC_INTERNAL_OOB was force requested for context "
-                      "without OOB");
-            goto error_ctx_create;
         }
     }
 

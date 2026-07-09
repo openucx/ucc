@@ -231,6 +231,7 @@ typedef struct ucc_tl_ucp_context {
     uint64_t                    n_rinfo_segs;
     uint64_t                    ucp_memory_types;
     int                         topo_required;
+    uint32_t                    n_teams;
     struct {
         ucc_tl_ucp_copy_post_fn_t     post;
         ucc_tl_ucp_copy_test_fn_t     test;
