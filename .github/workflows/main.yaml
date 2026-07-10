@@ -171,6 +171,24 @@ jobs:
           -x UCC_CONFIG_FILE=
         )
         PERFTEST_ARGS=(-m host -d float32 -b 1024 -e 1024 -n 10 -w 2)
+        if output=$(/tmp/ucc/install/bin/ucc_perftest --gen exp: 2>&1); then
+          echo "ucc_perftest accepted malformed --gen argument"
+          exit 1
+        fi
+        echo "${output}"
+        case "${output}" in
+          *"Invalid format for --gen exp:min=N[@max=M]"*) ;;
+          *)
+            echo "ucc_perftest did not report the parse error"
+            exit 1
+            ;;
+        esac
+        case "${output}" in
+          *"Collective:"*)
+            echo "ucc_perftest initialized the benchmark after a parse error"
+            exit 1
+            ;;
+        esac
         COLLS=(
           allgather allgatherv allreduce alltoall alltoallv
           barrier bcast gather gatherv

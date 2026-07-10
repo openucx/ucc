@@ -13,7 +13,10 @@ int main(int argc, char *argv[])
     ucc_pt_benchmark *bench;
     ucc_status_t st;
 
-    pt_config.process_args(argc, argv);
+    st = pt_config.process_args(argc, argv);
+    if (st != UCC_OK) {
+        return 1;
+    }
     ucc_pt_cuda_init();
     ucc_pt_rocm_init();
     try {
