@@ -67,6 +67,16 @@ typedef enum {
     UCC_PT_GEN_TYPE_TRAFFIC_MATRIX
 } ucc_pt_gen_type_t;
 
+typedef enum {
+    UCC_PT_ITER_MODE_ISOLATED,
+    UCC_PT_ITER_MODE_STREAMING
+} ucc_pt_iter_mode_t;
+
+static inline const char *ucc_pt_iter_mode_str(ucc_pt_iter_mode_t mode)
+{
+    return mode == UCC_PT_ITER_MODE_STREAMING ? "streaming" : "isolated";
+}
+
 static inline const char* ucc_pt_op_type_str(ucc_pt_op_type_t op)
 {
     if ((uint64_t)op < (uint64_t)UCC_COLL_TYPE_LAST) {
@@ -130,6 +140,7 @@ struct ucc_pt_benchmark_config {
     int                root_shift;
     int                mult_factor;
     uint64_t           seed;
+    ucc_pt_iter_mode_t iteration_mode;
     ucc_pt_gen_config  gen;
 };
 

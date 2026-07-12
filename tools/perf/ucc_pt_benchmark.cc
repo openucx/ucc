@@ -231,6 +231,11 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
 
     args.root = config.root % comm->get_size();
     for (int i = 0; i < nwarmup + niter; i++) {
+        /* Start the measured streaming batch with ranks aligned. */
+        if (i == nwarmup && nwarmup > 0 &&
+            config.iteration_mode == UCC_PT_ITER_MODE_STREAMING) {
+            UCCCHECK_GOTO(comm->barrier(), exit_err, st);
+        }
         double s = get_time_us();
 
         if (!persistent) {
@@ -265,7 +270,9 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
             time += f - s;
         }
         args.root = (args.root + config.root_shift) % comm->get_size();
-        UCCCHECK_GOTO(comm->barrier(), exit_err, st);
+        if (config.iteration_mode == UCC_PT_ITER_MODE_ISOLATED) {
+            UCCCHECK_GOTO(comm->barrier(), exit_err, st);
+        }
     }
 
     if (persistent) {
@@ -376,6 +383,9 @@ void ucc_pt_benchmark::print_header()
                   << "  small" << config.n_iter_small << std::endl
                   << std::left << std::setw(24)
                   << "  large" << config.n_iter_large << std::endl;
+        std::cout << std::left << std::setw(24)
+                  << "Iteration mode:"
+                  << ucc_pt_iter_mode_str(config.iteration_mode) << std::endl;
         std::cout.copyfmt(iostate);
         std::cout << std::endl;
         std::cout << std::setw(12) << "Count"
