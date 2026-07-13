@@ -37,6 +37,12 @@ typedef struct ucc_context_id {
 #define UCC_CTX_ID_EQUAL(_id1, _id2) (UCC_PROC_INFO_EQUAL((_id1).pi, (_id2).pi) \
                                       && (_id1).seq_num == (_id2).seq_num)
 
+enum ucc_tl_capabilities {
+    /* capabalities that every TL needs to be aware of
+     * about other TLs */
+    UCC_TL_UCP_CUDA_ENABLED = UCC_BIT(0)
+};
+
 enum {
     /* all ranks have identical set of TLs*/
     UCC_ADDR_STORAGE_FLAG_TLS_SYMMETRIC = UCC_BIT(0),
@@ -81,6 +87,7 @@ typedef struct ucc_context {
     uint64_t                 cl_flags;
     ucc_tl_team_t           *service_team;
     int32_t                  throttle_progress;
+    enum ucc_tl_capabilities tl_caps;
 } ucc_context_t;
 
 typedef struct ucc_context_config {
