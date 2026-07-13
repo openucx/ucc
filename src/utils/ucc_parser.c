@@ -618,12 +618,15 @@ ucc_status_t ucc_add_team_sections(void                *team_cfg,
                                    const char          *component_prefix)
 {
     khash_t(ucc_sections) *sections  = &ucc_global_config.file_cfg->sections;
-    ucc_cpu_vendor_t       vendor    = ucc_arch_get_cpu_vendor();
-    ucc_cpu_model_t        model     = ucc_arch_get_cpu_model();
+    ucc_cpu_vendor_t       vendor    = team_topo->cpu_vendor;
+    ucc_cpu_model_t        model     = team_topo->cpu_model;
     ucc_rank_t             ppn_min   = ucc_topo_min_ppn(team_topo);
     ucc_rank_t             ppn_max   = ucc_topo_max_ppn(team_topo);
-    ucc_rank_t             sock_min  = ucc_topo_min_socket_size(team_topo);
-    ucc_rank_t             sock_max  = ucc_topo_max_socket_size(team_topo);
+    ucc_rank_t             sock_min  = team_topo->topo->sock_bound ?
+                                       ucc_topo_min_socket_size(team_topo) : 0;
+    ucc_rank_t             sock_max  = team_topo->topo->sock_bound ?
+                                       ucc_topo_max_socket_size(team_topo) :
+                                       UCC_RANK_MAX;
     ucc_rank_t             nnodes    = ucc_topo_nnodes(team_topo);
     ucc_rank_t             team_size = team_topo->set.map.ep_num;
     int                    found     = 0;

@@ -37,6 +37,8 @@ typedef struct ucc_proc_info {
     ucc_numa_id_t   numa_id;
     ucc_host_id_t   host_id;
     pid_t           pid;
+    uint8_t         cpu_vendor;
+    uint8_t         cpu_model;
 } ucc_proc_info_t;
 
 typedef struct ucc_pci_info {
