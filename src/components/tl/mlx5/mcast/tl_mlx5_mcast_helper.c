@@ -206,7 +206,7 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_post(ucc_tl_mlx5_mcast_coll_context_t 
     char        buf[INET6_ADDRSTRLEN];
     const char *dst;
 
-    dst = inet_ntop(AF_INET6, net_addr, buf, INET6_ADDRSTRLEN);
+    dst = inet_ntop(AF_INET6, &net_addr->sin6_addr, buf, INET6_ADDRSTRLEN);
     if (NULL == dst) {
         tl_mlx5_mcast_log(ctx->params.mcast_enabled, ctx->lib, UCC_LOG_LEVEL_WARN, "inet_ntop failed");
         return UCC_ERR_NO_RESOURCE;
@@ -633,7 +633,7 @@ ucc_status_t ucc_tl_mlx5_leave_mcast_groups(ucc_tl_mlx5_mcast_coll_context_t *ct
 
     for (i = 0; i < comm->mcast_group_count; i++) {
         if (comm->mcast.groups[i].mcast_addr.sin6_flowinfo != 0) {
-            dst = inet_ntop(AF_INET6, &comm->mcast.groups[i].mcast_addr, buf, INET6_ADDRSTRLEN);
+            dst = inet_ntop(AF_INET6, &comm->mcast.groups[i].mcast_addr.sin6_addr, buf, INET6_ADDRSTRLEN);
             if (NULL == dst) {
                 tl_mlx5_mcast_log(comm->context->mcast_enabled, comm->lib, UCC_LOG_LEVEL_ERROR,
                                   "inet_ntop failed for group %d during mcast leave group", i);
