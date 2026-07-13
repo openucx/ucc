@@ -17,6 +17,7 @@
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_sys.h"
+#include "utils/arch/cpu.h"
 #ifdef HAVE_UCS_GET_SYSTEM_ID
 #include <ucs/sys/uid.h>
 #endif
@@ -380,10 +381,12 @@ error:
 
 ucc_status_t ucc_local_proc_info_init()
 {
-    ucc_local_proc.host_hash = ucc_get_system_id();
-    ucc_local_proc.pid       = getpid();
-    ucc_local_proc.socket_id = UCC_SOCKET_ID_INVALID;
-    ucc_local_proc.numa_id   = UCC_NUMA_ID_INVALID;
+    ucc_local_proc.host_hash  = ucc_get_system_id();
+    ucc_local_proc.pid        = getpid();
+    ucc_local_proc.socket_id  = UCC_SOCKET_ID_INVALID;
+    ucc_local_proc.numa_id    = UCC_NUMA_ID_INVALID;
+    ucc_local_proc.cpu_vendor = (uint8_t)ucc_arch_get_cpu_vendor();
+    ucc_local_proc.cpu_model  = (uint8_t)ucc_arch_get_cpu_model();
 
     if (UCC_OK != ucc_get_bound_socket_id(&ucc_local_proc.socket_id)) {
         ucc_debug("failed to get bound socket id");
