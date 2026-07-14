@@ -280,10 +280,17 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_reduce_2step_init,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    ucc_pipeline_nfrags_pdepth(&cfg->reduce_2step_pipeline,
-                               coll_args->args.src.info.count *
-                               ucc_dt_size(coll_args->args.src.info.datatype),
-                               &n_frags, &pipeline_depth);
+    status = ucc_pipeline_nfrags_pdepth(
+        &cfg->reduce_2step_pipeline,
+        coll_args->args.src.info.count *
+            ucc_dt_size(coll_args->args.src.info.datatype),
+        &n_frags,
+        &pipeline_depth);
+    if (ucc_unlikely(status != UCC_OK)) {
+        cl_error(
+            team->context->lib, "invalid pipeline parameters for reduce 2step");
+        return status;
+    }
 
     if (n_frags == 1) {
         return ucc_cl_hier_reduce_2step_init_schedule(

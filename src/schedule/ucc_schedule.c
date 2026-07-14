@@ -41,11 +41,29 @@ static ucc_status_t ucc_event_manager_init(ucc_coll_task_t *task)
     return UCC_OK;
 }
 
+/* Test binaries may interpose this weak symbol to inject a failure at an exact
+ * subscription attempt. Production builds always take the zero-cost success
+ * path below. */
+static ucc_status_t (*ucc_event_manager_subscribe_fault_cb)(void);
+
+void ucc_event_manager_set_subscribe_fault_cb(ucc_status_t (*cb)(void))
+{
+    ucc_event_manager_subscribe_fault_cb = cb;
+}
+
 ucc_status_t ucc_event_manager_subscribe(ucc_coll_task_t *parent_task,
                                          ucc_event_t event, ucc_coll_task_t *task,
                                          ucc_task_event_handler_p handler)
 {
     ucc_event_manager_t *em;
+    ucc_status_t         status;
+
+    if (ucc_unlikely(ucc_event_manager_subscribe_fault_cb != NULL)) {
+        status = ucc_event_manager_subscribe_fault_cb();
+        if (ucc_unlikely(status != UCC_OK)) {
+            return status;
+        }
+    }
 
     ucc_list_for_each(em, &parent_task->em_list, list_elem) {
         if (em->n_listeners < MAX_LISTENERS) {

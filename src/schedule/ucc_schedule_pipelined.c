@@ -16,6 +16,20 @@ const char* ucc_pipeline_order_names[] = {
     [UCC_PIPELINE_LAST]       =  NULL
 };
 
+static void (*ucc_schedule_pipelined_lock_observer)(int initialized);
+
+void ucc_schedule_pipelined_set_lock_observer(void (*cb)(int initialized))
+{
+    ucc_schedule_pipelined_lock_observer = cb;
+}
+
+static void ucc_schedule_pipelined_lock_observe(int initialized)
+{
+    if (ucc_schedule_pipelined_lock_observer) {
+        ucc_schedule_pipelined_lock_observer(initialized);
+    }
+}
+
 static ucc_status_t ucc_frag_start_handler(ucc_coll_task_t *parent,
                                            ucc_coll_task_t *task)
 {
@@ -139,12 +153,20 @@ ucc_status_t ucc_schedule_pipelined_finalize(ucc_coll_task_t *task)
     int              i;
 
     ucc_trace_req("schedule pipelined %p is complete", schedule_p);
+    ucc_coll_task_destruct(&schedule_p->super.super);
+    for (i = 0; i < schedule_p->n_frags; i++) {
+        ucc_coll_task_destruct(&frags[i]->super);
+        for (int j = 0; j < frags[i]->n_tasks; j++) {
+            ucc_coll_task_destruct(frags[i]->tasks[j]);
+        }
+    }
     for (i = 0; i < schedule_p->n_frags; i++) {
         schedule_p->frags[i]->super.finalize(&frags[i]->super);
     }
 
     if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
         ucc_recursive_spinlock_destroy(&schedule_p->lock);
+        ucc_schedule_pipelined_lock_observe(0);
     }
 
     return UCC_OK;
@@ -192,14 +214,52 @@ ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
                                          ucc_schedule_pipelined_t *schedule)
 {
     ucc_event_t      task_dependency_event = UCC_EVENT_LAST;
+    int              n_frags_initd         = 0;
     int              i, j;
     ucc_status_t     status;
     ucc_schedule_t **frags;
 
-    if (ucc_unlikely(n_frags > UCC_SCHEDULE_PIPELINED_MAX_FRAGS)) {
-        ucc_error("n_frags %d exceeds max limit of %d",
-                  n_frags, UCC_SCHEDULE_PIPELINED_MAX_FRAGS);
+    /* ==========================================================================
+     * Validation contract (task 405): reject zero/unusable active pipeline params
+     * Before any fragment instantiation or schedule construction, validate that:
+     *   1. n_frags >= 1 for an active pipeline (n_frags=0 means disabled)
+     *   2. n_frags_total >= n_frags and > 0 for a runnable schedule
+     *   3. order is valid (parallel/ordered/sequential) - checked below at line ~214
+     * Return UCC_ERR_INVALID_PARAM rather than hanging or dividing by zero.
+     * ========================================================================== */
+    if (ucc_unlikely(n_frags < 1)) {
+        ucc_error(
+            "n_frags=%d is invalid for active pipeline; must be >= 1", n_frags);
         return UCC_ERR_INVALID_PARAM;
+    }
+
+    if (ucc_unlikely(n_frags_total < n_frags || n_frags_total <= 0)) {
+        ucc_error(
+            "n_frags_total=%d is invalid (n_frags=%d); must be >= n_frags and "
+            "> 0",
+            n_frags_total,
+            n_frags);
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    if (ucc_unlikely(
+            order != UCC_PIPELINE_PARALLEL && order != UCC_PIPELINE_ORDERED &&
+            order != UCC_PIPELINE_SEQUENTIAL)) {
+        ucc_error("invalid pipeline order %d", order);
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    /* Clamp rather than fail: an over-large requested pipeline depth is a
+       tuning mistake, not a correctness problem -- the pipeline is valid at any
+       depth >= 1. Failing here aborts the whole collective with
+       UCC_ERR_INVALID_PARAM partway through a size sweep, which is far worse
+       than quietly running shallower. */
+    if (ucc_unlikely(n_frags > UCC_SCHEDULE_PIPELINED_MAX_FRAGS)) {
+        ucc_warn(
+            "n_frags %d exceeds max limit of %d, clamping",
+            n_frags,
+            UCC_SCHEDULE_PIPELINED_MAX_FRAGS);
+        n_frags = UCC_SCHEDULE_PIPELINED_MAX_FRAGS;
     }
 
     if (n_frags > 1) {
@@ -230,6 +290,7 @@ ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
 
     if (UCC_TASK_THREAD_MODE(&schedule->super.super) == UCC_THREAD_MULTIPLE) {
         ucc_recursive_spinlock_init(&schedule->lock, 0);
+        ucc_schedule_pipelined_lock_observe(1);
     }
 
     schedule->super.super.flags    |= UCC_COLL_TASK_FLAG_IS_PIPELINED_SCHEDULE;
@@ -256,6 +317,7 @@ ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
         }
         frags[i]->super.status       = UCC_OPERATION_INITIALIZED;
         frags[i]->super.super.status = UCC_OPERATION_INITIALIZED;
+        n_frags_initd++;
     }
 
     for (i = 0; i < n_frags; i++) {
@@ -283,8 +345,23 @@ ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
     }
     return UCC_OK;
 err:
-    for (i = i - 1; i >= 0; i--) {
+    /* Subscriptions point at fragment tasks and schedules. Remove every
+     * installed listener before any of those referenced objects is finalized
+     * or returned to its pool. Destruct leaves a valid empty list, so fragment
+     * finalizers that destruct their tasks remain safe. */
+    ucc_coll_task_destruct(&schedule->super.super);
+    for (i = 0; i < n_frags_initd; i++) {
+        ucc_coll_task_destruct(&frags[i]->super);
+        for (j = 0; j < frags[i]->n_tasks; j++) {
+            ucc_coll_task_destruct(frags[i]->tasks[j]);
+        }
+    }
+    for (i = n_frags_initd - 1; i >= 0; i--) {
         frags[i]->super.finalize(&frags[i]->super);
+    }
+    if (UCC_TASK_THREAD_MODE(&schedule->super.super) == UCC_THREAD_MULTIPLE) {
+        ucc_recursive_spinlock_destroy(&schedule->lock);
+        ucc_schedule_pipelined_lock_observe(0);
     }
     return status;
 }

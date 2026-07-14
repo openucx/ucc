@@ -162,9 +162,9 @@ ucc_tl_ucp_reduce_srg_knomial_frag_init(ucc_base_coll_args_t *coll_args,
     ucc_base_coll_args_t   args    = *coll_args;
     ucc_mrange_uint_t     *p       = &tl_team->cfg.reduce_srg_kn_radix;
     int                    n_frags = sp->super.n_tasks;
+    ucc_coll_task_t       *g_task = NULL, *rs_task = NULL;
     ucc_kn_radix_t         radix, cfg_radix;
     ucc_schedule_t        *schedule;
-    ucc_coll_task_t       *g_task, *rs_task;
     ucc_status_t           status;
     ptrdiff_t              scratch_offset;
     void                  *rs_rbuf, *rs_sbuf, *g_rbuf, *g_sbuf;
@@ -240,6 +240,16 @@ ucc_tl_ucp_reduce_srg_knomial_frag_init(ucc_base_coll_args_t *coll_args,
     *frag_p                  = schedule;
     return UCC_OK;
 out:
+    if (g_task) {
+        ucc_coll_task_destruct(g_task);
+        g_task->finalize(g_task);
+    }
+    if (rs_task) {
+        ucc_coll_task_destruct(rs_task);
+        rs_task->finalize(rs_task);
+    }
+    ucc_coll_task_destruct(&schedule->super);
+    ucc_tl_ucp_put_schedule(schedule);
     return status;
 }
 
@@ -281,6 +291,14 @@ ucc_tl_ucp_reduce_srg_knomial_get_pipeline_params(ucc_tl_ucp_team_t *team,
     if (mtype == UCC_MEMORY_TYPE_CUDA) {
         mc_attr.field_mask = UCC_MC_ATTR_FIELD_FAST_ALLOC_SIZE;
         ucc_mc_get_attr(&mc_attr, UCC_MEMORY_TYPE_CUDA);
+        if (mc_attr.fast_alloc_size == 0) {
+            pp->threshold = SIZE_MAX;
+            pp->n_frags   = 0;
+            pp->frag_size = 0;
+            pp->pdepth    = 1;
+            pp->order     = UCC_PIPELINE_PARALLEL;
+            return;
+        }
         pp->threshold = mc_attr.fast_alloc_size;
         pp->n_frags   = 2;
         pp->order     = UCC_PIPELINE_PARALLEL;
@@ -325,8 +343,13 @@ ucc_status_t ucc_tl_ucp_reduce_srg_knomial_init(ucc_base_coll_args_t *coll_args,
                       bargs.max_frag_count: count;
     ucc_tl_ucp_reduce_srg_knomial_get_pipeline_params(tl_team, mt,
                                                       &pipeline_params);
-    ucc_pipeline_nfrags_pdepth(&pipeline_params, max_frag_count * dt_size,
-                               &n_frags, &pipeline_depth);
+    st = ucc_pipeline_nfrags_pdepth(
+        &pipeline_params, max_frag_count * dt_size, &n_frags, &pipeline_depth);
+    if (ucc_unlikely(st != UCC_OK)) {
+        tl_error(
+            team->context->lib, "invalid pipeline parameters for reduce SRG");
+        goto err_free_schedule;
+    }
     bargs.max_frag_count = ucc_buffer_block_count(max_frag_count, n_frags, 0);
     if (n_frags > 1) {
         bargs.mask           |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
@@ -360,6 +383,7 @@ ucc_status_t ucc_tl_ucp_reduce_srg_knomial_init(ucc_base_coll_args_t *coll_args,
 err_free_scratch:
     ucc_mc_free(schedule->scratch_mc_header);
 err_free_schedule:
+    ucc_coll_task_destruct(&schedule->super.super.super);
     ucc_tl_ucp_put_schedule(&schedule->super.super);
 err_out:
     return st;

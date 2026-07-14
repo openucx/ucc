@@ -94,8 +94,8 @@ ucc_tl_ucp_allreduce_sra_knomial_frag_init(ucc_base_coll_args_t *coll_args,
     ucc_memory_type_t    mem_type = coll_args->args.dst.info.mem_type;
     ucc_base_coll_args_t args     = *coll_args;
     ucc_mrange_uint_t   *p        = &tl_team->cfg.allreduce_sra_kn_radix;
+    ucc_coll_task_t     *task = NULL, *rs_task = NULL;
     ucc_schedule_t      *schedule;
-    ucc_coll_task_t     *task, *rs_task;
     ucc_status_t         status;
     ucc_kn_radix_t       radix;
     size_t               count;
@@ -139,6 +139,16 @@ ucc_tl_ucp_allreduce_sra_knomial_frag_init(ucc_base_coll_args_t *coll_args,
     *frag_p                  = schedule;
     return UCC_OK;
 out:
+    if (task) {
+        ucc_coll_task_destruct(task);
+        task->finalize(task);
+    }
+    if (rs_task && rs_task != task) {
+        ucc_coll_task_destruct(rs_task);
+        rs_task->finalize(rs_task);
+    }
+    ucc_coll_task_destruct(&schedule->super);
+    ucc_tl_ucp_put_schedule(schedule);
     return status;
 }
 
@@ -160,15 +170,29 @@ ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_start(ucc_coll_task_t *task)
     return ucc_schedule_pipelined_post(task);
 }
 
-static void
-ucc_tl_ucp_allreduce_sra_knomial_get_pipeline_params(ucc_tl_ucp_team_t *team,
-                                                     ucc_coll_args_t *args,
-                                                     ucc_pipeline_params_t *pp)
+void ucc_tl_ucp_allreduce_sra_knomial_select_pipeline_params(
+    const ucc_pipeline_params_t *configured, const ucc_coll_args_t *args,
+    size_t topo_nnodes, ucc_pipeline_params_t *pp)
 {
-    ucc_tl_ucp_lib_config_t *cfg = &team->cfg;
+    if (args->mask & UCC_COLL_ARGS_FIELD_TAG) {
+        /* User-tagged (ordered) collective: every internal RS/AG task inherits
+         * the caller's single tag (see ucc_tl_ucp_init_task), instead of the
+         * per-task seq_num that makes concurrent fragments distinguishable. A
+         * multi-fragment UCC_PIPELINE_PARALLEL schedule would then have several
+         * fragments' RS/AG p2p messages sharing (tag, sender, id, scope) in
+         * flight at once, so a receive could match the wrong stage/fragment and
+         * corrupt or hang the result. Force the monolithic (single-fragment)
+         * path in this case -- correctness over the pipeline speedup. */
+        pp->threshold = SIZE_MAX;
+        pp->n_frags   = 0;
+        pp->frag_size = 0;
+        pp->pdepth    = 1;
+        pp->order     = UCC_PIPELINE_PARALLEL;
+        return;
+    }
 
-    if (!ucc_pipeline_params_is_auto(&cfg->allreduce_sra_kn_pipeline)) {
-        *pp = cfg->allreduce_sra_kn_pipeline;
+    if (!ucc_pipeline_params_is_auto(configured)) {
+        *pp = *configured;
         return;
     }
 
@@ -177,19 +201,80 @@ ucc_tl_ucp_allreduce_sra_knomial_get_pipeline_params(ucc_tl_ucp_team_t *team,
         ucc_mc_attr_t mc_attr;
         mc_attr.field_mask = UCC_MC_ATTR_FIELD_FAST_ALLOC_SIZE;
         ucc_mc_get_attr(&mc_attr, UCC_MEMORY_TYPE_CUDA);
+        if (mc_attr.fast_alloc_size == 0) {
+            pp->threshold = SIZE_MAX;
+            pp->n_frags   = 0;
+            pp->frag_size = 0;
+            pp->pdepth    = 1;
+            pp->order     = UCC_PIPELINE_PARALLEL;
+            return;
+        }
         pp->threshold = mc_attr.fast_alloc_size;
         pp->n_frags   = 2;
         pp->frag_size = mc_attr.fast_alloc_size;
         pp->order     = UCC_PIPELINE_PARALLEL;
         pp->pdepth    = 2;
+    } else if (args->dst.info.mem_type == UCC_MEMORY_TYPE_HOST) {
+        /* Key off dst.info.mem_type: for in-place calls src.info is not the
+         * active buffer and is commonly UCC_MEMORY_TYPE_UNKNOWN, while dst is
+         * always the authoritative type (see CHECK_SAME_MEMTYPE, which only
+         * ties src==dst for out-of-place). */
+        /* Multi-node guard (fail-closed): on a cross-node IB fabric the
+         * pipeline's concurrent fragments compete for NIC bandwidth; the
+         * fragmentation overhead outweighs the RS-AG overlap gain. Measured
+         * -15% to -59% at 8-112 PPN on gaia 4-node (DC transport, 1-16 MB).
+         *
+         * REQUIREMENT: automatic pipelining MUST require positive confirmation
+         * that the team is single-node. Missing topology (NULL) and known
+         * multi-node both select the monolithic path. User override via
+         * UCC_TL_UCP_ALLREDUCE_SRA_KN_PIPELINE can enable pipelining regardless
+         * of topology state. */
+        if (topo_nnodes != 1) {
+            /* Missing topo OR known multi-node: fail-closed -> monolithic */
+            pp->threshold = SIZE_MAX;
+            pp->n_frags   = 0;
+            pp->frag_size = 0;
+            pp->pdepth    = 1;
+            pp->order     = UCC_PIPELINE_PARALLEL;
+            return;
+        }
+        /* Host path: pipeline RS->AG across fragments so the allgather of
+         * one fragment overlaps the reduce-scatter (incl. CPU reduction) of
+         * the next. Values are conservative defaults; override via
+         * UCC_TL_UCP_ALLREDUCE_SRA_KN_PIPELINE. */
+        size_t total = args->dst.info.count *
+                       ucc_dt_size(args->dst.info.datatype);
+
+        pp->threshold = 262144; /* start pipelining above 256KB */
+        pp->frag_size = 524288; /* ~512KB fragments: fewer/larger frags beat
+                                   256KB by 6-17% at >=1MB across 2-256 ranks
+                                   (thor sweep), tie below, no regression */
+        pp->n_frags   = 2; /* floor: at least 2 frags once over threshold */
+        pp->order     = UCC_PIPELINE_PARALLEL;
+        /* Pipeline depth scales with fragment count: 2 in flight is optimal up
+         * to 1MB (<=2 frags of 512KB), but once >=4 fragments exist (>=2MB) a
+         * 4-deep pipeline adds 6-23% across 8-64 ranks (thor hi-rank sweep,
+         * depths 2/3/4). Depth 3 was never uniquely best. */
+        pp->pdepth    = (total >= 4 * pp->frag_size) ? 4 : 2;
     } else {
+        /* Non-host, non-CUDA-inplace (e.g. out-of-place CUDA): keep the
+         * pre-pipelining monolithic behavior -- host tuning does not apply
+         * to device buffers, and CUDA behavior must not change here. */
         pp->threshold = SIZE_MAX;
         pp->n_frags   = 0;
         pp->frag_size = 0;
         pp->pdepth    = 1;
         pp->order     = UCC_PIPELINE_PARALLEL;
-
     }
+}
+
+static void ucc_tl_ucp_allreduce_sra_knomial_get_pipeline_params(
+    ucc_tl_ucp_team_t *team, ucc_coll_args_t *args, ucc_pipeline_params_t *pp)
+{
+    size_t topo_nnodes = team->topo ? ucc_topo_nnodes(team->topo) : 0;
+
+    ucc_tl_ucp_allreduce_sra_knomial_select_pipeline_params(
+        &team->cfg.allreduce_sra_kn_pipeline, args, topo_nnodes, pp);
 }
 
 ucc_status_t
@@ -218,8 +303,16 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
                      bargs.max_frag_count: args->dst.info.count;
     ucc_tl_ucp_allreduce_sra_knomial_get_pipeline_params(tl_team, args,
                                                          &pipeline_params);
-    ucc_pipeline_nfrags_pdepth(&pipeline_params, max_frag_count * dt_size,
-                               &n_frags, &pipeline_depth);
+    st = ucc_pipeline_nfrags_pdepth(
+        &pipeline_params, max_frag_count * dt_size, &n_frags, &pipeline_depth);
+    if (ucc_unlikely(st != UCC_OK)) {
+        tl_error(
+            team->context->lib,
+            "invalid pipeline parameters for allreduce SRA");
+        ucc_coll_task_destruct(&schedule_p->super.super);
+        ucc_tl_ucp_put_schedule(&schedule_p->super);
+        return st;
+    }
     if (n_frags > 1) {
         bargs.mask           |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
         bargs.max_frag_count = ucc_buffer_block_count(max_frag_count, n_frags, 0);

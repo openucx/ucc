@@ -10,7 +10,12 @@
 #include "components/base/ucc_base_iface.h"
 
 #define UCC_SCHEDULE_FRAG_MAX_TASKS 8
-#define UCC_SCHEDULE_PIPELINED_MAX_FRAGS 4
+/* Upper bound on concurrently in-flight pipeline fragments. This sizes the
+   inline frags[] array below, so raising it grows every embedding schedule
+   object (tl_ucp/cl_hier) by 8 bytes per entry. Was 4; raised to 16 to allow
+   pipeline-depth sweeps up to 16. Depth is clamped to this value rather than
+   rejected, see ucc_schedule_pipelined_init(). */
+#define UCC_SCHEDULE_PIPELINED_MAX_FRAGS 16
 
 typedef struct ucc_schedule_pipelined ucc_schedule_pipelined_t;
 
@@ -53,11 +58,34 @@ typedef struct ucc_pipeline_params {
     ucc_pipeline_order_t order;
 } ucc_pipeline_params_t;
 
-static inline void ucc_pipeline_nfrags_pdepth(ucc_pipeline_params_t *p,
-                                              size_t msgsize, int *n_frags,
-                                              int *pipeline_depth)
+static inline ucc_status_t ucc_pipeline_nfrags_pdepth(
+    ucc_pipeline_params_t *p, size_t msgsize, int *n_frags, int *pipeline_depth)
 {
     int min_num_frags;
+
+    /* n_frags=0 is the canonical disabled form.  Normalize it to a usable
+     * monolithic schedule even when the unused pdepth/frag_size are zero. */
+    if (p->n_frags == 0) {
+        *n_frags        = 1;
+        *pipeline_depth = 1;
+        return UCC_OK;
+    }
+
+    /* ==========================================================================
+     * Validation contract (task 405): reject unusable active pipeline parameters
+     * An active pipeline with pdepth=0 produces zero pipeline depth while retaining
+     * positive fragment count, causing the collective to hang with no completion.
+     * A frag_size=0 when msgsize > threshold would cause division by zero.
+     * ========================================================================== */
+    if (p->pdepth <= 0) {
+        /* Active pipeline specified but pdepth=0 - this will hang */
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    if (p->frag_size == 0 && msgsize > p->threshold) {
+        /* frag_size=0 with message exceeding threshold would divide by zero */
+        return UCC_ERR_INVALID_PARAM;
+    }
 
     *n_frags = 1;
     if (msgsize > p->threshold) {
@@ -65,9 +93,12 @@ static inline void ucc_pipeline_nfrags_pdepth(ucc_pipeline_params_t *p,
         *n_frags      = ucc_max(min_num_frags, p->n_frags);
     }
     *pipeline_depth = ucc_min(*n_frags, p->pdepth);
+    return UCC_OK;
 }
 
 extern const char* ucc_pipeline_order_names[];
+
+void ucc_schedule_pipelined_set_lock_observer(void (*cb)(int initialized));
 typedef struct ucc_schedule_pipelined {
     ucc_schedule_t               super;
     /* Array of the frag schedules - 1 schedule per pipeline entry */

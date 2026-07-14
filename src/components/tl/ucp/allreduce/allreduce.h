@@ -68,6 +68,11 @@ ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_ar
 
 ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_start(ucc_coll_task_t *task);
 
+/* Internal selection seam. topo_nnodes is 0 when topology is unavailable. */
+void         ucc_tl_ucp_allreduce_sra_knomial_select_pipeline_params(
+            const ucc_pipeline_params_t *configured, const ucc_coll_args_t *args,
+            size_t topo_nnodes, ucc_pipeline_params_t *selected);
+
 ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_progress(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_ucp_allreduce_dbt_init(ucc_base_coll_args_t *coll_args,
