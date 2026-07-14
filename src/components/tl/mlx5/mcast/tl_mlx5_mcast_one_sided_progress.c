@@ -9,6 +9,33 @@
 #include "tl_mlx5_mcast_hca_copy.h"
 #include <inttypes.h>
 
+static inline int
+ucc_tl_mlx5_mcast_uses_tracked_recv(ucc_tl_mlx5_mcast_coll_comm_t *comm)
+{
+    return comm->one_sided.reliability_enabled &&
+           (comm->allgather_comm.truly_zero_copy_allgather_enabled ||
+            comm->bcast_comm.truly_zero_copy_bcast_enabled);
+}
+
+static inline void
+ucc_tl_mlx5_mcast_untrack_recv(ucc_tl_mlx5_mcast_coll_comm_t *comm,
+                               struct pp_packet *pp, int in_pending_queue)
+{
+    if (!in_pending_queue && ucc_tl_mlx5_mcast_uses_tracked_recv(comm)) {
+        ucc_list_del(&pp->super);
+        comm->one_sided.posted_recv[pp->qp_id].posted_recvs_count--;
+    }
+}
+
+static inline void
+ucc_tl_mlx5_mcast_recycle_packet(ucc_tl_mlx5_mcast_coll_comm_t *comm,
+                                 struct pp_packet *pp, int in_pending_queue)
+{
+    ucc_tl_mlx5_mcast_untrack_recv(comm, pp, in_pending_queue);
+    pp->context = 0;
+    ucc_list_add_tail(&comm->bpool, &pp->super);
+}
+
 ucc_status_t
 ucc_tl_mlx5_mcast_staging_allgather_reliable_one_sided_get(ucc_tl_mlx5_mcast_coll_comm_t *comm,
                                                            ucc_tl_mlx5_mcast_coll_req_t  *req,
@@ -208,13 +235,16 @@ ucc_tl_mlx5_mcast_progress_one_sided_communication(ucc_tl_mlx5_mcast_coll_comm_t
 ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_comm_t *comm,
                                                          ucc_tl_mlx5_mcast_coll_req_t  *req,
                                                          struct pp_packet  *pp,
-                                                         int coll_type)
+                                                         int coll_type,
+                                                         int in_pending_queue)
 {
     int               out_of_order_recvd = 0;
     void             *dest;
     int               offset;
     int               source_rank;
     uint32_t          ag_counter;
+    size_t            packet_offset;
+    size_t            expected_len;
     ucc_memory_type_t dst_mem_type;
     ucc_memory_type_t src_mem_type;
     ucc_status_t      status;
@@ -230,12 +260,53 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
              " %d ag_counter %d offset %d", pp->length, source_rank,
              ag_counter, offset);
 
-    ucc_assert(offset < req->num_packets);
+    /* source_rank is wire supplied and independent of the collective
+     * instance. Validate it before accepting the packet into any path. */
+    if (ucc_unlikely(source_rank >= comm->commsize)) {
+        tl_warn(comm->lib, "dropping mcast packet: source_rank %d >= "
+                "commsize %u, imm_data %u", source_rank,
+                (unsigned)comm->commsize, pp->psn);
+        goto drop_packet;
+    }
+
     // there are scenarios where we receive a packet with same offset/rank  more than one time
     // this means that a packet which was considered dropped in previous run has not just arrived
     // need to check the allgather call counter and ignore this packet if it does not match
 
     if (ag_counter == (req->ag_counter % ONE_SIDED_MAX_ZCOPY_COLL_COUNTER)) {
+        /* The remaining decoded fields are meaningful only for the current
+         * collective request. Never rely on ucc_assert for wire data. */
+        if (ucc_unlikely(offset >= req->num_packets)) {
+            tl_warn(comm->lib, "dropping mcast packet: offset %d >= "
+                    "num_packets %d, imm_data %u", offset, req->num_packets,
+                    pp->psn);
+            goto drop_packet;
+        }
+
+        if (ucc_unlikely(pp->length < 0)) {
+            tl_warn(comm->lib, "dropping mcast packet: negative length %d, "
+                    "imm_data %u", pp->length, pp->psn);
+            goto drop_packet;
+        }
+
+        packet_offset = (size_t)offset * (size_t)comm->max_per_packet;
+        if (ucc_unlikely(packet_offset >= req->length)) {
+            tl_warn(comm->lib, "dropping mcast packet: packet offset %zu "
+                    "outside message length %zu, imm_data %u", packet_offset,
+                    req->length, pp->psn);
+            goto drop_packet;
+        }
+
+        expected_len = (offset == (req->num_packets - 1)) ?
+                       req->length - packet_offset :
+                       (size_t)comm->max_per_packet;
+        if (ucc_unlikely((size_t)pp->length != expected_len)) {
+            tl_warn(comm->lib, "dropping mcast packet: length %d != expected "
+                    "%zu for offset %d, imm_data %u", pp->length, expected_len,
+                    offset, pp->psn);
+            goto drop_packet;
+        }
+
         /* Update reliability tracking FIRST before any data processing */
         if (comm->one_sided.reliability_enabled) {
             /* out of order recv'd packet that happen that is fatal in zero-copy
@@ -255,11 +326,6 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
                          req->num_packets, offset,
                          comm->allgather_comm.under_progress_counter, req->ag_counter);
                 return UCC_ERR_NO_MESSAGE;
-            }
-            if (comm->allgather_comm.truly_zero_copy_allgather_enabled ||
-                    comm->bcast_comm.truly_zero_copy_bcast_enabled) {
-                /* remove pp from posted_recv_bufs queue */
-                ucc_list_del(&pp->super);
             }
         }
 
@@ -328,22 +394,24 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
 
         req->to_recv--;
         comm->psn++;
-        pp->context = 0;
-        ucc_list_add_tail(&comm->bpool, &pp->super);
-        comm->one_sided.posted_recv[pp->qp_id].posted_recvs_count--;
+        ucc_tl_mlx5_mcast_recycle_packet(comm, pp, in_pending_queue);
     } else if (ag_counter > (req->ag_counter % ONE_SIDED_MAX_ZCOPY_COLL_COUNTER)) {
         /* received out of order allgather/bcast packet - add it to queue for future
          * processing */
+        ucc_tl_mlx5_mcast_untrack_recv(comm, pp, in_pending_queue);
         ucc_list_add_tail(&comm->pending_q, &pp->super);
     } else {
         /* received a packet which was left from previous iterations
          * it is due to the fact that reliability protocol was initiated.
          * return the posted receive buffer back to the pool */
         ucc_assert(comm->one_sided.reliability_enabled);
-        pp->context = 0;
-        ucc_list_add_tail(&comm->bpool, &pp->super);
+        ucc_tl_mlx5_mcast_recycle_packet(comm, pp, in_pending_queue);
     }
 
+    return UCC_OK;
+
+drop_packet:
+    ucc_tl_mlx5_mcast_recycle_packet(comm, pp, in_pending_queue);
     return UCC_OK;
 }
 
