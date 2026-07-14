@@ -19,15 +19,17 @@ allgatherv =                       \
 	allgatherv/allgatherv_ring.c   \
 	allgatherv/allgatherv_linear.c
 
-alltoall =                 \
-	alltoall/alltoall.h    \
-	alltoall/alltoall.c    \
-	alltoall/alltoall_ce.c
+alltoall =                          \
+	alltoall/alltoall.h             \
+	alltoall/alltoall.c             \
+	alltoall/alltoall_ce.c          \
+	alltoall/alltoall_push.c
 
-alltoallv =                  \
-	alltoallv/alltoallv.h    \
-	alltoallv/alltoallv.c    \
-	alltoallv/alltoallv_ce.c
+alltoallv =                      \
+	alltoallv/alltoallv.h        \
+	alltoallv/alltoallv.c        \
+	alltoallv/alltoallv_ce.c     \
+	alltoallv/alltoallv_push.c
 
 bcast =                  \
 	bcast/bcast.h        \

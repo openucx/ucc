@@ -77,7 +77,8 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
         break;
     case UCC_PT_OP_TYPE_ALLTOALLV:
         coll = new ucc_pt_coll_alltoallv(cfg.dt, cfg.mt, cfg.inplace,
-                                         cfg.persistent, comm, generator);
+                                         cfg.persistent, cfg.map_type,
+                                         comm, generator);
         break;
     case UCC_PT_OP_TYPE_BARRIER:
         coll = new ucc_pt_coll_barrier(comm, generator);
