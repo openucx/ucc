@@ -189,7 +189,9 @@ static ucc_status_t ucc_topo_build_sbgp_ring(
             }
             i = (i - 1 + gsize) % gsize;
         }
-        (*ring_buf)[r*gsize + path_len++] = sbgp_ranks[k];
+        if (k != j) {
+            (*ring_buf)[r*gsize + path_len++] = sbgp_ranks[k];
+        }
         r++;
     }
 
