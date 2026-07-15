@@ -202,6 +202,8 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
 {
     const bool    triggered  = config.triggered;
     const bool    persistent = config.persistent;
+    const bool    streaming  =
+        config.iteration_mode == UCC_PT_ITER_MODE_STREAMING;
     ucc_team_h    team       = comm->get_team();
     ucc_context_h ctx        = comm->get_context();
     ucc_status_t  st         = UCC_OK;
@@ -231,11 +233,6 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
 
     args.root = config.root % comm->get_size();
     for (int i = 0; i < nwarmup + niter; i++) {
-        /* Start the measured streaming batch with ranks aligned. */
-        if (i == nwarmup && nwarmup > 0 &&
-            config.iteration_mode == UCC_PT_ITER_MODE_STREAMING) {
-            UCCCHECK_GOTO(comm->barrier(), exit_err, st);
-        }
         double s = get_time_us();
 
         if (!persistent) {
@@ -270,7 +267,7 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
             time += f - s;
         }
         args.root = (args.root + config.root_shift) % comm->get_size();
-        if (config.iteration_mode == UCC_PT_ITER_MODE_ISOLATED) {
+        if (!streaming || (niter > 0 && i == nwarmup - 1)) {
             UCCCHECK_GOTO(comm->barrier(), exit_err, st);
         }
     }
