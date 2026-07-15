@@ -231,6 +231,10 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_bcast_2step_init,
     if (UCC_IS_PERSISTENT(coll_args->args)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
+
+    if (UCC_COLL_ARGS_ACTIVE_SET(&coll_args->args)) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     ucc_pipeline_nfrags_pdepth(&cfg->bcast_2step_pipeline,
                                coll_args->args.src.info.count *
                                ucc_dt_size(coll_args->args.src.info.datatype),
