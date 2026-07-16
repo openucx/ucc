@@ -21,8 +21,13 @@ extern ucc_base_coll_alg_info_t
              ucc_tl_ucp_allreduce_algs[UCC_TL_UCP_ALLREDUCE_ALG_LAST + 1];
 ucc_status_t ucc_tl_ucp_allreduce_init(ucc_tl_ucp_task_t *task);
 
+/* Default allreduce algorithm selection:
+ *   0 - 4KB: knomial (fast for small messages, low overhead)
+ *   4KB - 4MB: SRA knomial (optimal for moderate sizes via streaming)
+ *   >= 4MB: ring (avoids deep recursion of konomial/SRA on large payloads;
+ *           benchmarked crossover at ~4MB across typical team sizes). */
 #define UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR                            \
-    "allreduce:0-4k:@0#allreduce:4k-inf:@1"
+    "allreduce:0-4k:@0#allreduce:4k-4m:@1#allreduce:4m-inf:@4"
 
 #define CHECK_SAME_MEMTYPE(_args, _team)                                       \
     do {                                                                       \
