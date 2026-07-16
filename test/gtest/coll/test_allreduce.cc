@@ -378,10 +378,9 @@ TYPED_TEST(test_allreduce_alg, dbt) {
 
 TYPED_TEST(test_allreduce_alg, ring) {
     int           n_procs = 15;
-    /* "0-inf:@ring" forces ring for all message sizes; ring returns
-     * UCC_ERR_NOT_SUPPORTED when count % team_size != 0 (see
-     * ring_count_not_divisible).  All counts below are chosen to be
-     * divisible by n_procs so that this tune is valid here. */
+    /* "0-inf:@ring" forces ring for all message sizes. Ring now handles any
+     * count regardless of divisibility by team size (see
+     * ring_count_not_divisible). */
     ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
                              {"UCC_TL_UCP_TUNE", "allreduce:0-inf:@ring"}};
     UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
@@ -444,6 +443,46 @@ TYPED_TEST(test_allreduce_alg, ring_edge_cases) {
                     this->set_inplace(inplace);
                     this->data_init(team_size, TypeParam::dt, count, ctxs,
                                     false);
+                    UccReq req(team, ctxs);
+                    ASSERT_EQ(UCC_OK, req.status);
+
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, this->data_validate(ctxs));
+                    this->data_fini(ctxs);
+                }
+            }
+        }
+    }
+}
+
+TYPED_TEST(test_allreduce_alg, ring_count_not_divisible) {
+    // Test remainder handling: counts where count % team_size != 0.
+    // Team sizes {3, 5, 7}; each count is non-divisible by all three.
+    for (auto team_size : {3, 5, 7}) {
+        ucc_job_env_t env = {{"UCC_CL_BASIC_TUNE", "inf"},
+                             {"UCC_TL_UCP_TUNE", "allreduce:0-inf:@ring"}};
+        UccJob job(team_size, UccJob::UCC_JOB_CTX_GLOBAL, env);
+        UccTeam_h team = job.create_team(team_size);
+        UccCollCtxVec ctxs;
+        std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+        if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+            mt.push_back(UCC_MEMORY_TYPE_CUDA);
+        }
+        if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {
+            mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);
+        }
+
+        // 101%3=2, 101%5=1, 101%7=3  (small)
+        // 1001%3=2, 1001%5=1, 1001%7=6  (medium)
+        // 4000001%3=2, %5=1, %7=3  (large, spans the 4m default threshold)
+        for (auto count : {101, 1001, 4000001}) {
+            for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
+                for (auto m : mt) {
+                    SET_MEM_TYPE(m);
+                    this->set_inplace(inplace);
+                    this->data_init(team_size, TypeParam::dt, count, ctxs, false);
                     UccReq req(team, ctxs);
                     ASSERT_EQ(UCC_OK, req.status);
 
