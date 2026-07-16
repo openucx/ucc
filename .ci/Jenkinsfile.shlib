@@ -8,6 +8,7 @@
 // load pipeline functions
 // Requires pipeline-github-lib plugin to load library from github
 @Library('ci-demo')
+@Library('swx-jenkins-lib')  // provides the ciTriage helper for the CI triage trigger
 def matrix = new com.mellanox.cicd.Matrix()
 
 def githubHelper = null
@@ -28,12 +29,27 @@ try {
 } catch (Exception ex) {
     currentBuild.result = 'FAILURE'
     println ex
+    // On failure, kick off an automated CI triage investigation.
+    if (params.githubData) {
+        try {
+            // ciTriage (swx-jenkins-lib) POSTs to the agent on the flyweight
+            // executor. The endpoint comes from the 'ci-triage-ucc-url' secret
+            // text credential rather than being hardcoded here.
+            withCredentials([string(credentialsId: 'ci-triage-ucc-url', variable: 'CI_TRIAGE_URL')]) {
+                ciTriage(
+                    url:       env.CI_TRIAGE_URL,
+                    commitSha: githubHelper.getMergedSHA(),
+                    prNumber:  githubHelper.getPRNumber(),
+                    insecure:  true,   // the ingress wildcard CA isn't in the controller trust store
+                )
+            }
+        } catch (Exception triageEx) {
+            echo "CI triage trigger failed (non-fatal): ${triageEx}"
+        }
+    }
     throw ex
 } finally {
     if (params.githubData) {
         githubHelper.updateCommitStatus(blueOceanUrl, "Test completed", currentBuild.resultIsBetterOrEqualTo('SUCCESS') ? GitHubCommitState.SUCCESS : GitHubCommitState.FAILURE, env.JOB_BASE_NAME)
-        githubHelper.uploadLogs(this, env.JOB_NAME, env.BUILD_NUMBER, null, null)
     }
 }
-
-
