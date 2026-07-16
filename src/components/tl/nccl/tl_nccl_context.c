@@ -144,15 +144,24 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_context_t,
 {
     ucc_tl_nccl_context_config_t *tl_nccl_config =
         ucc_derived_of(config, ucc_tl_nccl_context_config_t);
-    int mem_ops_attr = 0;
+    int          mem_ops_attr = 0;
     ucc_status_t status;
+    CUcontext    cu_ctx;
+    CUresult     cu_st;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_nccl_config->super,
                               params->context);
     memcpy(&self->cfg, tl_nccl_config, sizeof(*tl_nccl_config));
+
+    /* Bail out early if there is no active CUDA context */
+    cu_st = cuCtxGetCurrent(&cu_ctx);
+    if (cu_st != CUDA_SUCCESS || cu_ctx == NULL) {
+        tl_debug(self->super.super.lib, "no active CUDA context");
+        return UCC_ERR_NO_RESOURCE;
+    }
+
     if (self->cfg.sync_type != UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
 #if CUDA_VERSION < 12000
-        CUresult cu_st;
         CUdevice cu_dev;
         cu_st = cuCtxGetDevice(&cu_dev);
         if (cu_st == CUDA_SUCCESS) {
