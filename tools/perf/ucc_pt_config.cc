@@ -485,6 +485,9 @@ void ucc_pt_config::print_help()
     std::cout << "  --iteration-mode <isolated|streaming>: synchronize ranks "
                  "between iterations (isolated, default) or run back-to-back "
                  "without an iteration barrier (streaming)" << std::endl;
+    std::cout << "    Note: streaming mode may hang with the TL/UCP one-sided "
+                 "Alltoallv algorithm; use isolated mode for that configuration"
+              << std::endl;
     std::cout << "  -h: show this help message"<<std::endl;
     std::cout << std::endl;
 }
