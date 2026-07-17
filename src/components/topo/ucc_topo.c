@@ -219,6 +219,20 @@ ucc_status_t ucc_topo_init(
     topo->device_map.n_ranks    = 0;
     topo->n_nodes               = 0;
 
+    topo->cpu_vendor = (ucc_cpu_vendor_t)ctx_topo->procs[
+                           ucc_ep_map_eval(set.map, 0)].cpu_vendor;
+    topo->cpu_model  = (ucc_cpu_model_t)ctx_topo->procs[
+                           ucc_ep_map_eval(set.map, 0)].cpu_model;
+    for (i = 1; i < size; i++) {
+        ctx_rank = ucc_ep_map_eval(set.map, i);
+        if (ctx_topo->procs[ctx_rank].cpu_vendor != topo->cpu_vendor ||
+            ctx_topo->procs[ctx_rank].cpu_model  != topo->cpu_model) {
+            topo->cpu_vendor = UCC_CPU_VENDOR_UNKNOWN;
+            topo->cpu_model  = UCC_CPU_MODEL_UNKNOWN;
+            break;
+        }
+    }
+
     for (i = 0; i < size; i++) {
 
         ctx_rank = ucc_ep_map_eval(set.map, i);

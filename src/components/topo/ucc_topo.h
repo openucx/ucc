@@ -7,6 +7,7 @@
 #include "ucc_sbgp.h"
 #include "utils/ucc_proc_info.h"
 #include "utils/ucc_coll_utils.h"
+#include "utils/arch/cpu.h"
 
 /* Topo data structure initialized per UCC context.
    key elements of this struct are the arrays of ucc_proc_info_t and
@@ -83,6 +84,12 @@ typedef struct ucc_topo {
     ucc_rank_t   max_numa_size; /*< max number of processes on a numa,
                                     across all nodes of a team */
     ucc_device_map_t device_map; /*< map of team ranks to device indices */
+    ucc_cpu_vendor_t cpu_vendor;  /*< CPU vendor shared by all team members,
+                                      or UCC_CPU_VENDOR_UNKNOWN if the team is
+                                      CPU-heterogeneous. Used to keep config-file
+                                      tuning selection symmetric across ranks. */
+    ucc_cpu_model_t  cpu_model;   /*< CPU model shared by all team members,
+                                      or UCC_CPU_MODEL_UNKNOWN if heterogeneous */
 } ucc_topo_t;
 
 /* Initializes ctx level topo structure using addr_storage.
