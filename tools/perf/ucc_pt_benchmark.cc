@@ -202,6 +202,8 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
 {
     const bool    triggered  = config.triggered;
     const bool    persistent = config.persistent;
+    const bool    streaming  =
+        config.iteration_mode == UCC_PT_ITER_MODE_STREAMING;
     ucc_team_h    team       = comm->get_team();
     ucc_context_h ctx        = comm->get_context();
     ucc_status_t  st         = UCC_OK;
@@ -265,7 +267,9 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
             time += f - s;
         }
         args.root = (args.root + config.root_shift) % comm->get_size();
-        UCCCHECK_GOTO(comm->barrier(), exit_err, st);
+        if (!streaming || (niter > 0 && i == nwarmup - 1)) {
+            UCCCHECK_GOTO(comm->barrier(), exit_err, st);
+        }
     }
 
     if (persistent) {
@@ -376,6 +380,9 @@ void ucc_pt_benchmark::print_header()
                   << "  small" << config.n_iter_small << std::endl
                   << std::left << std::setw(24)
                   << "  large" << config.n_iter_large << std::endl;
+        std::cout << std::left << std::setw(24)
+                  << "Iteration mode:"
+                  << ucc_pt_iter_mode_str(config.iteration_mode) << std::endl;
         std::cout.copyfmt(iostate);
         std::cout << std::endl;
         std::cout << std::setw(12) << "Count"
