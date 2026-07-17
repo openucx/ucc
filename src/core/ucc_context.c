@@ -1577,13 +1577,14 @@ ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_mode_t mode,
 
 ucc_status_t ucc_mem_unmap(ucc_mem_map_mem_h *memh)
 {
+    ucc_status_t              status = UCC_OK;
     ucc_context_t            *ctx;
-    ucc_status_t              status;
     ucc_mem_map_memh_t       *lmemh;
     ucc_tl_lib_t             *tl_lib;
     int                       i;
     int                       j;
     ucc_config_names_array_t *tls;
+    ucc_status_t              s;
 
     if (!memh) {
         ucc_warn("unable to free NULL memh");
@@ -1598,11 +1599,9 @@ ucc_status_t ucc_mem_unmap(ucc_mem_map_mem_h *memh)
     lmemh  = *memh;
     ctx    = (ucc_context_t *)lmemh->context;
     tls    = &ctx->all_tls;
-    status = UCC_OK;
     for (i = 0; i < ctx->n_tl_ctx; i++) {
         for (j = 0; j < lmemh->num_tls; j++) {
             if (strcmp(lmemh->tl_h[j].tl_name, tls->names[i]) == 0) {
-                ucc_status_t s;
                 tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
                 s = tl_lib->iface->context.mem_unmap(
                     (const ucc_base_context_t *)ctx->tl_ctx[i], lmemh->mode,

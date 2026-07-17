@@ -758,6 +758,7 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, ucc_mem_map_m
         if (UCC_OK != ucc_status) {
             tl_error(ctx->super.super.lib, "failed to export memory handles");
             ucc_free(m_data);
+            tl_h->tl_data = NULL;
             return ucc_status;
         }
     } else if (mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
