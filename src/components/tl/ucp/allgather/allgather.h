@@ -100,4 +100,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
 ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
     ucc_coll_task_t **task_h, ucc_kn_radix_t radix);
+
+ucc_status_t ucc_tl_ucp_allgather_knomial_parse_radices(
+    const char *value, ucc_rank_t team_size, ucc_kn_radix_t *radices,
+    uint8_t *nradices);
 #endif
