@@ -11,6 +11,7 @@ endif
 
 allgather =                        \
 	allgather/allgather.h          \
+	allgather/allgather_knomial_schedule.c \
 	allgather/allgather.c          \
 	allgather/allgather_ring.c     \
 	allgather/allgather_neighbor.c \
