@@ -144,6 +144,12 @@ gtest_LDFLAGS  += $(UCX_LDFLAGS)
 gtest_LDADD    += $(UCX_LIBS) $(UCX_LIBADD)
 endif
 
+if TL_UCP_ENABLED
+gtest_SOURCES +=                                                    \
+	coll/test_knomial_schedule.cc                                   \
+	$(top_srcdir)/src/components/tl/ucp/allgather/allgather_knomial_schedule.c
+endif
+
 noinst_HEADERS =                         \
 	common/gtest.h                       \
 	common/test.h                        \

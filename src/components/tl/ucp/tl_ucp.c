@@ -172,6 +172,13 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allgather_kn_radix),
      UCC_CONFIG_TYPE_UINT_RANGED},
 
+    {"ALLGATHER_KN_MIXED_RADICES", "",
+     "Optional exact mixed-radix schedule for knomial allgather, for example "
+     "4,4,6. Every radix must be at least 2 and their product must equal the "
+     "team size. Invalid schedules are rejected",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allgather_kn_mixed_radices),
+     UCC_CONFIG_TYPE_STRING},
+
     {"BCAST_KN_RADIX", "4", "Radix of the recursive-knomial bcast algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_kn_radix),
      UCC_CONFIG_TYPE_UINT},

@@ -17,6 +17,9 @@
 static inline
 ucc_rank_t ucc_kn_compute_step_radix(ucc_knomial_pattern_t *p)
 {
+    if (p->is_mixed) {
+        return p->radix;
+    }
     int n_full = ucc_kn_pattern_n_full(p);
 
     return p->radix_pow * p->radix >= p->size ? (n_full > 1 ? n_full : p->radix)
@@ -270,6 +273,38 @@ ucc_kn_ag_pattern_init(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
     p->block_size   = p->radix_pow * radix;
     p->block_offset = ucc_knomial_pattern_loop_rank(p, rank) / p->block_size *
                       p->block_size;
+}
+
+static inline void ucc_kn_ag_pattern_reset(ucc_knomial_pattern_t *p)
+{
+    p->iteration    = 0;
+    p->radix        = p->radices[0];
+    p->radix_pow    = 1;
+    p->block_size   = p->radix;
+    p->block_offset = ucc_knomial_pattern_loop_rank(p, p->rank) /
+                      p->block_size * p->block_size;
+}
+
+static inline void ucc_kn_ag_pattern_init_mixed(
+    ucc_rank_t size, ucc_rank_t rank, size_t count,
+    const ucc_kn_radix_t *radices, uint8_t nradices, ucc_knomial_pattern_t *p)
+{
+    uint8_t i;
+
+    ucc_assert(nradices > 0 && nradices <= UCC_KN_MAX_RADIX_PHASES);
+    p->type      = KN_PATTERN_ALLGATHER;
+    p->n_iters   = nradices;
+    p->node_type = KN_NODE_BASE;
+    p->backward  = 0;
+    p->size      = size;
+    p->rank      = rank;
+    p->n_extra   = 0;
+    p->count     = count;
+    p->is_mixed  = 1;
+    for (i = 0; i < nradices; i++) {
+        p->radices[i] = radices[i];
+    }
+    ucc_kn_ag_pattern_reset(p);
 }
 
 static inline void
