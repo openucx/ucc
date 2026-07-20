@@ -10,6 +10,7 @@
 #include "tl_ucp_sendrecv.h"
 #include "tl_ucp_copy.h"
 #include "core/ucc_progress_queue.h"
+#include "allgather.h"
 #include "coll_patterns/sra_knomial.h"
 #include "tl_ucp_task.h"
 #include "ucc/api/ucc.h"
@@ -198,6 +199,7 @@ UCC_KN_PHASE_EXTRA:
             return;
         }
         ucc_kn_ag_pattern_next_iter(p);
+        radix = p->radix;
     }
 
     if (KN_NODE_PROXY == node_type) {
@@ -243,8 +245,11 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     task->allgather_kn.copy_task = NULL;
     task->allgather_kn.phase     = UCC_KN_PHASE_INIT;
     if (ct == UCC_COLL_TYPE_ALLGATHER) {
-        ucc_kn_ag_pattern_init(size, rank, radix, args->dst.info.count,
-                               &task->allgather_kn.p);
+        if (p->is_mixed) {
+            ucc_kn_ag_pattern_reset(p);
+        } else {
+            ucc_kn_ag_pattern_init(size, rank, radix, args->dst.info.count, p);
+        }
         offset = ucc_buffer_block_offset(args->dst.info.count, size, rank) *
                  ucc_dt_size(args->dst.info.datatype);
         rbuf   = args->dst.info.buffer;
@@ -306,9 +311,10 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
-ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
+static ucc_status_t ucc_tl_ucp_allgather_knomial_init_common(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
-    ucc_coll_task_t **task_h, ucc_kn_radix_t radix)
+    ucc_coll_task_t **task_h, ucc_kn_radix_t radix,
+    const ucc_kn_radix_t *radices, uint8_t nradices)
 {
     ucc_tl_ucp_team_t    *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_context_t *ctx     = UCC_TL_UCP_TEAM_CTX(tl_team);
@@ -323,7 +329,20 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
         task->subset.myrank = sbgp->group_rank;
         task->subset.map    = sbgp->map;
     }
-    task->allgather_kn.p.radix = radix;
+    if (nradices > 0) {
+        ucc_rank_t tsize = UCC_TL_TEAM_SIZE(tl_team);
+
+        ucc_kn_ag_pattern_init_mixed(
+            tsize,
+            task->subset.myrank,
+            GET_TOTAL_COUNT(&coll_args->args, tsize),
+            radices,
+            nradices,
+            &task->allgather_kn.p);
+    } else {
+        task->allgather_kn.p.radix    = radix;
+        task->allgather_kn.p.is_mixed = 0;
+    }
     if (!UCC_IS_INPLACE(coll_args->args)) {
         if (ctx->cfg.local_copy_type == UCC_TL_UCP_LOCAL_COPY_TYPE_EC) {
             task->super.flags         |= UCC_COLL_TASK_FLAG_EXECUTOR;
@@ -357,6 +376,14 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     return UCC_OK;
 }
 
+ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
+    ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
+    ucc_coll_task_t **task_h, ucc_kn_radix_t radix)
+{
+    return ucc_tl_ucp_allgather_knomial_init_common(
+        coll_args, team, task_h, radix, NULL, 0);
+}
+
 ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
                                                ucc_base_team_t      *team,
                                                ucc_coll_task_t     **task_h)
@@ -367,9 +394,40 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_memory_type_t  mtype   = GET_MT(&coll_args->args);
     size_t             count   = GET_TOTAL_COUNT(&coll_args->args, tsize);
     ucc_datatype_t     dtype   = GET_DT(&coll_args->args);
+    size_t             msgsize = count * ucc_dt_size(dtype);
     ucc_kn_radix_t     radix;
+    ucc_kn_radix_t     radices[UCC_KN_MAX_RADIX_PHASES];
+    uint8_t            nradices = 0;
+    ucc_status_t       status;
 
     radix = ucc_tl_ucp_get_knomial_radix(tl_team, count, dtype, mtype, p, 0);
+    if (coll_args->args.coll_type != UCC_COLL_TYPE_ALLGATHER) {
+        return ucc_tl_ucp_allgather_knomial_init_r(
+            coll_args, team, task_h, radix);
+    }
 
-    return ucc_tl_ucp_allgather_knomial_init_r(coll_args, team, task_h, radix);
+    if (tl_team->cfg.allgather_kn_mixed_radices != NULL &&
+        tl_team->cfg.allgather_kn_mixed_radices[0] != '\0') {
+        if (!strcmp(tl_team->cfg.allgather_kn_mixed_radices, "auto")) {
+            ucc_tl_ucp_allgather_knomial_select_radices(
+                tsize, msgsize, &radix, radices, &nradices);
+        } else {
+            status = ucc_tl_ucp_allgather_knomial_parse_radices(
+                tl_team->cfg.allgather_kn_mixed_radices,
+                tsize,
+                radices,
+                &nradices);
+            if (status != UCC_OK) {
+                tl_error(
+                    UCC_TL_TEAM_LIB(tl_team),
+                    "invalid ALLGATHER_KN_MIXED_RADICES '%s' for team size %u",
+                    tl_team->cfg.allgather_kn_mixed_radices,
+                    tsize);
+                return status;
+            }
+        }
+    }
+
+    return ucc_tl_ucp_allgather_knomial_init_common(
+        coll_args, team, task_h, radix, radices, nradices);
 }
