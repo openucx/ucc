@@ -394,6 +394,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_memory_type_t  mtype   = GET_MT(&coll_args->args);
     size_t             count   = GET_TOTAL_COUNT(&coll_args->args, tsize);
     ucc_datatype_t     dtype   = GET_DT(&coll_args->args);
+    size_t             msgsize = count * ucc_dt_size(dtype);
     ucc_kn_radix_t     radix;
     ucc_kn_radix_t     radices[UCC_KN_MAX_RADIX_PHASES];
     uint8_t            nradices = 0;
@@ -407,15 +408,23 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
 
     if (tl_team->cfg.allgather_kn_mixed_radices != NULL &&
         tl_team->cfg.allgather_kn_mixed_radices[0] != '\0') {
-        status = ucc_tl_ucp_allgather_knomial_parse_radices(
-            tl_team->cfg.allgather_kn_mixed_radices, tsize, radices, &nradices);
-        if (status != UCC_OK) {
-            tl_error(
-                UCC_TL_TEAM_LIB(tl_team),
-                "invalid ALLGATHER_KN_MIXED_RADICES '%s' for team size %u",
+        if (!strcmp(tl_team->cfg.allgather_kn_mixed_radices, "auto")) {
+            ucc_tl_ucp_allgather_knomial_select_radices(
+                tsize, msgsize, &radix, radices, &nradices);
+        } else {
+            status = ucc_tl_ucp_allgather_knomial_parse_radices(
                 tl_team->cfg.allgather_kn_mixed_radices,
-                tsize);
-            return status;
+                tsize,
+                radices,
+                &nradices);
+            if (status != UCC_OK) {
+                tl_error(
+                    UCC_TL_TEAM_LIB(tl_team),
+                    "invalid ALLGATHER_KN_MIXED_RADICES '%s' for team size %u",
+                    tl_team->cfg.allgather_kn_mixed_radices,
+                    tsize);
+                return status;
+            }
         }
     }
 
