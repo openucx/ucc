@@ -44,9 +44,9 @@ ucc_tl_ucp_allreduce_ring_start(ucc_coll_task_t *task)
          * Copy src to dst before starting reduce-scatter.
          *
          * Both sub-collectives run in-place on dst so each rank's reduced
-          * segment lands at ucc_buffer_block_offset(count, tsize, rank) (equal
-          * blocks with remainder distributed to leading ranks).  The source
-          * data must already reside in dst before the pipeline starts.
+         * segment lands at ucc_buffer_block_offset(count, tsize, rank) (equal
+         * blocks with remainder distributed to leading ranks).  The source
+         * data must already reside in dst before the pipeline starts.
          *
          * Performance trade-off: this adds one full-buffer memory pass per
          * out-of-place call.  On large counts or high-latency memory types

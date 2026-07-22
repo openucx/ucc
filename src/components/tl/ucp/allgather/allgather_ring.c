@@ -62,14 +62,16 @@ void ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
         send_offset = ucc_buffer_block_offset(count, tsize, sblock) * dt_size;
         recv_size   = ucc_buffer_block_count(count, tsize, rblock) * dt_size;
         recv_offset = ucc_buffer_block_offset(count, tsize, rblock) * dt_size;
-        buf = PTR_OFFSET(rbuf, send_offset);
+        buf         = PTR_OFFSET(rbuf, send_offset);
         UCPCHECK_GOTO(
             ucc_tl_ucp_send_nb(buf, send_size, rmem, sendto, team, task),
-            task, out);
+            task,
+            out);
         buf = PTR_OFFSET(rbuf, recv_offset);
         UCPCHECK_GOTO(
             ucc_tl_ucp_recv_nb(buf, recv_size, rmem, recvfrom, team, task),
-            task, out);
+            task,
+            out);
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             return;
         }
@@ -101,12 +103,12 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-        block        = task->allgather_ring.get_send_block(&task->subset,
-                                                           trank, tsize, 0);
+        block = task->allgather_ring.get_send_block(
+            &task->subset, trank, tsize, 0);
         block_size   = ucc_buffer_block_count(count, tsize, block) * dt_size;
         block_offset = ucc_buffer_block_offset(count, tsize, block) * dt_size;
-        status = ucc_mc_memcpy(PTR_OFFSET(rbuf, block_offset),
-                               sbuf, block_size, rmem, smem);
+        status       = ucc_mc_memcpy(
+            PTR_OFFSET(rbuf, block_offset), sbuf, block_size, rmem, smem);
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }
