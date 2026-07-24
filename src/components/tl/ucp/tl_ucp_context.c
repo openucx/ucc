@@ -910,9 +910,13 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
 
 failed_alloc_buffer:
     ucp_rkey_buffer_release(data->rinfo.packed_key);
+    data->rinfo.packed_key     = NULL;
+    data->rinfo.packed_key_len = 0;
 failed_rkey_pack:
     if (data->packed_memh) {
         ucp_memh_buffer_release(data->packed_memh, NULL);
+        data->packed_memh     = NULL;
+        data->packed_memh_len = 0;
     }
     return ucc_status;
 }

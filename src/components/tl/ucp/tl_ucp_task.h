@@ -47,8 +47,6 @@ typedef struct {
     size_t              dst_pack_size;
     size_t              max_individual_pack_size;
     size_t              exchange_size;
-    ucc_mem_map_memh_t *src_memh_pack;
-    ucc_mem_map_memh_t *dst_memh_pack;
     void               *exchange_buffer;
     ucc_mem_map_memh_t *src_memh_local;
     ucc_mem_map_memh_t *dst_memh_local;

@@ -6,6 +6,7 @@
 
 #include "tl_ucp.h"
 #include "tl_ucp_coll.h"
+#include "tl_ucp_ep.h"
 #include "components/mc/ucc_mc.h"
 #include "core/ucc_team.h"
 #include "utils/ucc_math.h"
@@ -252,66 +253,61 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_init,
     return status;
 }
 
-static inline ucc_status_t dynamic_segment_alloc_seg(ucc_mem_map_memh_t **memh,
-                                                     size_t packed_size)
-{
-    ucc_mem_map_memh_t *lmemh;
+/* Explicit on-wire representation of an exported dynamic segment.  Only
+ * serializable scalar fields cross the wire -- no process-local pointers
+ * (context/tl_h/tl_data), so the format is self-contained and unambiguous.
+ * The receiver reconstructs a full ucc_mem_map_memh_t from these bytes in
+ * dynamic_segment_import_memory_handles().
+ *
+ * payload[] mirrors the ucc_mem_map_memh_t pack_buffer layout that
+ * resolve_p2p_by_memh() consumes on the receiver:
+ *   [ TL name (UCC_MEM_MAP_TL_NAME_LEN) | packed rkey size | packed rkey ] */
+typedef struct ucc_tl_ucp_dyn_seg_wire_t {
+    uint64_t address;      /* base VA of the exported segment (sender-local) */
+    uint64_t len;          /* segment length in bytes                        */
+    uint64_t payload_size; /* number of payload bytes that follow            */
+    char     tl_name[UCC_MEM_MAP_TL_NAME_LEN]; /* owning TL, e.g. "ucp"      */
+    char     payload[0];
+} ucc_tl_ucp_dyn_seg_wire_t;
 
-    lmemh = ucc_calloc(1, sizeof(ucc_mem_map_memh_t) + packed_size, "packed_memh");
-    if (!lmemh) {
-        return UCC_ERR_NO_MEMORY;
-    }
-    lmemh->tl_h = ucc_calloc(1, sizeof(ucc_mem_map_tl_t), "packed_tl_h");
-    if (!lmemh->tl_h) {
-        ucc_free(lmemh);
-        return UCC_ERR_NO_MEMORY;
-    }
-    *memh = lmemh;
-    return UCC_OK;
-}
+/* Fixed per-rank overhead of the wire payload (TL name + packed rkey size). */
+#define UCC_TL_UCP_DYN_SEG_PAYLOAD_HDR (UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t))
 
-static inline void dynamic_segment_memh_pack(ucc_context_h              ctx,
-                                             ucc_tl_ucp_dyn_seg_args_t *args,
+static inline void dynamic_segment_memh_pack(ucc_tl_ucp_dyn_seg_args_t *args,
                                              int                        is_src)
 {
-    ucc_mem_map_memh_t *memh;
-    void               *pack_buffer;
-    size_t              pack_size;
-    void               *address;
-    size_t              len;
+    ucc_tl_ucp_dyn_seg_wire_t *wire = args->exchange_buffer;
+    ucc_mem_map_memh_t        *local;
+    void                      *pack_buffer;
+    size_t                     pack_size;
+    char                      *payload;
 
     if (is_src) {
         pack_buffer = args->src_pack_buffer;
         pack_size   = args->src_pack_size;
-        address     = args->src_memh_local->address;
-        len         = args->src_memh_local->len;
-        memh        = args->src_memh_pack;
+        local       = args->src_memh_local;
     } else {
         pack_buffer = args->dst_pack_buffer;
         pack_size   = args->dst_pack_size;
-        address     = args->dst_memh_local->address;
-        len         = args->dst_memh_local->len;
-        memh        = args->dst_memh_pack;
+        local       = args->dst_memh_local;
     }
-    /* Pack into exchange buffer.  pack_buffer layout:
+
+    /* Serialize only scalar, address-space-independent fields. */
+    wire->address      = (uint64_t)local->address;
+    wire->len          = local->len;
+    wire->payload_size = UCC_TL_UCP_DYN_SEG_PAYLOAD_HDR + pack_size;
+    memcpy(wire->tl_name, local->tl_h->tl_name, UCC_MEM_MAP_TL_NAME_LEN);
+
+    /* Serialize the packed rkey into the receiver-facing pack_buffer layout:
      *   [0 .. TL_NAME_LEN)              : TL name (null-padded)
      *   [TL_NAME_LEN .. +sizeof(size_t)): packed rkey size
      *   [TL_NAME_LEN + sizeof(size_t).. ): packed rkey data             */
-    strncpy(memh->pack_buffer, "ucp", UCC_MEM_MAP_TL_NAME_LEN - 1);
-    memcpy(PTR_OFFSET(memh->pack_buffer, UCC_MEM_MAP_TL_NAME_LEN), &pack_size,
+    payload = wire->payload;
+    strncpy(payload, "ucp", UCC_MEM_MAP_TL_NAME_LEN - 1);
+    memcpy(PTR_OFFSET(payload, UCC_MEM_MAP_TL_NAME_LEN), &pack_size,
            sizeof(size_t));
-    memcpy(PTR_OFFSET(memh->pack_buffer, UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t)),
+    memcpy(PTR_OFFSET(payload, UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t)),
            pack_buffer, pack_size);
-    if (!is_src) {
-        memcpy(memh->tl_h, args->dst_memh_local->tl_h, sizeof(ucc_mem_map_tl_t));
-    } else {
-        memcpy(memh->tl_h, args->src_memh_local->tl_h, sizeof(ucc_mem_map_tl_t));
-    }
-    memh->mode    = UCC_MEM_MAP_MODE_EXPORT;
-    memh->context = ctx;
-    memh->address = address;
-    memh->len     = len;
-    memh->num_tls = 1;
 }
 
 static ucc_status_t
@@ -418,9 +414,10 @@ dynamic_segment_calculate_sizes_test(ucc_tl_ucp_dyn_seg_args_t *args,
             args->max_individual_pack_size = args->global_sizes[i];
         }
     }
-    /* Total per-rank slot: memh struct + TL name + packed-size field + rkey data. */
-    args->exchange_size = sizeof(ucc_mem_map_memh_t) + UCC_MEM_MAP_TL_NAME_LEN +
-                          sizeof(size_t) + args->max_individual_pack_size;
+    /* Total per-rank slot: wire header + TL name + packed-size field + rkey data. */
+    args->exchange_size = sizeof(ucc_tl_ucp_dyn_seg_wire_t) +
+                          UCC_TL_UCP_DYN_SEG_PAYLOAD_HDR +
+                          args->max_individual_pack_size;
     ucc_service_coll_finalize(*scoll_req);
     ucc_free(args->global_sizes);
     args->global_sizes = NULL;
@@ -431,26 +428,12 @@ dynamic_segment_calculate_sizes_test(ucc_tl_ucp_dyn_seg_args_t *args,
 static ucc_status_t
 dynamic_segment_allocate_buffers(ucc_tl_ucp_dyn_seg_args_t *args)
 {
-    ucc_tl_ucp_team_t *tl_team    = UCC_TL_UCP_TASK_TEAM(args->task);
-    size_t             pack_slots  = args->max_individual_pack_size +
-                                     UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t);
-    ucc_status_t       status;
+    ucc_tl_ucp_team_t *tl_team = UCC_TL_UCP_TASK_TEAM(args->task);
 
-    status = dynamic_segment_alloc_seg(&args->src_memh_pack, pack_slots);
-    if (UCC_OK != status) {
-        tl_error(UCC_TASK_LIB(args->task), "failed to allocate src_memh_pack");
-        return status;
-    }
-    status = dynamic_segment_alloc_seg(&args->dst_memh_pack, pack_slots);
-    if (UCC_OK != status) {
-        tl_error(UCC_TASK_LIB(args->task), "failed to allocate dst_memh_pack");
-        goto err_free_src;
-    }
     args->exchange_buffer = ucc_calloc(1, args->exchange_size, "exchange buffer");
     if (!args->exchange_buffer) {
         tl_error(UCC_TASK_LIB(args->task), "failed to allocate exchange buffer");
-        status = UCC_ERR_NO_MEMORY;
-        goto err_free_dst;
+        return UCC_ERR_NO_MEMORY;
     }
     args->task->dynamic_segments.global_buffer =
         ucc_calloc(UCC_TL_TEAM_SIZE(tl_team), args->exchange_size, "global buffer");
@@ -458,20 +441,9 @@ dynamic_segment_allocate_buffers(ucc_tl_ucp_dyn_seg_args_t *args)
         tl_error(UCC_TASK_LIB(args->task), "failed to allocate global buffer");
         ucc_free(args->exchange_buffer);
         args->exchange_buffer = NULL;
-        status                = UCC_ERR_NO_MEMORY;
-        goto err_free_dst;
+        return UCC_ERR_NO_MEMORY;
     }
     return UCC_OK;
-
-err_free_dst:
-    ucc_free(args->dst_memh_pack->tl_h);
-    ucc_free(args->dst_memh_pack);
-    args->dst_memh_pack = NULL;
-err_free_src:
-    ucc_free(args->src_memh_pack->tl_h);
-    ucc_free(args->src_memh_pack);
-    args->src_memh_pack = NULL;
-    return status;
 }
 
 static ucc_status_t
@@ -479,28 +451,21 @@ dynamic_segment_pack_and_exchange_data_start(ucc_tl_ucp_dyn_seg_args_t *args,
                                              ucc_service_coll_req_t **scoll_req)
 {
     ucc_tl_ucp_team_t    *tl_team   = UCC_TL_UCP_TASK_TEAM(args->task);
-    ucc_tl_ucp_context_t *ctx       = UCC_TL_UCP_TEAM_CTX(tl_team);
     ucc_team_t           *core_team = UCC_TL_CORE_TEAM(tl_team);
     ucc_subset_t          subset;
     ucc_status_t          status;
-    size_t                copy_size;
 
     subset.map    = UCC_TL_TEAM_MAP(tl_team);
     subset.myrank = UCC_TL_TEAM_RANK(tl_team);
 
-    /* Include outer TL header (name + size) in the copy size in addition to memh struct */
-    copy_size = sizeof(ucc_mem_map_memh_t) + UCC_MEM_MAP_TL_NAME_LEN +
-                sizeof(size_t);
+    /* Serialize this rank's exported handle straight into the exchange buffer
+     * as an explicit wire struct (no in-memory memh pointers leak over). */
     if (args->task->dynamic_segments.alg == UCC_TL_UCP_ALLTOALL_ONESIDED_GET) {
         /* GET: each rank shares its src handle so peers can GET from it */
-        dynamic_segment_memh_pack((ucc_context_h)&ctx->super.super, args, DYN_SEG_SRC);
-        copy_size += args->src_pack_size;
-        memcpy(args->exchange_buffer, args->src_memh_pack, copy_size);
+        dynamic_segment_memh_pack(args, DYN_SEG_SRC);
     } else {
         /* PUT: each rank shares its dst handle so peers can PUT into it */
-        dynamic_segment_memh_pack((ucc_context_h)&ctx->super.super, args, DYN_SEG_DST);
-        copy_size += args->dst_pack_size;
-        memcpy(args->exchange_buffer, args->dst_memh_pack, copy_size);
+        dynamic_segment_memh_pack(args, DYN_SEG_DST);
     }
     /* Allgather the packed memory handles */
     status = ucc_service_allgather(core_team, args->exchange_buffer,
@@ -560,18 +525,37 @@ dynamic_segment_import_memory_handles(ucc_tl_ucp_dyn_seg_args_t *args)
         return UCC_ERR_NO_MEMORY;
     }
 
-    /* Import memory handles for each rank using ucc_tl_ucp_mem_map */
+    /* Reconstruct a local memory handle for each rank from the serialized
+       wire bytes.  global[i] is an independently-allocated ucc_mem_map_memh_t
+       (NOT an interior pointer into global_buffer); it owns its tl_h and its
+       copy of the pack_buffer, and is released in finalize()/on error below. */
     for (i = 0; i < UCC_TL_TEAM_SIZE(tl_team); i++) {
-        /* Each rank's data in global buffer contains only:
-           - dst_memh_pack: sizeof(ucc_mem_map_memh_t) + max_individual_pack_size + sizeof(size_t) * 2
-        */
-        offset    = i * args->exchange_size;
-        global[i] =
-        (ucc_mem_map_memh_t *)PTR_OFFSET(
-                args->task->dynamic_segments.global_buffer, offset);
-        global[i]->tl_h =
-            ucc_calloc(1, sizeof(ucc_mem_map_tl_t), "global tl_h");
-        if (!global[i]->tl_h) {
+        ucc_tl_ucp_dyn_seg_wire_t *wire;
+        ucc_mem_map_memh_t        *memh;
+
+        offset = i * args->exchange_size;
+        wire   = PTR_OFFSET(args->task->dynamic_segments.global_buffer, offset);
+
+        memh = ucc_calloc(1, sizeof(ucc_mem_map_memh_t) + wire->payload_size,
+                          "imported memh");
+        if (!memh) {
+            tl_error(UCC_TASK_LIB(args->task),
+                     "failed to allocate imported memh for rank %d", i);
+            status = UCC_ERR_NO_MEMORY;
+            goto out;
+        }
+        global[i] = memh;
+        /* Populate all pointer/scalar fields locally; nothing here is trusted
+           from the wire except the serialized address, length and rkey bytes. */
+        memh->mode    = UCC_MEM_MAP_MODE_IMPORT;
+        memh->context = (ucc_context_h)&ctx->super.super;
+        memh->address = (void *)wire->address;
+        memh->len     = wire->len;
+        memh->num_tls = 1;
+        memcpy(memh->pack_buffer, wire->payload, wire->payload_size);
+
+        memh->tl_h = ucc_calloc(1, sizeof(ucc_mem_map_tl_t), "global tl_h");
+        if (!memh->tl_h) {
             tl_error(UCC_TASK_LIB(args->task),
                     "failed to allocate global tl handles");
             status = UCC_ERR_NO_MEMORY;
@@ -580,14 +564,39 @@ dynamic_segment_import_memory_handles(ucc_tl_ucp_dyn_seg_args_t *args)
 
         status = ucc_tl_ucp_mem_map(
             &ctx->super.super, UCC_MEM_MAP_MODE_IMPORT,
-            global[i],
-            global[i]->tl_h);
+            memh,
+            memh->tl_h);
         if (status != UCC_OK) {
             tl_error(UCC_TASK_LIB(args->task),
                      "failed to import dst memory handle for rank %d ", i);
-            ucc_free(global[i]->tl_h);
-            global[i]->tl_h = NULL;
             goto out;
+        }
+        /* Validate remote key by unpacking immediately, so exchange-phase
+           failures are reported here rather than lazily during data access. */
+        {
+            ucp_ep_h    ep;
+            ucp_rkey_h  test_rkey;
+            void       *packed_rkey;
+            ucs_status_t ucs_status;
+
+            status = ucc_tl_ucp_get_ep(tl_team, i, &ep);
+            if (status != UCC_OK) {
+                tl_error(UCC_TASK_LIB(args->task),
+                         "failed to get EP for rank %d during import validation", i);
+                goto out;
+            }
+            packed_rkey = PTR_OFFSET(
+                memh->pack_buffer,
+                UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t) * 3);
+            ucs_status = ucp_ep_rkey_unpack(ep, packed_rkey, &test_rkey);
+            if (ucs_status != UCS_OK) {
+                status = ucs_status_to_ucc_status(ucs_status);
+                tl_error(UCC_TASK_LIB(args->task),
+                         "rkey validation failed for rank %d: %s", i,
+                         ucs_status_string(ucs_status));
+                goto out;
+            }
+            ucp_rkey_destroy(test_rkey);
         }
     }
 
@@ -601,13 +610,21 @@ dynamic_segment_import_memory_handles(ucc_tl_ucp_dyn_seg_args_t *args)
 
     return UCC_OK;
 out:
-    for (j = 0; j < i; j++) {
-        if (global[j]->tl_h) {
-            /* we need to unmap */
-            ucc_tl_ucp_mem_unmap(&ctx->super.super, UCC_MEM_MAP_MODE_IMPORT,
-                                 global[j]->tl_h);
+    /* Release every handle reconstructed so far, including the current partial
+       one at index i (global[i] is NULL if its allocation is what failed). */
+    for (j = 0; j <= i && j < (int)UCC_TL_TEAM_SIZE(tl_team); j++) {
+        if (!global[j]) {
+            continue;
         }
-        ucc_free(global[j]->tl_h);
+        if (global[j]->tl_h) {
+            /* tl_data is set only once mem_map succeeded; unmap needs it. */
+            if (global[j]->tl_h->tl_data) {
+                ucc_tl_ucp_mem_unmap(&ctx->super.super,
+                                     UCC_MEM_MAP_MODE_IMPORT, global[j]->tl_h);
+            }
+            ucc_free(global[j]->tl_h);
+        }
+        ucc_free(global[j]);
     }
     ucc_free(global);
     return status;
@@ -626,22 +643,6 @@ static void dynamic_segment_cleanup_buffers(ucc_tl_ucp_dyn_seg_args_t *args)
     if (args->dst_pack_buffer) {
         ucc_free(args->dst_pack_buffer);
         args->dst_pack_buffer = NULL;
-    }
-    if (args->src_memh_pack) {
-        if (args->src_memh_pack->tl_h) {
-            ucc_free(args->src_memh_pack->tl_h);
-            args->src_memh_pack->tl_h = NULL;
-        }
-        ucc_free(args->src_memh_pack);
-        args->src_memh_pack = NULL;
-    }
-    if (args->dst_memh_pack) {
-        if (args->dst_memh_pack->tl_h) {
-            ucc_free(args->dst_memh_pack->tl_h);
-            args->dst_memh_pack->tl_h = NULL;
-        }
-        ucc_free(args->dst_memh_pack);
-        args->dst_memh_pack = NULL;
     }
     if (args->exchange_buffer) {
         ucc_free(args->exchange_buffer);
@@ -799,6 +800,10 @@ err_cleanup:
 UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_finalize,
                         (task), ucc_tl_ucp_task_t *task)
 {
+    /* Idempotent: safe to call once per completed iteration. USE_DYN_SEG flag
+       is intentionally NOT cleared so destroy() and re-exchange paths still
+       function correctly. */
+
     ucc_tl_ucp_team_t    *team      = UCC_TL_UCP_TASK_TEAM(task);
     ucc_tl_ucp_context_t *ctx       = UCC_TL_UCP_TEAM_CTX(team);
     ucc_status_t          status    = UCC_OK;
@@ -810,9 +815,13 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_finalize,
         return UCC_OK;
     }
     if (task->dynamic_segments.src_global) {
+        /* Each global[i] is an independently-allocated imported handle that
+           owns its tl_h and its copy of the packed rkey bytes; free both. */
         for (i = 0; i < team_size; i++) {
-            if (task->dynamic_segments.src_global[i] &&
-                task->dynamic_segments.src_global[i]->tl_h) {
+            if (!task->dynamic_segments.src_global[i]) {
+                continue;
+            }
+            if (task->dynamic_segments.src_global[i]->tl_h) {
                 tmp = ucc_tl_ucp_mem_unmap(
                     &ctx->super.super, UCC_MEM_MAP_MODE_IMPORT,
                     task->dynamic_segments.src_global[i]->tl_h);
@@ -827,16 +836,21 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_finalize,
                 }
                 ucc_free(task->dynamic_segments.src_global[i]->tl_h);
                 task->dynamic_segments.src_global[i]->tl_h = NULL;
-                task->dynamic_segments.src_global[i] = NULL;
             }
+            ucc_free(task->dynamic_segments.src_global[i]);
+            task->dynamic_segments.src_global[i] = NULL;
         }
         ucc_free(task->dynamic_segments.src_global);
         task->dynamic_segments.src_global = NULL;
     }
     if (task->dynamic_segments.dst_global) {
+        /* Each global[i] is an independently-allocated imported handle that
+           owns its tl_h and its copy of the packed rkey bytes; free both. */
         for (i = 0; i < team_size; i++) {
-            if (task->dynamic_segments.dst_global[i] &&
-                task->dynamic_segments.dst_global[i]->tl_h) {
+            if (!task->dynamic_segments.dst_global[i]) {
+                continue;
+            }
+            if (task->dynamic_segments.dst_global[i]->tl_h) {
                 tmp = ucc_tl_ucp_mem_unmap(
                     &ctx->super.super, UCC_MEM_MAP_MODE_IMPORT,
                     task->dynamic_segments.dst_global[i]->tl_h);
@@ -851,13 +865,15 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_finalize,
                 }
                 ucc_free(task->dynamic_segments.dst_global[i]->tl_h);
                 task->dynamic_segments.dst_global[i]->tl_h = NULL;
-                task->dynamic_segments.dst_global[i] = NULL;
             }
+            ucc_free(task->dynamic_segments.dst_global[i]);
+            task->dynamic_segments.dst_global[i] = NULL;
         }
         ucc_free(task->dynamic_segments.dst_global);
         task->dynamic_segments.dst_global = NULL;
     }
-    /* Free global buffer */
+    /* Free the allgather receive buffer.  The imported handles no longer point
+       into it (each holds its own copy), so ordering here is not critical. */
     if (task->dynamic_segments.global_buffer) {
         ucc_free(task->dynamic_segments.global_buffer);
         task->dynamic_segments.global_buffer = NULL;
@@ -866,6 +882,13 @@ UCC_TL_UCP_PROFILE_FUNC(ucc_status_t, ucc_tl_ucp_coll_dynamic_segment_finalize,
      * They are released by ucc_tl_ucp_coll_dynamic_segment_destroy() when the
      * task is truly destroyed.  On the next start(), exchange_nb will detect
      * exchange_args == NULL and restart the exchange from scratch. */
+
+    /* Reset exchange state machine so that a subsequent start() restarts the
+       exchange from INIT, regardless of how exchange_args is handled. */
+    task->dynamic_segments.exchange_step = UCC_TL_UCP_DYN_SEG_EXCHANGE_STEP_INIT;
+    task->dynamic_segments.scoll_req_sizes = NULL;
+    task->dynamic_segments.scoll_req_data  = NULL;
+
     return status;
 }
 

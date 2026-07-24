@@ -57,6 +57,18 @@ static inline void alltoall_onesided_wait_completion(ucc_tl_ucp_task_t *task,
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_sched_start(ucc_coll_task_t *ctask)
 {
+    ucc_schedule_t *schedule = ucc_derived_of(ctask, ucc_schedule_t);
+    int             i;
+
+    /* Re-arm each subtask's dependency counter so the schedule can be
+     * re-posted for a persistent collective.  The plain ucc_schedule_start()
+     * only re-emits SCHEDULE_STARTED; unlike the pipelined schedule it does
+     * not reset n_deps_satisfied, so without this the SCHEDULE_STARTED /
+     * COMPLETED dependencies would never fire again on the second post and
+     * the schedule would hang. */
+    for (i = 0; i < schedule->n_tasks; i++) {
+        schedule->tasks[i]->n_deps_satisfied = 0;
+    }
     return ucc_schedule_start(ctask);
 }
 
@@ -126,10 +138,16 @@ void ucc_tl_ucp_alltoall_onesided_get_progress(ucc_coll_task_t *ctask)
         remote_rkeys = (ucc_mem_map_mem_h *)task->dynamic_segments.src_global;
     } else {
         local_h = ((TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-                   (TASK_ARGS(task).flags &
-                    UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL))
-                  ? TASK_ARGS(task).dst_memh.global_memh[grank]
-                  : TASK_ARGS(task).dst_memh.local_memh;
+                    (TASK_ARGS(task).flags &
+                     UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL))
+                   ? TASK_ARGS(task).dst_memh.global_memh[grank]
+                   : TASK_ARGS(task).dst_memh.local_memh;
+    }
+
+    if (ucc_unlikely((task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG) &&
+                     remote_rkeys == NULL)) {
+        task->super.status = UCC_OK;
+        goto out;
     }
 
     nelems   = TASK_ARGS(task).src.info.count;
@@ -202,6 +220,12 @@ void ucc_tl_ucp_alltoall_onesided_put_progress(ucc_coll_task_t *ctask)
                      UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL))
                    ? TASK_ARGS(task).src_memh.global_memh[grank]
                    : TASK_ARGS(task).src_memh.local_memh;
+    }
+
+    if (ucc_unlikely((task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG) &&
+                     dst_memh == NULL)) {
+        task->super.status = UCC_OK;
+        goto out;
     }
 
     if (nelems == 0) {
