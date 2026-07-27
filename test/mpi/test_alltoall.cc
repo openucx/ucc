@@ -62,6 +62,11 @@ TestAlltoall::TestAlltoall(ucc_test_team_t &_team, TestCaseParams &params) :
     args.dst.info.count       = single_rank_count * nprocs;
     args.dst.info.datatype    = dt;
     args.dst.info.mem_type    = mem_type;
+    if (!is_onesided) {
+        register_memhs(sbuf,
+                       inplace ? 0 : (size_t)single_rank_count * nprocs * ucc_dt_size(dt),
+                       rbuf, (size_t)single_rank_count * nprocs * ucc_dt_size(dt));
+    }
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }

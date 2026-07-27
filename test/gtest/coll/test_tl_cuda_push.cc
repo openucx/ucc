@@ -72,6 +72,10 @@ static bool exchange_dst_memh(
         if (ucc_mem_map(ctx_handles[r], UCC_MEM_MAP_MODE_EXPORT,
                         &params, &exp_sizes[r],
                         &export_handles[r]) != UCC_OK) {
+            for (int k = 0; k < r; k++) {
+                if (export_handles[k])
+                    ucc_mem_unmap(&export_handles[k]);
+            }
             return false;
         }
     }
@@ -82,7 +86,7 @@ static bool exchange_dst_memh(
 
         for (int i = 0; i < nprocs; i++) {
             if (i == r) {
-                /* push_init skips self; slot can hold the exported handle */
+                /* push_init doesn't import from self; reuse export pointer */
                 global_memh[r][i] = export_handles[i];
                 continue;
             }
@@ -90,7 +94,22 @@ static bool exchange_dst_memh(
             /* Copy exported bytes and import from rank r's context */
             size_t import_size = exp_sizes[i];
             void  *hbuf        = malloc(import_size);
-            if (!hbuf) return false;
+            if (!hbuf) {
+                for (int k = 0; k < r; k++) {
+                    if (!global_memh[k]) continue;
+                    for (int j = 0; j < nprocs; j++) {
+                        if (j == k) continue;
+                        if (global_memh[k][j])
+                            ucc_mem_unmap(&global_memh[k][j]);
+                    }
+                    delete[] global_memh[k];
+                }
+                for (int k = 0; k < nprocs; k++) {
+                    if (export_handles[k])
+                        ucc_mem_unmap(&export_handles[k]);
+                }
+                return false;
+            }
             memcpy(hbuf, export_handles[i], import_size);
 
             ucc_mem_map_mem_h    imp = (ucc_mem_map_mem_h)hbuf;
@@ -105,6 +124,24 @@ static bool exchange_dst_memh(
             if (ucc_mem_map(ctx_handles[r], UCC_MEM_MAP_MODE_IMPORT,
                             &params, &import_size, &imp) != UCC_OK) {
                 free(hbuf);
+                for (int k = 0; k < r; k++) {
+                    if (!global_memh[k]) continue;
+                    for (int j = 0; j < nprocs; j++) {
+                        if (j == k) continue;
+                        if (global_memh[k][j])
+                            ucc_mem_unmap(&global_memh[k][j]);
+                    }
+                    delete[] global_memh[k];
+                }
+                for (int k = 0; k < i; k++) {
+                    if ((k != r) && global_memh[r][k])
+                        ucc_mem_unmap(&global_memh[r][k]);
+                }
+                delete[] global_memh[r];
+                for (int k = 0; k < nprocs; k++) {
+                    if (export_handles[k])
+                        ucc_mem_unmap(&export_handles[k]);
+                }
                 return false;
             }
             global_memh[r][i] = imp;

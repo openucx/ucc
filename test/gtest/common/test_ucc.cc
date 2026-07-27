@@ -11,6 +11,15 @@ constexpr ucc_lib_params_t UccProcess::default_lib_params;
 constexpr ucc_context_params_t UccProcess::default_ctx_params;
 constexpr int UccJob::staticTeamSizes[];
 
+namespace {
+bool env_has(const ucc_job_env_t &v, const char *key) {
+    for (size_t i = 0; i < v.size(); ++i) {
+        if (v[i].first == key) return true;
+    }
+    return false;
+}
+}
+
 UccProcess::UccProcess(int _job_rank, const ucc_lib_params_t &lib_params,
                        const ucc_context_params_t &_ctx_params)
 {
@@ -276,17 +285,23 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
 
 {
     ucc_job_env_t env_bkp;
+    std::vector<std::string> unset_vars;
     char *var;
 
-    /* NCCL TL is disabled since it currently can not support non-blocking
-       team creation. */
-    vars.push_back({"UCC_TL_NCCL_TUNE", "0"});
-    vars.push_back({"UCC_TL_RCCL_TUNE", "0"});
-    /* CUDA TL is disabled since cuda context is not initialized in threads. */
-    vars.push_back({"UCC_TL_CUDA_TUNE", "0"});
-    /* GDR is temporarily disabled due to known issue that may result
-       in a hang in the destruction flow */
-    vars.push_back({"UCX_IB_GPU_DIRECT_RDMA", "no"});
+    /*
+     * Disable NCCL/RCCL/CUDA TLs and GDR by default since they cannot support
+     * non-blocking team creation or cuda context in threads.  Only append the
+     * disabling entry if the caller did not already provide a value for that key
+     * (e.g., push tests need CUDA TL enabled).
+     */
+    if (!env_has(vars, "UCC_TL_NCCL_TUNE"))
+        vars.push_back({"UCC_TL_NCCL_TUNE", "0"});
+    if (!env_has(vars, "UCC_TL_RCCL_TUNE"))
+        vars.push_back({"UCC_TL_RCCL_TUNE", "0"});
+    if (!env_has(vars, "UCC_TL_CUDA_TUNE"))
+        vars.push_back({"UCC_TL_CUDA_TUNE", "0"});
+    if (!env_has(vars, "UCX_IB_GPU_DIRECT_RDMA"))
+        vars.push_back({"UCX_IB_GPU_DIRECT_RDMA", "no"});
 
     for (auto &v : vars) {
         var = std::getenv(v.first.c_str());
@@ -294,6 +309,8 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
             /* found env - back it up for later restore
                after processes creation */
             env_bkp.push_back(ucc_env_var_t(v.first, var));
+        } else {
+            unset_vars.push_back(v.first);
         }
         setenv(v.first.c_str(), v.second.c_str(), 1);
     }
@@ -305,6 +322,9 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
     for (auto &v : env_bkp) {
         /*restore original env */
         setenv(v.first.c_str(), v.second.c_str(), 1);
+    }
+    for (size_t i = 0; i < unset_vars.size(); i++) {
+        unsetenv(unset_vars[i].c_str());
     }
 }
 
