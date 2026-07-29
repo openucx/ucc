@@ -1364,6 +1364,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     int                       i;
     int                       tls;
     int                       tlh_index;
+    int                       n_buffers;
 
     if (mode != UCC_MEM_MAP_MODE_EXPORT_OFFLOAD && !params) {
         ucc_error("params cannot be NULL");
@@ -1556,20 +1557,29 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     ucc_free(packed_buffers);
     return UCC_OK;
 failed_pack:
-    for (int j = 0; j < i; j++) {
+    /* buffers are indexed by tlh_index, which may differ from the tl ctx
+       index, so free the whole (calloc'd) array */
+    n_buffers = ucc_max(ctx->n_tl_ctx, (int)local_memh->num_tls);
+    for (int j = 0; j < n_buffers; j++) {
         ucc_free(packed_buffers[j]);
     }
+    ucc_free(packed_buffers);
     i = ctx->n_tl_ctx;
 failed_mem_map:
+    if (mode == UCC_MEM_MAP_MODE_EXPORT_OFFLOAD) {
+        /* no memory was mapped by this call and local_memh is owned by the
+           caller: unmapping here would tear down the caller's imported
+           mappings and free a handle we do not own. Leave *memh alone. */
+        *memh_size = 0;
+        return status;
+    }
     for (int j = 0; j < i; j++) {
         tl_lib = ucc_derived_of(ctx->tl_ctx[j]->super.lib, ucc_tl_lib_t);
         tl_lib->iface->context.mem_unmap(
             (const ucc_base_context_t *)ctx->tl_ctx[j],
             mode, &local_memh->tl_h[j]);
     }
-    if (mode == UCC_MEM_MAP_MODE_EXPORT) {
-        ucc_free(local_memh->tl_h);
-    }
+    ucc_free(local_memh->tl_h);
     ucc_free(local_memh);
     *memh      = NULL;
     *memh_size = 0;
