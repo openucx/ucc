@@ -59,3 +59,10 @@ ucc_status_t ucc_cl_basic_coll_init(ucc_base_coll_args_t *coll_args,
 ucc_status_t ucc_cl_basic_team_get_scores(ucc_base_team_t   *cl_team,
                                           ucc_coll_score_t **score);
 UCC_CL_IFACE_DECLARE(basic, BASIC);
+
+__attribute__((constructor)) static void cl_basic_iface_init(void)
+{
+    /* Wire update_id (left NULL by UCC_BASE_IFACE_DECLARE): CL/BASIC holds UCP
+       TL teams whose tag domain must be re-seated on id change. */
+    ucc_cl_basic.super.team.update_id = ucc_cl_basic_team_update_id;
+}

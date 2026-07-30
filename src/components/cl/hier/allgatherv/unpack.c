@@ -72,7 +72,7 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
     ucc_rank_t                 *node_leaders      = NULL;
     ucc_sbgp_t                 *all_nodes         = NULL;
     ucc_sbgp_t                 *node_leaders_sbgp = NULL;
-    ucc_topo_t                 *topo              = task->team->params.team->topo;
+    ucc_topo_t                 *topo = UCC_TEAM_TOPO(task->team->params.team);
     ucc_ee_executor_t          *exec;
     ucc_status_t                status;
     ucc_rank_t                  i;

@@ -47,13 +47,13 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     ucc_tl_lib_t              *tl_lib;
     ucc_base_lib_attr_t        attr;
 
-    if (!params->team->topo) {
+    if (!UCC_TEAM_TOPO(params->team)) {
         cl_debug(cl_context->lib,
                 "can't create hier team without topology data");
         return UCC_ERR_INVALID_PARAM;
     }
 
-    if (ucc_topo_is_single_node(params->team->topo)) {
+    if (ucc_topo_is_single_node(UCC_TEAM_TOPO(params->team))) {
         cl_debug(cl_context->lib, "skipping single node team");
         return UCC_ERR_INVALID_PARAM;
     }
@@ -65,7 +65,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
         hs = &self->sbgps[i];
         if (hs->state == UCC_HIER_SBGP_ENABLED) {
-            hs->sbgp = ucc_topo_get_sbgp(params->team->topo, hs->sbgp_type);
+            hs->sbgp = ucc_topo_get_sbgp(
+                UCC_TEAM_TOPO(params->team), hs->sbgp_type);
             if (hs->sbgp->status != UCC_SBGP_ENABLED) {
                 /* SBGP of that type either not exists or the calling process
                  * is not part of subgroup
@@ -192,6 +193,27 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_hier_team_t)
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_cl_hier_team_t, ucc_base_team_t);
 UCC_CLASS_DEFINE(ucc_cl_hier_team_t, ucc_cl_team_t);
+
+void ucc_cl_hier_team_update_id(ucc_base_team_t *cl_team, uint16_t id)
+{
+    ucc_cl_hier_team_t *team = ucc_derived_of(cl_team, ucc_cl_hier_team_t);
+    ucc_hier_sbgp_t    *hs;
+    ucc_tl_team_t      *tl;
+    int                 s, t;
+
+    /* Re-seat every per-sbgp TL team's tag domain to the new core team id.
+       HIER nests TL teams per subgroup (sbgps[].tl_teams[]); only UCP TLs
+       expose scoll.update_id, others are skipped. */
+    for (s = 0; s < UCC_HIER_SBGP_LAST; s++) {
+        hs = &team->sbgps[s];
+        for (t = 0; t < hs->n_tls; t++) {
+            tl = hs->tl_teams[t];
+            if (tl && UCC_TL_TEAM_IFACE(tl)->scoll.update_id) {
+                UCC_TL_TEAM_IFACE(tl)->scoll.update_id(&tl->super, id);
+            }
+        }
+    }
+}
 
 ucc_status_t ucc_cl_hier_team_destroy(ucc_base_team_t *cl_team)
 {

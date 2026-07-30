@@ -145,8 +145,8 @@ ucc_cl_hier_bcast_2step_init_schedule(ucc_base_coll_args_t *coll_args,
 
     if (SBGP_ENABLED(cl_team, NODE)) {
         args.args.root = root_on_local_node
-            ? find_root_node_rank(root, cl_team)
-            : core_team->topo->node_leader_rank_id;
+                             ? find_root_node_rank(root, cl_team)
+                             : UCC_TEAM_TOPO(core_team)->node_leader_rank_id;
         status =
             ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]);
         if (ucc_unlikely(UCC_OK != status)) {

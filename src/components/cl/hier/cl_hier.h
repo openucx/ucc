@@ -124,6 +124,8 @@ ucc_status_t ucc_cl_hier_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t      *team,
                                    ucc_coll_task_t     **task);
 
+void         ucc_cl_hier_team_update_id(ucc_base_team_t *cl_team, uint16_t id);
+
 #define UCC_CL_HIER_TEAM_CTX(_team)                                            \
     (ucc_derived_of((_team)->super.super.context, ucc_cl_hier_context_t))
 

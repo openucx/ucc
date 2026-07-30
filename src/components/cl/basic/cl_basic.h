@@ -52,6 +52,8 @@ typedef struct ucc_cl_basic_team {
 UCC_CLASS_DECLARE(ucc_cl_basic_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
+void ucc_cl_basic_team_update_id(ucc_base_team_t *cl_team, uint16_t id);
+
 #define UCC_CL_BASIC_TEAM_CTX(_team)                                           \
     (ucc_derived_of((_team)->super.super.context, ucc_cl_basic_context_t))
 

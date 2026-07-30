@@ -54,7 +54,7 @@ static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
     ucc_assert(team_rank < UCC_CL_TEAM_SIZE(cl_team));
     ucc_assert(SBGP_EXISTS(cl_team, NODE_LEADERS));
 
-    status = ucc_topo_get_node_leaders(core_team->topo, &node_leaders);
+    status = ucc_topo_get_node_leaders(UCC_TEAM_TOPO(core_team), &node_leaders);
     if (UCC_OK != status) {
         cl_error(team->context->lib, "Could not get node leaders");
         return status;
@@ -69,7 +69,7 @@ static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
    dst buffer is contiguous */
 static inline ucc_status_t is_block_ordered(ucc_cl_hier_team_t *cl_team, int *ordered)
 {
-    ucc_topo_t  *topo             = cl_team->super.super.params.team->topo;
+    ucc_topo_t  *topo = UCC_TEAM_TOPO(cl_team->super.super.params.team);
     ucc_sbgp_t  *all_nodes        = NULL;
     int          is_block_ordered = 1;
     int          n_nodes;
@@ -129,7 +129,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     ucc_rank_t              node_sbgp_size   = SBGP_SIZE(cl_team, NODE);
     ucc_rank_t              leader_sbgp_size = SBGP_SIZE(cl_team, NODE_LEADERS);
     ucc_rank_t              team_size        = UCC_CL_TEAM_SIZE(cl_team);
-    ucc_topo_t             *topo             = team->params.team->topo;
+    ucc_topo_t             *topo             = UCC_TEAM_TOPO(team->params.team);
     ucc_aint_t             *node_disps       = NULL;
     ucc_count_t            *node_counts      = NULL;
     ucc_aint_t             *leader_disps     = NULL;
