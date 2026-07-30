@@ -51,6 +51,7 @@ noinst_HEADERS =                       \
 	core/ucc_lib.h                     \
 	core/ucc_context.h                 \
 	core/ucc_team.h                    \
+	core/ucc_team_cache.h              \
 	core/ucc_ee.h                      \
 	core/ucc_progress_queue.h          \
 	core/ucc_service_coll.h            \
@@ -115,6 +116,7 @@ libucc_la_SOURCES =                   \
 	core/ucc_version.c                \
 	core/ucc_context.c                \
 	core/ucc_team.c                   \
+	core/ucc_team_cache.c             \
 	core/ucc_ee.c                     \
 	core/ucc_coll.c                   \
 	core/ucc_progress_queue.c         \

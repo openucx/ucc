@@ -13,6 +13,9 @@
 #include "utils/ucc_proc_info.h"
 #include "components/topo/ucc_topo.h"
 
+/* Forward declaration - avoids pulling in ucc_team_cache.h from context callers */
+typedef struct ucc_team_cache ucc_team_cache_t;
+
 #define UCC_MEM_MAP_TL_NAME_LEN 8
 
 typedef struct ucc_lib_info          ucc_lib_info_t;
@@ -81,6 +84,7 @@ typedef struct ucc_context {
     uint64_t                 cl_flags;
     ucc_tl_team_t           *service_team;
     int32_t                  throttle_progress;
+    ucc_team_cache_t        *team_cache;
 } ucc_context_t;
 
 typedef struct ucc_context_config {
@@ -90,6 +94,14 @@ typedef struct ucc_context_config {
     int                       n_cl_cfg;
     int                       n_tl_cfg;
     uint32_t                  team_ids_pool_size;
+    uint32_t                  team_cache_enable;
+    uint32_t                  team_cache_max_size;
+    uint32_t                  team_cache_eviction;
+    uint32_t                  team_cache_disable_linear_check;
+    uint32_t                  team_cache_dump_stats;
+    uint32_t                  team_cache_derived;
+    uint32_t                  team_cache_reseat;
+    uint32_t                  team_cache_agreement;
     uint32_t                  estimated_num_eps;
     uint32_t                  estimated_num_ppn;
     uint32_t                  lock_free_progress_q;
