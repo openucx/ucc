@@ -48,6 +48,10 @@
 #define UCC_TL_UCP_MAX_COLL_TAG   (UCC_TL_UCP_MAX_TAG - UCC_TL_UCP_RESERVED_TAGS)
 #define UCC_TL_UCP_SERVICE_TAG    (UCC_TL_UCP_MAX_COLL_TAG + 1)
 #define UCC_TL_UCP_ACTIVE_SET_TAG (UCC_TL_UCP_MAX_COLL_TAG + 2)
+/* Reserved tags MAX_COLL_TAG+3 .. +7 are currently unused. The team-cache
+ * agreement vote reuses UCC_TL_UCP_SERVICE_TAG, safe because ctx->service_team
+ * ops are strictly sequential per team and only one create is outstanding per
+ * context (see ucc_team.c). */
 #define UCC_TL_UCP_MAX_SENDER      UCC_MASK(UCC_TL_UCP_SENDER_BITS)
 #define UCC_TL_UCP_MAX_ID          UCC_MASK(UCC_TL_UCP_ID_BITS)
 

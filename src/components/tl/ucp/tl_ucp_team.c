@@ -23,9 +23,13 @@ static inline ucc_status_t ucc_tl_ucp_get_topo(ucc_tl_ucp_team_t *team)
         return UCC_OK;
     }
 
-    status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
-                                      &UCC_TL_TEAM_MAP(team),
-                                      &team->ctx_map);
+    /* Alias the core team's shared ctx_map: the nested map stores a raw pointer to
+       &artifacts->ctx_map, which must stay at a stable address for this TL team's
+       lifetime. The refcounted artifacts holder guarantees that. */
+    status = ucc_ep_map_create_nested(
+        &UCC_TEAM_CTX_MAP(UCC_TL_CORE_TEAM(team)),
+        &UCC_TL_TEAM_MAP(team),
+        &team->ctx_map);
     if (UCC_OK != status) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
         return status;

@@ -19,8 +19,10 @@ static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
     ucc_subset_t subset;
     ucc_status_t status;
 
-    status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
-                                      &UCC_TL_TEAM_MAP(team), &team->ctx_map);
+    status = ucc_ep_map_create_nested(
+        &UCC_TEAM_CTX_MAP(UCC_TL_CORE_TEAM(team)),
+        &UCC_TL_TEAM_MAP(team),
+        &team->ctx_map);
     if (UCC_OK != status) {
         tl_debug(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
         return status;
