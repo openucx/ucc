@@ -108,6 +108,14 @@ ucc_status_t ucc_topo_init(
 
 void ucc_topo_cleanup(ucc_topo_t *subset_topo);
 
+/*
+ * Force-materialize every lazily-filled topo field (sbgps[], all_*, node_leaders,
+ * layout scalars) once at team-create, so a topo shared read-only across derived
+ * teams cannot race those lazy fills under THREAD_MULTIPLE. A non-existent
+ * grouping stays NOT_EXISTS (valid); a real materialization failure is propagated
+ * so the caller can decline to share/cache rather than leave a half-built topo. */
+ucc_status_t      ucc_topo_prepare_shared(ucc_topo_t *topo);
+
 ucc_sbgp_t *ucc_topo_get_sbgp(ucc_topo_t *topo, ucc_sbgp_type_t type);
 
 int ucc_topo_is_single_node(ucc_topo_t *topo);

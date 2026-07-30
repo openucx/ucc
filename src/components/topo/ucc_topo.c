@@ -323,6 +323,55 @@ ucc_sbgp_t *ucc_topo_get_sbgp(ucc_topo_t *topo, ucc_sbgp_type_t type)
     return &topo->sbgps[type];
 }
 
+/* Only an allocation failure is fatal to shared-topo prep: it can leave a field
+   NULL so a later first-touch would retry it (the race the guard prevents). A
+   grouping that simply does not apply records a terminal status and never retries. */
+#define UCC_TOPO_PREP_FATAL(_status) ((_status) == UCC_ERR_NO_MEMORY)
+
+ucc_status_t ucc_topo_prepare_shared(ucc_topo_t *topo)
+{
+    ucc_sbgp_t  *sbgps;
+    ucc_rank_t  *node_leaders;
+    ucc_status_t status;
+    int          n_sbgps, i;
+
+    if (!topo) {
+        return UCC_OK;
+    }
+
+    /* Build every local sbgp (also fills the layout scalars). Each sets a terminal
+       status even on failure, so a failed sbgp is never lazily retried - best-effort. */
+    for (i = 0; i < UCC_SBGP_LAST; i++) {
+        (void)ucc_topo_get_sbgp(topo, (ucc_sbgp_type_t)i);
+    }
+
+    /* The on-demand all-sub-group arrays DO leave state NULL (and thus retryable)
+       on failure, so surface a real allocation failure to the caller. */
+    status = ucc_topo_get_all_sockets(topo, &sbgps, &n_sbgps);
+    if (UCC_TOPO_PREP_FATAL(status)) {
+        return status;
+    }
+    status = ucc_topo_get_all_numas(topo, &sbgps, &n_sbgps);
+    if (UCC_TOPO_PREP_FATAL(status)) {
+        return status;
+    }
+    status = ucc_topo_get_all_nodes(topo, &sbgps, &n_sbgps);
+    if (UCC_TOPO_PREP_FATAL(status)) {
+        return status;
+    }
+
+    /* Node-leaders map is only defined for multi-node teams (the accessor
+       asserts nnodes > 1); single-node never exercises the lazy path either. */
+    if (topo->topo->nnodes > 1) {
+        status = ucc_topo_get_node_leaders(topo, &node_leaders);
+        if (UCC_TOPO_PREP_FATAL(status)) {
+            return status;
+        }
+    }
+
+    return UCC_OK;
+}
+
 int ucc_topo_is_single_node(ucc_topo_t *topo)
 {
     ucc_sbgp_t *sbgp;
