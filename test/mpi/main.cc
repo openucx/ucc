@@ -5,6 +5,7 @@
  * See file LICENSE for terms.
  */
 
+#include <cctype>
 #include <getopt.h>
 #include <sstream>
 #include <algorithm>
@@ -795,6 +796,19 @@ int main(int argc, char *argv[])
     }
 
 test_exit:
+    /* Team-cache correctness tests: run when explicitly requested. Set
+     * UCC_TEAM_CACHE_CORRECTNESS_TESTS=y in the environment to activate. These
+     * tests manage team create/destroy lifecycle directly and require
+     * UCC_TEAM_CACHE_ENABLE=y to be set as well. */
+    if (test && !test->teams.empty()) {
+        const char *cache_tests_env = getenv(
+            "UCC_TEAM_CACHE_CORRECTNESS_TESTS");
+        if (cache_tests_env &&
+            (tolower((unsigned char)cache_tests_env[0]) == 'y' ||
+             cache_tests_env[0] == '1')) {
+            run_team_cache_tests(test->teams[0].ctx, rank, size);
+        }
+    }
     delete test;
 mpi_exit:
     MPI_Finalize();

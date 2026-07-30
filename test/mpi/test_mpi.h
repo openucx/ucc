@@ -546,5 +546,17 @@ ucc_status_t compare_buffers(void *rst, void *expected, size_t count,
 ucc_status_t divide_buffer(void *expected, size_t divider, size_t count,
                            ucc_datatype_t dt);
 
+/**
+ * run_team_cache_tests - multi-rank team-cache correctness test suite.
+ *
+ * Exercises dormant reuse and eviction-under-pressure across multiple MPI ranks.
+ * Called from main() when UCC_TEAM_CACHE_CORRECTNESS_TESTS=y is set in the
+ * environment, after the standard test run completes.
+ *
+ * @param ctx         UCC context created by UccTestMpi.
+ * @param world_rank  MPI_COMM_WORLD rank.
+ * @param world_size  MPI_COMM_WORLD size.
+ */
+void run_team_cache_tests(ucc_context_h ctx, int world_rank, int world_size);
 
 #endif
