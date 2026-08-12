@@ -30,6 +30,8 @@ typedef khash_t(ucc_team_cache_map) ucc_team_cache_map_t;
 const char *ucc_team_cache_eviction_names[] = {
     [UCC_TEAM_CACHE_EVICTION_NONE] = "none",
     [UCC_TEAM_CACHE_EVICTION_FIFO] = "fifo",
+    [UCC_TEAM_CACHE_EVICTION_LFU]  = "lfu",
+    [UCC_TEAM_CACHE_EVICTION_LRU]  = "lru", /* alias for lfu */
     NULL};
 
 ucc_status_t ucc_team_cache_init(
@@ -553,10 +555,28 @@ int ucc_team_cache_put(ucc_team_t *team)
 
 ucc_team_t *ucc_team_cache_pick_victim(ucc_team_cache_t *cache)
 {
+    ucc_team_t *best = NULL;
+    ucc_team_t *victim;
+
     if (ucc_list_is_empty(&cache->dormant)) {
         ucc_debug(
             "team_cache %p: pick_victim - dormant list empty", (void *)cache);
         return NULL;
+    }
+
+    if (UCC_TEAM_CACHE_EVICTION_IS_USAGE_BASED(cache->eviction)) {
+        /* LFU and its LRU alias: smallest seq_num wins, ties keep the older */
+        ucc_list_for_each(victim, &cache->dormant, cache_link) {
+            if (best == NULL || victim->seq_num < best->seq_num) {
+                best = victim;
+            }
+        }
+        if (best == NULL) {
+            return NULL;
+        }
+        ucc_debug("team_cache %p: pick_victim LFU -> team %p (seq_num=%u)",
+                  (void *)cache, (void *)best, best->seq_num);
+        return best;
     }
 
     /* For FIFO and NONE alike, the list head is the oldest insert */
