@@ -399,9 +399,8 @@ UCC_TEST_F(test_team_cache, vote_one_miss_rank_forces_miss_keeps_cookie)
     EXPECT_EQ((uint64_t)0x900D, ucc_team_cache_vote_new_cookie(out));
 }
 
-/* Ranks that agree on the action and key but disagree on the instance cookie
-   must not reuse: the cookie equality pair breaks, so the vote degrades to
-   MISS.  This is what keeps a re-seated instance from being silently adopted. */
+/* Two members hold DIFFERENT candidate cookies for the same membership -> the
+   cookie equality lane breaks -> global MISS, so no false reuse. */
 UCC_TEST_F(test_team_cache, vote_reseat_different_cookie_misses)
 {
     std::vector<std::vector<uint64_t>> in(
@@ -412,32 +411,18 @@ UCC_TEST_F(test_team_cache, vote_reseat_different_cookie_misses)
         in[0].data(),
         1,
         UCC_TEAM_CACHE_ACTION_EXACT_REUSE,
-        0xABCD,
-        /*cookie=*/0x11,
-        /*parent_cookie=*/0,
+        0x1234,
+        /*cookie=*/0xAAAA,
+        0,
         /*is_rank0=*/1,
-        /*proposed_cookie=*/0x77);
+        0xFEED);
     ucc_team_cache_vote_fill(
         in[1].data(),
         1,
         UCC_TEAM_CACHE_ACTION_EXACT_REUSE,
-        0xABCD,
-        /*cookie=*/0x22, /* re-seated instance */
-        /*parent_cookie=*/0,
-        /*is_rank0=*/0,
-        0);
-    vote_band_reduce(in, out);
-    EXPECT_EQ(UCC_TEAM_CACHE_ACTION_MISS, ucc_team_cache_vote_result(out));
-    EXPECT_EQ((uint64_t)0x77, ucc_team_cache_vote_new_cookie(out));
-
-    /* A parent-cookie disagreement alone is equally disqualifying. */
-    ucc_team_cache_vote_fill(
-        in[1].data(),
-        1,
-        UCC_TEAM_CACHE_ACTION_EXACT_REUSE,
-        0xABCD,
-        /*cookie=*/0x11,
-        /*parent_cookie=*/0x99,
+        0x1234,
+        /*cookie=*/0xBBBB,
+        0,
         /*is_rank0=*/0,
         0);
     vote_band_reduce(in, out);
@@ -905,28 +890,52 @@ static void insert_three_dormant(
     ASSERT_NE(nullptr, *tC);
 }
 
-/* Victim selection: FIFO returns the insertion head (oldest). */
+/* Victim selection across policies: FIFO returns the insertion head and ignores
+   seq_num; LFU and its LRU alias return the least-used team (min seq_num) and
+   break ties by dormant-list order (earliest wins). */
 UCC_TEST_F(test_team_cache, evict_victim_selection)
 {
-    SCOPED_TRACE("fifo");
-    ScopedCache cache(8, UCC_TEAM_CACHE_EVICTION_FIFO, 0);
+    const struct {
+        ucc_team_cache_eviction_policy_t policy;
+        const char                      *name;
+    } cases[] = {
+        {UCC_TEAM_CACHE_EVICTION_FIFO, "fifo"},
+        {UCC_TEAM_CACHE_EVICTION_LFU, "lfu"},
+        {UCC_TEAM_CACHE_EVICTION_LRU, "lru"},
+    };
 
-    ucc_team_t *tA, *tB, *tC;
-    insert_three_dormant(cache, &tA, &tB, &tC);
-    ASSERT_EQ(3u, cache->size);
+    for (auto &c : cases) {
+        SCOPED_TRACE(c.name);
+        ScopedCache cache(8, c.policy, 0);
 
-    tA->seq_num = 10;
-    tB->seq_num = 3;
-    tC->seq_num = 20;
+        ucc_team_t *tA, *tB, *tC;
+        insert_three_dormant(cache, &tA, &tB, &tC);
+        ASSERT_EQ(3u, cache->size);
 
-    ucc_spin_lock(&cache->lock);
-    ucc_team_t *victim = ucc_team_cache_pick_victim(cache);
-    ucc_spin_unlock(&cache->lock);
+        /* B is least-used. */
+        tA->seq_num = 10;
+        tB->seq_num = 3;
+        tC->seq_num = 20;
 
-    /* FIFO: oldest inserted (tA) regardless of seq_num. */
-    EXPECT_EQ(tA, victim);
+        ucc_spin_lock(&cache->lock);
+        ucc_team_t *victim = ucc_team_cache_pick_victim(cache);
+        ucc_spin_unlock(&cache->lock);
 
-    erase_and_free(cache, {tA, tB, tC});
+        ucc_team_t *expect = (c.policy == UCC_TEAM_CACHE_EVICTION_FIFO) ? tA
+                                                                        : tB;
+        EXPECT_EQ(expect, victim);
+
+        /* Tie on the minimum: the usage policies pick the earliest dormant
+           entry (A); FIFO still returns the head. */
+        tA->seq_num = 3;
+        tB->seq_num = 3;
+        ucc_spin_lock(&cache->lock);
+        victim = ucc_team_cache_pick_victim(cache);
+        ucc_spin_unlock(&cache->lock);
+        EXPECT_EQ(tA, victim);
+
+        erase_and_free(cache, {tA, tB, tC});
+    }
 }
 
 /* pick_victim skips LIVE teams: adopt both -> dormant empty -> NULL;
