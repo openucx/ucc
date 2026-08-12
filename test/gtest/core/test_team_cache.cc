@@ -1991,3 +1991,86 @@ UCC_TEST_F(test_team_cache_integration, derived_coexist_interleaved)
     run_barrier(t1);
     t1.reset();
 }
+
+/* Knob defaults and overrides: unset -> derived ON, reseat OFF; explicit
+   derived=n / reseat=y reach the cache struct. */
+UCC_TEST_F(test_team_cache_integration, derived_reseat_knob_defaults)
+{
+    {
+        UccJob job(
+            4,
+            UccJob::UCC_JOB_CTX_GLOBAL,
+            {ucc_env_var_t("UCC_TEAM_CACHE_ENABLE", "y")});
+
+        UccTeam_h t1 = job.create_team(2, /*use_team_ep_map=*/true);
+        ASSERT_NE(nullptr, t1);
+        ucc_context_t *ctx0 = ctx_ptr(t1, 0);
+        ASSERT_NE(nullptr, ctx0->team_cache);
+
+        EXPECT_NE(0u, ctx0->team_cache->derived)
+            << "UCC_TEAM_CACHE_DERIVED must default ON";
+        EXPECT_EQ(0u, ctx0->team_cache->reseat)
+            << "UCC_TEAM_CACHE_RESEAT must default OFF (opt-in)";
+        run_barrier(t1);
+    }
+
+    /* The UccJob env mechanism only restores pre-existing vars, so guard these
+       ourselves to avoid leaking DERIVED=n into later tests. */
+    ScopedEnv derived_guard("UCC_TEAM_CACHE_DERIVED");
+    ScopedEnv reseat_guard("UCC_TEAM_CACHE_RESEAT");
+
+    {
+        UccJob job(
+            4,
+            UccJob::UCC_JOB_CTX_GLOBAL,
+            {ucc_env_var_t("UCC_TEAM_CACHE_ENABLE", "y"),
+             ucc_env_var_t("UCC_TEAM_CACHE_DERIVED", "n"),
+             ucc_env_var_t("UCC_TEAM_CACHE_RESEAT", "y")});
+
+        UccTeam_h t1 = job.create_team(2, /*use_team_ep_map=*/true);
+        ASSERT_NE(nullptr, t1);
+        ucc_context_t *ctx0 = ctx_ptr(t1, 0);
+        ASSERT_NE(nullptr, ctx0->team_cache);
+
+        EXPECT_EQ(0u, ctx0->team_cache->derived)
+            << "UCC_TEAM_CACHE_DERIVED=n must clear the cache flag";
+        EXPECT_NE(0u, ctx0->team_cache->reseat)
+            << "UCC_TEAM_CACHE_RESEAT=y must set the cache flag";
+        run_barrier(t1);
+    }
+}
+
+/* A team with an outstanding persistent handle (persistent_coll_count > 0) must
+   NOT enter DORMANT state at destroy time. The cache guard bypasses admission so
+   a stale handle cannot corrupt a later re-adopted communicator. Verify by
+   checking that the dormant list is empty after destroy. */
+UCC_TEST_F(test_team_cache_integration, persistent_handle_blocks_dormant_admission)
+{
+    UccJob job(
+        4,
+        UccJob::UCC_JOB_CTX_GLOBAL,
+        {ucc_env_var_t("UCC_TEAM_CACHE_ENABLE", "y")});
+
+    UccTeam_h      t1   = job.create_team(2, /*use_team_ep_map=*/true);
+    ucc_context_t *ctx0 = ctx_ptr(t1, 0);
+    ASSERT_NE(nullptr, ctx0->team_cache);
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_LIVE, team_ptr(t1, 0)->cache_state);
+
+    run_barrier(t1);
+
+    /* Simulate outstanding persistent handles on every rank's team by
+       manually bumping persistent_coll_count. In production this counter is
+       incremented by ucc_collective_init for each persistent collective. */
+    for (int i = 0; i < 2; i++) {
+        team_ptr(t1, i)->persistent_coll_count = 1;
+    }
+
+    /* Destroy the team. The persistent_coll_count guard must fire on every
+       rank and bypass the DORMANT transition, so the team is torn down
+       immediately rather than retained in the cache. The dormant list must
+       be empty; the team pointer is freed and must not be dereferenced. */
+    t1.reset();
+    EXPECT_TRUE(ucc_list_is_empty(&ctx0->team_cache->dormant))
+        << "team with persistent_coll_count > 0 must not enter dormant cache";
+}
+

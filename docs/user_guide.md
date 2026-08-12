@@ -195,6 +195,217 @@ which of those TLs with the highest score is selected.
 
 Tuning UCC heuristics is also possible with the UCC configuration file (`ucc.conf`). This file provides a unified way of tailoring the behavior of UCC components - CLs, TLs, and ECs. It can contain any UCC variables of the format `VAR = VALUE`, e.g. `UCC_TL_NCCL_TUNE=allreduce:cuda:inf#alltoall:0` to force NCCL allreduce for "cuda" buffers and disable NCCL for alltoall. See [`contrib/ucc.conf`](../contrib/ucc.conf) for an example and the [FAQ](https://github.com/openucx/ucc/wiki/FAQ#13-ucc-configuration-file-and-priority) for further details.
 
+## Team (communicator) caching
+
+Building a UCC team (collective communicator structure) is an expensive operation involving out-of-band communication, unique ID allocation, and per-component initialization. UCC can transparently cache and reuse teams built for identical-membership communicator groups, avoiding repeated reconstruction for the same process sets.
+
+### When caching helps
+
+Caching accelerates **create → use → free → recreate-identical** workloads via two
+complementary mechanisms:
+
+1. **Dormant reuse** — a freed team is retained and re-adopted when an
+   identical-membership communicator is recreated:
+   - An MPI program repeatedly creates and destroys communicators with the same rank membership (e.g., iterative solvers splitting a rank subset each iteration).
+   - Repeated `MPI_Comm_split` or `MPI_Comm_create` with stable rank sets or colors (common in ScaLAPACK-style process-grid splitting and domain decomposition).
+
+2. **Derived teams (simultaneous coexistence)** — when a second identical-membership
+   communicator is created while the first is *still live* (e.g., `MPI_Comm_dup` of a
+   live communicator), UCC builds a lightweight **derived team** that shares the
+   parent's immutable membership and topology while getting its **own** team id (its
+   own tag/sequence domain, so the two live teams never alias). This skips the
+   address exchange and topology build — the bulk of team-creation cost.
+
+Both mechanisms are transparent and work for externally-provided team ids (e.g. an
+MPI communicator's context id): dormant reuse re-adopts only when membership **and**
+id match, while derived-create keys coexistence on membership alone (a dup legitimately
+carries a different id than its live parent).
+
+**Order-dependence note:** teams are keyed by their materialized membership — the rank-to-endpoint mapping. If the same process set is reordered (a different `MPI_Comm_create` with a different `ranks` argument order), it is treated as a *different* team, so no reuse occurs. Only identical membership in identical rank order is eligible for reuse.
+
+### Configuration reference
+
+UCC team caching is controlled via environment variables (`UCC_*`) or the `ucc.conf` configuration file. It is **experimental and disabled by default** (`UCC_TEAM_CACHE_ENABLE=n`). Use `ucc_info -c` to list the current settings:
+
+```text
+$ ucc_info -c | grep -i team_cache
+UCC_TEAM_CACHE_ENABLE: n
+UCC_TEAM_CACHE_AGREEMENT: y
+UCC_TEAM_CACHE_MAX_SIZE: 128
+UCC_TEAM_CACHE_EVICTION: fifo
+UCC_TEAM_CACHE_DISABLE_LINEAR_CHECK: n
+UCC_TEAM_CACHE_DUMP_STATS: n
+UCC_TEAM_CACHE_DERIVED: y
+UCC_TEAM_CACHE_RESEAT: n
+```
+
+| Knob | Type | Default | Description |
+|------|------|---------|-------------|
+| `UCC_TEAM_CACHE_ENABLE` | Boolean | `n` | Enable team caching. When disabled, each communicator creation rebuilds its team from scratch. Experimental. |
+| `UCC_TEAM_CACHE_AGREEMENT` | Boolean | `y` | Run a cross-rank agreement on every cacheable create so all members reach an identical reuse-vs-fresh decision, making reuse safe for overlapping subcommunicators (adds one small member-scoped allreduce per create). Set to `n` only when communicator scopes never overlap. |
+| `UCC_TEAM_CACHE_MAX_SIZE` | Unsigned integer | `128` | Maximum number of teams (live plus dormant) tracked by the cache. Each holds a unique team ID, so the effective limit is also clamped by `UCC_TEAM_IDS_POOL_SIZE` (see [Team-ID pool and cache sizing](#team-id-pool-and-cache-sizing)). |
+| `UCC_TEAM_CACHE_EVICTION` | Enum: `fifo`, `lfu`, `lru`, `none` | `fifo` | Eviction policy at capacity (only dormant teams are evictable): `none` never evicts; `fifo` evicts the oldest dormant team; `lfu` evicts the least-used (fewest collectives, by `seq_num`); `lru` is an alias for `lfu` (UCC has no wall-clock recency). |
+| `UCC_TEAM_CACHE_DISABLE_LINEAR_CHECK` | Boolean | `n` | Trust the 64-bit membership hash alone and skip the exact rank-array compare after a hash match. Faster, but a hash collision would reuse the wrong team. Enable only if collisions cannot occur. |
+| `UCC_TEAM_CACHE_DUMP_STATS` | Boolean | `n` | Log cache statistics (lookups, hits and hit rate, misses, inserts, evictions) at context destruction. |
+| `UCC_TEAM_CACHE_DERIVED` | Boolean | `y` | Cache and reuse derived teams: when a create duplicates the membership of a still-live team (e.g. `MPI_Comm_dup`), build it with its own team ID but borrow the parent's shared membership/topology artifacts. No effect unless `UCC_TEAM_CACHE_ENABLE=y`. |
+| `UCC_TEAM_CACHE_RESEAT` | Boolean | `n` | Experimental: recover reuse under context-id drift by re-adopting a cached dormant derived team of identical membership but a different external id, re-seating its id/tag domain instead of rebuilding. Requires `UCC_TEAM_CACHE_DERIVED=y`. |
+| `UCC_TEAM_IDS_POOL_SIZE` | Unsigned integer | `32` | Size of the team-ID pool in 64-ID blocks; total unique IDs per context is `pool_size × 64` (32 → 2048). See [Team-ID pool and cache sizing](#team-id-pool-and-cache-sizing). |
+
+### Requirements
+
+- `UCC_TEAM_PARAM_FIELD_EP_MAP` must be set in `ucc_team_params_t` for a team
+  to be cacheable (it provides the membership the cache keys on).
+- Teams with optional behavioral parameters (`ORDERING`, `OUTSTANDING_COLLS`,
+  `SYNC_TYPE`, `P2P_CONN`, `MEM_PARAMS`) are not cached because those
+  parameters are not part of the identity.
+
+### Derived teams
+
+A create whose membership matches a team that is still live cannot re-adopt that
+team, since the original is still in use - `MPI_Comm_dup` is the common case. With
+`UCC_TEAM_CACHE_DERIVED` on, the new team is instead built as a *derived* team: it
+draws its own team id, and therefore its own tag and sequence-number domain, but
+borrows the live parent's membership map and topology instead of rebuilding them.
+That skips the address exchange and the topology build, which is the expensive
+part of a create.
+
+The borrowed state is reference counted, so the parent and every derived team may
+be destroyed in any order. A derived team is itself cacheable and can later be
+re-adopted like any other dormant team. Under `UCC_TEAM_CACHE_AGREEMENT` the
+derive decision is voted on like any other, and a member that cannot derive forces
+all members to fall back to a full build.
+
+Turn this off to make every such create an independent full build.
+
+### Re-seating under context-id drift (experimental)
+
+A cached team is keyed on its membership *and* its external id, which for MPI is
+the communicator context id. Some workloads never reuse a context id: each
+create/free cycle over the same ranks draws a fresh one, so the id drifts and
+the exact-identity lookup misses every time even though a perfectly good dormant
+team of that membership is sitting in the cache.
+
+`UCC_TEAM_CACHE_RESEAT=y` recovers reuse in that case. When the exact lookup
+misses, the cache is searched a second time for a dormant *derived* team of
+identical membership, ignoring the external id. A match is re-adopted and
+*re-seated*: its team id, and with it the tag and sequence-number domain of its
+service team and of every CL and TL team beneath it, is moved to the caller's
+new external id. Only derived teams are eligible, since only they hold borrowed
+artifacts that make the move cheap relative to a full build.
+
+Re-seating is the reason the id must be pushed all the way down. A team whose
+core id changed while a TL team below it still addressed the retired id would
+put two logically distinct teams in one tag domain, which is exactly the
+aliasing this path exists to avoid.
+
+This knob is experimental and off by default. It requires
+`UCC_TEAM_CACHE_DERIVED=y`; with derived teams off there is nothing eligible to
+re-seat. Under `UCC_TEAM_CACHE_AGREEMENT` the re-seat is voted on like any other
+reuse, and the vote carries the candidate's instance cookie so that all members
+re-seat the same team or none do.
+
+### Cross-rank agreement
+
+Each rank classifies a create as a cache hit or a miss from its own cache
+contents, and those contents can diverge - for example when an eviction happens
+on one rank only. Without agreement, the members of a single create could then
+disagree on whether to re-adopt a dormant team or build a fresh one, and a create
+where some ranks re-adopt while others rebuild does not make progress.
+
+`UCC_TEAM_CACHE_AGREEMENT` (on by default) reconciles that with a small
+`UCC_OP_BAND` allreduce over the members before any rank skips the address
+exchange. Reuse happens only when every member independently classified the
+create the same way; otherwise all members fall back to a fresh build. This makes
+reuse safe even when team scopes overlap.
+
+Disable the agreement only when team scopes never overlap - that is, when no rank
+belongs to two simultaneously created teams with the same membership - and the
+per-create allreduce is measurably too expensive. Applications that build only
+disjoint or strictly nested communicators, such as a fixed set of row/column
+communicators recreated over and over, satisfy that condition. Single-rank teams
+never vote, since they cannot diverge.
+
+### Team-cache settings must be identical on every rank
+
+> **The team-cache settings above are not per-rank tunables. A rank whose
+> settings differ from its peers' can hang the job, not merely lose reuse.**
+
+When caching and agreement are both on, a cacheable multi-rank create posts a
+member-scoped allreduce (the *agreement vote*) so that every member reaches the
+same reuse-vs-rebuild decision. A rank only enters that vote if all of the
+following hold on that rank:
+
+- `UCC_TEAM_CACHE_ENABLE=y`
+- `UCC_TEAM_CACHE_AGREEMENT=y`
+- the team is cacheable (no optional behavioral fields in `ucc_team_params_t`)
+- the team has more than one member, and
+- the caller passed `UCC_TEAM_PARAM_FIELD_EP_MAP`.
+
+A rank that fails any of these skips the vote entirely and proceeds to build its
+team directly. Its peers, meanwhile, have posted an allreduce that now has no
+matching contribution from that rank and will never complete: the create hangs.
+
+In practice this means:
+
+- Set the team-cache variables in the launcher environment so every rank
+  inherits the same values (`mpirun -x UCC_TEAM_CACHE_ENABLE=y ...` or
+  `ucc.conf`). Do not set them from a per-rank wrapper script or from a rank
+  conditional.
+- If a middleware creates some teams with `EP_MAP` and others without, that is
+  safe only when the choice is the same on every rank for a given team, which
+  it is for MPI communicators.
+- If you must disable caching for part of a job, disable it for the whole job.
+
+Setting `UCC_TEAM_CACHE_AGREEMENT=n` uniformly on every rank removes the vote
+and with it this hazard, but it is only safe when communicator scopes never
+overlap (see the table above).
+
+### Team-ID pool and cache sizing
+
+Dormant cached teams retain their unique team IDs, so the team-ID pool (`UCC_TEAM_IDS_POOL_SIZE`, default 32 blocks × 64 = 2048 IDs) must accommodate both live and cached dormant teams. If the cache grows too large it risks pool exhaustion, failing team creation with `UCC_ERR_NO_RESOURCE`. To guard against this, `UCC_TEAM_CACHE_MAX_SIZE` is automatically clamped at runtime to stay safely below the pool size, reserving headroom for live and in-flight teams.
+
+If your workload needs a large cache, raise `UCC_TEAM_IDS_POOL_SIZE` to match. The clamp reserves a small ID headroom for live/in-flight teams, so a pool of `N × 64` IDs caches somewhat fewer than `N × 64` dormant teams — size the pool with margin (e.g. `UCC_TEAM_IDS_POOL_SIZE=5` comfortably caches 256 teams) rather than exactly. Monitor with `UCC_TEAM_CACHE_DUMP_STATS`: high eviction counts mean the cache is thrashing and the pool is undersized. Verify both values with `ucc_info -c`.
+
+### Reading cache statistics
+
+Set `UCC_TEAM_CACHE_DUMP_STATS=y` to log per-context cache statistics at context destruction. Each context (typically one per MPI process) logs a line like:
+
+```text
+team_cache stats: lookups=1000 hits=950 (95.0%) misses=50 inserts=50 evictions=0
+```
+
+`hits` counts reuses of a cached dormant team (derived-team creates are new teams sharing a parent's artifacts, not hits). If the hit rate is low and evictions are high, raise `UCC_TEAM_CACHE_MAX_SIZE` (and `UCC_TEAM_IDS_POOL_SIZE` if the cache is pool-clamped — see [Team-ID pool and cache sizing](#team-id-pool-and-cache-sizing)).
+
+### Persistent collective handles and cache safety
+
+Teams with outstanding persistent collective handles (`ucc_coll_p_h`) are excluded from cache admission at destroy time. If `ucc_team_destroy` is called while one or more persistent handles remain active (initialised but not yet finalised), the team undergoes immediate teardown rather than transitioning to the DORMANT state. This prevents a dormant team from being re-adopted by a new communicator while stale handles still reference it — a scenario that would corrupt the new communicator's collectives.
+
+The cache bypasses itself silently; no user action is required beyond correct handle lifecycle management. Once all persistent handles for a given team are finalised and the count reaches zero, subsequent creates of the same-membership team are again eligible for DORMANT caching and EXACT_REUSE.
+
+> **Note:** Calling `ucc_collective_finalize` on a persistent handle after its team has been destroyed is undefined behaviour. The documented usage is: finalise all persistent handles before destroying the team.
+
+### Configuration example
+
+To enable aggressive caching with increased pool size and detailed statistics:
+
+```bash
+export UCC_TEAM_CACHE_ENABLE=y
+export UCC_TEAM_CACHE_MAX_SIZE=256
+export UCC_TEAM_CACHE_EVICTION=lfu
+export UCC_TEAM_IDS_POOL_SIZE=5
+export UCC_TEAM_CACHE_DUMP_STATS=y
+```
+
+Or in `ucc.conf`:
+
+```ini
+UCC_TEAM_CACHE_ENABLE=y
+UCC_TEAM_CACHE_MAX_SIZE=256
+UCC_TEAM_CACHE_EVICTION=lfu
+UCC_TEAM_IDS_POOL_SIZE=5
+UCC_TEAM_CACHE_DUMP_STATS=y
+```
+
 ## Logging
 
 To detect if Open MPI leverages UCC for a given collective one can set `OMPI_MCA_coll_ucc_verbose=3` checking for output like
@@ -336,141 +547,6 @@ $ UCC_COLL_TRACE=INFO srun ./c/mpi/collective/osu_allreduce -i 1 -x 0 -d cuda -m
 [1678205653.810651] [node_name:903  :0]        ucc_coll.c:255  UCC_COLL INFO  coll_init: Reduce sum root 0: src={0x7ffef34d5898, 1, float64, Host}, dst={0x7ffef34d58a0, 1, float64, Host}; CL_BASIC {TL_UCP}, team_id 32768
 1048576               582.07
 [1678205653.810705] [node_name:903  :0]        ucc_coll.c:255  UCC_COLL INFO  coll_init: Barrier; CL_BASIC {TL_UCP}, team_id 32768
-```
-
-## Team Cache (Experimental)
-
-UCC supports an optional per-context communicator team cache that retains
-`ucc_team_t` objects after `ucc_team_destroy` so that a subsequent
-`ucc_team_create_post` with identical membership can re-adopt the same built
-team instead of rebuilding it from scratch.
-
-### Configuration knobs
-
-| Environment variable | Default | Description |
-|---|---|---|
-| `UCC_TEAM_CACHE_ENABLE` | `n` | Enable the team cache. Off by default; opt-in. |
-| `UCC_TEAM_CACHE_MAX_SIZE` | `128` | Maximum number of teams retained in the cache. Also clamped by `UCC_TEAM_IDS_POOL_SIZE`. |
-| `UCC_TEAM_CACHE_EVICTION` | `fifo` | Eviction policy when the cache is full. `none`: never evict (new teams stay uncached). `fifo`: evict the oldest dormant entry (default). |
-| `UCC_TEAM_CACHE_DISABLE_LINEAR_CHECK` | `n` | Trust the 64-bit membership hash alone in lookup, skipping the exact rank-array compare. Faster but unsafe on hash collision. |
-| `UCC_TEAM_CACHE_DUMP_STATS` | `n` | Log hit/miss/eviction counters at context destroy. |
-| `UCC_TEAM_CACHE_AGREEMENT` | `y` | Agree on the reuse decision across the members of every cacheable team create. Makes reuse safe for overlapping team scopes, at the cost of one small allreduce per create. |
-| `UCC_TEAM_CACHE_DERIVED` | `y` | Reuse the shared artifacts of a still-live cached team when a create duplicates its membership, as `MPI_Comm_dup` does. No effect unless `UCC_TEAM_CACHE_ENABLE=y`. |
-| `UCC_TEAM_CACHE_RESEAT` | `n` | Experimental: recover reuse under context-id drift by re-adopting a cached dormant derived team of identical membership but a different external id, re-seating its id and tag domain instead of rebuilding it. Requires `UCC_TEAM_CACHE_DERIVED=y`. |
-
-### Derived teams
-
-A create whose membership matches a team that is still live cannot re-adopt that
-team, since the original is still in use - `MPI_Comm_dup` is the common case. With
-`UCC_TEAM_CACHE_DERIVED` on, the new team is instead built as a *derived* team: it
-draws its own team id, and therefore its own tag and sequence-number domain, but
-borrows the live parent's membership map and topology instead of rebuilding them.
-That skips the address exchange and the topology build, which is the expensive
-part of a create.
-
-The borrowed state is reference counted, so the parent and every derived team may
-be destroyed in any order. A derived team is itself cacheable and can later be
-re-adopted like any other dormant team. Under `UCC_TEAM_CACHE_AGREEMENT` the
-derive decision is voted on like any other, and a member that cannot derive forces
-all members to fall back to a full build.
-
-Turn this off to make every such create an independent full build.
-
-### Re-seating under context-id drift (experimental)
-
-A cached team is keyed on its membership *and* its external id, which for MPI is
-the communicator context id. Some workloads never reuse a context id: each
-create/free cycle over the same ranks draws a fresh one, so the id drifts and
-the exact-identity lookup misses every time even though a perfectly good dormant
-team of that membership is sitting in the cache.
-
-`UCC_TEAM_CACHE_RESEAT=y` recovers reuse in that case. When the exact lookup
-misses, the cache is searched a second time for a dormant *derived* team of
-identical membership, ignoring the external id. A match is re-adopted and
-*re-seated*: its team id, and with it the tag and sequence-number domain of its
-service team and of every CL and TL team beneath it, is moved to the caller's
-new external id. Only derived teams are eligible, since only they hold borrowed
-artifacts that make the move cheap relative to a full build.
-
-Re-seating is the reason the id must be pushed all the way down. A team whose
-core id changed while a TL team below it still addressed the retired id would
-put two logically distinct teams in one tag domain, which is exactly the
-aliasing this path exists to avoid.
-
-This knob is experimental and off by default. It requires
-`UCC_TEAM_CACHE_DERIVED=y`; with derived teams off there is nothing eligible to
-re-seat. Under `UCC_TEAM_CACHE_AGREEMENT` the re-seat is voted on like any other
-reuse, and the vote carries the candidate's instance cookie so that all members
-re-seat the same team or none do.
-
-### Cross-rank agreement
-
-Each rank classifies a create as a cache hit or a miss from its own cache
-contents, and those contents can diverge - for example when an eviction happens
-on one rank only. Without agreement, the members of a single create could then
-disagree on whether to re-adopt a dormant team or build a fresh one, and a create
-where some ranks re-adopt while others rebuild does not make progress.
-
-`UCC_TEAM_CACHE_AGREEMENT` (on by default) reconciles that with a small
-`UCC_OP_BAND` allreduce over the members before any rank skips the address
-exchange. Reuse happens only when every member independently classified the
-create the same way; otherwise all members fall back to a fresh build. This makes
-reuse safe even when team scopes overlap.
-
-Disable the agreement only when team scopes never overlap - that is, when no rank
-belongs to two simultaneously created teams with the same membership - and the
-per-create allreduce is measurably too expensive. Applications that build only
-disjoint or strictly nested communicators, such as a fixed set of row/column
-communicators recreated over and over, satisfy that condition. Single-rank teams
-never vote, since they cannot diverge.
-
-### Team-cache settings must be identical on every rank
-
-> **The team-cache settings above are not per-rank tunables. A rank whose
-> settings differ from its peers' can hang the job, not merely lose reuse.**
-
-When caching and agreement are both on, a cacheable multi-rank create posts a
-member-scoped allreduce (the *agreement vote*) so that every member reaches the
-same reuse-vs-rebuild decision. A rank only enters that vote if all of the
-following hold on that rank:
-
-- `UCC_TEAM_CACHE_ENABLE=y`
-- `UCC_TEAM_CACHE_AGREEMENT=y`
-- the team is cacheable (no optional behavioral fields in `ucc_team_params_t`)
-- the team has more than one member, and
-- the caller passed `UCC_TEAM_PARAM_FIELD_EP_MAP`.
-
-A rank that fails any of these skips the vote entirely and proceeds to build its
-team directly. Its peers, meanwhile, have posted an allreduce that now has no
-matching contribution from that rank and will never complete: the create hangs.
-
-In practice this means:
-
-- Set the team-cache variables in the launcher environment so every rank
-  inherits the same values (`mpirun -x UCC_TEAM_CACHE_ENABLE=y ...` or
-  `ucc.conf`). Do not set them from a per-rank wrapper script or from a rank
-  conditional.
-- If a middleware creates some teams with `EP_MAP` and others without, that is
-  safe only when the choice is the same on every rank for a given team, which
-  it is for MPI communicators.
-- If you must disable caching for part of a job, disable it for the whole job.
-
-Setting `UCC_TEAM_CACHE_AGREEMENT=n` uniformly on every rank removes the vote
-and with it this hazard, but it is only safe when communicator scopes never
-overlap (see the table above).
-
-### Requirements
-
-- `UCC_TEAM_PARAM_FIELD_EP_MAP` must be set in `ucc_team_params_t` for a team
-  to be cacheable (it provides the membership the cache keys on).
-- Teams with optional behavioral parameters (`ORDERING`, `OUTSTANDING_COLLS`,
-  `SYNC_TYPE`, `P2P_CONN`, `MEM_PARAMS`) are not cached because those
-  parameters are not part of the identity.
-
-### Usage example
-
-```bash
-UCC_TEAM_CACHE_ENABLE=y UCC_TEAM_CACHE_MAX_SIZE=64 mpirun -np 8 ./my_app
 ```
 
 ## Known Issues
