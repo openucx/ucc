@@ -384,6 +384,42 @@ The cache bypasses itself silently; no user action is required beyond correct ha
 
 > **Note:** Calling `ucc_collective_finalize` on a persistent handle after its team has been destroyed is undefined behaviour. The documented usage is: finalise all persistent handles before destroying the team.
 
+### GPU/NCCL-backed teams
+
+NCCL-backed teams (UCC TL/NCCL, selected when using CUDA device memory) are
+fully supported by dormant caching.  The `ncclComm_t` communicator handle stays
+alive inside the dormant team object — it is not destroyed when the team goes
+DORMANT, and it is not rebuilt when the team is re-adopted.  Re-adopted NCCL
+teams are immediately usable without any additional NCCL initialization.
+
+**RESEAT_DERIVED limitation:** `UCC_TEAM_CACHE_RESEAT=y` re-seats a dormant
+derived team's id/tag domain by calling `update_id` on every child TL team.
+NCCL communicators do not have a settable tag-domain concept, so `update_id`
+is a no-op for TL/NCCL.  As a result, NCCL-backed teams are excluded from the
+RESEAT_DERIVED code path and only participate in **EXACT_REUSE** (same
+membership and same external id).  This is the same reuse mode used by
+CPU-only teams when RESEAT is disabled (the default).
+
+**GPU test coverage:** the `test_team_cache` MPI test suite includes a
+GPU-aware dormant-reuse test (`nccl_dormant_reuse`) that allocates CUDA device
+buffers, runs allreduce, lets the team go DORMANT, re-adopts it, and verifies
+both the cache hit and allreduce correctness.  It is skipped by default to
+avoid requiring a GPU in every CI environment.  Enable it with:
+
+```bash
+export UCC_TEAM_CACHE_GPU_TESTS=y
+```
+
+Run the test with NCCL selected explicitly:
+
+```bash
+mpirun -np 2 \
+    -x UCC_TEAM_CACHE_ENABLE=y \
+    -x UCC_TEAM_CACHE_CORRECTNESS_TESTS=y \
+    -x UCC_TEAM_CACHE_GPU_TESTS=y \
+    ./ucc_test_mpi -c barrier -M host
+```
+
 ### Configuration example
 
 To enable aggressive caching with increased pool size and detailed statistics:

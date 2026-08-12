@@ -1030,6 +1030,115 @@ static tc_verdict_t test_persistent_handle_safety(ucc_context_h ctx,
     return v;
 }
 
+/* ==========================================================================
+ * nccl_dormant_reuse: verify that an NCCL-backed team (CUDA memory allreduce)
+ * can go DORMANT and be re-adopted. The ncclComm_t must survive the DORMANT
+ * lifecycle intact so that collectives work correctly after re-adoption.
+ *
+ * Gated on UCC_TEAM_CACHE_GPU_TESTS=y and compile-time HAVE_CUDA. Skipped if no
+ * CUDA device is available at runtime.
+ * ========================================================================== */
+static tc_verdict_t test_nccl_dormant_reuse(ucc_context_h ctx, int world_rank,
+                                            int world_size)
+{
+    const char *name    = "nccl_dormant_reuse";
+    const char *gpu_env = std::getenv("UCC_TEAM_CACHE_GPU_TESTS");
+
+    if (!gpu_env ||
+        (gpu_env[0] != 'y' && gpu_env[0] != 'Y' && gpu_env[0] != '1')) {
+        return tc_skip(name, world_rank,
+                       "set UCC_TEAM_CACHE_GPU_TESTS=y to enable");
+    }
+
+#ifdef HAVE_CUDA
+    ucc_team_cache_t *cache     = cache_of(ctx);
+    tc_verdict_t      v         = TC_PASS;
+    int               dev_count = 0;
+    int64_t          *d_send    = NULL;
+    int64_t          *d_recv    = NULL;
+    int64_t           h_send    = (int64_t)(world_rank + 1);
+    int64_t           h_recv    = 0;
+    int64_t           expect    = (int64_t)world_size * (world_size + 1) / 2;
+    uint64_t          hits_before;
+    ucc_team_h        team;
+
+    if (cudaGetDeviceCount(&dev_count) != cudaSuccess || dev_count == 0) {
+        return tc_skip(name, world_rank, "no CUDA devices available");
+    }
+
+    drain_cache(ctx);
+
+    CUDA_CHECK(cudaMalloc(&d_send, sizeof(int64_t)));
+    CUDA_CHECK(cudaMalloc(&d_recv, sizeof(int64_t)));
+    CUDA_CHECK(cudaMemcpy(d_send, &h_send, sizeof(int64_t),
+                          cudaMemcpyHostToDevice));
+
+    auto run_cuda_allreduce = [&](ucc_team_h t, const char *where) {
+        ucc_coll_args_t args;
+        ucc_coll_req_h  req;
+
+        memset(&args, 0, sizeof(args));
+        args.coll_type         = UCC_COLL_TYPE_ALLREDUCE;
+        args.op                = UCC_OP_SUM;
+        args.src.info.buffer   = d_send;
+        args.src.info.count    = 1;
+        args.src.info.datatype = UCC_DT_INT64;
+        args.src.info.mem_type = UCC_MEMORY_TYPE_CUDA;
+        args.dst.info.buffer   = d_recv;
+        args.dst.info.count    = 1;
+        args.dst.info.datatype = UCC_DT_INT64;
+        args.dst.info.mem_type = UCC_MEMORY_TYPE_CUDA;
+        UCC_CHECK(ucc_collective_init(&args, &req, t));
+        UCC_CHECK(ucc_collective_post(req));
+        progress_until(ctx, req, where);
+        UCC_CHECK(ucc_collective_finalize(req));
+        CUDA_CHECK(cudaMemcpy(&h_recv, d_recv, sizeof(int64_t),
+                              cudaMemcpyDeviceToHost));
+        if (h_recv != expect) {
+            std::cerr << "*** UCC TEST FAIL: " << name << " rank " << world_rank
+                      << " " << where << ": allreduce got " << h_recv << " (exp "
+                      << expect << ")\n";
+            v = TC_FAIL;
+        }
+    };
+
+    /* Create -> run -> destroy (-> DORMANT). */
+    team = create_world_team(ctx, world_size);
+    run_cuda_allreduce(team, "first allreduce");
+    MPI_Barrier(MPI_COMM_WORLD);
+    destroy_ucc_team(team, ctx); /* ncclComm_t stays alive in the DORMANT team */
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    /* Re-create the identical team: must be a DORMANT cache hit, otherwise the
+       re-adopted-ncclComm_t path below is never exercised. */
+    hits_before = cache->stats.hits;
+    team        = create_world_team(ctx, world_size);
+    if (cache->stats.hits <= hits_before) {
+        tc_report_fail(name, world_rank,
+                       "re-create did not hit the dormant cache");
+        v = TC_FAIL;
+    }
+
+    /* Verify the re-adopted ncclComm_t is still functional. */
+    run_cuda_allreduce(team, "second allreduce (after dormant reuse)");
+    MPI_Barrier(MPI_COMM_WORLD);
+    destroy_ucc_team(team, ctx);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    CUDA_CHECK(cudaFree(d_send));
+    CUDA_CHECK(cudaFree(d_recv));
+
+    if (v == TC_PASS && 0 == world_rank) {
+        std::cout << "PASS " << name << "\n";
+    }
+    return v;
+#else  /* !HAVE_CUDA */
+    (void)ctx;
+    (void)world_size;
+    return tc_skip(name, world_rank, "built without CUDA support");
+#endif /* HAVE_CUDA */
+}
+
 /* Reduce a per-rank verdict to a suite-wide one: any FAIL makes the test a
    failure, otherwise any SKIP makes it a skip. */
 static tc_verdict_t tc_reduce(tc_verdict_t local)
@@ -1067,7 +1176,7 @@ ucc_test_suite_result_t run_team_cache_tests(ucc_context_h ctx, int world_rank,
     /* Must match the number of tc_tally calls below: used to report every test
        as skipped when caching is off, so a disabled run is never mistaken for a
        clean one. */
-    const int               kNumTests = 11;
+    const int               kNumTests = 12;
     ucc_test_suite_result_t r         = {0, 0, 0};
 
     if (0 == world_rank) {
@@ -1098,6 +1207,7 @@ ucc_test_suite_result_t run_team_cache_tests(ucc_context_h ctx, int world_rank,
     tc_tally(&r, test_nonblocking_create_post(ctx, world_rank, world_size));
     tc_tally(&r, test_singleton_team(ctx, world_rank, world_size));
     tc_tally(&r, test_persistent_handle_safety(ctx, world_rank, world_size));
+    tc_tally(&r, test_nccl_dormant_reuse(ctx, world_rank, world_size));
 
     ucc_assert(r.passed + r.failed + r.skipped == kNumTests);
 
