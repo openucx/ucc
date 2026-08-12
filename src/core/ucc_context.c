@@ -67,7 +67,8 @@ static ucc_config_field_t ucc_context_config_table[] = {
     {"TEAM_CACHE_EVICTION", "fifo",
      "Eviction policy once the team cache is full. Only retained teams are\n"
      "evictable. none - never evict, the new team stays uncached.\n"
-     "fifo - evict the oldest retained team.",
+     "fifo - evict the oldest retained team. lfu - evict the least used\n"
+     "retained team, by seq_num. lru - alias for lfu.",
      ucc_offsetof(ucc_context_config_t, team_cache_eviction),
      UCC_CONFIG_TYPE_ENUM(ucc_team_cache_eviction_names)},
 
