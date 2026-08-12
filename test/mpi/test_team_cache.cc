@@ -129,6 +129,22 @@ static void destroy_ucc_team(ucc_team_h team, ucc_context_h ctx)
     }
 }
 
+/* Non-zero if the team that used to live at @handle is on the dormant list.
+   @handle is compared by value only: when destroy admits the team to the cache
+   the object is retained, but on the teardown path it is freed, and reading
+   team->cache_state there would be a use-after-free. */
+static int is_dormant(ucc_team_cache_t *cache, uintptr_t handle)
+{
+    ucc_team_t *dt;
+
+    ucc_list_for_each (dt, &cache->dormant, cache_link) {
+        if ((uintptr_t)dt == handle) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* Drain dormant entries left by earlier tests, with barriers so that every rank
    drains before any rank starts creating again. */
 static void drain_cache(ucc_context_h ctx)
@@ -869,6 +885,151 @@ static tc_verdict_t test_singleton_team(ucc_context_h ctx, int world_rank,
     return v;
 }
 
+/* ==========================================================================
+ * persistent_handle_safety
+ *
+ * Verify that outstanding persistent collective handles block cache DORMANT
+ * admission at team-destroy time, preventing handle-to-team aliasing under
+ * EXACT_REUSE.
+ *
+ * Part A (counter lifecycle): init persistent allreduce -> count=1 -> finalize
+ *   -> count=0 -> destroy -> team goes DORMANT -> recreate -> DORMANT hit.
+ * Part B (bypass guard): init persistent allreduce -> count=1 -> destroy ->
+ *   team NOT DORMANT (real teardown) -> no dormant entry for it -> recreate ->
+ *   cache MISS (fresh build), not a stale re-adoption.
+ *   The handle from Part B is intentionally not finalized: calling finalize
+ *   after its team is destroyed is undefined behaviour; the handle's memory is
+ *   an accepted bounded leak at test exit.
+ *
+ * Dormancy is checked against the cache's dormant list rather than through the
+ * team handle: on the teardown path the team object is freed, so reading
+ * team->cache_state would be a use-after-free in exactly the case the check
+ * exists to catch.
+ * ========================================================================== */
+static tc_verdict_t test_persistent_handle_safety(ucc_context_h ctx,
+                                                  int world_rank,
+                                                  int world_size)
+{
+    const char       *name  = "persistent_handle_safety";
+    ucc_team_cache_t *cache = cache_of(ctx);
+    tc_verdict_t      v     = TC_PASS;
+    int64_t           sbuf, rbuf, expected;
+    ucc_coll_args_t   args;
+    ucc_coll_req_h    reqA, reqB;
+    ucc_team_h        tA, tA2, tB, tB2;
+    uintptr_t         tA_addr, tB_addr, tB2_addr;
+    uint64_t          hits_before, misses_before;
+
+    drain_cache(ctx);
+    expected = rank_sum(world_size);
+
+    /* --- Part A: handle finalised before destroy --- */
+    sbuf    = (int64_t)world_rank;
+    rbuf    = 0;
+    tA      = create_world_team(ctx, world_size);
+    tA_addr = (uintptr_t)tA;
+
+    fill_allreduce_int64(&args, &sbuf, &rbuf, UCC_COLL_ARGS_FLAG_PERSISTENT);
+    UCC_CHECK(ucc_collective_init(&args, &reqA, tA));
+
+    if (((ucc_team_t *)tA)->persistent_coll_count != 1) {
+        tc_report_fail(name, world_rank,
+                       "Part A: persistent_coll_count expected 1 after init");
+        v = TC_FAIL;
+    }
+
+    UCC_CHECK(ucc_collective_post(reqA));
+    progress_until(ctx, reqA, "persistent allreduce (Part A)");
+    if (rbuf != expected) {
+        std::cerr << "*** UCC TEST FAIL: " << name << " rank " << world_rank
+                  << ": Part A allreduce got " << rbuf << " (exp " << expected
+                  << ")\n";
+        v = TC_FAIL;
+    }
+
+    UCC_CHECK(ucc_collective_finalize(reqA));
+    if (((ucc_team_t *)tA)->persistent_coll_count != 0) {
+        tc_report_fail(name, world_rank,
+                       "Part A: persistent_coll_count expected 0 after "
+                       "finalize");
+        v = TC_FAIL;
+    }
+
+    /* With count == 0, destroy must admit the team as DORMANT. */
+    destroy_ucc_team(tA, ctx);
+    if (!is_dormant(cache, tA_addr)) {
+        tc_report_fail(name, world_rank,
+                       "Part A: team must be DORMANT after destroy with "
+                       "count==0");
+        v = TC_FAIL;
+    }
+
+    /* Re-create the identical team: must be a DORMANT hit. */
+    hits_before = cache->stats.hits;
+    tA2         = create_world_team(ctx, world_size);
+    if (cache->stats.hits <= hits_before) {
+        tc_report_fail(name, world_rank,
+                       "Part A: recreate after DORMANT must be a cache hit");
+        v = TC_FAIL;
+    }
+    run_barrier_on_team(tA2, ctx);
+    destroy_ucc_team(tA2, ctx);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    /* --- Part B: outstanding persistent handle blocks DORMANT admission --- */
+    sbuf    = (int64_t)world_rank;
+    rbuf    = 0;
+    tB      = create_world_team(ctx, world_size);
+    tB_addr = (uintptr_t)tB;
+
+    fill_allreduce_int64(&args, &sbuf, &rbuf, UCC_COLL_ARGS_FLAG_PERSISTENT);
+    UCC_CHECK(ucc_collective_init(&args, &reqB, tB));
+
+    if (((ucc_team_t *)tB)->persistent_coll_count != 1) {
+        tc_report_fail(name, world_rank,
+                       "Part B: persistent_coll_count expected 1 after init");
+        v = TC_FAIL;
+    }
+
+    /* Destroy the team while the persistent handle is still outstanding. The
+       bypass guard must fire: real teardown, not DORMANT admission. reqB is
+       intentionally not finalized - doing so after the team is freed is
+       undefined behaviour. The task struct is a bounded leak. */
+    destroy_ucc_team(tB, ctx);
+    if (is_dormant(cache, tB_addr)) {
+        tc_report_fail(name, world_rank,
+                       "Part B: team must not be on the dormant list after the "
+                       "bypass");
+        v = TC_FAIL;
+    }
+
+    /* Recreate the identical team: must be a MISS (no dormant entry). */
+    misses_before = cache->stats.misses;
+    tB2           = create_world_team(ctx, world_size);
+    tB2_addr      = (uintptr_t)tB2;
+    if (cache->stats.misses <= misses_before) {
+        tc_report_fail(name, world_rank,
+                       "Part B: recreate after bypass teardown must be a cache "
+                       "miss");
+        v = TC_FAIL;
+    }
+    run_barrier_on_team(tB2, ctx);
+
+    /* Now destroy normally (no outstanding handles) -> DORMANT. */
+    destroy_ucc_team(tB2, ctx);
+    if (!is_dormant(cache, tB2_addr)) {
+        tc_report_fail(name, world_rank,
+                       "Part B: tB2 must be DORMANT after a normal destroy");
+        v = TC_FAIL;
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (v == TC_PASS && 0 == world_rank) {
+        std::cout << "PASS " << name << "\n";
+    }
+    return v;
+}
+
 /* Reduce a per-rank verdict to a suite-wide one: any FAIL makes the test a
    failure, otherwise any SKIP makes it a skip. */
 static tc_verdict_t tc_reduce(tc_verdict_t local)
@@ -906,7 +1067,7 @@ ucc_test_suite_result_t run_team_cache_tests(ucc_context_h ctx, int world_rank,
     /* Must match the number of tc_tally calls below: used to report every test
        as skipped when caching is off, so a disabled run is never mistaken for a
        clean one. */
-    const int               kNumTests = 10;
+    const int               kNumTests = 11;
     ucc_test_suite_result_t r         = {0, 0, 0};
 
     if (0 == world_rank) {
@@ -936,6 +1097,7 @@ ucc_test_suite_result_t run_team_cache_tests(ucc_context_h ctx, int world_rank,
     tc_tally(&r, test_derived_exact_rebuild(ctx, world_rank, world_size));
     tc_tally(&r, test_nonblocking_create_post(ctx, world_rank, world_size));
     tc_tally(&r, test_singleton_team(ctx, world_rank, world_size));
+    tc_tally(&r, test_persistent_handle_safety(ctx, world_rank, world_size));
 
     ucc_assert(r.passed + r.failed + r.skipped == kNumTests);
 
