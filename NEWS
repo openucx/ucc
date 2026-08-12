@@ -48,6 +48,9 @@
 
 ### Core
 - Added collective checker function {PR #1292}
+- Added FUJITSU-MONAKA CPU support {PR #1257}
+- Moved CUDA topology to core {PR #1261}
+- Fixed task restart in pipelined schedule {PR #1262}
 
 ### TL/CUDA
 - Added INT32, INT64, UINT32, UINT64 support for NVLS {PR #1259}
@@ -57,9 +60,14 @@
 - Linked libstdc++ for aarch64 {PR #1296}
 - NVLS allreduce small buffers {PR #1304}
 - Fixed NVLS alignment {PR #1312}
+- Enabled NVLS build by default {PR #1200}
+- Fixed NVLS arch {PR #1264}
 
 ### TL/UCP
 - Added allreduce ring algorithm {PR #1258}
+
+### EC/CUDA
+- Reduced compilation time {PR #1265}
 
 ### Build and Test
 - Enhanced NVLS tests {PR #1269}
@@ -73,6 +81,10 @@
 - Bumped version to v1.9 {PR #1297}
 - Increased max line length for ini files {PR #1316}
 - Fixed ini max file line length {PR #1317}
+- Improved ucc MPI tests to check IP exists {PR #1263}
+- Updated NVLS tests timeout logic {PR #1266}
+- Ran Coverity in container {PR #1267}
+- Disabled hanging ctx team tests {PR #1273}
 
 ### Tools
 - Shuffled columns in perftest traffic matrix generator {PR #1251}
@@ -83,17 +95,12 @@
 
 ### Core
 - Ported UCS logger from libucs to UCC, enabling file filtering and log-to-file features {PR #1191}
-- Added FUJITSU-MONAKA CPU support {PR #1257}
-- Moved CUDA topology to core {PR #1261}
-- Fixed task restart in pipelined schedule {PR #1262}
 
 ### TL/CUDA
 - Added multinode NVLS support using CUDA fabric handles for cross-node allreduce {PR #1185}
-- Enabled NVLS build by default {PR #1200}
 - Added NVLS reduce_scatterv with BF16 datatype support and kernel-based synchronization {PR #1211}
 - Added ptrace permissions for NVLS POSIX handle sharing via pidfd_getfd {PR #1218}
 - Added NVLS allgatherv using multimem.st instructions with 16-byte alignment {PR #1240}
-- Fixed NVLS arch {PR #1264}
 
 ### TL/UCP
 - Added memory type parameter to tl_ucp_put/get for GPU memory in onesided collectives {PR #1253}
@@ -102,9 +109,6 @@
 
 ### TL/NCCL
 - Added native ncclAlltoAll support for NCCL 2.28.3+ {PR #1244}
-
-### EC/CUDA
-- Reduced compilation time {PR #1265}
 
 ### Build and Test
 - Bumped version to v1.7 {PR #1225}
@@ -128,10 +132,6 @@
 - Fixed parallel GPU tests with CUDA context creation and IB port validation {PR #1209}
 - Enabled parallel UCC test execution in CI {PR #1206}
 - Fixed Jenkins JJB YAML variable syntax for check separation {PR #1246}
-- Improved ucc MPI tests to check IP exists {PR #1263}
-- Updated NVLS tests timeout logic {PR #1266}
-- Ran Coverity in container {PR #1267}
-- Disabled hanging ctx team tests {PR #1273}
 
 ### Documentation
 - Fixed various typos throughout comments and outputs {PR #1228}
