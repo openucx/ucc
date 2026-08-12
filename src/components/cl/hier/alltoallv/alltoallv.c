@@ -52,8 +52,8 @@ static ucc_status_t ucc_cl_hier_alltoallv_finalize(ucc_coll_task_t *task)
         for (_i = 0; _i < (_sbgp)->group_size; _i++) {                         \
             _scount = ((_type *)(_coll_args)->args.src.info_v.counts)[_i];     \
             _rcount = ((_type *)(_coll_args)->args.dst.info_v.counts)[_i];     \
-            _is_local =                                                        \
-                ucc_rank_on_local_node(_i, (_team)->params.team->topo);        \
+            _is_local = ucc_rank_on_local_node(                                \
+                _i, (_team)->params.team->artifacts->topo);                      \
             if ((_scount * _sdt_size > (_node_thresh)) && _is_local) {         \
                 ((_type *)_sc_full)[_i] = 0;                                   \
             } else {                                                           \
