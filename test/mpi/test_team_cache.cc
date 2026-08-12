@@ -300,7 +300,7 @@ static tc_verdict_t test_ep_map_cb_freed_after_cache(ucc_context_h ctx,
        freed box; without it, poisonable_rank_cb aborts on the poison. */
     t = (ucc_team_t *)team2;
     for (ucc_rank_t e = 0; e < (ucc_rank_t)world_size; e++) {
-        ucc_rank_t got = ucc_ep_map_eval(t->ctx_map, e);
+        ucc_rank_t got = ucc_ep_map_eval(t->artifacts->ctx_map, e);
 
         if (got != e) {
             std::cerr << "*** UCC TEST FAIL: " << name << " rank " << world_rank
