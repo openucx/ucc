@@ -23,7 +23,8 @@ static inline ucc_status_t ucc_tl_ucp_get_topo(ucc_tl_ucp_team_t *team)
         return UCC_OK;
     }
 
-    status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
+    /* The nested map aliases ctx_map, kept at a fixed address by the holder */
+    status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->artifacts->ctx_map,
                                       &UCC_TL_TEAM_MAP(team),
                                       &team->ctx_map);
     if (UCC_OK != status) {

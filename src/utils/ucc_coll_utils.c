@@ -768,7 +768,7 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
         ucc_snprintf_safe(task_info, sizeof(task_info),
                           " rank %u, ctx_rank %u, seq_num %d, req %p",
                           team->rank,
-                          ucc_ep_map_eval(team->ctx_map, team->rank),
+                          ucc_ep_map_eval(team->artifacts->ctx_map, team->rank),
                           task->seq_num, task);
         strncat(str, task_info, len - strlen(str));
     }

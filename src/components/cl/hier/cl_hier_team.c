@@ -47,13 +47,13 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     ucc_tl_lib_t              *tl_lib;
     ucc_base_lib_attr_t        attr;
 
-    if (!params->team->topo) {
+    if (!params->team->artifacts->topo) {
         cl_debug(cl_context->lib,
                 "can't create hier team without topology data");
         return UCC_ERR_INVALID_PARAM;
     }
 
-    if (ucc_topo_is_single_node(params->team->topo)) {
+    if (ucc_topo_is_single_node(params->team->artifacts->topo)) {
         cl_debug(cl_context->lib, "skipping single node team");
         return UCC_ERR_INVALID_PARAM;
     }
@@ -65,7 +65,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
         hs = &self->sbgps[i];
         if (hs->state == UCC_HIER_SBGP_ENABLED) {
-            hs->sbgp = ucc_topo_get_sbgp(params->team->topo, hs->sbgp_type);
+            hs->sbgp = ucc_topo_get_sbgp(params->team->artifacts->topo,
+                                         hs->sbgp_type);
             if (hs->sbgp->status != UCC_SBGP_ENABLED) {
                 /* SBGP of that type either not exists or the calling process
                  * is not part of subgroup

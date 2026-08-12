@@ -30,6 +30,26 @@ typedef enum {
     UCC_TEAM_CACHE_MISS_TEARDOWN, /* vote lost, draining before a rebuild */
 } ucc_team_state_t;
 
+/* Refcounted holder of the per-team state that derived teams may share */
+typedef struct ucc_team_artifacts {
+    ucc_ep_map_t   ctx_map;   /*< map to the ctx ranks, set if CTX is global */
+    ucc_rank_t    *ctx_ranks; /*< UCC-owned backing array of ctx_map, or NULL */
+    ucc_topo_t    *topo;      /*< subset topology */
+    int            refcount;  /*< number of teams pointing at this holder */
+    ucc_spinlock_t lock;      /*< guards refcount */
+    uint8_t        heap;      /*< 1: heap-allocated, 0: embedded in a team */
+} ucc_team_artifacts_t;
+
+/* Init an embedded holder in place: refcount 1, heap 0 */
+void ucc_team_artifacts_init_inline(ucc_team_artifacts_t *a);
+
+/* Drop a reference; at zero release contents, free the struct if heap */
+void ucc_team_artifacts_put(ucc_team_artifacts_t *a);
+
+#define UCC_TEAM_CTX_MAP(_team)   ((_team)->artifacts->ctx_map)
+#define UCC_TEAM_CTX_RANKS(_team) ((_team)->artifacts->ctx_ranks)
+#define UCC_TEAM_TOPO(_team)      ((_team)->artifacts->topo)
+
 typedef struct ucc_team {
     ucc_team_state_t        state;
     ucc_context_t **        contexts;
@@ -45,11 +65,9 @@ typedef struct ucc_team {
     ucc_tl_team_t *         service_team;
     ucc_service_coll_req_t *sreq;
     ucc_addr_storage_t      addr_storage; /*< addresses of team endpoints */
-    ucc_rank_t *            ctx_ranks;
     void *                  oob_req;
-    ucc_ep_map_t            ctx_map; /*< map to the ctx ranks, defined if CTX
-                                  type is global (oob provided) */
-    ucc_topo_t             *topo;
+    ucc_team_artifacts_t   *artifacts; /*< ctx_map/ctx_ranks/topo holder */
+    ucc_team_artifacts_t    artifacts_inline; /*< holder used when not shared */
     ucc_score_map_t        *score_map; /*< score map of CLs */
     uint32_t                seq_num;
     int                       refcount; /* live teams backing a cache entry */
@@ -99,7 +117,8 @@ ucc_get_team_ep_header(ucc_context_t *context, ucc_team_t *team,
                                            : &team->addr_storage;
     ucc_rank_t          storage_rank =
         context->addr_storage.storage
-                     ? (team ? ucc_ep_map_eval(team->ctx_map, rank) : rank)
+                     ? (team ? ucc_ep_map_eval(UCC_TEAM_CTX_MAP(team), rank)
+                             : rank)
                      : rank;
 
     return UCC_ADDR_STORAGE_RANK_HEADER(storage, storage_rank);
@@ -129,12 +148,14 @@ static inline void *ucc_get_team_ep_addr(ucc_context_t *context,
 
 static inline ucc_rank_t ucc_get_ctx_rank(ucc_team_t *team, ucc_rank_t team_rank)
 {
-    return ucc_ep_map_eval(team->ctx_map, team_rank);
+    return ucc_ep_map_eval(UCC_TEAM_CTX_MAP(team), team_rank);
 }
 
 static inline ucc_host_id_t ucc_team_rank_host_id(ucc_rank_t rank, ucc_team_t *team)
 {
-    return team->topo->topo->procs[ucc_get_ctx_rank(team, rank)].host_id;
+    ucc_topo_t *topo = UCC_TEAM_TOPO(team);
+
+    return topo->topo->procs[ucc_get_ctx_rank(team, rank)].host_id;
 }
 
 static inline int ucc_team_ranks_on_same_node(ucc_rank_t rank1, ucc_rank_t rank2,

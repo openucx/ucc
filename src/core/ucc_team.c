@@ -22,6 +22,39 @@ static ucc_status_t ucc_team_teardown_for_rebuild(ucc_team_t *team);
 static ucc_status_t ucc_team_reset_for_rebuild(
     ucc_context_t *context, ucc_team_t *team);
 
+void ucc_team_artifacts_init_inline(ucc_team_artifacts_t *a)
+{
+    memset(a, 0, sizeof(*a));
+    a->refcount = 1;
+    a->heap     = 0;
+    ucc_spinlock_init(&a->lock, 0);
+}
+
+void ucc_team_artifacts_put(ucc_team_artifacts_t *artifacts)
+{
+    int refcount;
+
+    if (!artifacts) {
+        return;
+    }
+    ucc_spin_lock(&artifacts->lock);
+    ucc_assert(artifacts->refcount > 0);
+    refcount = --artifacts->refcount;
+    ucc_spin_unlock(&artifacts->lock);
+
+    if (refcount > 0) {
+        return;
+    }
+
+    /* ctx_ranks is NULL when ctx_map aliases the caller's ep_map */
+    ucc_topo_cleanup(artifacts->topo);
+    ucc_free(artifacts->ctx_ranks);
+    ucc_spinlock_destroy(&artifacts->lock);
+    if (artifacts->heap) {
+        ucc_free(artifacts);
+    }
+}
+
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
 {
     dst->mask = src->mask;
@@ -126,6 +159,8 @@ static ucc_team_t *ucc_team_alloc_shell(
         *status_out = UCC_ERR_NO_MEMORY;
         return NULL;
     }
+    team->artifacts = &team->artifacts_inline;
+    ucc_team_artifacts_init_inline(team->artifacts);
     team->runtime_oob  = params->oob;
     team->num_contexts = num_contexts;
     team->size         = (ucc_rank_t)team_size;
@@ -150,6 +185,7 @@ static ucc_team_t *ucc_team_alloc_shell(
             "failed to allocate %zd bytes for ucc team contexts array",
             sizeof(ucc_context_t *) * num_contexts);
         ucc_team_cache_identity_free(&team->cache_identity);
+        ucc_team_artifacts_put(team->artifacts);
         ucc_free(team);
         *status_out = UCC_ERR_NO_MEMORY;
         return NULL;
@@ -483,12 +519,12 @@ static ucc_status_t ucc_team_create_cls(ucc_context_t *context,
     ucc_subset_t     subset;
     int              i;
 
-    if (context->topo && !team->topo && team->size > 1) {
+    if (context->topo && !UCC_TEAM_TOPO(team) && team->size > 1) {
         /* Context->topo is not NULL if any of the enabled CLs
            reported topo_required through the lib_attr */
-        subset.map    = team->ctx_map;
+        subset.map    = UCC_TEAM_CTX_MAP(team);
         subset.myrank = team->rank;
-        status        = ucc_topo_init(subset, context->topo, &team->topo);
+        status = ucc_topo_init(subset, context->topo, &UCC_TEAM_TOPO(team));
         if (UCC_OK != status) {
             ucc_warn("failed to init team topo");
         }
@@ -556,41 +592,43 @@ static inline ucc_status_t ucc_team_exchange(ucc_context_t *context,
             /* A cached team outlives the caller's map, so copy it now */
             ucc_rank_t i;
 
-            if (!team->ctx_ranks) {
-                team->ctx_ranks = ucc_malloc(
+            if (!UCC_TEAM_CTX_RANKS(team)) {
+                UCC_TEAM_CTX_RANKS(team) = ucc_malloc(
                     team->size * sizeof(ucc_rank_t), "ctx_ranks");
-                if (!team->ctx_ranks) {
+                if (!UCC_TEAM_CTX_RANKS(team)) {
                     ucc_error(
                         "failed to allocate %zd bytes for ctx ranks array",
                         team->size * sizeof(ucc_rank_t));
                     return UCC_ERR_NO_MEMORY;
                 }
                 for (i = 0; i < team->size; i++) {
-                    team->ctx_ranks[i] = (ucc_rank_t)ucc_ep_map_eval(
-                        team->bp.params.ep_map, i);
+                    UCC_TEAM_CTX_RANKS(team)[i] =
+                        (ucc_rank_t)ucc_ep_map_eval(team->bp.params.ep_map, i);
                 }
             }
-            team->ctx_map = ucc_ep_map_from_array(
-                &team->ctx_ranks, team->size, context->addr_storage.size, 1);
+            UCC_TEAM_CTX_MAP(team) = ucc_ep_map_from_array(
+                &UCC_TEAM_CTX_RANKS(team), team->size,
+                context->addr_storage.size, 1);
         } else {
-            team->ctx_map = team->bp.params.ep_map;
+            /* The caller's ep_map outlives the team, so aliasing it is safe */
+            UCC_TEAM_CTX_MAP(team) = team->bp.params.ep_map;
         }
     } else {
-        if (!team->ctx_ranks) {
-            team->ctx_ranks =
+        if (!UCC_TEAM_CTX_RANKS(team)) {
+            UCC_TEAM_CTX_RANKS(team) =
                 ucc_malloc(team->size * sizeof(ucc_rank_t), "ctx_ranks");
-            if (!team->ctx_ranks) {
+            if (!UCC_TEAM_CTX_RANKS(team)) {
                 ucc_error("failed to allocate %zd bytes for ctx ranks array",
                           team->size * sizeof(ucc_rank_t));
                 return UCC_ERR_NO_MEMORY;
             }
-            status = oob.allgather(&context->rank, team->ctx_ranks,
+            status = oob.allgather(&context->rank, UCC_TEAM_CTX_RANKS(team),
                                    sizeof(ucc_rank_t), oob.coll_info,
                                    &team->oob_req);
             if (UCC_OK != status) {
                 ucc_error("failed to start oob allgather for proc info exchange");
-                ucc_free(team->ctx_ranks);
-                team->ctx_ranks = NULL;
+                ucc_free(UCC_TEAM_CTX_RANKS(team));
+                UCC_TEAM_CTX_RANKS(team) = NULL;
                 return status;
             }
         }
@@ -604,11 +642,12 @@ static inline ucc_status_t ucc_team_exchange(ucc_context_t *context,
         }
         oob.req_free(team->oob_req);
         ucc_assert(team->size >= 2);
-        team->ctx_map = ucc_ep_map_from_array(&team->ctx_ranks, team->size,
-                                              context->addr_storage.size, 1);
+        UCC_TEAM_CTX_MAP(team) =
+            ucc_ep_map_from_array(&UCC_TEAM_CTX_RANKS(team), team->size,
+                                  context->addr_storage.size, 1);
     }
     ucc_debug("team %p rank %d, ctx_rank %d, map_type %d", team, team->rank,
-              context->rank, team->ctx_map.type);
+              context->rank, UCC_TEAM_CTX_MAP(team).type);
     return UCC_OK;
 }
 
@@ -905,8 +944,9 @@ static ucc_status_t ucc_team_destroy_single_ex(ucc_team_h team, int for_rebuild)
         team->cl_teams[i] = NULL;
     }
 
-    ucc_topo_cleanup(team->topo);
-    team->topo = NULL;
+    /* Safe here: the TL nested maps aliasing ctx_map are destroyed above */
+    ucc_team_artifacts_put(team->artifacts);
+    team->artifacts = NULL;
 
     if (team->contexts[0]->service_team && team->size > 1) {
         ucc_internal_oob_finalize(&team->bp.params.oob);
@@ -920,8 +960,6 @@ static ucc_status_t ucc_team_destroy_single_ex(ucc_team_h team, int for_rebuild)
     ucc_coll_score_free_map(team->score_map);
     team->score_map = NULL;
     ucc_free(team->addr_storage.storage);
-    ucc_free(team->ctx_ranks);
-    team->ctx_ranks = NULL;
     ucc_team_release_id(team);
 
     if (for_rebuild) {
@@ -968,8 +1006,9 @@ static ucc_status_t ucc_team_reset_for_rebuild(
     team->cache_state          = UCC_TEAM_CACHE_STATE_NONE;
     team->cache_pending_insert = 1;
     ucc_list_head_init(&team->cache_link);
-    team->ctx_map.ep_num = 0; /* ucc_team_exchange rebuilds ctx_map/ctx_ranks */
-    team->topo           = NULL;
+    /* Teardown released the old holder, so re-init the inline one */
+    team->artifacts = &team->artifacts_inline;
+    ucc_team_artifacts_init_inline(team->artifacts);
 
     return ucc_team_create_post_single(context, team);
 }
