@@ -1345,6 +1345,25 @@ ucc_status_t ucc_team_destroy(ucc_team_h team)
     /* we don't support multiple contexts per team yet */
     ucc_assert(team->num_contexts == 1);
 
+    /* Stale persistent handles must not survive into a re-adopted team */
+    if (team->cache_state == UCC_TEAM_CACHE_STATE_LIVE &&
+        team->persistent_coll_count > 0) {
+        ucc_context_t    *ctx   = team->contexts[0];
+        ucc_team_cache_t *cache = ctx->team_cache;
+
+        ucc_assert(cache != NULL);
+        ucc_debug("team cache: team %p has %u outstanding persistent handle(s), "
+                  "tearing down instead of caching (hash=0x%" PRIx64 ")",
+                  (void *)team, team->persistent_coll_count,
+                  team->cache_identity.hash);
+
+        ucc_spin_lock(&cache->lock);
+        ucc_team_cache_detach(cache, team);
+        ucc_team_cache_identity_free(&team->cache_identity);
+        ucc_spin_unlock(&cache->lock);
+        return ucc_team_destroy_single(team);
+    }
+
     /* A cached team is retained, keeping its id and its CL/TL teams */
     if (team->cache_state == UCC_TEAM_CACHE_STATE_LIVE) {
         ucc_context_t    *ctx   = team->contexts[0];

@@ -93,6 +93,7 @@ typedef struct ucc_team {
     uint16_t                  cache_derive_parent_id;
     uint64_t                  cache_parent_instance_cookie;
     uint16_t                  cache_reseat_new_id; /* drifted ext_id, RESEAT */
+    uint32_t                  persistent_coll_count; /* outstanding handles */
 } ucc_team_t;
 
 /* If the bit is set then team_id is provided by the user */
