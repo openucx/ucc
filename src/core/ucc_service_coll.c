@@ -18,7 +18,7 @@ uint64_t ucc_service_coll_map_cb(uint64_t ep, void *cb_ctx)
     ucc_rank_t              team_rank;
 
     team_rank = ucc_ep_map_eval(req->subset.map, (ucc_rank_t)ep);
-    return ucc_ep_map_eval(team->artifacts->ctx_map, team_rank);
+    return ucc_ep_map_eval(UCC_TEAM_CTX_MAP(team), team_rank);
 }
 
 /* Maps a subset index straight to a context rank, bypassing team->ctx_map */
