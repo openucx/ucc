@@ -29,7 +29,13 @@ typedef enum ucc_team_cache_state {
 typedef enum ucc_team_cache_eviction_policy {
     UCC_TEAM_CACHE_EVICTION_NONE = 0,
     UCC_TEAM_CACHE_EVICTION_FIFO = 1,
+    UCC_TEAM_CACHE_EVICTION_LFU  = 2, /* evict least used, by seq_num */
+    UCC_TEAM_CACHE_EVICTION_LRU  = 3, /* alias for LFU */
 } ucc_team_cache_eviction_policy_t;
+
+/* Non-zero iff @_p selects a victim by usage: LFU or its LRU alias */
+#define UCC_TEAM_CACHE_EVICTION_IS_USAGE_BASED(_p)                             \
+    ((_p) == UCC_TEAM_CACHE_EVICTION_LFU || (_p) == UCC_TEAM_CACHE_EVICTION_LRU)
 
 /* UCC_TEAM_CACHE_EVICTION choices, indexed by the enum, NULL terminated */
 extern const char *ucc_team_cache_eviction_names[];
