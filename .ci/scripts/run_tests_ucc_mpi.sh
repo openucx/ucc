@@ -212,6 +212,15 @@ cache_args=" -x UCC_TEAM_CACHE_ENABLE=y -x UCC_TEAM_CACHE_MAX_SIZE=2 -x UCC_TEAM
 mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $cache_args $EXE -c barrier -t world,half,odd_even
 echo "INFO: UCC team-cache correctness tests (world,half,odd_even) ... DONE"
 
+# Second pass with UCC_TEAM_CACHE_RESEAT=y. The knob is off by default, so
+# without this leg the reseat path (derived_reuse[drift] and the update_id
+# fanout it drives) skips itself and ships untested.
+echo "INFO: UCC team-cache correctness tests (RESEAT) ..."
+# shellcheck disable=SC2046,SC2086  # MPI argument fragments intentionally word-split.
+reseat_args="${cache_args} -x UCC_TEAM_CACHE_RESEAT=y "
+mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $reseat_args $EXE -c barrier -t world,half,odd_even
+echo "INFO: UCC team-cache correctness tests (RESEAT) ... DONE"
+
 # Team-cache enabled-vs-disabled equivalence pass. The script runs ucc_test_mpi
 # with cache on, then off, using its built-in per-collective correctness checks
 # as the equivalence oracle.

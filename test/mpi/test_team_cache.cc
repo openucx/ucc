@@ -388,19 +388,25 @@ static tc_verdict_t test_dormant_reuse_stats(ucc_context_h ctx, int world_rank,
  * derived_reuse: with a live parent kept throughout, create/destroy a derived
  * team of identical membership kReuseIters times. From iter 1 the dormant
  * derived is re-adopted (cache HIT).
- * The derived's external id is stable, so an exact-identity lookup re-adopts
- * it. Requires UCC_TEAM_CACHE_DERIVED, else it skips.
+ *   - drift==false: the derived's external id is stable, so an exact-identity
+ *     lookup re-adopts it.
+ *   - drift==true : the derived's external id drifts every iteration, so only a
+ *     membership-match re-adopt (reseat) can hit; requires
+ *     UCC_TEAM_CACHE_RESEAT and UCC_TEAM_CACHE_DERIVED, else it skips.
  * ========================================================================== */
-static tc_verdict_t test_derived_reuse(ucc_context_h ctx,
-                                       int world_rank, int world_size)
+static tc_verdict_t test_derived_reuse(ucc_context_h ctx, int world_rank,
+                                       int world_size, bool drift)
 {
-    const char       *name  = "derived_reuse";
+    const char       *name  = drift ? "derived_reuse[drift]" : "derived_reuse";
     ucc_team_cache_t *cache = cache_of(ctx);
     tc_verdict_t      v     = TC_PASS;
     ucc_team_h        parent;
 
     if (!cache->derived) {
         return tc_skip(name, world_rank, "UCC_TEAM_CACHE_DERIVED not enabled");
+    }
+    if (drift && !cache->reseat) {
+        return tc_skip(name, world_rank, "UCC_TEAM_CACHE_RESEAT not enabled");
     }
 
     drain_cache(ctx);
@@ -412,9 +418,12 @@ static tc_verdict_t test_derived_reuse(ucc_context_h ctx,
 
     for (int i = 0; i < kReuseIters; i++) {
         uint64_t hits_before = cache->stats.hits;
-        /* Derived: same membership as the parent, under a stable ext_id, so
-           an exact-identity lookup re-adopts it. */
-        ucc_team_h derived    = create_world_team(ctx, world_size, /*ext_id=*/2);
+        /* Derived: same membership as the parent. Under drift the ext_id
+           changes every iteration (100, 101, ...) so the exact-identity lookup
+           misses and only a reseat re-adopt can hit; otherwise ext_id=2 is
+           stable. */
+        uint64_t   derived_id = drift ? (uint64_t)(100 + i) : 2;
+        ucc_team_h derived    = create_world_team(ctx, world_size, derived_id);
         int64_t    sbuf       = (int64_t)(100 + i);
         int64_t    exp        = sbuf * (int64_t)world_size;
         int64_t    rbuf       = run_allreduce_int64(derived, ctx, sbuf,
@@ -427,7 +436,7 @@ static tc_verdict_t test_derived_reuse(ucc_context_h ctx,
             v = TC_FAIL;
         }
         /* From iter 1 onwards: expect a cache hit re-adopting the dormant
-           derived. */
+           derived (via reseat under drift). */
         if (i > 0 && cache->stats.hits <= hits_before) {
             std::cerr << "*** UCC TEST FAIL: " << name << " rank " << world_rank
                       << " iter " << i
@@ -897,7 +906,7 @@ ucc_test_suite_result_t run_team_cache_tests(ucc_context_h ctx, int world_rank,
     /* Must match the number of tc_tally calls below: used to report every test
        as skipped when caching is off, so a disabled run is never mistaken for a
        clean one. */
-    const int               kNumTests = 9;
+    const int               kNumTests = 10;
     ucc_test_suite_result_t r         = {0, 0, 0};
 
     if (0 == world_rank) {
@@ -920,7 +929,8 @@ ucc_test_suite_result_t run_team_cache_tests(ucc_context_h ctx, int world_rank,
     tc_tally(&r, test_dup_coexist_derived(ctx, world_rank, world_size, false));
     tc_tally(&r, test_dup_coexist_derived(ctx, world_rank, world_size, true));
     tc_tally(&r, test_dormant_reuse_stats(ctx, world_rank, world_size));
-    tc_tally(&r, test_derived_reuse(ctx, world_rank, world_size));
+    tc_tally(&r, test_derived_reuse(ctx, world_rank, world_size, false));
+    tc_tally(&r, test_derived_reuse(ctx, world_rank, world_size, true));
     tc_tally(&r, test_ep_map_cb_freed_after_cache(ctx, world_rank, world_size));
     tc_tally(&r, test_overlap_agreement(ctx, world_rank, world_size));
     tc_tally(&r, test_derived_exact_rebuild(ctx, world_rank, world_size));
