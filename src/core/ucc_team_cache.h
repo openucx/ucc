@@ -130,7 +130,7 @@ void        ucc_team_cache_destroy(ucc_team_cache_t *cache);
 ucc_team_t *ucc_team_cache_lookup(
     ucc_team_cache_t *cache, const ucc_team_cache_identity_t *id);
 
-/* Insert @team as DORMANT; a full cache or hash collision skips the insert */
+/* Insert @team as DORMANT; a full cache skips the insert, collisions chain */
 ucc_status_t ucc_team_cache_insert(ucc_team_cache_t *cache, ucc_team_t *team);
 
 /* Adopt a DORMANT team: refcount++, DORMANT -> LIVE; under @cache->lock */

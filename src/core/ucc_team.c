@@ -176,6 +176,7 @@ static ucc_team_t *ucc_team_alloc_shell(
         team->cache_pending_insert = 0;
     }
     ucc_list_head_init(&team->cache_link);
+    ucc_list_head_init(&team->bucket_link);
     team->cache_state        = UCC_TEAM_CACHE_STATE_NONE;
     team->cache_local_action = UCC_TEAM_CACHE_ACTION_MISS;
     team->contexts           = ucc_malloc(
@@ -1016,6 +1017,7 @@ static ucc_status_t ucc_team_reset_for_rebuild(
     team->cache_state          = UCC_TEAM_CACHE_STATE_NONE;
     team->cache_pending_insert = 1;
     ucc_list_head_init(&team->cache_link);
+    ucc_list_head_init(&team->bucket_link);
     /* Teardown released the old holder, so re-init the inline one */
     team->artifacts = &team->artifacts_inline;
     ucc_team_artifacts_init_inline(team->artifacts);

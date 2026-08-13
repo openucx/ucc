@@ -14,9 +14,17 @@
 #include <inttypes.h>
 #include <string.h>
 
-/* One team per key; the cache holds the table as an opaque void * */
+/* Chain head per key; the cache holds the table as an opaque void * */
 KHASH_MAP_INIT_INT64(ucc_team_cache_map, ucc_team_t *)
 typedef khash_t(ucc_team_cache_map) ucc_team_cache_map_t;
+
+/* Walk the bucket ring headed by @_head; do not unlink @_it inside the loop */
+#define UCC_TEAM_CACHE_BUCKET_FOR_EACH(_it, _head)                             \
+    for ((_it) = (_head); (_it) != NULL;                                       \
+         (_it) = ((_it)->bucket_link.next == &(_head)->bucket_link)            \
+                     ? NULL                                                    \
+                     : ucc_container_of(                                       \
+                           (_it)->bucket_link.next, ucc_team_t, bucket_link))
 
 /* Order must match ucc_team_cache_eviction_policy_t */
 const char *ucc_team_cache_eviction_names[] = {
@@ -330,13 +338,42 @@ void ucc_team_cache_table_erase(ucc_team_cache_t *cache, ucc_team_t *team)
     ucc_team_cache_map_t *h    = (ucc_team_cache_map_t *)cache->table;
     uint64_t              hash = team->cache_identity.hash;
     khiter_t              k;
+    ucc_team_t           *head, *it, *found = NULL;
 
+    /* A team skipped at insert is on no ring, so the erase is a no-op */
     k = kh_get(ucc_team_cache_map, h, hash);
-    if (k == kh_end(h) || kh_value(h, k) != team) {
-        /* Absent, or a colliding team owns the bucket */
+    if (k == kh_end(h)) {
         return;
     }
-    kh_del(ucc_team_cache_map, h, k);
+    head = kh_value(h, k);
+
+    UCC_TEAM_CACHE_BUCKET_FOR_EACH(it, head)
+    {
+        if (it == team) {
+            found = team;
+            break;
+        }
+    }
+    if (!found) {
+        return;
+    }
+
+    if (team != head) {
+        /* Non-head sibling: unlink from the ring, head untouched */
+        ucc_list_del(&team->bucket_link);
+        ucc_list_head_init(&team->bucket_link);
+    } else if (ucc_list_is_empty(&head->bucket_link)) {
+        /* Single-entry chain: drop the whole bucket */
+        kh_del(ucc_team_cache_map, h, k);
+    } else {
+        /* Promote the next sibling, preserving ring order */
+        ucc_team_t *next = ucc_container_of(
+            head->bucket_link.next, ucc_team_t, bucket_link);
+
+        ucc_list_del(&head->bucket_link);
+        ucc_list_head_init(&head->bucket_link);
+        kh_value(h, k) = next;
+    }
     ucc_assert(cache->size > 0);
     cache->size--;
 }
@@ -348,47 +385,45 @@ ucc_team_t *ucc_team_cache_lookup(
 {
     ucc_team_cache_map_t *h = (ucc_team_cache_map_t *)cache->table;
     khiter_t              k;
-    ucc_team_t           *team;
+    ucc_team_t           *head, *team;
 
     cache->stats.lookups++;
 
     k = kh_get(ucc_team_cache_map, h, id->hash);
-    if (k == kh_end(h)) {
-        cache->stats.misses++;
-        ucc_debug(
-            "team_cache %p: lookup miss (hash=0x%" PRIx64 ")",
-            (void *)cache,
-            id->hash);
-        return NULL;
+    if (k != kh_end(h)) {
+        head = kh_value(h, k);
+
+        UCC_TEAM_CACHE_BUCKET_FOR_EACH(team, head)
+        {
+            /* A different ext_id is a different tag domain, not a reuse */
+            if (team->cache_identity.ext_id != id->ext_id) {
+                continue;
+            }
+            if (!cache->disable_linear_check &&
+                !ucc_team_cache_identity_equal_membership(
+                    &team->cache_identity, id)) {
+                continue;
+            }
+            /* Only a DORMANT team is free to re-adopt */
+            if (team->cache_state != UCC_TEAM_CACHE_STATE_DORMANT) {
+                continue;
+            }
+            cache->stats.hits++;
+            ucc_debug(
+                "team_cache %p: lookup HIT team %p (hash=0x%" PRIx64 ")",
+                (void *)cache,
+                (void *)team,
+                id->hash);
+            return team;
+        }
     }
 
-    team = kh_value(h, k);
-
-    /* A different ext_id is a different tag domain, so not a valid reuse */
-    if (team->cache_identity.ext_id != id->ext_id) {
-        cache->stats.misses++;
-        return NULL;
-    }
-
-    if (!cache->disable_linear_check &&
-        !ucc_team_cache_identity_equal_membership(&team->cache_identity, id)) {
-        cache->stats.misses++;
-        return NULL;
-    }
-
-    /* Only a DORMANT team is free to re-adopt */
-    if (team->cache_state != UCC_TEAM_CACHE_STATE_DORMANT) {
-        cache->stats.misses++;
-        return NULL;
-    }
-
-    cache->stats.hits++;
+    cache->stats.misses++;
     ucc_debug(
-        "team_cache %p: lookup HIT team %p (hash=0x%" PRIx64 ")",
+        "team_cache %p: lookup miss (hash=0x%" PRIx64 ")",
         (void *)cache,
-        (void *)team,
         id->hash);
-    return team;
+    return NULL;
 }
 
 ucc_status_t ucc_team_cache_insert(ucc_team_cache_t *cache, ucc_team_t *team)
@@ -408,27 +443,45 @@ ucc_status_t ucc_team_cache_insert(ucc_team_cache_t *cache, ucc_team_t *team)
         return UCC_OK; /* cache_state stays NONE, so destroy tears it down */
     }
 
-    /* An occupied bucket leaves the new team uncached but still functional */
+    /* Same-hash teams coexist on one ring, so only a re-insert is refused */
     k = kh_get(ucc_team_cache_map, h, hash);
     if (k != kh_end(h)) {
-        ucc_info(
-            "team_cache %p: bucket occupied (hash=0x%" PRIx64
-            ") - team %p not cached (duplicate or hash collision)",
-            (void *)cache,
-            hash,
-            (void *)team);
-        return UCC_OK;
-    }
+        ucc_team_t *head = kh_value(h, k);
+        ucc_team_t *it;
 
-    k = kh_put(ucc_team_cache_map, h, hash, &ret);
-    if (ucc_unlikely(ret < 0)) {
-        ucc_error(
-            "team_cache %p: kh_put failed for hash=0x%" PRIx64,
+        UCC_TEAM_CACHE_BUCKET_FOR_EACH(it, head)
+        {
+            if (ucc_team_cache_identity_equal(
+                    &it->cache_identity, &team->cache_identity)) {
+                ucc_info(
+                    "team_cache %p: duplicate identity (hash=0x%" PRIx64
+                    ") - team %p not re-inserted",
+                    (void *)cache,
+                    hash,
+                    (void *)team);
+                return UCC_OK;
+            }
+        }
+
+        /* Tail-append: chain order = insertion (collective) order */
+        ucc_list_add_tail(&head->bucket_link, &team->bucket_link);
+        ucc_debug(
+            "team_cache %p: chained team %p onto bucket (hash=0x%" PRIx64 ")",
             (void *)cache,
+            (void *)team,
             hash);
-        return UCC_ERR_NO_MEMORY;
+    } else {
+        k = kh_put(ucc_team_cache_map, h, hash, &ret);
+        if (ucc_unlikely(ret < 0)) {
+            ucc_error(
+                "team_cache %p: kh_put failed for hash=0x%" PRIx64,
+                (void *)cache,
+                hash);
+            return UCC_ERR_NO_MEMORY;
+        }
+        /* First team for this key becomes the chain head (self-linked ring) */
+        kh_value(h, k) = team;
     }
-    kh_value(h, k) = team;
 
     /* The caller immediately promotes this to LIVE via registry_make_live */
     ucc_list_add_tail(&cache->dormant, &team->cache_link);
