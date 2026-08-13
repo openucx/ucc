@@ -75,6 +75,21 @@ typedef enum ucc_team_cache_action {
     UCC_TEAM_CACHE_ACTION_EXACT_REUSE = 1, /* re-adopt a DORMANT team */
 } ucc_team_cache_action_t;
 
+/* Vote lanes: [0] prepared, [1..8] (value, ~value) pairs, [9] new cookie */
+#define UCC_TEAM_CACHE_VOTE_LANES 10
+
+/* Fill one rank's vote buffer @v ahead of the UCC_OP_BAND allreduce */
+void ucc_team_cache_vote_fill(
+    uint64_t *v, int prepared, ucc_team_cache_action_t action, uint64_t key,
+    uint64_t cookie, uint64_t parent_cookie, int is_rank0,
+    uint64_t proposed_cookie);
+
+/* Agreed action from a BAND reduced vote buffer, or MISS if not unanimous */
+ucc_team_cache_action_t ucc_team_cache_vote_result(const uint64_t *v);
+
+/* Team rank 0's proposed instance cookie, from a BAND reduced vote buffer */
+uint64_t                ucc_team_cache_vote_new_cookie(const uint64_t *v);
+
 typedef struct ucc_team_cache_stats {
     uint64_t lookups;
     uint64_t hits;
