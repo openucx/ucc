@@ -270,6 +270,175 @@ UCC_TEST_F(test_team_cache, differing_membership_not_equal)
     ucc_team_cache_identity_free(&s2);
 }
 
+/* Agreement vote: a UCC_OP_BAND allreduce over the members' fill buffers. */
+static void vote_band_reduce(
+    const std::vector<std::vector<uint64_t>> &in, uint64_t *out)
+{
+    for (int l = 0; l < UCC_TEAM_CACHE_VOTE_LANES; l++) {
+        out[l] = ~(uint64_t)0;
+    }
+    for (const auto &v : in) {
+        for (int l = 0; l < UCC_TEAM_CACHE_VOTE_LANES; l++) {
+            out[l] &= v[l];
+        }
+    }
+}
+
+/* All-hit agreement: EXACT_REUSE with a stable key agrees; rank-0's proposed
+   cookie is distributed via lane [9]. */
+UCC_TEST_F(test_team_cache, vote_agreement_and_cookie)
+{
+    uint64_t out[UCC_TEAM_CACHE_VOTE_LANES];
+
+    /* EXACT_REUSE with cookie=0 everywhere still agrees (ext_id pins the
+       instance). */
+    {
+        std::vector<std::vector<uint64_t>> in(
+            3, std::vector<uint64_t>(UCC_TEAM_CACHE_VOTE_LANES));
+        for (int r = 0; r < 3; r++) {
+            ucc_team_cache_vote_fill(
+                in[r].data(),
+                1,
+                UCC_TEAM_CACHE_ACTION_EXACT_REUSE,
+                0x55,
+                /*cookie=*/0,
+                /*parent_cookie=*/0,
+                /*is_rank0=*/(r == 0),
+                0x1);
+        }
+        vote_band_reduce(in, out);
+        EXPECT_EQ(
+            UCC_TEAM_CACHE_ACTION_EXACT_REUSE, ucc_team_cache_vote_result(out));
+        /* rank-0's proposed cookie must survive in lane [9]. */
+        EXPECT_EQ((uint64_t)0x1, ucc_team_cache_vote_new_cookie(out));
+    }
+
+    /* MISS from all ranks (all prepared=0) -> result stays MISS. */
+    {
+        std::vector<std::vector<uint64_t>> in(
+            2, std::vector<uint64_t>(UCC_TEAM_CACHE_VOTE_LANES));
+        for (int r = 0; r < 2; r++) {
+            ucc_team_cache_vote_fill(
+                in[r].data(),
+                /*prepared=*/0,
+                UCC_TEAM_CACHE_ACTION_MISS,
+                0,
+                0,
+                0,
+                /*is_rank0=*/(r == 0),
+                /*proposed_cookie=*/0xBEEF);
+        }
+        vote_band_reduce(in, out);
+        EXPECT_EQ(UCC_TEAM_CACHE_ACTION_MISS, ucc_team_cache_vote_result(out));
+        EXPECT_EQ((uint64_t)0xBEEF, ucc_team_cache_vote_new_cookie(out));
+    }
+}
+
+/* A single miss rank (prepared=0) forces a global MISS even if every other rank
+   agrees, and rank-0's new-cookie proposal still survives for the fresh build. */
+UCC_TEST_F(test_team_cache, vote_one_miss_rank_forces_miss_keeps_cookie)
+{
+    std::vector<std::vector<uint64_t>> in(
+        3, std::vector<uint64_t>(UCC_TEAM_CACHE_VOTE_LANES));
+    uint64_t out[UCC_TEAM_CACHE_VOTE_LANES];
+
+    ucc_team_cache_vote_fill(
+        in[0].data(),
+        1,
+        UCC_TEAM_CACHE_ACTION_EXACT_REUSE,
+        0x1234,
+        0,
+        0,
+        /*is_rank0=*/1,
+        /*proposed_cookie=*/0x900D);
+    ucc_team_cache_vote_fill(
+        in[1].data(),
+        1,
+        UCC_TEAM_CACHE_ACTION_EXACT_REUSE,
+        0x1234,
+        0,
+        0,
+        /*is_rank0=*/0,
+        0);
+    ucc_team_cache_vote_fill(
+        in[2].data(),
+        /*prepared=*/0,
+        UCC_TEAM_CACHE_ACTION_MISS,
+        0,
+        0,
+        0,
+        /*is_rank0=*/0,
+        0);
+    vote_band_reduce(in, out);
+    EXPECT_EQ(UCC_TEAM_CACHE_ACTION_MISS, ucc_team_cache_vote_result(out));
+    EXPECT_EQ((uint64_t)0x900D, ucc_team_cache_vote_new_cookie(out));
+}
+
+/* Ranks that agree on the action and key but disagree on the instance cookie
+   must not reuse: the cookie equality pair breaks, so the vote degrades to
+   MISS.  This is what keeps a re-seated instance from being silently adopted. */
+UCC_TEST_F(test_team_cache, vote_reseat_different_cookie_misses)
+{
+    std::vector<std::vector<uint64_t>> in(
+        2, std::vector<uint64_t>(UCC_TEAM_CACHE_VOTE_LANES));
+    uint64_t out[UCC_TEAM_CACHE_VOTE_LANES];
+
+    ucc_team_cache_vote_fill(
+        in[0].data(),
+        1,
+        UCC_TEAM_CACHE_ACTION_EXACT_REUSE,
+        0xABCD,
+        /*cookie=*/0x11,
+        /*parent_cookie=*/0,
+        /*is_rank0=*/1,
+        /*proposed_cookie=*/0x77);
+    ucc_team_cache_vote_fill(
+        in[1].data(),
+        1,
+        UCC_TEAM_CACHE_ACTION_EXACT_REUSE,
+        0xABCD,
+        /*cookie=*/0x22, /* re-seated instance */
+        /*parent_cookie=*/0,
+        /*is_rank0=*/0,
+        0);
+    vote_band_reduce(in, out);
+    EXPECT_EQ(UCC_TEAM_CACHE_ACTION_MISS, ucc_team_cache_vote_result(out));
+    EXPECT_EQ((uint64_t)0x77, ucc_team_cache_vote_new_cookie(out));
+
+    /* A parent-cookie disagreement alone is equally disqualifying. */
+    ucc_team_cache_vote_fill(
+        in[1].data(),
+        1,
+        UCC_TEAM_CACHE_ACTION_EXACT_REUSE,
+        0xABCD,
+        /*cookie=*/0x11,
+        /*parent_cookie=*/0x99,
+        /*is_rank0=*/0,
+        0);
+    vote_band_reduce(in, out);
+    EXPECT_EQ(UCC_TEAM_CACHE_ACTION_MISS, ucc_team_cache_vote_result(out));
+}
+
+/* next_cookie is strictly monotonic and never returns 0, since 0 is the
+   "unstamped" sentinel that makes a vote accept any instance. */
+UCC_TEST_F(test_team_cache, next_cookie_monotonic_nonzero)
+{
+    ucc_team_cache_t c;
+    memset(&c, 0, sizeof(c));
+    c.cache_gen = 0;
+    uint64_t a  = ucc_team_cache_next_cookie(&c);
+    uint64_t b  = ucc_team_cache_next_cookie(&c);
+    EXPECT_NE((uint64_t)0, a);
+    EXPECT_NE((uint64_t)0, b);
+    EXPECT_LT(a, b);
+
+    /* The wrap is only reachable after 2^64 adoptions, so seed it: the next
+       increment rolls cache_gen to 0, which must be skipped. */
+    c.cache_gen = UINT64_MAX;
+    EXPECT_NE((uint64_t)0, ucc_team_cache_next_cookie(&c))
+        << "a wrapped cookie must skip the unstamped sentinel";
+}
+
 /* is_cacheable: true when only EP_MAP/EP/OOB/etc are set; false when any
    optional behavioral field is set.  FLAGS is ignored. */
 UCC_TEST_F(test_team_cache, is_cacheable_policy)
