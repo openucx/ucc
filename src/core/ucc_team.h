@@ -21,11 +21,13 @@
 
 typedef struct ucc_service_coll_req ucc_service_coll_req_t;
 typedef enum {
-    UCC_TEAM_ADDR_EXCHANGE,
+    UCC_TEAM_ADDR_EXCHANGE, /* zero, so it is the calloc default */
     UCC_TEAM_SERVICE_TEAM,
     UCC_TEAM_ALLOC_ID,
     UCC_TEAM_CL_CREATE,
     UCC_TEAM_ACTIVE,
+    UCC_TEAM_CACHE_AGREE,         /* cache-action vote in flight */
+    UCC_TEAM_CACHE_MISS_TEARDOWN, /* vote lost, draining before a rebuild */
 } ucc_team_state_t;
 
 typedef struct ucc_team {
@@ -68,6 +70,15 @@ void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src);
 /* Team-id pool bit helpers; bit (pos - 1) of word i encodes id i * 64 + pos */
 int  ucc_team_id_pool_ffs_clear(uint64_t *value);
 void ucc_team_id_pool_set_bit(uint64_t *local, int id);
+
+/* Destroy every dormant team; call before the CL/TL contexts are destroyed */
+void ucc_team_cache_drain(ucc_context_t *context);
+
+/* Drive one teardown attempt for each team on the pending-destroy list */
+void ucc_team_cache_progress_pending(ucc_team_cache_t *cache);
+
+/* Move the eviction victim to the pending-destroy list and start its teardown */
+ucc_status_t ucc_team_cache_evict_one(ucc_team_cache_t *cache);
 
 /* Returns addressing information for "rank" in a team.
    If ucc context was created with OOB then addr storage is located on context.
