@@ -120,6 +120,38 @@ int ucc_team_can_derive_from(const ucc_team_t *parent)
     return 1;
 }
 
+void ucc_team_reseat_id(ucc_team_t *team, uint16_t new_ext_id)
+{
+    int i;
+
+    ucc_assert(team->is_derived);
+
+    team->id                    = new_ext_id;
+    team->bp.id                 = new_ext_id;
+    team->cache_identity.ext_id = new_ext_id;
+
+    /* The hook is optional, same as the CL one below: the service team is
+       always tl/ucp today, but nothing in the interface requires that */
+    if (team->service_team) {
+        ucc_tl_iface_t *tl_iface = UCC_TL_TEAM_IFACE(team->service_team);
+
+        if (tl_iface->scoll.update_id) {
+            tl_iface->scoll.update_id(&team->service_team->super, new_ext_id);
+        }
+    }
+    for (i = 0; i < team->n_cl_teams; i++) {
+        ucc_base_team_iface_t *cl_iface;
+
+        if (!team->cl_teams[i]) {
+            continue;
+        }
+        cl_iface = &UCC_CL_TEAM_IFACE(team->cl_teams[i])->team;
+        if (cl_iface->update_id) {
+            cl_iface->update_id(&team->cl_teams[i]->super, new_ext_id);
+        }
+    }
+}
+
 void ucc_team_init_derived(
     ucc_team_t *team, ucc_team_artifacts_t *held_artifacts, uint16_t parent_id)
 {
@@ -280,15 +312,39 @@ static ucc_team_t *ucc_team_alloc_shell(
     return team;
 }
 
+/* Rebook a miss as a hit: a reseat reused a team the exact lookup had missed */
+static void ucc_team_cache_rebook_miss_as_hit(ucc_team_cache_t *cache)
+{
+    ucc_assert(cache->stats.misses > 0);
+    cache->stats.misses--;
+    cache->stats.hits++;
+}
+
+/* Undo the rebook above when the reseat candidate is not adopted after all.
+   Only the RESEAT hit is reversed: it was booked optimistically against a
+   lookup that had actually missed, so a rebuild makes the original miss the
+   truthful count. An EXACT_REUSE that later loses the vote keeps its hit, which
+   is a real lookup hit by the same definition the rest of the stats use. */
+static void ucc_team_cache_rebook_hit_as_miss(ucc_team_cache_t *cache)
+{
+    ucc_assert(cache->stats.hits > 0);
+    cache->stats.hits--;
+    cache->stats.misses++;
+}
+
 /* Undo a posted vote setup after a fatal post failure */
 static void ucc_team_agreement_rollback(
     ucc_team_cache_t *cache, ucc_team_t *handle, ucc_team_cache_action_t action)
 {
-    if (action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE) {
-        /* The refcount was never bumped, so just release the reservation */
+    if (action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE ||
+        action == UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED) {
+        /* Neither bumped the refcount, and a reseat has not happened yet */
         ucc_spin_lock(&cache->lock);
         handle->cache_state = UCC_TEAM_CACHE_STATE_DORMANT;
         ucc_team_cache_registry_make_dormant(cache, handle);
+        if (action == UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED) {
+            ucc_team_cache_rebook_hit_as_miss(cache);
+        }
         ucc_spin_unlock(&cache->lock);
         return;
     }
@@ -314,7 +370,9 @@ static ucc_status_t ucc_team_agreement_create_post(
     uint16_t                  derive_parent_id = 0;
     ucc_team_cache_action_t   action           = UCC_TEAM_CACHE_ACTION_MISS;
     uint64_t                  key              = 0;
+    uint64_t                  cookie           = 0;
     uint64_t                  parent_cookie    = 0;
+    uint16_t                  reseat_new_id    = 0;
     int                       is_rank0         = (team_rank == 0);
     uint64_t                  proposed_cookie  = 0;
     ucc_subset_t              subset;
@@ -333,12 +391,29 @@ static ucc_status_t ucc_team_agreement_create_post(
             key    = cached->id;
             ucc_team_cache_registry_make_reserved(cache, cached);
             cached->cache_state = UCC_TEAM_CACHE_STATE_RESERVED;
+        } else if (
+            cache->reseat && cache->derived &&
+            (cached = ucc_team_cache_lookup_dormant_derived(cache, &id)) !=
+                NULL &&
+            cached->cache_identity.instance_cookie != 0) {
+            /* A zero cookie lets the vote accept any instance, so decline */
+            action        = UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED;
+            key           = cached->id;
+            cookie        = cached->cache_identity.instance_cookie;
+            parent_cookie = cached->cache_parent_instance_cookie;
+            reseat_new_id = id.ext_id;
+            ucc_team_cache_registry_make_reserved(cache, cached);
+            cached->cache_state = UCC_TEAM_CACHE_STATE_RESERVED;
+            /* Reversed by ucc_team_cache_rebook_hit_as_miss if the
+               vote is lost or the post fails */
+            ucc_team_cache_rebook_miss_as_hit(cache);
         } else {
             /* A live match is a second comm over the same members */
-            ucc_team_t *live = cache->derived
-                                   ? ucc_team_cache_lookup_live(cache, &id)
-                                   : NULL;
+            ucc_team_t *live;
 
+            cached = NULL; /* the dormant-derived probe above may have set it */
+            live   = cache->derived ? ucc_team_cache_lookup_live(cache, &id)
+                                    : NULL;
             if (live != NULL && ucc_team_can_derive_from(live)) {
                 action           = UCC_TEAM_CACHE_ACTION_DERIVED_FROM_LIVE;
                 key              = live->id;
@@ -350,10 +425,12 @@ static ucc_status_t ucc_team_agreement_create_post(
         ucc_spin_unlock(&cache->lock);
     }
 
-    if (action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE) {
+    if (action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE ||
+        action == UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED) {
         handle = cached;
         /* The candidate already carries its own identity */
         ucc_team_cache_identity_free(&id);
+        handle->cache_reseat_new_id = reseat_new_id;
         /* Refresh the map, since the candidate's may name a freed team */
         handle->bp.params.ep_map = params->ep_map;
         handle->bp.params.mask |= UCC_TEAM_PARAM_FIELD_EP_MAP;
@@ -397,7 +474,7 @@ static ucc_status_t ucc_team_agreement_create_post(
         action != UCC_TEAM_CACHE_ACTION_MISS,
         action,
         key,
-        /*cookie=*/0,
+        cookie,
         parent_cookie,
         is_rank0,
         proposed_cookie);
@@ -436,6 +513,8 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     /* Parent pin taken under cache->lock, consumed by ucc_team_init_derived */
     ucc_team_artifacts_t     *derive_artifacts = NULL;
     uint16_t                  derive_parent_id = 0;
+    int                       reseat_needed    = 0;
+    uint16_t                  reseat_new_id    = 0;
 
     if (num_contexts < 1) {
         return UCC_ERR_INVALID_PARAM;
@@ -548,10 +627,36 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
             /* One lock spans lookup and adopt, so no team is adopted twice */
             ucc_spin_lock(&cache->lock);
             cached = ucc_team_cache_lookup(cache, &id);
+            if (cache->reseat && cache->derived && cached == NULL) {
+                /* The exact lookup missed, so try a team whose cid drifted */
+                ucc_team_t *reseat =
+                    ucc_team_cache_lookup_dormant_derived(cache, &id);
+
+                if (reseat != NULL) {
+                    cached        = reseat;
+                    reseat_needed = 1;
+                    reseat_new_id = id.ext_id;
+                    ucc_team_cache_rebook_miss_as_hit(cache);
+                }
+            }
             if (cached != NULL) {
-                cached->cache_local_action = UCC_TEAM_CACHE_ACTION_EXACT_REUSE;
+                cached->cache_local_action =
+                    reseat_needed ? UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED
+                                  : UCC_TEAM_CACHE_ACTION_EXACT_REUSE;
                 ucc_team_cache_get(cached);
                 ucc_team_cache_registry_make_live(cache, cached);
+
+                /* Under the lock, so no user observes a half-reseated team */
+                if (reseat_needed &&
+                    cached->cache_identity.ext_id != reseat_new_id) {
+                    ucc_debug(
+                        "team cache: reseat team %p id 0x%x -> 0x%x "
+                        "(cid drift, same membership)",
+                        (void *)cached,
+                        (unsigned)cached->cache_identity.ext_id,
+                        (unsigned)reseat_new_id);
+                    ucc_team_reseat_id(cached, reseat_new_id);
+                }
             } else {
                 /* A live match is a second comm over the same members */
                 ucc_team_t *live = cache->derived
@@ -909,6 +1014,26 @@ static void ucc_team_cache_admit(ucc_team_t *team)
     ucc_spin_unlock(&cache->lock);
 }
 
+/* Adopt the reserved candidate after a unanimous vote; @reseat re-keys it */
+static void ucc_team_agreement_promote_reserved(
+    ucc_context_t *context, ucc_team_t *team, int reseat)
+{
+    ucc_team_cache_t *cache = context->team_cache;
+
+    ucc_spin_lock(&cache->lock);
+    ucc_team_cache_get(team); /* refcount 0 -> 1, RESERVED -> LIVE */
+    ucc_team_cache_registry_make_live(cache, team);
+    if (reseat && team->cache_identity.ext_id != team->cache_reseat_new_id) {
+        ucc_debug(
+            "team cache: agreed RESEAT team %p id 0x%x -> 0x%x",
+            (void *)team,
+            (unsigned)team->cache_identity.ext_id,
+            (unsigned)team->cache_reseat_new_id);
+        ucc_team_reseat_id(team, team->cache_reseat_new_id);
+    }
+    ucc_spin_unlock(&cache->lock);
+}
+
 ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
                                          ucc_team_t    *team)
 {
@@ -933,13 +1058,15 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
         agreed = ucc_team_cache_vote_result(team->cache_vote_out);
         if (agreed == UCC_TEAM_CACHE_ACTION_EXACT_REUSE &&
             team->cache_local_action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE) {
-            ucc_team_cache_t *vote_cache = context->team_cache;
-
-            ucc_spin_lock(&vote_cache->lock);
-            ucc_team_cache_get(team); /* RESERVED -> LIVE */
-            ucc_team_cache_registry_make_live(vote_cache, team);
-            ucc_spin_unlock(&vote_cache->lock);
+            ucc_team_agreement_promote_reserved(context, team, 0);
             ucc_debug("team cache: agreed EXACT reuse, team %p", (void *)team);
+            team->state = UCC_TEAM_ACTIVE;
+            return UCC_OK;
+        }
+        if (agreed == UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED &&
+            team->cache_local_action == UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED) {
+            /* The cookie lanes proved every member picked the same instance */
+            ucc_team_agreement_promote_reserved(context, team, 1);
             team->state = UCC_TEAM_ACTIVE;
             return UCC_OK;
         }
@@ -957,13 +1084,23 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
             return UCC_INPROGRESS;
         }
         /* Not unanimous, so every member builds a fresh team */
-        if (team->cache_local_action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE) {
+        if (team->cache_local_action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE ||
+            team->cache_local_action == UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED) {
             /* Detach the rejected candidate and rebuild the same handle */
             ucc_team_cache_t *vote_cache = context->team_cache;
 
             ucc_spin_lock(&vote_cache->lock);
-            ucc_team_cache_table_erase(vote_cache, team);
-            ucc_team_cache_registry_remove(team);
+            ucc_team_cache_detach(vote_cache, team);
+            /* The rebuild belongs to the caller's cid, not the retired one */
+            if (team->cache_local_action ==
+                UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED) {
+                /* The optimistic reseat hit did not happen */
+                ucc_team_cache_rebook_hit_as_miss(vote_cache);
+                if (UCC_TEAM_ID_IS_EXTERNAL(team)) {
+                    team->id = team->cache_reseat_new_id;
+                }
+                team->cache_identity.ext_id = team->cache_reseat_new_id;
+            }
             /* A rebuild owns its artifacts, so it is no longer derived */
             team->is_derived = 0;
             team->parent_id  = 0;
