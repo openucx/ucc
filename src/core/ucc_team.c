@@ -11,9 +11,11 @@
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
 #include "ucc_service_coll.h"
+#include <inttypes.h>
 
 static ucc_status_t ucc_team_alloc_id(ucc_team_t *team);
 static void ucc_team_release_id(ucc_team_t *team);
+static ucc_status_t ucc_team_destroy_single(ucc_team_h team);
 
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
 {
@@ -102,6 +104,62 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
     return UCC_OK;
 }
 
+/* Allocate an unbuilt team; on @id_built the identity MOVES from @id to it.
+   The move happens only on success: when this returns NULL the caller still
+   owns @id and must free it. Both call sites rely on that split. */
+static ucc_team_t *ucc_team_alloc_shell(
+    ucc_context_h *contexts, uint32_t num_contexts,
+    const ucc_team_params_t *params, uint64_t team_size, uint64_t team_rank,
+    int id_built, ucc_team_cache_identity_t *id, ucc_status_t *status_out)
+{
+    ucc_team_t *team;
+
+    team = ucc_calloc(1, sizeof(ucc_team_t), "ucc_team");
+    if (!team) {
+        ucc_error(
+            "failed to allocate %zd bytes for ucc team", sizeof(ucc_team_t));
+        *status_out = UCC_ERR_NO_MEMORY;
+        return NULL;
+    }
+    team->runtime_oob  = params->oob;
+    team->num_contexts = num_contexts;
+    team->size         = (ucc_rank_t)team_size;
+    team->rank         = (ucc_rank_t)team_rank;
+    team->seq_num      = 0;
+    team->refcount     = 1;
+    if (id_built) {
+        team->cache_identity       = *id; /* the caller's id now owns nothing */
+        team->cache_pending_insert = 1;
+        memset(id, 0, sizeof(*id));
+    } else {
+        memset(&team->cache_identity, 0, sizeof(team->cache_identity));
+        team->cache_pending_insert = 0;
+    }
+    ucc_list_head_init(&team->cache_link);
+    team->cache_state        = UCC_TEAM_CACHE_STATE_NONE;
+    team->cache_local_action = UCC_TEAM_CACHE_ACTION_MISS;
+    team->contexts           = ucc_malloc(
+        sizeof(ucc_context_t *) * num_contexts, "ucc_team_ctx");
+    if (!team->contexts) {
+        ucc_error(
+            "failed to allocate %zd bytes for ucc team contexts array",
+            sizeof(ucc_context_t *) * num_contexts);
+        ucc_team_cache_identity_free(&team->cache_identity);
+        ucc_free(team);
+        *status_out = UCC_ERR_NO_MEMORY;
+        return NULL;
+    }
+    memcpy(team->contexts, contexts, sizeof(ucc_context_t *) * num_contexts);
+    ucc_copy_team_params(&team->bp.params, params);
+    /* check if user provides team id and if it is not too large */
+    if ((params->mask & UCC_TEAM_PARAM_FIELD_ID) &&
+        (params->id <= UCC_TEAM_ID_MAX)) {
+        team->id = ((uint16_t)params->id) | UCC_TEAM_ID_EXTERNAL_BIT;
+    }
+    *status_out = UCC_OK;
+    return team;
+}
+
 ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts,
                                   const ucc_team_params_t *params,
                                   ucc_team_h *new_team)
@@ -110,6 +168,9 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     uint64_t     team_rank = UINT64_MAX;
     ucc_team_t  *team;
     ucc_status_t status;
+    ucc_team_cache_t         *cache    = NULL;
+    ucc_team_cache_identity_t id;
+    int                       id_built = 0;
 
     if (num_contexts < 1) {
         return UCC_ERR_INVALID_PARAM;
@@ -188,40 +249,56 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
         return UCC_ERR_INVALID_PARAM;
     }
 
-    team = ucc_calloc(1, sizeof(ucc_team_t), "ucc_team");
-    if (!team) {
-        ucc_error("failed to allocate %zd bytes for ucc team",
-                  sizeof(ucc_team_t));
-        return UCC_ERR_NO_MEMORY;
-    }
-    team->runtime_oob  = params->oob;
-    team->num_contexts = num_contexts;
-    team->size         = (ucc_rank_t)team_size;
-    team->rank         = (ucc_rank_t)team_rank;
-    team->seq_num      = 0;
-    team->contexts     = ucc_malloc(sizeof(ucc_context_t *) * num_contexts,
-                                    "ucc_team_ctx");
-    if (!team->contexts) {
-        ucc_error("failed to allocate %zd bytes for ucc team contexts array",
-                  sizeof(ucc_context_t) * num_contexts);
-        status = UCC_ERR_NO_MEMORY;
-        goto err_ctx_alloc;
+    /* Direct reuse, when a dormant team with identical membership exists */
+    cache = ((ucc_context_t *)contexts[0])->team_cache;
+    if (cache != NULL && ucc_team_cache_is_cacheable(params)) {
+        status = ucc_team_cache_identity_build(params, &id);
+        if (status == UCC_OK) {
+            ucc_team_t *cached;
+
+            id_built = 1;
+
+            /* One lock spans lookup and adopt, so no team is adopted twice */
+            ucc_spin_lock(&cache->lock);
+            cached = ucc_team_cache_lookup(cache, &id);
+            if (cached != NULL) {
+                cached->cache_local_action = UCC_TEAM_CACHE_ACTION_EXACT_REUSE;
+                ucc_team_cache_get(cached);
+                ucc_team_cache_registry_make_live(cache, cached);
+            }
+            ucc_spin_unlock(&cache->lock);
+
+            if (cached != NULL) {
+                ucc_debug(
+                    "team cache: dormant reuse / hit, team %p (hash=0x%" PRIx64
+                    ")",
+                    (void *)cached,
+                    id.hash);
+                ucc_team_cache_identity_free(&id);
+                *new_team = cached;
+                return UCC_OK;
+            }
+            /* On a miss @id moves onto the new team, to insert once ACTIVE */
+        }
     }
 
-    memcpy(team->contexts, contexts, sizeof(ucc_context_t *) * num_contexts);
-    ucc_copy_team_params(&team->bp.params, params);
-    /* check if user provides team id and if it is not too large */
-    if ((params->mask & UCC_TEAM_PARAM_FIELD_ID) &&
-        (params->id <= UCC_TEAM_ID_MAX)) {
-        team->id = ((uint16_t)params->id) | UCC_TEAM_ID_EXTERNAL_BIT;
+    team = ucc_team_alloc_shell(
+        contexts,
+        num_contexts,
+        params,
+        team_size,
+        team_rank,
+        id_built,
+        &id,
+        &status);
+    if (team == NULL) {
+        if (id_built) {
+            ucc_team_cache_identity_free(&id);
+        }
+        return status;
     }
     status    = ucc_team_create_post_single(contexts[0], team);
     *new_team = team;
-    return status;
-
-err_ctx_alloc:
-    *new_team = NULL;
-    ucc_free(team);
     return status;
 }
 
@@ -346,7 +423,29 @@ static inline ucc_status_t ucc_team_exchange(ucc_context_t *context,
     /* We only need to exchange ctx_ranks and build map to ctx array */
     ucc_assert(context->addr_storage.storage != NULL);
     if (team->bp.params.mask & UCC_TEAM_PARAM_FIELD_EP_MAP) {
-        team->ctx_map = team->bp.params.ep_map;
+        if (team->cache_pending_insert) {
+            /* A cached team outlives the caller's map, so copy it now */
+            ucc_rank_t i;
+
+            if (!team->ctx_ranks) {
+                team->ctx_ranks = ucc_malloc(
+                    team->size * sizeof(ucc_rank_t), "ctx_ranks");
+                if (!team->ctx_ranks) {
+                    ucc_error(
+                        "failed to allocate %zd bytes for ctx ranks array",
+                        team->size * sizeof(ucc_rank_t));
+                    return UCC_ERR_NO_MEMORY;
+                }
+                for (i = 0; i < team->size; i++) {
+                    team->ctx_ranks[i] = (ucc_rank_t)ucc_ep_map_eval(
+                        team->bp.params.ep_map, i);
+                }
+            }
+            team->ctx_map = ucc_ep_map_from_array(
+                &team->ctx_ranks, team->size, context->addr_storage.size, 1);
+        } else {
+            team->ctx_map = team->bp.params.ep_map;
+        }
     } else {
         if (!team->ctx_ranks) {
             team->ctx_ranks =
@@ -422,12 +521,79 @@ static ucc_status_t ucc_team_build_score_map(ucc_team_t *team)
     return status;
 }
 
+/* Detach @team from the cache table and from whichever list it is on, and mark
+   it uncached. Callers hold @cache->lock, so the state change happens under the
+   lock as ucc_team_cache_state_t requires. The identity is left intact: the
+   teardown paths still log from it, and the callers that must release it do so
+   themselves. */
+static void ucc_team_cache_detach(ucc_team_cache_t *cache, ucc_team_t *team)
+{
+    ucc_team_cache_table_erase(cache, team);
+    ucc_team_cache_registry_remove(team);
+    team->cache_state = UCC_TEAM_CACHE_STATE_NONE;
+}
+
+/* Add a freshly built, now ACTIVE team to its context cache */
+static void ucc_team_cache_admit(ucc_team_t *team)
+{
+    ucc_context_t    *ctx   = team->contexts[0];
+    ucc_team_cache_t *cache = ctx->team_cache;
+
+    team->cache_pending_insert = 0;
+
+    if (cache == NULL) {
+        return;
+    }
+
+    /* Both take cache->lock, so they must run before the insert below */
+    ucc_team_cache_progress_pending(cache);
+
+    if (cache->eviction != UCC_TEAM_CACHE_EVICTION_NONE &&
+        cache->size >= cache->max_size) {
+        if (UCC_ERR_NO_RESOURCE == ucc_team_cache_evict_one(cache)) {
+            ucc_debug(
+                "team cache at pool-safe capacity (size=%u/%u), all entries "
+                "live; admitting team %p (hash=0x%" PRIx64 ") un-cached",
+                cache->size,
+                cache->max_size,
+                (void *)team,
+                team->cache_identity.hash);
+        }
+    }
+
+    ucc_spin_lock(&cache->lock);
+    if (UCC_OK == ucc_team_cache_insert(cache, team) &&
+        team->cache_state == UCC_TEAM_CACHE_STATE_DORMANT) {
+        ucc_list_del(&team->cache_link);
+        team->cache_state = UCC_TEAM_CACHE_STATE_LIVE;
+        ucc_team_cache_registry_add_live(cache, team);
+        ucc_debug(
+            "team cache: insert (hash=0x%" PRIx64 ") team %p -> LIVE "
+            "refcount=%d",
+            team->cache_identity.hash,
+            (void *)team,
+            team->refcount);
+    } else if (team->cache_state == UCC_TEAM_CACHE_STATE_NONE) {
+        ucc_debug(
+            "team cache: insert skipped (hash=0x%" PRIx64 ") team %p stays "
+            "uncached",
+            team->cache_identity.hash,
+            (void *)team);
+    }
+    ucc_spin_unlock(&cache->lock);
+}
+
 ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
                                          ucc_team_t    *team)
 {
     ucc_status_t status = UCC_OK;
 
     switch (team->state) {
+    case UCC_TEAM_CACHE_AGREE:
+    case UCC_TEAM_CACHE_MISS_TEARDOWN:
+        /* Only the agreement vote enters these, and it is never posted here */
+        status = UCC_ERR_NOT_IMPLEMENTED;
+        break;
     case UCC_TEAM_ADDR_EXCHANGE:
         status = ucc_team_exchange(context, team);
         if (UCC_OK != status) {
@@ -488,6 +654,9 @@ out:
     }
     /* TODO: add team/coll selection and check if some teams are never
              used after selection and clean them up */
+    if (UCC_OK == status && team->cache_pending_insert) {
+        ucc_team_cache_admit(team);
+    }
     return status;
 }
 
@@ -547,6 +716,7 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
     ucc_team_release_id(team);
     ucc_free(team->cl_teams);
     ucc_free(team->contexts);
+    ucc_team_cache_identity_free(&team->cache_identity);
     ucc_free(team);
     return UCC_OK;
 }
@@ -565,7 +735,152 @@ ucc_status_t ucc_team_destroy(ucc_team_h team)
 
     /* we don't support multiple contexts per team yet */
     ucc_assert(team->num_contexts == 1);
+
+    /* A cached team is retained, keeping its id and its CL/TL teams */
+    if (team->cache_state == UCC_TEAM_CACHE_STATE_LIVE) {
+        ucc_context_t    *ctx   = team->contexts[0];
+        ucc_team_cache_t *cache = ctx->team_cache;
+        int               n;
+
+        ucc_assert(cache != NULL);
+        ucc_spin_lock(&cache->lock);
+        n = ucc_team_cache_put(team); /* LIVE -> DORMANT */
+        ucc_team_cache_registry_make_dormant(cache, team);
+        ucc_spin_unlock(&cache->lock);
+
+        ucc_debug(
+            "team cache: team %p now dormant, retained for reuse "
+            "(hash=0x%" PRIx64 ", live_users=%d)",
+            (void *)team,
+            team->cache_identity.hash,
+            n);
+        return UCC_OK; /* callers spin on UCC_INPROGRESS, so never return it */
+    }
+
     return ucc_team_destroy_single(team);
+}
+
+/* Reclaim the team id after a failed teardown; the rest is a bounded leak */
+static void ucc_team_cache_abandon_failed(ucc_team_t *team, ucc_status_t status)
+{
+    ucc_error(
+        "cached team %p teardown failed terminally (%s); reclaiming "
+        "team-id %u and abandoning partially destroyed component state",
+        (void *)team,
+        ucc_status_string(status),
+        (unsigned)team->id);
+    ucc_team_release_id(team);
+}
+
+void ucc_team_cache_drain(ucc_context_t *context)
+{
+    ucc_team_cache_t *cache = context->team_cache;
+    ucc_team_t       *team, *tmp;
+    ucc_status_t      status;
+
+    if (cache == NULL) {
+        return;
+    }
+
+    /* Context teardown is single threaded, so the walk needs no lock */
+    ucc_list_for_each_safe (team, tmp, &cache->dormant, cache_link) {
+        ucc_assert(team->cache_state == UCC_TEAM_CACHE_STATE_DORMANT);
+
+        ucc_team_cache_detach(cache, team);
+
+        while (UCC_INPROGRESS == (status = ucc_team_destroy_single(team))) {
+            ucc_context_progress(context);
+        }
+        if (status < 0) {
+            ucc_team_cache_abandon_failed(team, status);
+        }
+    }
+
+    ucc_assert(ucc_list_is_empty(&cache->dormant));
+
+    while (!ucc_list_is_empty(&cache->pending_destroy)) {
+        ucc_team_cache_progress_pending(cache);
+        if (!ucc_list_is_empty(&cache->pending_destroy)) {
+            ucc_context_progress(context);
+        }
+    }
+}
+
+/* Teams are popped under the lock, since a destroy must not run holding it */
+void ucc_team_cache_progress_pending(ucc_team_cache_t *cache)
+{
+    ucc_team_t  *team;
+    ucc_status_t status;
+    unsigned     pending, i;
+    uint16_t     team_id;
+
+    if (cache == NULL) {
+        return;
+    }
+
+    ucc_spin_lock(&cache->lock);
+    pending = (unsigned)ucc_list_length(&cache->pending_destroy);
+    ucc_spin_unlock(&cache->lock);
+
+    /* Bounded by the initial count so a re-queued team is not retried here */
+    for (i = 0; i < pending; i++) {
+        ucc_spin_lock(&cache->lock);
+        if (ucc_list_is_empty(&cache->pending_destroy)) {
+            ucc_spin_unlock(&cache->lock);
+            break;
+        }
+        team = ucc_list_extract_head(&cache->pending_destroy, ucc_team_t,
+                                     cache_link);
+        ucc_spin_unlock(&cache->lock);
+
+        team_id = team->id;
+        status  = ucc_team_destroy_single(team);
+        if (status == UCC_INPROGRESS) {
+            ucc_spin_lock(&cache->lock);
+            ucc_list_add_tail(&cache->pending_destroy, &team->cache_link);
+            ucc_spin_unlock(&cache->lock);
+        } else if (status < 0) {
+            ucc_team_cache_abandon_failed(team, status);
+        } else {
+            ucc_debug("team cache: evicted team destroy complete "
+                      "(UCC_OK, id=%u); team-id pool headroom restored",
+                      (unsigned)team_id);
+        }
+    }
+}
+
+ucc_status_t ucc_team_cache_evict_one(ucc_team_cache_t *cache)
+{
+    ucc_team_t *victim;
+    uint64_t    hash;
+
+    ucc_spin_lock(&cache->lock);
+
+    victim = ucc_team_cache_pick_victim(cache);
+    if (victim == NULL) {
+        ucc_spin_unlock(&cache->lock);
+        return UCC_ERR_NO_RESOURCE;
+    }
+    ucc_assert(victim->cache_state == UCC_TEAM_CACHE_STATE_DORMANT);
+    hash = victim->cache_identity.hash;
+
+    ucc_team_cache_detach(cache, victim);
+    ucc_list_add_tail(&cache->pending_destroy, &victim->cache_link);
+    cache->stats.evictions++;
+
+    ucc_debug(
+        "team cache %p: evicting dormant team %p (hash=0x%" PRIx64
+        ", size now %u, evictions=%" PRIu64 ")",
+        (void *)cache,
+        (void *)victim,
+        hash,
+        cache->size,
+        cache->stats.evictions);
+
+    ucc_spin_unlock(&cache->lock);
+
+    ucc_team_cache_progress_pending(cache);
+    return UCC_OK;
 }
 
 int ucc_team_id_pool_ffs_clear(uint64_t *value)
