@@ -355,6 +355,25 @@ team instead of rebuilding it from scratch.
 | `UCC_TEAM_CACHE_DISABLE_LINEAR_CHECK` | `n` | Trust the 64-bit membership hash alone in lookup, skipping the exact rank-array compare. Faster but unsafe on hash collision. |
 | `UCC_TEAM_CACHE_DUMP_STATS` | `n` | Log hit/miss/eviction counters at context destroy. |
 | `UCC_TEAM_CACHE_AGREEMENT` | `y` | Agree on the reuse decision across the members of every cacheable team create. Makes reuse safe for overlapping team scopes, at the cost of one small allreduce per create. |
+| `UCC_TEAM_CACHE_DERIVED` | `y` | Reuse the shared artifacts of a still-live cached team when a create duplicates its membership, as `MPI_Comm_dup` does. No effect unless `UCC_TEAM_CACHE_ENABLE=y`. |
+
+### Derived teams
+
+A create whose membership matches a team that is still live cannot re-adopt that
+team, since the original is still in use - `MPI_Comm_dup` is the common case. With
+`UCC_TEAM_CACHE_DERIVED` on, the new team is instead built as a *derived* team: it
+draws its own team id, and therefore its own tag and sequence-number domain, but
+borrows the live parent's membership map and topology instead of rebuilding them.
+That skips the address exchange and the topology build, which is the expensive
+part of a create.
+
+The borrowed state is reference counted, so the parent and every derived team may
+be destroyed in any order. A derived team is itself cacheable and can later be
+re-adopted like any other dormant team. Under `UCC_TEAM_CACHE_AGREEMENT` the
+derive decision is voted on like any other, and a member that cannot derive forces
+all members to fall back to a full build.
+
+Turn this off to make every such create an independent full build.
 
 ### Cross-rank agreement
 
