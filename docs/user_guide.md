@@ -338,6 +338,51 @@ $ UCC_COLL_TRACE=INFO srun ./c/mpi/collective/osu_allreduce -i 1 -x 0 -d cuda -m
 [1678205653.810705] [node_name:903  :0]        ucc_coll.c:255  UCC_COLL INFO  coll_init: Barrier; CL_BASIC {TL_UCP}, team_id 32768
 ```
 
+## Team Cache (Experimental)
+
+UCC supports an optional per-context communicator team cache that retains
+`ucc_team_t` objects after `ucc_team_destroy` so that a subsequent
+`ucc_team_create_post` with identical membership can re-adopt the same built
+team instead of rebuilding it from scratch.
+
+### Configuration knobs
+
+| Environment variable | Default | Description |
+|---|---|---|
+| `UCC_TEAM_CACHE_ENABLE` | `n` | Enable the team cache. Off by default; opt-in. |
+| `UCC_TEAM_CACHE_MAX_SIZE` | `128` | Maximum number of teams retained in the cache. Also clamped by `UCC_TEAM_IDS_POOL_SIZE`. |
+| `UCC_TEAM_CACHE_EVICTION` | `fifo` | Eviction policy when the cache is full. `none`: never evict (new teams stay uncached). `fifo`: evict the oldest dormant entry (default). |
+| `UCC_TEAM_CACHE_DISABLE_LINEAR_CHECK` | `n` | Trust the 64-bit membership hash alone in lookup, skipping the exact rank-array compare. Faster but unsafe on hash collision. |
+| `UCC_TEAM_CACHE_DUMP_STATS` | `n` | Log hit/miss/eviction counters at context destroy. |
+
+### Restriction: non-overlapping team scopes
+
+Each rank classifies a create as a cache hit or a miss on its own, so reuse is
+only safe when team scopes never overlap - that is, when no rank belongs to two
+simultaneously created teams with the same membership. When scopes do overlap,
+per-rank cache contents can diverge (for example after an eviction on one rank
+only), and the members of a single create can then disagree on whether to
+re-adopt a dormant team or build a fresh one. A create where some ranks re-adopt
+while others rebuild does not make progress.
+
+Applications that build only disjoint or strictly nested communicators, such as
+a fixed set of row/column communicators recreated over and over, satisfy this
+restriction. If team scopes may overlap, leave `UCC_TEAM_CACHE_ENABLE=n`.
+
+### Requirements
+
+- `UCC_TEAM_PARAM_FIELD_EP_MAP` must be set in `ucc_team_params_t` for a team
+  to be cacheable (it provides the membership the cache keys on).
+- Teams with optional behavioral parameters (`ORDERING`, `OUTSTANDING_COLLS`,
+  `SYNC_TYPE`, `P2P_CONN`, `MEM_PARAMS`) are not cached because those
+  parameters are not part of the identity.
+
+### Usage example
+
+```bash
+UCC_TEAM_CACHE_ENABLE=y UCC_TEAM_CACHE_MAX_SIZE=64 mpirun -np 8 ./my_app
+```
+
 ## Known Issues
 
 - For the CUDA and NCCL TL CUDA device dependent data structures are created when UCC
