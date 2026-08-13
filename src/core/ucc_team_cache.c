@@ -380,50 +380,71 @@ void ucc_team_cache_table_erase(ucc_team_cache_t *cache, ucc_team_t *team)
 
 /* NONE --insert--> DORMANT --get--> LIVE --put-to-0--> DORMANT */
 
-ucc_team_t *ucc_team_cache_lookup(
-    ucc_team_cache_t *cache, const ucc_team_cache_identity_t *id)
+/* First team in @id's bucket passing every filter, or NULL; under @lock */
+static ucc_team_t *ucc_team_cache_bucket_find(
+    ucc_team_cache_t *cache, const ucc_team_cache_identity_t *id,
+    int match_ext_id, ucc_team_cache_state_t want_state)
 {
     ucc_team_cache_map_t *h = (ucc_team_cache_map_t *)cache->table;
     khiter_t              k;
     ucc_team_t           *head, *team;
 
-    cache->stats.lookups++;
-
     k = kh_get(ucc_team_cache_map, h, id->hash);
-    if (k != kh_end(h)) {
-        head = kh_value(h, k);
-
-        UCC_TEAM_CACHE_BUCKET_FOR_EACH(team, head)
-        {
-            /* A different ext_id is a different tag domain, not a reuse */
-            if (team->cache_identity.ext_id != id->ext_id) {
-                continue;
-            }
-            if (!cache->disable_linear_check &&
-                !ucc_team_cache_identity_equal_membership(
-                    &team->cache_identity, id)) {
-                continue;
-            }
-            /* Only a DORMANT team is free to re-adopt */
-            if (team->cache_state != UCC_TEAM_CACHE_STATE_DORMANT) {
-                continue;
-            }
-            cache->stats.hits++;
-            ucc_debug(
-                "team_cache %p: lookup HIT team %p (hash=0x%" PRIx64 ")",
-                (void *)cache,
-                (void *)team,
-                id->hash);
-            return team;
-        }
+    if (k == kh_end(h)) {
+        return NULL;
     }
+    head = kh_value(h, k);
 
-    cache->stats.misses++;
-    ucc_debug(
-        "team_cache %p: lookup miss (hash=0x%" PRIx64 ")",
-        (void *)cache,
-        id->hash);
+    UCC_TEAM_CACHE_BUCKET_FOR_EACH(team, head)
+    {
+        /* A different ext_id is a different tag domain, not a reuse */
+        if (match_ext_id && team->cache_identity.ext_id != id->ext_id) {
+            continue;
+        }
+        if (!cache->disable_linear_check &&
+            !ucc_team_cache_identity_equal_membership(
+                &team->cache_identity, id)) {
+            continue;
+        }
+        if (team->cache_state != want_state) {
+            continue;
+        }
+        return team;
+    }
     return NULL;
+}
+
+ucc_team_t *ucc_team_cache_lookup(
+    ucc_team_cache_t *cache, const ucc_team_cache_identity_t *id)
+{
+    ucc_team_t *team;
+
+    cache->stats.lookups++;
+    /* A LIVE team already backs a communicator, so match DORMANT only */
+    team = ucc_team_cache_bucket_find(
+        cache, id, 1, UCC_TEAM_CACHE_STATE_DORMANT);
+    if (team) {
+        cache->stats.hits++;
+        ucc_debug(
+            "team_cache %p: lookup HIT team %p (hash=0x%" PRIx64 ")",
+            (void *)cache,
+            (void *)team,
+            id->hash);
+    } else {
+        cache->stats.misses++;
+        ucc_debug(
+            "team_cache %p: lookup miss (hash=0x%" PRIx64 ")",
+            (void *)cache,
+            id->hash);
+    }
+    return team;
+}
+
+ucc_team_t *ucc_team_cache_lookup_live(
+    ucc_team_cache_t *cache, const ucc_team_cache_identity_t *id)
+{
+    /* A derived child's ext_id differs from its parent's, so ignore it */
+    return ucc_team_cache_bucket_find(cache, id, 0, UCC_TEAM_CACHE_STATE_LIVE);
 }
 
 ucc_status_t ucc_team_cache_insert(ucc_team_cache_t *cache, ucc_team_t *team)
