@@ -64,6 +64,21 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_team_t)
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_cl_basic_team_t, ucc_base_team_t);
 UCC_CLASS_DEFINE(ucc_cl_basic_team_t, ucc_cl_team_t);
 
+void ucc_cl_basic_team_update_id(ucc_base_team_t *cl_team, uint16_t id)
+{
+    ucc_cl_basic_team_t *team = ucc_derived_of(cl_team, ucc_cl_basic_team_t);
+    ucc_tl_team_t       *tl;
+    unsigned             i;
+
+    /* Only UCP TLs expose scoll.update_id, so the others are skipped */
+    for (i = 0; i < team->n_tl_teams; i++) {
+        tl = team->tl_teams[i];
+        if (tl && UCC_TL_TEAM_IFACE(tl)->scoll.update_id) {
+            UCC_TL_TEAM_IFACE(tl)->scoll.update_id(&tl->super, id);
+        }
+    }
+}
+
 ucc_status_t ucc_cl_basic_team_destroy(ucc_base_team_t *cl_team)
 {
     ucc_cl_basic_team_t    *team    = ucc_derived_of(cl_team, ucc_cl_basic_team_t);
