@@ -32,6 +32,8 @@ ucc_test_mpi_SOURCES = \
 	test_mem_map.cc         \
 	test_team_cache.cc
 
+EXTRA_DIST = run_cache_equivalence.sh
+
 CXX=$(MPICXX)
 LD=$(MPICXX)
 ucc_test_mpi_CPPFLAGS = $(BASE_CPPFLAGS)
