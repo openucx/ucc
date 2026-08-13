@@ -565,6 +565,7 @@ static ucc_team_t *alloc_stub_team(void)
     t->refcount    = 0;
     t->cache_state = UCC_TEAM_CACHE_STATE_NONE;
     ucc_list_head_init(&t->cache_link);
+    ucc_list_head_init(&t->bucket_link);
     memset(&t->cache_identity, 0, sizeof(t->cache_identity));
     return t;
 }
@@ -663,7 +664,7 @@ UCC_TEST_F(test_team_cache, full_cache_skip)
     free_stub_team(t2); /* t2 was not inserted (NONE); free directly */
 }
 
-/* A duplicate identity finds the bucket occupied and is left uncached. */
+/* A duplicate identity is found on the bucket chain and is left uncached. */
 UCC_TEST_F(test_team_cache, duplicate_identity_skips_insert)
 {
     ScopedCache       cache(16, UCC_TEAM_CACHE_EVICTION_FIFO, 0);
@@ -1077,6 +1078,99 @@ UCC_TEST_F(test_team_cache, dump_stats_no_crash)
     ucc_team_cache_dump_stats(cache);
 
     ucc_team_cache_dump_stats(nullptr);
+}
+
+/* Chained-bucket invariants (stub teams + identity injection). */
+
+/* Allocate a stub team with @arr membership and external id @ext_id. */
+static ucc_team_t *alloc_stub_team_with_id(
+    ucc_rank_t *arr, ucc_rank_t n, ucc_rank_t self_ep, uint64_t ext_id)
+{
+    ucc_team_params_t p = make_array_id_params(arr, n, self_ep, ext_id);
+
+    ucc_team_t       *t = alloc_stub_team();
+    if (!t) {
+        return nullptr;
+    }
+    if (UCC_OK != ucc_team_cache_identity_build(&p, &t->cache_identity)) {
+        free(t);
+        return nullptr;
+    }
+    return t;
+}
+
+/* Same membership, different ext_ids chain in one membership-only bucket: each
+   insert increments size (not de-duped), full-identity lookup finds each by
+   ext_id, and head + sibling erase collapse the chain and drop size correctly. */
+UCC_TEST_F(test_team_cache, chained_bucket_same_membership_different_ext_id)
+{
+    ScopedCache cache(16, UCC_TEAM_CACHE_EVICTION_FIFO, 0);
+
+    ucc_rank_t  arr[3] = {1, 2, 3};
+
+    ucc_team_t *t10    = alloc_stub_team_with_id(arr, 3, 0, 10);
+    ucc_team_t *t20    = alloc_stub_team_with_id(arr, 3, 0, 20);
+    ucc_team_t *t30    = alloc_stub_team_with_id(arr, 3, 0, 30);
+    ASSERT_NE(nullptr, t10);
+    ASSERT_NE(nullptr, t20);
+    ASSERT_NE(nullptr, t30);
+
+    ASSERT_EQ(t10->cache_identity.hash, t20->cache_identity.hash);
+    ASSERT_EQ(t10->cache_identity.hash, t30->cache_identity.hash);
+    ASSERT_NE(t10->cache_identity.ext_id, t20->cache_identity.ext_id);
+    ASSERT_NE(t10->cache_identity.ext_id, t30->cache_identity.ext_id);
+
+    ucc_spin_lock(&cache->lock);
+
+    EXPECT_EQ(UCC_OK, ucc_team_cache_insert(cache, t10));
+    EXPECT_EQ(1u, cache->size);
+    EXPECT_EQ(UCC_OK, ucc_team_cache_insert(cache, t20));
+    EXPECT_EQ(2u, cache->size);
+    EXPECT_EQ(UCC_OK, ucc_team_cache_insert(cache, t30));
+    EXPECT_EQ(3u, cache->size);
+
+    ucc_team_cache_identity_t key10, key20, key30;
+    build_id_key(arr, 3, 0, 10, key10);
+    build_id_key(arr, 3, 0, 20, key20);
+    build_id_key(arr, 3, 0, 30, key30);
+
+    /* Each is independently reachable, and repeated lookups are side-effect
+       free. */
+    EXPECT_EQ(t10, ucc_team_cache_lookup(cache, &key10));
+    EXPECT_EQ(t20, ucc_team_cache_lookup(cache, &key20));
+    EXPECT_EQ(t30, ucc_team_cache_lookup(cache, &key30));
+    EXPECT_EQ(t10, ucc_team_cache_lookup(cache, &key10));
+    EXPECT_EQ(t30, ucc_team_cache_lookup(cache, &key30));
+
+    /* Erase the chain head (t10): t20 is promoted; size drops by one. */
+    ucc_team_cache_table_erase(cache, t10);
+    EXPECT_EQ(2u, cache->size);
+    EXPECT_EQ(nullptr, ucc_team_cache_lookup(cache, &key10));
+    EXPECT_EQ(t20, ucc_team_cache_lookup(cache, &key20));
+    EXPECT_EQ(t30, ucc_team_cache_lookup(cache, &key30));
+
+    /* Erase a non-head sibling (t30). */
+    ucc_team_cache_table_erase(cache, t30);
+    EXPECT_EQ(1u, cache->size);
+    EXPECT_EQ(nullptr, ucc_team_cache_lookup(cache, &key30));
+    EXPECT_EQ(t20, ucc_team_cache_lookup(cache, &key20));
+
+    /* Erase the last entry (t20): bucket removed. */
+    ucc_team_cache_table_erase(cache, t20);
+    EXPECT_EQ(0u, cache->size);
+    EXPECT_EQ(nullptr, ucc_team_cache_lookup(cache, &key20));
+
+    ucc_team_cache_registry_remove(t10);
+    ucc_team_cache_registry_remove(t20);
+    ucc_team_cache_registry_remove(t30);
+    ucc_spin_unlock(&cache->lock);
+
+    ucc_team_cache_identity_free(&key10);
+    ucc_team_cache_identity_free(&key20);
+    ucc_team_cache_identity_free(&key30);
+    free_stub_team(t10);
+    free_stub_team(t20);
+    free_stub_team(t30);
 }
 
 /* Cache-concurrency stress: overlapping create_post on the same context is
