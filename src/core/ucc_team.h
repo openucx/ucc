@@ -18,8 +18,8 @@
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
 #include "coll_score/ucc_coll_score.h"
+#include "ucc_service_coll.h" /* ucc_service_coll_req_t is embedded below */
 
-typedef struct ucc_service_coll_req ucc_service_coll_req_t;
 typedef enum {
     UCC_TEAM_ADDR_EXCHANGE, /* zero, so it is the calloc default */
     UCC_TEAM_SERVICE_TEAM,
@@ -58,6 +58,9 @@ typedef struct ucc_team {
     ucc_team_cache_state_t    cache_state;
     int                       cache_pending_insert; /* cacheable, not yet in */
     ucc_team_cache_action_t   cache_local_action;   /* this rank's vote */
+    ucc_service_coll_req_t    cache_vote_req;       /* embedded, never freed */
+    uint64_t                  cache_vote_in[UCC_TEAM_CACHE_VOTE_LANES];
+    uint64_t                  cache_vote_out[UCC_TEAM_CACHE_VOTE_LANES];
 } ucc_team_t;
 
 /* If the bit is set then team_id is provided by the user */

@@ -84,6 +84,14 @@ static ucc_config_field_t ucc_context_config_table[] = {
      ucc_offsetof(ucc_context_config_t, team_cache_dump_stats),
      UCC_CONFIG_TYPE_BOOL},
 
+    {"TEAM_CACHE_AGREEMENT", "y",
+     "Agree on the reuse decision across the members of every cacheable team\n"
+     "create, which makes reuse safe for overlapping subcommunicators at the\n"
+     "cost of one small allreduce per create. Disable only when team scopes\n"
+     "never overlap. Requires UCC_TEAM_CACHE_ENABLE.",
+     ucc_offsetof(ucc_context_config_t, team_cache_agreement),
+     UCC_CONFIG_TYPE_BOOL},
+
     {"INTERNAL_OOB", "1",
      "Use internal OOB transport for team creation. Available for ucc_context "
      "is configured with OOB (global mode). 0 - disable, 1 - try, 2 - force.",
@@ -981,6 +989,7 @@ ucc_status_t ucc_context_create_proc_info(
             ctx->team_cache = NULL;
         } else {
             ctx->team_cache->dump_stats = config->team_cache_dump_stats;
+            ctx->team_cache->agreement  = config->team_cache_agreement;
             /* cache_gen is seeded once ctx->id.seq_num is assigned below */
         }
         ucc_debug(
