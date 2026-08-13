@@ -22,12 +22,38 @@ static ucc_status_t ucc_team_teardown_for_rebuild(ucc_team_t *team);
 static ucc_status_t ucc_team_reset_for_rebuild(
     ucc_context_t *context, ucc_team_t *team);
 
+ucc_team_artifacts_t *ucc_team_artifacts_alloc(void)
+{
+    ucc_team_artifacts_t *a;
+
+    a = ucc_calloc(1, sizeof(*a), "team_artifacts");
+    if (!a) {
+        ucc_error(
+            "failed to allocate %zd bytes for team artifacts", sizeof(*a));
+        return NULL;
+    }
+    a->refcount = 1;
+    a->heap     = 1;
+    ucc_spinlock_init(&a->lock, 0);
+    return a;
+}
+
 void ucc_team_artifacts_init_inline(ucc_team_artifacts_t *a)
 {
     memset(a, 0, sizeof(*a));
     a->refcount = 1;
     a->heap     = 0;
     ucc_spinlock_init(&a->lock, 0);
+}
+
+ucc_team_artifacts_t *ucc_team_artifacts_get(ucc_team_artifacts_t *artifacts)
+{
+    ucc_assert(artifacts != NULL);
+    ucc_spin_lock(&artifacts->lock);
+    ucc_assert(artifacts->refcount > 0);
+    artifacts->refcount++;
+    ucc_spin_unlock(&artifacts->lock);
+    return artifacts;
 }
 
 void ucc_team_artifacts_put(ucc_team_artifacts_t *artifacts)
@@ -73,6 +99,42 @@ void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_TEAM_PARAM_FIELD_MEM_PARAMS,
                             mem_params);
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_TEAM_PARAM_FIELD_EP_MAP, ep_map);
+}
+
+int ucc_team_can_derive_from(const ucc_team_t *parent)
+{
+    if (parent == NULL || parent->artifacts == NULL) {
+        return 0;
+    }
+    if (parent->state != UCC_TEAM_ACTIVE) {
+        return 0;
+    }
+    /* A built multi-rank ctx_map has ep_num == size, so 0 means unfilled */
+    if (parent->size > 1 && parent->artifacts->ctx_map.ep_num == 0) {
+        return 0;
+    }
+    /* A size 1 team never builds a topo, so only require one above that */
+    if (parent->size > 1 && parent->artifacts->topo == NULL) {
+        return 0;
+    }
+    return 1;
+}
+
+void ucc_team_init_derived(
+    ucc_team_t *team, ucc_team_artifacts_t *held_artifacts, uint16_t parent_id)
+{
+    /* Drop the unused holder create_post made, and consume the caller's ref */
+    ucc_team_artifacts_put(team->artifacts);
+    team->artifacts  = held_artifacts;
+    team->is_derived = 1;
+    team->parent_id  = parent_id;
+
+    ucc_debug(
+        "team %p: derived-create (shared artifacts %p, parent id=%u) - "
+        "skipping ADDR_EXCHANGE + topo build",
+        (void *)team,
+        (void *)team->artifacts,
+        parent_id);
 }
 
 ucc_status_t ucc_team_get_attr(ucc_team_h team, ucc_team_attr_t *team_attr)
@@ -136,8 +198,14 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
     team->bp.team                 = team;
     team->bp.map.type             = UCC_EP_MAP_FULL;
     team->bp.map.ep_num           = team->size;
-    team->state                   = (team->size > 1) ? UCC_TEAM_ADDR_EXCHANGE
-                                                     : UCC_TEAM_CL_CREATE;
+    if (team->is_derived) {
+        /* The borrowed ctx_map and topo make ADDR_EXCHANGE unnecessary */
+        team->state = (team->size > 1) ? UCC_TEAM_SERVICE_TEAM
+                                       : UCC_TEAM_CL_CREATE;
+    } else {
+        team->state = (team->size > 1) ? UCC_TEAM_ADDR_EXCHANGE
+                                       : UCC_TEAM_CL_CREATE;
+    }
     team->last_team_create_posted = -1;
     return UCC_OK;
 }
@@ -159,8 +227,18 @@ static ucc_team_t *ucc_team_alloc_shell(
         *status_out = UCC_ERR_NO_MEMORY;
         return NULL;
     }
-    team->artifacts = &team->artifacts_inline;
-    ucc_team_artifacts_init_inline(team->artifacts);
+    if (id_built) {
+        /* A cacheable team may later lend its artifacts, so share a heap one */
+        team->artifacts = ucc_team_artifacts_alloc();
+        if (!team->artifacts) {
+            ucc_free(team);
+            *status_out = UCC_ERR_NO_MEMORY;
+            return NULL;
+        }
+    } else {
+        team->artifacts = &team->artifacts_inline;
+        ucc_team_artifacts_init_inline(team->artifacts);
+    }
     team->runtime_oob  = params->oob;
     team->num_contexts = num_contexts;
     team->size         = (ucc_rank_t)team_size;
@@ -202,6 +280,26 @@ static ucc_team_t *ucc_team_alloc_shell(
     return team;
 }
 
+/* Undo a posted vote setup after a fatal post failure */
+static void ucc_team_agreement_rollback(
+    ucc_team_cache_t *cache, ucc_team_t *handle, ucc_team_cache_action_t action)
+{
+    if (action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE) {
+        /* The refcount was never bumped, so just release the reservation */
+        ucc_spin_lock(&cache->lock);
+        handle->cache_state = UCC_TEAM_CACHE_STATE_DORMANT;
+        ucc_team_cache_registry_make_dormant(cache, handle);
+        ucc_spin_unlock(&cache->lock);
+        return;
+    }
+    if (action == UCC_TEAM_CACHE_ACTION_DERIVED_FROM_LIVE &&
+        handle->cache_derive_artifacts) {
+        ucc_team_artifacts_put(handle->cache_derive_artifacts);
+        handle->cache_derive_artifacts = NULL;
+    }
+    ucc_team_destroy_single(handle);
+}
+
 /* Classify this rank's cache action and post the vote that reconciles it */
 static ucc_status_t ucc_team_agreement_create_post(
     ucc_context_h *contexts, uint32_t num_contexts,
@@ -212,10 +310,13 @@ static ucc_status_t ucc_team_agreement_create_post(
     int                       id_built = 0;
     ucc_team_t               *cached   = NULL;
     ucc_team_t               *handle;
-    ucc_team_cache_action_t   action          = UCC_TEAM_CACHE_ACTION_MISS;
-    uint64_t                  key             = 0;
-    int                       is_rank0        = (team_rank == 0);
-    uint64_t                  proposed_cookie = 0;
+    ucc_team_artifacts_t     *derive_artifacts = NULL;
+    uint16_t                  derive_parent_id = 0;
+    ucc_team_cache_action_t   action           = UCC_TEAM_CACHE_ACTION_MISS;
+    uint64_t                  key              = 0;
+    uint64_t                  parent_cookie    = 0;
+    int                       is_rank0         = (team_rank == 0);
+    uint64_t                  proposed_cookie  = 0;
     ucc_subset_t              subset;
     ucc_status_t              status;
 
@@ -232,6 +333,19 @@ static ucc_status_t ucc_team_agreement_create_post(
             key    = cached->id;
             ucc_team_cache_registry_make_reserved(cache, cached);
             cached->cache_state = UCC_TEAM_CACHE_STATE_RESERVED;
+        } else {
+            /* A live match is a second comm over the same members */
+            ucc_team_t *live = cache->derived
+                                   ? ucc_team_cache_lookup_live(cache, &id)
+                                   : NULL;
+
+            if (live != NULL && ucc_team_can_derive_from(live)) {
+                action           = UCC_TEAM_CACHE_ACTION_DERIVED_FROM_LIVE;
+                key              = live->id;
+                parent_cookie    = live->cache_identity.instance_cookie;
+                derive_artifacts = ucc_team_artifacts_get(live->artifacts);
+                derive_parent_id = live->id;
+            }
         }
         ucc_spin_unlock(&cache->lock);
     }
@@ -257,12 +371,23 @@ static ucc_status_t ucc_team_agreement_create_post(
             if (id_built) {
                 ucc_team_cache_identity_free(&id);
             }
+            if (derive_artifacts) {
+                ucc_team_artifacts_put(derive_artifacts);
+            }
             return status;
         }
         status = ucc_team_create_post_single(contexts[0], handle);
         if (status < 0) {
+            if (derive_artifacts) {
+                ucc_team_artifacts_put(derive_artifacts);
+            }
             ucc_team_destroy_single(handle);
             return status;
+        }
+        if (action == UCC_TEAM_CACHE_ACTION_DERIVED_FROM_LIVE) {
+            handle->cache_derive_artifacts       = derive_artifacts;
+            handle->cache_derive_parent_id       = derive_parent_id;
+            handle->cache_parent_instance_cookie = parent_cookie;
         }
     }
 
@@ -273,7 +398,7 @@ static ucc_status_t ucc_team_agreement_create_post(
         action,
         key,
         /*cookie=*/0,
-        /*parent_cookie=*/0,
+        parent_cookie,
         is_rank0,
         proposed_cookie);
     /* ep_map is valid for this create and maps member index to ctx rank */
@@ -289,14 +414,7 @@ static ucc_status_t ucc_team_agreement_create_post(
         subset,
         &handle->cache_vote_req);
     if (status < 0) {
-        if (action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE) {
-            ucc_spin_lock(&cache->lock);
-            handle->cache_state = UCC_TEAM_CACHE_STATE_DORMANT;
-            ucc_team_cache_registry_make_dormant(cache, handle);
-            ucc_spin_unlock(&cache->lock);
-        } else {
-            ucc_team_destroy_single(handle);
-        }
+        ucc_team_agreement_rollback(cache, handle, action);
         return status;
     }
     handle->state = UCC_TEAM_CACHE_AGREE;
@@ -315,6 +433,9 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     ucc_team_cache_t         *cache    = NULL;
     ucc_team_cache_identity_t id;
     int                       id_built = 0;
+    /* Parent pin taken under cache->lock, consumed by ucc_team_init_derived */
+    ucc_team_artifacts_t     *derive_artifacts = NULL;
+    uint16_t                  derive_parent_id = 0;
 
     if (num_contexts < 1) {
         return UCC_ERR_INVALID_PARAM;
@@ -431,6 +552,17 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
                 cached->cache_local_action = UCC_TEAM_CACHE_ACTION_EXACT_REUSE;
                 ucc_team_cache_get(cached);
                 ucc_team_cache_registry_make_live(cache, cached);
+            } else {
+                /* A live match is a second comm over the same members */
+                ucc_team_t *live = cache->derived
+                                       ? ucc_team_cache_lookup_live(cache, &id)
+                                       : NULL;
+
+                if (live != NULL && ucc_team_can_derive_from(live)) {
+                    /* Keep the holder and the id only, never the parent */
+                    derive_artifacts = ucc_team_artifacts_get(live->artifacts);
+                    derive_parent_id = live->id;
+                }
             }
             ucc_spin_unlock(&cache->lock);
 
@@ -461,7 +593,14 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
         if (id_built) {
             ucc_team_cache_identity_free(&id);
         }
+        if (derive_artifacts) { /* release the pinned parent artifacts */
+            ucc_team_artifacts_put(derive_artifacts);
+        }
         return status;
+    }
+    team->cache_local_action = UCC_TEAM_CACHE_ACTION_MISS;
+    if (derive_artifacts != NULL) { /* before create_post_single reads is_derived */
+        ucc_team_init_derived(team, derive_artifacts, derive_parent_id);
     }
     status    = ucc_team_create_post_single(contexts[0], team);
     *new_team = team;
@@ -804,6 +943,19 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
             team->state = UCC_TEAM_ACTIVE;
             return UCC_OK;
         }
+        if (agreed == UCC_TEAM_CACHE_ACTION_DERIVED_FROM_LIVE &&
+            team->cache_local_action ==
+                UCC_TEAM_CACHE_ACTION_DERIVED_FROM_LIVE) {
+            /* Unanimous derive: borrow the parent artifacts, build the rest */
+            ucc_team_init_derived(
+                team,
+                team->cache_derive_artifacts,
+                team->cache_derive_parent_id);
+            team->cache_derive_artifacts = NULL;
+            team->state = (team->size > 1) ? UCC_TEAM_SERVICE_TEAM
+                                           : UCC_TEAM_CL_CREATE;
+            return UCC_INPROGRESS;
+        }
         /* Not unanimous, so every member builds a fresh team */
         if (team->cache_local_action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE) {
             /* Detach the rejected candidate and rebuild the same handle */
@@ -812,6 +964,9 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
             ucc_spin_lock(&vote_cache->lock);
             ucc_team_cache_table_erase(vote_cache, team);
             ucc_team_cache_registry_remove(team);
+            /* A rebuild owns its artifacts, so it is no longer derived */
+            team->is_derived = 0;
+            team->parent_id  = 0;
             ucc_spin_unlock(&vote_cache->lock);
             team->cache_pending_insert = 1;
             team->state                = UCC_TEAM_CACHE_MISS_TEARDOWN;
@@ -820,6 +975,11 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
                 (void *)team);
             /* fall through to CACHE_MISS_TEARDOWN */
         } else {
+            if (team->cache_local_action ==
+                UCC_TEAM_CACHE_ACTION_DERIVED_FROM_LIVE) {
+                ucc_team_artifacts_put(team->cache_derive_artifacts);
+                team->cache_derive_artifacts = NULL;
+            }
             team->state = (team->size > 1) ? UCC_TEAM_ADDR_EXCHANGE
                                            : UCC_TEAM_CL_CREATE;
             return UCC_INPROGRESS;
@@ -877,6 +1037,10 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
             if (UCC_OK != status) {
                 goto out;
             }
+        }
+        /* A derived team owns an independent tag domain, hence its own id */
+        if (team->is_derived && team->id != 0) {
+            ucc_assert(team->id != team->parent_id);
         }
         team->bp.id = team->id;
         team->state = UCC_TEAM_CL_CREATE;
@@ -1011,16 +1175,20 @@ static ucc_status_t ucc_team_reset_for_rebuild(
     if (!UCC_TEAM_ID_IS_EXTERNAL(team)) {
         team->id = 0;
     }
-    team->bp.id                = 0;
-    team->oob_req              = NULL;
-    team->refcount             = 1;
-    team->cache_state          = UCC_TEAM_CACHE_STATE_NONE;
-    team->cache_pending_insert = 1;
+    team->bp.id                  = 0;
+    team->oob_req                = NULL;
+    team->refcount               = 1;
+    team->cache_state            = UCC_TEAM_CACHE_STATE_NONE;
+    team->cache_pending_insert   = 1;
+    team->cache_derive_artifacts = NULL;
     ucc_list_head_init(&team->cache_link);
     ucc_list_head_init(&team->bucket_link);
-    /* Teardown released the old holder, so re-init the inline one */
-    team->artifacts = &team->artifacts_inline;
-    ucc_team_artifacts_init_inline(team->artifacts);
+
+    /* Teardown released the old holder, and a cached team needs a heap one */
+    team->artifacts = ucc_team_artifacts_alloc();
+    if (!team->artifacts) {
+        return UCC_ERR_NO_MEMORY;
+    }
 
     return ucc_team_create_post_single(context, team);
 }

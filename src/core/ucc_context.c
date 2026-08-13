@@ -84,6 +84,16 @@ static ucc_config_field_t ucc_context_config_table[] = {
      ucc_offsetof(ucc_context_config_t, team_cache_dump_stats),
      UCC_CONFIG_TYPE_BOOL},
 
+    {"TEAM_CACHE_DERIVED",
+     "y",
+     "Reuse the shared artifacts of a still live cached team when a create\n"
+     "duplicates its membership, as MPI_Comm_dup does. The derived team gets\n"
+     "its own team id and borrows the parent membership and topology. When\n"
+     "off, such a create is an independent full build. Requires\n"
+     "UCC_TEAM_CACHE_ENABLE.",
+     ucc_offsetof(ucc_context_config_t, team_cache_derived),
+     UCC_CONFIG_TYPE_BOOL},
+
     {"TEAM_CACHE_AGREEMENT", "y",
      "Agree on the reuse decision across the members of every cacheable team\n"
      "create, which makes reuse safe for overlapping subcommunicators at the\n"
@@ -989,6 +999,7 @@ ucc_status_t ucc_context_create_proc_info(
             ctx->team_cache = NULL;
         } else {
             ctx->team_cache->dump_stats = config->team_cache_dump_stats;
+            ctx->team_cache->derived    = config->team_cache_derived;
             ctx->team_cache->agreement  = config->team_cache_agreement;
             /* cache_gen is seeded once ctx->id.seq_num is assigned below */
         }

@@ -40,8 +40,14 @@ typedef struct ucc_team_artifacts {
     uint8_t        heap;      /*< 1: heap-allocated, 0: embedded in a team */
 } ucc_team_artifacts_t;
 
+/* Allocate a shareable heap holder, refcount 1, artifacts zeroed */
+ucc_team_artifacts_t *ucc_team_artifacts_alloc(void);
+
 /* Init an embedded holder in place: refcount 1, heap 0 */
 void ucc_team_artifacts_init_inline(ucc_team_artifacts_t *a);
+
+/* Add a reference and return @a, for call site convenience */
+ucc_team_artifacts_t *ucc_team_artifacts_get(ucc_team_artifacts_t *a);
 
 /* Drop a reference; at zero release contents, free the struct if heap */
 void ucc_team_artifacts_put(ucc_team_artifacts_t *a);
@@ -76,10 +82,16 @@ typedef struct ucc_team {
     ucc_list_link_t           bucket_link; /* same-hash chain off the bucket */
     ucc_team_cache_state_t    cache_state;
     int                       cache_pending_insert; /* cacheable, not yet in */
-    ucc_team_cache_action_t   cache_local_action;   /* this rank's vote */
-    ucc_service_coll_req_t    cache_vote_req;       /* embedded, never freed */
+    int                       is_derived; /* borrows a parent's artifacts */
+    uint16_t                  parent_id;  /* id borrowed from, if derived */
+    ucc_team_cache_action_t   cache_local_action; /* this rank's vote */
+    ucc_service_coll_req_t    cache_vote_req;     /* embedded, never freed */
     uint64_t                  cache_vote_in[UCC_TEAM_CACHE_VOTE_LANES];
     uint64_t                  cache_vote_out[UCC_TEAM_CACHE_VOTE_LANES];
+    /* Parent pin held across the vote, consumed by ucc_team_init_derived */
+    ucc_team_artifacts_t     *cache_derive_artifacts;
+    uint16_t                  cache_derive_parent_id;
+    uint64_t                  cache_parent_instance_cookie;
 } ucc_team_t;
 
 /* If the bit is set then team_id is provided by the user */
@@ -92,6 +104,13 @@ void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src);
 /* Team-id pool bit helpers; bit (pos - 1) of word i encodes id i * 64 + pos */
 int  ucc_team_id_pool_ffs_clear(uint64_t *value);
 void ucc_team_id_pool_set_bit(uint64_t *local, int id);
+
+/* Non-zero if @parent is ACTIVE with materialized artifacts to lend */
+int ucc_team_can_derive_from(const ucc_team_t *parent);
+
+/* Attach @team to @held_artifacts, consuming that reference */
+void ucc_team_init_derived(
+    ucc_team_t *team, ucc_team_artifacts_t *held_artifacts, uint16_t parent_id);
 
 /* Destroy every dormant team; call before the CL/TL contexts are destroyed */
 void ucc_team_cache_drain(ucc_context_t *context);

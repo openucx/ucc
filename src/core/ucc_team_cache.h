@@ -71,8 +71,9 @@ void ucc_team_cache_identity_free(ucc_team_cache_identity_t *identity);
 int  ucc_team_cache_is_cacheable(const ucc_team_params_t *params);
 
 typedef enum ucc_team_cache_action {
-    UCC_TEAM_CACHE_ACTION_MISS        = 0, /* fresh full build */
-    UCC_TEAM_CACHE_ACTION_EXACT_REUSE = 1, /* re-adopt a DORMANT team */
+    UCC_TEAM_CACHE_ACTION_MISS              = 0, /* fresh full build */
+    UCC_TEAM_CACHE_ACTION_EXACT_REUSE       = 1, /* re-adopt a DORMANT team */
+    UCC_TEAM_CACHE_ACTION_DERIVED_FROM_LIVE = 2, /* derive from a LIVE parent */
 } ucc_team_cache_action_t;
 
 /* Vote lanes: [0] prepared, [1..8] (value, ~value) pairs, [9] new cookie */
@@ -111,6 +112,7 @@ typedef struct ucc_team_cache {
     ucc_team_cache_eviction_policy_t eviction;
     uint32_t                         disable_linear_check;
     uint32_t                         dump_stats;
+    uint32_t                         derived;
     uint32_t                         agreement;
     uint64_t                         cache_gen; /* source of instance cookies */
     ucc_team_cache_stats_t           stats;
@@ -128,6 +130,10 @@ void        ucc_team_cache_destroy(ucc_team_cache_t *cache);
 
 /* Find a DORMANT team by exact identity, or NULL; under @cache->lock */
 ucc_team_t *ucc_team_cache_lookup(
+    ucc_team_cache_t *cache, const ucc_team_cache_identity_t *id);
+
+/* Find a LIVE team by membership, ignoring ext_id; the derive-create parent */
+ucc_team_t *ucc_team_cache_lookup_live(
     ucc_team_cache_t *cache, const ucc_team_cache_identity_t *id);
 
 /* Insert @team as DORMANT; a full cache skips the insert, collisions chain */
