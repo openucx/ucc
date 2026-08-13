@@ -92,6 +92,7 @@ typedef struct ucc_team {
     ucc_team_artifacts_t     *cache_derive_artifacts;
     uint16_t                  cache_derive_parent_id;
     uint64_t                  cache_parent_instance_cookie;
+    uint16_t                  cache_reseat_new_id; /* drifted ext_id, RESEAT */
 } ucc_team_t;
 
 /* If the bit is set then team_id is provided by the user */
@@ -107,6 +108,9 @@ void ucc_team_id_pool_set_bit(uint64_t *local, int id);
 
 /* Non-zero if @parent is ACTIVE with materialized artifacts to lend */
 int ucc_team_can_derive_from(const ucc_team_t *parent);
+
+/* Move @team and every CL/TL team it owns to the tag domain of @new_ext_id */
+void ucc_team_reseat_id(ucc_team_t *team, uint16_t new_ext_id);
 
 /* Attach @team to @held_artifacts, consuming that reference */
 void ucc_team_init_derived(
