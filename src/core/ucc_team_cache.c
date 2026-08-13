@@ -383,7 +383,7 @@ void ucc_team_cache_table_erase(ucc_team_cache_t *cache, ucc_team_t *team)
 /* First team in @id's bucket passing every filter, or NULL; under @lock */
 static ucc_team_t *ucc_team_cache_bucket_find(
     ucc_team_cache_t *cache, const ucc_team_cache_identity_t *id,
-    int match_ext_id, ucc_team_cache_state_t want_state)
+    int match_ext_id, ucc_team_cache_state_t want_state, int require_derived)
 {
     ucc_team_cache_map_t *h = (ucc_team_cache_map_t *)cache->table;
     khiter_t              k;
@@ -409,6 +409,10 @@ static ucc_team_t *ucc_team_cache_bucket_find(
         if (team->cache_state != want_state) {
             continue;
         }
+        /* Only a derived team may be re-seated into another tag domain */
+        if (require_derived && !team->is_derived) {
+            continue;
+        }
         return team;
     }
     return NULL;
@@ -422,7 +426,7 @@ ucc_team_t *ucc_team_cache_lookup(
     cache->stats.lookups++;
     /* A LIVE team already backs a communicator, so match DORMANT only */
     team = ucc_team_cache_bucket_find(
-        cache, id, 1, UCC_TEAM_CACHE_STATE_DORMANT);
+        cache, id, 1, UCC_TEAM_CACHE_STATE_DORMANT, 0);
     if (team) {
         cache->stats.hits++;
         ucc_debug(
@@ -444,7 +448,16 @@ ucc_team_t *ucc_team_cache_lookup_live(
     ucc_team_cache_t *cache, const ucc_team_cache_identity_t *id)
 {
     /* A derived child's ext_id differs from its parent's, so ignore it */
-    return ucc_team_cache_bucket_find(cache, id, 0, UCC_TEAM_CACHE_STATE_LIVE);
+    return ucc_team_cache_bucket_find(
+        cache, id, 0, UCC_TEAM_CACHE_STATE_LIVE, 0);
+}
+
+ucc_team_t *ucc_team_cache_lookup_dormant_derived(
+    ucc_team_cache_t *cache, const ucc_team_cache_identity_t *id)
+{
+    /* A drifted cid makes the exact lookup miss, so match membership only */
+    return ucc_team_cache_bucket_find(
+        cache, id, 0, UCC_TEAM_CACHE_STATE_DORMANT, 1);
 }
 
 ucc_status_t ucc_team_cache_insert(ucc_team_cache_t *cache, ucc_team_t *team)

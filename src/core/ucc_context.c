@@ -94,6 +94,15 @@ static ucc_config_field_t ucc_context_config_table[] = {
      ucc_offsetof(ucc_context_config_t, team_cache_derived),
      UCC_CONFIG_TYPE_BOOL},
 
+    {"TEAM_CACHE_RESEAT",
+     "n",
+     "Re-adopt a retained derived team of identical membership but a\n"
+     "different external id, that is a drifted MPI context id, by re-seating\n"
+     "its id and tag domain instead of rebuilding it. Experimental. Requires\n"
+     "UCC_TEAM_CACHE_DERIVED.",
+     ucc_offsetof(ucc_context_config_t, team_cache_reseat),
+     UCC_CONFIG_TYPE_BOOL},
+
     {"TEAM_CACHE_AGREEMENT", "y",
      "Agree on the reuse decision across the members of every cacheable team\n"
      "create, which makes reuse safe for overlapping subcommunicators at the\n"
@@ -1000,6 +1009,7 @@ ucc_status_t ucc_context_create_proc_info(
         } else {
             ctx->team_cache->dump_stats = config->team_cache_dump_stats;
             ctx->team_cache->derived    = config->team_cache_derived;
+            ctx->team_cache->reseat     = config->team_cache_reseat;
             ctx->team_cache->agreement  = config->team_cache_agreement;
             /* cache_gen is seeded once ctx->id.seq_num is assigned below */
         }
