@@ -5,6 +5,7 @@
 extern "C" {
 #include "core/ucc_team_cache.h"
 #include "core/ucc_team.h"
+#include "core/ucc_context.h"
 #include "utils/ucc_spinlock.h"
 }
 #include <common/test.h>
@@ -1060,4 +1061,301 @@ UCC_TEST_F(test_team_cache, concurrent_lookup_adopt_release_stress)
         ucc_team_cache_identity_free(&keys[i]);
     }
     drain_stub_teams(cache, teams);
+}
+
+/* Integration tests: full create->use->destroy->recreate cycle through
+   UccJob/UccTeam (real create_post / create_test / destroy).  White-box access
+   to ucc_team_t.cache_state and ucc_context_t.team_cache asserts dormant-reuse
+   invariants.  Caching is enabled per-test via the UccJob env-var mechanism. */
+class test_team_cache_integration : public ucc::test {};
+
+/* Return the underlying ucc_team_t* from a per-process team handle. */
+static ucc_team_t *team_ptr(UccTeam_h &team, int proc_idx = 0)
+{
+    return (ucc_team_t *)team->procs[proc_idx].team;
+}
+
+/* Return the ucc_context_t* for the given process in a team. */
+static ucc_context_t *ctx_ptr(UccTeam_h &team, int proc_idx = 0)
+{
+    return (ucc_context_t *)team->procs[proc_idx].p.get()->ctx_h;
+}
+
+/* True if the team that lived at @handle is on @ctx's dormant list. @handle is
+   compared by value only: when a destroy does NOT admit the team to the cache
+   the object is freed, so reading handle->cache_state would be a use-after-free
+   in exactly the case a dormancy assertion exists to catch. */
+static bool is_dormant(ucc_context_t *ctx, const ucc_team_t *handle)
+{
+    ucc_team_t *dt;
+
+    ucc_list_for_each (dt, &ctx->team_cache->dormant, cache_link) {
+        if (dt == handle) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Run a single barrier collective on a team and assert it completes. */
+static void run_barrier(UccTeam_h &team)
+{
+    ucc_coll_args_t coll;
+    coll.mask      = 0;
+    coll.coll_type = UCC_COLL_TYPE_BARRIER;
+    UccReq req(team, &coll);
+    req.start();
+    ASSERT_EQ(UCC_OK, req.wait());
+}
+
+/* create->barrier->destroy->recreate-identical must re-adopt the SAME
+   ucc_team_t (pointer + team-id preserved) and record a hit on the second
+   create, then drive a second lifetime cycle. */
+UCC_TEST_F(test_team_cache_integration, dormant_reuse)
+{
+    UccJob job(
+        4,
+        UccJob::UCC_JOB_CTX_GLOBAL,
+        {ucc_env_var_t("UCC_TEAM_CACHE_ENABLE", "y")});
+
+    UccTeam_h   t1         = job.create_team(2, /*use_team_ep_map=*/true);
+
+    ucc_team_t *tp0_before = team_ptr(t1, 0);
+    ucc_team_t *tp1_before = team_ptr(t1, 1);
+    uint16_t    id0_before = tp0_before->id;
+
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_LIVE, tp0_before->cache_state);
+
+    /* Both contexts are captured before the reset below drops the team. */
+    ucc_context_t *ctx0 = ctx_ptr(t1, 0);
+    ucc_context_t *ctx1 = ctx_ptr(t1, 1);
+    ASSERT_NE(nullptr, ctx0->team_cache);
+
+    /* First create: a miss, no hit, one insert. */
+    EXPECT_GE(ctx0->team_cache->stats.lookups, 1u);
+    EXPECT_EQ(0u, ctx0->team_cache->stats.hits);
+    EXPECT_EQ(1u, ctx0->team_cache->stats.inserts);
+
+    run_barrier(t1);
+
+    t1.reset();
+    EXPECT_TRUE(is_dormant(ctx0, tp0_before));
+    EXPECT_TRUE(is_dormant(ctx1, tp1_before));
+
+    /* Second team, IDENTICAL membership -> re-adopt the dormant team. */
+    UccTeam_h   t2        = job.create_team(2, /*use_team_ep_map=*/true);
+
+    ucc_team_t *tp0_after = team_ptr(t2, 0);
+    ucc_team_t *tp1_after = team_ptr(t2, 1);
+
+    EXPECT_EQ(tp0_before, tp0_after) << "team not reused";
+    EXPECT_EQ(tp1_before, tp1_after) << "team not reused";
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_LIVE, tp0_after->cache_state);
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_LIVE, tp1_after->cache_state);
+    EXPECT_EQ(id0_before, tp0_after->id)
+        << "re-adopted team must retain its original team ID";
+
+    /* Second create: one more lookup, exactly one hit, no extra insert. */
+    EXPECT_GE(ctx0->team_cache->stats.lookups, 2u);
+    EXPECT_EQ(1u, ctx0->team_cache->stats.hits);
+    EXPECT_EQ(1u, ctx0->team_cache->stats.inserts);
+
+    run_barrier(t2);
+
+    t2.reset();
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_DORMANT, tp0_after->cache_state);
+}
+
+/* With UCC_TEAM_CACHE_ENABLE=n, create->destroy->recreate produces DISTINCT
+   ucc_team_t pointers; a team without EP_MAP is never cacheable. */
+UCC_TEST_F(test_team_cache_integration, knob_off)
+{
+    UccJob job(
+        4,
+        UccJob::UCC_JOB_CTX_GLOBAL,
+        {ucc_env_var_t("UCC_TEAM_CACHE_ENABLE", "n")});
+
+    UccTeam_h      t1        = job.create_team(2, /*use_team_ep_map=*/true);
+    ucc_team_t    *tp_before = team_ptr(t1, 0);
+
+    ucc_context_t *ctx0      = ctx_ptr(t1, 0);
+    EXPECT_EQ(nullptr, ctx0->team_cache)
+        << "team_cache must be NULL when caching is disabled";
+
+    run_barrier(t1);
+
+    /* Create t2 while t1 is still live so pointer-distinctness is meaningful. */
+    UccTeam_h   t2       = job.create_team(2, /*use_team_ep_map=*/true);
+    ucc_team_t *tp_after = team_ptr(t2, 0);
+
+    EXPECT_NE(tp_before, tp_after);
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_NONE, tp_after->cache_state);
+
+    run_barrier(t2);
+    t1.reset();
+
+    /* A team created WITHOUT EP_MAP is never cacheable (identity_build requires
+       FIELD_EP_MAP): cache_state==NONE and distinct pointers. */
+    UccTeam_h   n1  = job.create_team(2, /*use_team_ep_map=*/false);
+    ucc_team_t *np1 = team_ptr(n1, 0);
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_NONE, np1->cache_state);
+    run_barrier(n1);
+
+    UccTeam_h   n2  = job.create_team(2, /*use_team_ep_map=*/false);
+    ucc_team_t *np2 = team_ptr(n2, 0);
+    EXPECT_NE(np1, np2);
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_NONE, np2->cache_state);
+    run_barrier(n2);
+    n1.reset();
+}
+
+/* Real UccJob, 2-slot FIFO cache.  Create/destroy T1{2p}, T2{3p} (both DORMANT,
+   cache full), then create T3{4p}: admission evicts T1 and drains its destroy
+   synchronously; T3 lands in the freed slot.  Asserts evictions >= 1 and
+   size <= max_size. */
+UCC_TEST_F(test_team_cache_integration, evict_id_release_on_evict)
+{
+    UccJob job(
+        4,
+        UccJob::UCC_JOB_CTX_GLOBAL,
+        {ucc_env_var_t("UCC_TEAM_CACHE_ENABLE", "y"),
+         ucc_env_var_t("UCC_TEAM_CACHE_MAX_SIZE", "2"),
+         ucc_env_var_t("UCC_TEAM_CACHE_EVICTION", "fifo"),
+         ucc_env_var_t("UCC_TEAM_IDS_POOL_SIZE", "1")});
+
+    UccTeam_h t1 = job.create_team(2, /*use_team_ep_map=*/true);
+    ASSERT_NE(nullptr, t1);
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_LIVE, team_ptr(t1)->cache_state);
+    run_barrier(t1);
+    t1.reset(); /* T1 -> DORMANT (slot 1) */
+
+    UccTeam_h t2 = job.create_team(3, /*use_team_ep_map=*/true);
+    ASSERT_NE(nullptr, t2);
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_LIVE, team_ptr(t2)->cache_state);
+    run_barrier(t2);
+
+    ucc_context_t    *ctx0  = ctx_ptr(t2, 0);
+    ucc_team_cache_t *cache = ctx0->team_cache;
+    ASSERT_NE(nullptr, cache);
+    uint64_t evictions_before = cache->stats.evictions;
+
+    t2.reset(); /* T2 -> DORMANT (slot 2, cache full) */
+
+    UccTeam_h t3 = job.create_team(4, /*use_team_ep_map=*/true);
+    ASSERT_NE(nullptr, t3);
+    run_barrier(t3);
+
+    EXPECT_GT(cache->stats.evictions, evictions_before)
+        << "inserting T3 into a full cache must evict";
+    EXPECT_LE(cache->size, cache->max_size);
+    EXPECT_TRUE(ucc_list_is_empty(&cache->pending_destroy))
+        << "pending destroys must complete synchronously in gtest context";
+}
+
+/* Pool-pressure headroom: six DISTINCT-membership teams churned through a 2-slot
+   cache + size-1 ID pool. */
+UCC_TEST_F(test_team_cache_integration, id_pool_headroom_with_dormant_teams)
+{
+    UccJob job(
+        16,
+        UccJob::UCC_JOB_CTX_GLOBAL,
+        {ucc_env_var_t("UCC_TEAM_CACHE_ENABLE", "y"),
+         ucc_env_var_t("UCC_TEAM_CACHE_MAX_SIZE", "2"),
+         ucc_env_var_t("UCC_TEAM_CACHE_EVICTION", "fifo"),
+         ucc_env_var_t("UCC_TEAM_IDS_POOL_SIZE", "1")});
+
+    ucc_context_t    *ctx0   = nullptr;
+    ucc_team_cache_t *cache  = nullptr;
+
+    const int         kTeams = 6;
+    for (int i = 0; i < kTeams; i++) {
+        int sz = 2 + i; /* sizes 2..7, all distinct, all fit in a 16-proc job */
+        UccTeam_h t = job.create_team(sz, /*use_team_ep_map=*/true);
+        ASSERT_NE(nullptr, t)
+            << "create_team must succeed (no UCC_ERR_NO_RESOURCE) at team "
+            << i;
+        if (i == 0) {
+            ctx0  = ctx_ptr(t, 0);
+            cache = ctx0->team_cache;
+        }
+        run_barrier(t);
+        t.reset();
+    }
+
+    ASSERT_NE(nullptr, cache);
+    EXPECT_LE(cache->size, cache->max_size);
+    EXPECT_GT(cache->stats.evictions, 0u)
+        << "eviction must fire across " << kTeams << " distinct teams";
+}
+
+/* With UCC_TEAM_CACHE_DUMP_STATS=y the knob is wired onto the cache struct and
+   the destroy path dumps stats; the knob-off leg reads back zero. */
+UCC_TEST_F(test_team_cache_integration, dump_stats_integration_knob_on)
+{
+    UccJob job(
+        4,
+        UccJob::UCC_JOB_CTX_GLOBAL,
+        {ucc_env_var_t("UCC_TEAM_CACHE_ENABLE", "y"),
+         ucc_env_var_t("UCC_TEAM_CACHE_DUMP_STATS", "y")});
+
+    UccTeam_h t = job.create_team(2, /*use_team_ep_map=*/true);
+    ASSERT_NE(nullptr, t);
+
+    ucc_context_t *ctx = ctx_ptr(t, 0);
+    ASSERT_NE(nullptr, ctx->team_cache);
+    EXPECT_NE(0u, ctx->team_cache->dump_stats);
+
+    run_barrier(t);
+    t.reset();
+
+    UccJob job_off(
+        4,
+        UccJob::UCC_JOB_CTX_GLOBAL,
+        {ucc_env_var_t("UCC_TEAM_CACHE_ENABLE", "y"),
+         ucc_env_var_t("UCC_TEAM_CACHE_DUMP_STATS", "n")});
+
+    UccTeam_h t_off = job_off.create_team(2, /*use_team_ep_map=*/true);
+    ASSERT_NE(nullptr, t_off);
+
+    ucc_context_t *ctx_off = ctx_ptr(t_off, 0);
+    ASSERT_NE(nullptr, ctx_off->team_cache);
+    EXPECT_EQ(0u, ctx_off->team_cache->dump_stats);
+
+    run_barrier(t_off);
+    t_off.reset();
+}
+
+/* With DISABLE_LINEAR_CHECK=y the hash-trust path is used; for non-colliding
+   membership it produces the same dormant reuse as the safe path. */
+UCC_TEST_F(test_team_cache_integration, disable_linear_check_accepted)
+{
+    UccJob job(
+        4,
+        UccJob::UCC_JOB_CTX_GLOBAL,
+        {ucc_env_var_t("UCC_TEAM_CACHE_ENABLE", "y"),
+         ucc_env_var_t("UCC_TEAM_CACHE_DISABLE_LINEAR_CHECK", "y")});
+
+    UccTeam_h t1 = job.create_team(2, /*use_team_ep_map=*/true);
+    ASSERT_NE(nullptr, t1);
+
+    ucc_team_t    *tp0_before = team_ptr(t1, 0);
+    ucc_context_t *ctx0       = ctx_ptr(t1, 0);
+
+    ASSERT_NE(nullptr, ctx0->team_cache);
+    EXPECT_NE(0u, ctx0->team_cache->disable_linear_check);
+
+    run_barrier(t1);
+    t1.reset();
+    EXPECT_TRUE(is_dormant(ctx0, tp0_before));
+
+    UccTeam_h t2 = job.create_team(2, /*use_team_ep_map=*/true);
+    ASSERT_NE(nullptr, t2);
+
+    ucc_team_t *tp0_after = team_ptr(t2, 0);
+    EXPECT_EQ(tp0_before, tp0_after)
+        << "hash-trust re-adopt must return the same ucc_team_t pointer";
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_LIVE, tp0_after->cache_state);
+    EXPECT_GE(ctx0->team_cache->stats.hits, 1u);
+
+    run_barrier(t2);
 }
