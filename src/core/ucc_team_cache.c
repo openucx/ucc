@@ -228,6 +228,57 @@ uint64_t ucc_team_cache_next_cookie(ucc_team_cache_t *cache)
     return c;
 }
 
+void ucc_team_cache_vote_fill(
+    uint64_t *v, int prepared, ucc_team_cache_action_t action, uint64_t key,
+    uint64_t cookie, uint64_t parent_cookie, int is_rank0,
+    uint64_t proposed_cookie)
+{
+    if (!prepared) {
+        /* All-ones equality lanes are a BAND no-op */
+        v[0] = 0;
+        v[1] = ~(uint64_t)0;
+        v[2] = ~(uint64_t)0;
+        v[3] = ~(uint64_t)0;
+        v[4] = ~(uint64_t)0;
+        v[5] = ~(uint64_t)0;
+        v[6] = ~(uint64_t)0;
+        v[7] = ~(uint64_t)0;
+        v[8] = ~(uint64_t)0;
+    } else {
+        v[0] = 1;
+        v[1] = (uint64_t)action;
+        v[2] = ~(uint64_t)action;
+        v[3] = key;
+        v[4] = ~key;
+        v[5] = cookie;
+        v[6] = ~cookie;
+        v[7] = parent_cookie;
+        v[8] = ~parent_cookie;
+    }
+    /* Only rank 0 contributes here, so every member reads its value */
+    v[9] = is_rank0 ? proposed_cookie : ~(uint64_t)0;
+}
+
+ucc_team_cache_action_t ucc_team_cache_vote_result(const uint64_t *v)
+{
+    int all_prepared  = (v[0] == 1);
+    int action_agree  = (v[1] == ~v[2]);
+    int key_agree     = (v[3] == ~v[4]);
+    int cookie_agree  = (v[5] == ~v[6]);
+    int pcookie_agree = (v[7] == ~v[8]);
+
+    if (all_prepared && action_agree && key_agree && cookie_agree &&
+        pcookie_agree) {
+        return (ucc_team_cache_action_t)v[1];
+    }
+    return UCC_TEAM_CACHE_ACTION_MISS;
+}
+
+uint64_t ucc_team_cache_vote_new_cookie(const uint64_t *v)
+{
+    return v[9];
+}
+
 int ucc_team_cache_is_cacheable(const ucc_team_params_t *params)
 {
     /* These are not part of the identity, so a reuse could change semantics */
