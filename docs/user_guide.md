@@ -354,20 +354,63 @@ team instead of rebuilding it from scratch.
 | `UCC_TEAM_CACHE_EVICTION` | `fifo` | Eviction policy when the cache is full. `none`: never evict (new teams stay uncached). `fifo`: evict the oldest dormant entry (default). |
 | `UCC_TEAM_CACHE_DISABLE_LINEAR_CHECK` | `n` | Trust the 64-bit membership hash alone in lookup, skipping the exact rank-array compare. Faster but unsafe on hash collision. |
 | `UCC_TEAM_CACHE_DUMP_STATS` | `n` | Log hit/miss/eviction counters at context destroy. |
+| `UCC_TEAM_CACHE_AGREEMENT` | `y` | Agree on the reuse decision across the members of every cacheable team create. Makes reuse safe for overlapping team scopes, at the cost of one small allreduce per create. |
 
-### Restriction: non-overlapping team scopes
+### Cross-rank agreement
 
-Each rank classifies a create as a cache hit or a miss on its own, so reuse is
-only safe when team scopes never overlap - that is, when no rank belongs to two
-simultaneously created teams with the same membership. When scopes do overlap,
-per-rank cache contents can diverge (for example after an eviction on one rank
-only), and the members of a single create can then disagree on whether to
-re-adopt a dormant team or build a fresh one. A create where some ranks re-adopt
-while others rebuild does not make progress.
+Each rank classifies a create as a cache hit or a miss from its own cache
+contents, and those contents can diverge - for example when an eviction happens
+on one rank only. Without agreement, the members of a single create could then
+disagree on whether to re-adopt a dormant team or build a fresh one, and a create
+where some ranks re-adopt while others rebuild does not make progress.
 
-Applications that build only disjoint or strictly nested communicators, such as
-a fixed set of row/column communicators recreated over and over, satisfy this
-restriction. If team scopes may overlap, leave `UCC_TEAM_CACHE_ENABLE=n`.
+`UCC_TEAM_CACHE_AGREEMENT` (on by default) reconciles that with a small
+`UCC_OP_BAND` allreduce over the members before any rank skips the address
+exchange. Reuse happens only when every member independently classified the
+create the same way; otherwise all members fall back to a fresh build. This makes
+reuse safe even when team scopes overlap.
+
+Disable the agreement only when team scopes never overlap - that is, when no rank
+belongs to two simultaneously created teams with the same membership - and the
+per-create allreduce is measurably too expensive. Applications that build only
+disjoint or strictly nested communicators, such as a fixed set of row/column
+communicators recreated over and over, satisfy that condition. Single-rank teams
+never vote, since they cannot diverge.
+
+### Team-cache settings must be identical on every rank
+
+> **The team-cache settings above are not per-rank tunables. A rank whose
+> settings differ from its peers' can hang the job, not merely lose reuse.**
+
+When caching and agreement are both on, a cacheable multi-rank create posts a
+member-scoped allreduce (the *agreement vote*) so that every member reaches the
+same reuse-vs-rebuild decision. A rank only enters that vote if all of the
+following hold on that rank:
+
+- `UCC_TEAM_CACHE_ENABLE=y`
+- `UCC_TEAM_CACHE_AGREEMENT=y`
+- the team is cacheable (no optional behavioral fields in `ucc_team_params_t`)
+- the team has more than one member, and
+- the caller passed `UCC_TEAM_PARAM_FIELD_EP_MAP`.
+
+A rank that fails any of these skips the vote entirely and proceeds to build its
+team directly. Its peers, meanwhile, have posted an allreduce that now has no
+matching contribution from that rank and will never complete: the create hangs.
+
+In practice this means:
+
+- Set the team-cache variables in the launcher environment so every rank
+  inherits the same values (`mpirun -x UCC_TEAM_CACHE_ENABLE=y ...` or
+  `ucc.conf`). Do not set them from a per-rank wrapper script or from a rank
+  conditional.
+- If a middleware creates some teams with `EP_MAP` and others without, that is
+  safe only when the choice is the same on every rank for a given team, which
+  it is for MPI communicators.
+- If you must disable caching for part of a job, disable it for the whole job.
+
+Setting `UCC_TEAM_CACHE_AGREEMENT=n` uniformly on every rank removes the vote
+and with it this hazard, but it is only safe when communicator scopes never
+overlap (see the table above).
 
 ### Requirements
 

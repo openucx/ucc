@@ -53,6 +53,14 @@ static void tc_report_fail(const char *name, int rank, const char *what)
               << what << "\n";
 }
 
+static tc_verdict_t tc_skip(const char *name, int rank, const char *why)
+{
+    if (0 == rank) {
+        std::cout << "SKIP " << name << ": " << why << "\n";
+    }
+    return TC_SKIP;
+}
+
 /* Pump the context until a single collective request completes; abort on error
    (a failed collective leaves the ranks out of step, so there is nothing left
    to report cooperatively). */
@@ -313,6 +321,161 @@ static tc_verdict_t test_ep_map_cb_freed_after_cache(ucc_context_h ctx,
 }
 
 /* ==========================================================================
+ * overlap_agreement: overlapping subcommunicator scopes plus a small cache force
+ * DIVERGENT per-rank eviction, which previously deadlocked (one rank re-adopts a
+ * dormant team while a peer that evicted it enters a fresh collective build and
+ * waits forever). The cross-rank agreement must reconcile the split hit/miss to
+ * a consistent fresh build.
+ *
+ * Requires UCC_TEAM_CACHE_MAX_SIZE<=2 and >=3 ranks. Without the small cache no
+ * eviction happens, so the test would construct no divergence at all and still
+ * print PASS; the max_size guard below makes that configuration an explicit
+ * skip instead.
+ * ========================================================================== */
+static tc_verdict_t test_overlap_agreement(ucc_context_h ctx, int world_rank,
+                                           int world_size)
+{
+    const char       *name      = "overlap_agreement";
+    ucc_team_cache_t *cache     = cache_of(ctx);
+    ucc_rank_t        ranksA[2] = {0, 1};
+    ucc_rank_t        ranksB[2] = {1, 2};
+    ucc_rank_t        ranksD[3] = {0, 1, 2};
+    MPI_Comm          commA, commB, commD;
+    ucc_team_h        t;
+
+    if (world_size < 3 || cache->max_size > 2) {
+        return tc_skip(name, world_rank, "needs >=3 ranks and MAX_SIZE<=2");
+    }
+
+    drain_cache(ctx);
+
+    /* Overlapping member sets: A{0,1}, B{1,2}, D{0,1,2}. */
+    MPI_Comm_split(MPI_COMM_WORLD, (world_rank <= 1) ? 0 : MPI_UNDEFINED,
+                   world_rank, &commA);
+    MPI_Comm_split(MPI_COMM_WORLD,
+                   (world_rank >= 1 && world_rank <= 2) ? 0 : MPI_UNDEFINED,
+                   world_rank, &commB);
+    MPI_Comm_split(MPI_COMM_WORLD, (world_rank <= 2) ? 0 : MPI_UNDEFINED,
+                   world_rank, &commD);
+
+    /* 1) A dormant on {0,1}; 2) B dormant on {1,2} (rank 1's cache is now full
+       at MAX_SIZE=2); 3) D on {0,1,2} evicts the oldest dormant (A) on rank 1
+       but not on rank 0 -> divergence; 4) re-create A: rank 0 re-adopts, rank 1
+       missed. Pre-agreement this deadlocks; the vote must reconcile to a fresh
+       build on both. */
+    if (commA != MPI_COMM_NULL) {
+        t = create_array_team(ctx, commA, ranksA, 2);
+        destroy_ucc_team(t, ctx);
+    }
+    if (commB != MPI_COMM_NULL) {
+        t = create_array_team(ctx, commB, ranksB, 2);
+        destroy_ucc_team(t, ctx);
+    }
+    if (commD != MPI_COMM_NULL) {
+        t = create_array_team(ctx, commD, ranksD, 3);
+        destroy_ucc_team(t, ctx);
+    }
+    if (commA != MPI_COMM_NULL) {
+        t = create_array_team(ctx, commA, ranksA, 2);
+        run_barrier_on_team(t, ctx); /* must complete, not deadlock */
+        destroy_ucc_team(t, ctx);
+        MPI_Comm_free(&commA);
+    }
+    if (commB != MPI_COMM_NULL) {
+        MPI_Comm_free(&commB);
+    }
+    if (commD != MPI_COMM_NULL) {
+        MPI_Comm_free(&commD);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if (0 == world_rank) {
+        std::cout << "PASS " << name << "\n";
+    }
+    return TC_PASS;
+}
+
+/* ==========================================================================
+ * nonblocking_create_post: ucc_team_create_post must return promptly (post the
+ * vote, not block) even if one rank is late entering it. Rank 0 sleeps briefly;
+ * the other ranks call create_post and must return before rank 0 arrives.
+ *
+ * The threshold is the full rank-0 delay rather than a fraction of it: the
+ * failure being detected is create_post blocking until rank 0 shows up, and the
+ * CI legs run oversubscribed, where a tighter bound measures scheduling noise.
+ * ========================================================================== */
+static tc_verdict_t test_nonblocking_create_post(ucc_context_h ctx,
+                                                 int world_rank, int world_size)
+{
+    const char       *name     = "nonblocking_create_post";
+    const int         kSleepMs = 2000;
+    tc_verdict_t      v        = TC_PASS;
+    ucc_team_params_t p;
+    ucc_team_h        team;
+    ucc_status_t      status;
+    double            t_start, elapsed_ms;
+
+    if (world_size < 2) {
+        return tc_skip(name, world_rank, "needs >=2 ranks");
+    }
+
+    /* Drain so this is a clean fresh create (the vote is posted regardless). */
+    drain_cache(ctx);
+
+    t_start = MPI_Wtime();
+    if (world_rank == 0) {
+        /* Delay entering create_post: peers must not block waiting on us. */
+        usleep(kSleepMs * 1000);
+    }
+
+    /* Posted inline rather than through ucc_test_create_team, which blocks to
+       completion; only the post itself is being timed. */
+    memset(&p, 0, sizeof(p));
+    p.mask = UCC_TEAM_PARAM_FIELD_EP | UCC_TEAM_PARAM_FIELD_EP_RANGE |
+             UCC_TEAM_PARAM_FIELD_OOB | UCC_TEAM_PARAM_FIELD_EP_MAP;
+    p.oob.allgather = oob_allgather;
+    p.oob.req_test  = oob_allgather_test;
+    p.oob.req_free  = oob_allgather_free;
+    p.oob.coll_info = (void *)(uintptr_t)MPI_COMM_WORLD;
+    p.oob.n_oob_eps = world_size;
+    p.oob.oob_ep    = world_rank;
+    p.ep            = world_rank;
+    p.ep_range      = UCC_COLLECTIVE_EP_RANGE_CONTIG;
+    p.ep_map        = ep_map_full(world_size);
+
+    UCC_CHECK(ucc_team_create_post(&ctx, 1, &p, &team));
+    elapsed_ms = (MPI_Wtime() - t_start) * 1000.0;
+
+    /* On a non-zero rank, create_post must have returned before rank 0's sleep
+       elapsed - proving it posted (did not block on) the vote. */
+    if (world_rank != 0 && elapsed_ms >= (double)kSleepMs) {
+        std::cerr << "*** UCC TEST FAIL: " << name << " rank " << world_rank
+                  << ": create_post blocked " << elapsed_ms
+                  << "ms (rank 0 delay " << kSleepMs << "ms)\n";
+        v = TC_FAIL;
+    }
+
+    while (UCC_INPROGRESS == (status = ucc_team_create_test(team))) {
+        ucc_context_progress(ctx);
+    }
+    if (status < 0) {
+        std::cerr << "*** UCC TEST FAIL: " << name << " create ("
+                  << ucc_status_string(status) << ")\n";
+        MPI_Abort(MPI_COMM_WORLD, -1);
+    }
+
+    run_barrier_on_team(team, ctx);
+    MPI_Barrier(MPI_COMM_WORLD);
+    destroy_ucc_team(team, ctx);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if (v == TC_PASS && 0 == world_rank) {
+        std::cout << "PASS " << name << "\n";
+    }
+    return v;
+}
+
+/* ==========================================================================
  * singleton_team: a size-1 cacheable team creates + reuses correctly with no
  * network vote (self-membership; the size>1 gate is not taken). Each rank builds
  * its own {self} team independently over MPI_COMM_SELF, so the recreates must
@@ -393,7 +556,7 @@ ucc_test_suite_result_t run_team_cache_tests(ucc_context_h ctx, int world_rank,
     /* Must match the number of tc_tally calls below: used to report every test
        as skipped when caching is off, so a disabled run is never mistaken for a
        clean one. */
-    const int               kNumTests = 3;
+    const int               kNumTests = 5;
     ucc_test_suite_result_t r         = {0, 0, 0};
 
     if (0 == world_rank) {
@@ -415,6 +578,8 @@ ucc_test_suite_result_t run_team_cache_tests(ucc_context_h ctx, int world_rank,
 
     tc_tally(&r, test_dormant_reuse_stats(ctx, world_rank, world_size));
     tc_tally(&r, test_ep_map_cb_freed_after_cache(ctx, world_rank, world_size));
+    tc_tally(&r, test_overlap_agreement(ctx, world_rank, world_size));
+    tc_tally(&r, test_nonblocking_create_post(ctx, world_rank, world_size));
     tc_tally(&r, test_singleton_team(ctx, world_rank, world_size));
 
     ucc_assert(r.passed + r.failed + r.skipped == kNumTests);
