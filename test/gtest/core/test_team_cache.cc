@@ -1217,6 +1217,52 @@ static void drain_stub_teams(
     }
 }
 
+/* lookup_live skips DORMANT teams and returns the LIVE same-membership sibling,
+   which is the parent a derived create borrows its artifacts from. */
+UCC_TEST_F(test_team_cache, lookup_live_returns_live_sibling)
+{
+    ScopedCache cache(16, UCC_TEAM_CACHE_EVICTION_FIFO, 0);
+
+    ucc_rank_t  arr[3]    = {10, 20, 30};
+
+    ucc_team_t *t_dormant = alloc_stub_team_with_id(arr, 3, 0, 10);
+    ucc_team_t *t_live    = alloc_stub_team_with_id(arr, 3, 0, 20);
+    ASSERT_NE(nullptr, t_dormant);
+    ASSERT_NE(nullptr, t_live);
+    ASSERT_EQ(t_dormant->cache_identity.hash, t_live->cache_identity.hash);
+
+    ucc_spin_lock(&cache->lock);
+
+    ASSERT_EQ(UCC_OK, ucc_team_cache_insert(cache, t_dormant));
+    ASSERT_EQ(UCC_OK, ucc_team_cache_insert(cache, t_live));
+    EXPECT_EQ(2u, cache->size);
+
+    ucc_team_cache_get(t_live);
+    ucc_team_cache_registry_make_live(cache, t_live);
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_LIVE, t_live->cache_state);
+
+    ucc_team_cache_identity_t key;
+    build_id_key(arr, 3, 0, 10, key);
+
+    /* Full-identity lookup returns the DORMANT team; lookup_live returns the
+       LIVE sibling, skipping the dormant one. */
+    EXPECT_EQ(t_dormant, ucc_team_cache_lookup(cache, &key));
+    EXPECT_EQ(t_live, ucc_team_cache_lookup_live(cache, &key));
+
+    /* Release the live sibling to dormant: no live sibling, so NULL. */
+    ucc_team_cache_put(t_live);
+    ucc_team_cache_registry_make_dormant(cache, t_live);
+    EXPECT_EQ(nullptr, ucc_team_cache_lookup_live(cache, &key));
+
+    erase_stub(cache, t_dormant);
+    erase_stub(cache, t_live);
+    ucc_spin_unlock(&cache->lock);
+
+    ucc_team_cache_identity_free(&key);
+    free_stub_team(t_dormant);
+    free_stub_team(t_live);
+}
+
 /* Contended DESTROY + LOOKUP path.  A pool of DORMANT stub teams; N threads
    race, each iteration under cache->lock: lookup, adopt on a DORMANT hit, then
    release. */
@@ -1621,4 +1667,161 @@ UCC_TEST_F(test_team_cache_integration, disable_linear_check_accepted)
     EXPECT_GE(ctx0->team_cache->stats.hits, 1u);
 
     run_barrier(t2);
+}
+
+/* Two simultaneously-LIVE identical-membership teams (parent + derived) with
+   distinct team-ids run interleaved-order collectives.  A shared id would
+   cross-match in the (team_id, src_rank, seq_num) tag space and produce a wrong
+   result or hang; the derived team's own id keeps the streams isolated.
+   gtest limitation: the in-process UCP path can't re-adopt >= 4-proc teams after
+   dormancy, so these use <= 3-proc teams (the MPI leg covers the rest). */
+
+/* One in-flight per-proc collective: request + owned buffers + expected. */
+struct coll_op {
+    ucc_coll_req_h req;
+    ucc_context_h  ctx;
+    int64_t        sbuf;
+    int64_t        rbuf;
+    int64_t        expect;
+    bool           is_allreduce;
+};
+
+static void set_int64_host_buf(ucc_coll_buffer_info_t &info, int64_t *buf)
+{
+    info.buffer   = buf;
+    info.count    = 1;
+    info.datatype = UCC_DT_INT64;
+    info.mem_type = UCC_MEMORY_TYPE_HOST;
+}
+
+/* init + post @args as @op's request on proc @p of @team. */
+static void post_op(UccTeam_h &team, int p, ucc_coll_args_t &args, coll_op &op)
+{
+    op.ctx = ctx_ptr(team, p);
+    ASSERT_EQ(UCC_OK, ucc_collective_init(&args, &op.req, team->procs[p].team));
+    ASSERT_EQ(UCC_OK, ucc_collective_post(op.req));
+}
+
+/* Post an allreduce(SUM) of one int64 on proc @p; result must equal @expect. */
+static void post_allreduce(
+    UccTeam_h &team, int p, int64_t val, int64_t expect, coll_op &op)
+{
+    op.sbuf         = val;
+    op.rbuf         = 0;
+    op.expect       = expect;
+    op.is_allreduce = true;
+
+    ucc_coll_args_t args;
+    memset(&args, 0, sizeof(args));
+    args.coll_type = UCC_COLL_TYPE_ALLREDUCE;
+    args.op        = UCC_OP_SUM;
+    set_int64_host_buf(args.src.info, &op.sbuf);
+    set_int64_host_buf(args.dst.info, &op.rbuf);
+
+    post_op(team, p, args, op);
+}
+
+/* Post a bcast of a single int64 from root proc 0 on proc @p. */
+static void post_bcast(UccTeam_h &team, int p, int64_t val, coll_op &op)
+{
+    op.rbuf         = (p == 0) ? val : 0;
+    op.expect       = val;
+    op.is_allreduce = false;
+
+    ucc_coll_args_t args;
+    memset(&args, 0, sizeof(args));
+    args.coll_type = UCC_COLL_TYPE_BCAST;
+    args.root      = 0;
+    set_int64_host_buf(args.src.info, &op.rbuf);
+
+    post_op(team, p, args, op);
+}
+
+/* Drive a set of in-flight per-proc collectives to completion, finalize, and
+   validate each.  Every participating context is pumped each round. */
+static void drive_and_check(std::vector<coll_op *> ops)
+{
+    bool all_done = false;
+    while (!all_done) {
+        all_done = true;
+        for (auto *op : ops) {
+            ucc_status_t st = ucc_collective_test(op->req);
+            ASSERT_GE(st, 0);
+            if (st != UCC_OK) {
+                all_done = false;
+            }
+        }
+        for (auto *op : ops) {
+            ucc_context_progress(op->ctx);
+        }
+    }
+    for (auto *op : ops) {
+        ASSERT_EQ(UCC_OK, ucc_collective_finalize(op->req));
+        ASSERT_EQ(op->expect, op->rbuf)
+            << (op->is_allreduce ? "allreduce" : "bcast") << " wrong result";
+    }
+}
+
+/* Parent (LIVE) + derived team, identical 2-proc membership, distinct team-ids.
+   Each rank posts on each team in OPPOSITE relative order; distinct tag domains
+   keep this correct where a shared id would cross-match. */
+UCC_TEST_F(test_team_cache_integration, derived_coexist_interleaved)
+{
+    UccJob job(
+        4,
+        UccJob::UCC_JOB_CTX_GLOBAL,
+        {ucc_env_var_t("UCC_TEAM_CACHE_ENABLE", "y")});
+
+    UccTeam_h   t1 = job.create_team(2, /*use_team_ep_map=*/true);
+
+    ucc_team_t *p0 = team_ptr(t1, 0);
+    ucc_team_t *p1 = team_ptr(t1, 1);
+    ASSERT_EQ(UCC_TEAM_CACHE_STATE_LIVE, p0->cache_state);
+    EXPECT_EQ(0, p0->is_derived);
+    ASSERT_NE(nullptr, p0->artifacts);
+    run_barrier(t1);
+
+    UccTeam_h   t2 = job.create_team(2, /*use_team_ep_map=*/true);
+
+    ucc_team_t *d0 = team_ptr(t2, 0);
+    ucc_team_t *d1 = team_ptr(t2, 1);
+
+    /* Derivation fired: distinct object per proc, is_derived, not itself cached
+       (NONE), sharing the parent's artifacts holder. */
+    ASSERT_EQ(1, d0->is_derived);
+    EXPECT_EQ(1, d1->is_derived);
+    EXPECT_NE(p0, d0);
+    EXPECT_NE(p1, d1);
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_NONE, d0->cache_state);
+    EXPECT_EQ(p0->artifacts, d0->artifacts);
+    EXPECT_EQ(p1->artifacts, d1->artifacts);
+    EXPECT_GE(d0->artifacts->refcount, 2);
+
+    /* Distinct team-ids => distinct tag/seq domains.  ASSERT so a shared id
+       fails fast instead of hanging the loop below. */
+    ASSERT_NE(p0->id, d0->id);
+    ASSERT_NE(team_ptr(t1, 1)->id, team_ptr(t2, 1)->id);
+
+    const int kIters = 40;
+    for (int it = 0; it < kIters; it++) {
+        int64_t ar_val = 100 + it;
+        int64_t ar_exp = ar_val * 2;
+        int64_t bc_val = 900000 + it;
+
+        coll_op p0_ar, p0_bc, p1_ar, p1_bc;
+
+        /* proc 0: t1.allreduce then t2.bcast; proc 1: opposite order. */
+        post_allreduce(t1, 0, ar_val, ar_exp, p0_ar);
+        post_bcast(t2, 0, bc_val, p0_bc);
+        post_bcast(t2, 1, bc_val, p1_bc);
+        post_allreduce(t1, 1, ar_val, ar_exp, p1_ar);
+
+        drive_and_check({&p0_ar, &p1_ar, &p0_bc, &p1_bc});
+    }
+
+    /* Teardown: derived first, parent last.  Parent must remain LIVE + usable. */
+    t2.reset();
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_LIVE, p0->cache_state);
+    run_barrier(t1);
+    t1.reset();
 }
