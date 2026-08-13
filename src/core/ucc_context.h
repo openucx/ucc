@@ -102,6 +102,7 @@ typedef struct ucc_context_config {
     uint32_t                  team_cache_eviction;
     uint32_t                  team_cache_disable_linear_check;
     uint32_t                  team_cache_dump_stats;
+    uint32_t                  team_cache_agreement;
     uint32_t                  estimated_num_eps;
     uint32_t                  estimated_num_ppn;
     uint32_t                  lock_free_progress_q;

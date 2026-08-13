@@ -16,6 +16,11 @@
 static ucc_status_t ucc_team_alloc_id(ucc_team_t *team);
 static void ucc_team_release_id(ucc_team_t *team);
 static ucc_status_t ucc_team_destroy_single(ucc_team_h team);
+static ucc_status_t ucc_team_destroy_single_ex(
+    ucc_team_h team, int for_rebuild);
+static ucc_status_t ucc_team_teardown_for_rebuild(ucc_team_t *team);
+static ucc_status_t ucc_team_reset_for_rebuild(
+    ucc_context_t *context, ucc_team_t *team);
 
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
 {
@@ -160,6 +165,108 @@ static ucc_team_t *ucc_team_alloc_shell(
     return team;
 }
 
+/* Classify this rank's cache action and post the vote that reconciles it */
+static ucc_status_t ucc_team_agreement_create_post(
+    ucc_context_h *contexts, uint32_t num_contexts,
+    const ucc_team_params_t *params, uint64_t team_size, uint64_t team_rank,
+    ucc_team_cache_t *cache, ucc_team_h *new_team)
+{
+    ucc_team_cache_identity_t id;
+    int                       id_built = 0;
+    ucc_team_t               *cached   = NULL;
+    ucc_team_t               *handle;
+    ucc_team_cache_action_t   action          = UCC_TEAM_CACHE_ACTION_MISS;
+    uint64_t                  key             = 0;
+    int                       is_rank0        = (team_rank == 0);
+    uint64_t                  proposed_cookie = 0;
+    ucc_subset_t              subset;
+    ucc_status_t              status;
+
+    if (ucc_team_cache_identity_build(params, &id) == UCC_OK) {
+        id_built = 1;
+        ucc_spin_lock(&cache->lock);
+        /* Drawn unconditionally, so a MISS outcome has a cookie to adopt */
+        if (is_rank0) {
+            proposed_cookie = ucc_team_cache_next_cookie(cache);
+        }
+        cached = ucc_team_cache_lookup(cache, &id);
+        if (cached != NULL) {
+            action = UCC_TEAM_CACHE_ACTION_EXACT_REUSE;
+            key    = cached->id;
+            ucc_team_cache_registry_make_reserved(cache, cached);
+            cached->cache_state = UCC_TEAM_CACHE_STATE_RESERVED;
+        }
+        ucc_spin_unlock(&cache->lock);
+    }
+
+    if (action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE) {
+        handle = cached;
+        /* The candidate already carries its own identity */
+        ucc_team_cache_identity_free(&id);
+        /* Refresh the map, since the candidate's may name a freed team */
+        handle->bp.params.ep_map = params->ep_map;
+        handle->bp.params.mask |= UCC_TEAM_PARAM_FIELD_EP_MAP;
+    } else {
+        handle = ucc_team_alloc_shell(
+            contexts,
+            num_contexts,
+            params,
+            team_size,
+            team_rank,
+            id_built,
+            &id,
+            &status);
+        if (handle == NULL) {
+            if (id_built) {
+                ucc_team_cache_identity_free(&id);
+            }
+            return status;
+        }
+        status = ucc_team_create_post_single(contexts[0], handle);
+        if (status < 0) {
+            ucc_team_destroy_single(handle);
+            return status;
+        }
+    }
+
+    handle->cache_local_action = action;
+    ucc_team_cache_vote_fill(
+        handle->cache_vote_in,
+        action != UCC_TEAM_CACHE_ACTION_MISS,
+        action,
+        key,
+        /*cookie=*/0,
+        /*parent_cookie=*/0,
+        is_rank0,
+        proposed_cookie);
+    /* ep_map is valid for this create and maps member index to ctx rank */
+    subset.myrank = handle->rank;
+    subset.map    = params->ep_map;
+    status        = ucc_service_allreduce_ctx(
+        handle,
+        handle->cache_vote_in,
+        handle->cache_vote_out,
+        UCC_DT_UINT64,
+        UCC_TEAM_CACHE_VOTE_LANES,
+        UCC_OP_BAND,
+        subset,
+        &handle->cache_vote_req);
+    if (status < 0) {
+        if (action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE) {
+            ucc_spin_lock(&cache->lock);
+            handle->cache_state = UCC_TEAM_CACHE_STATE_DORMANT;
+            ucc_team_cache_registry_make_dormant(cache, handle);
+            ucc_spin_unlock(&cache->lock);
+        } else {
+            ucc_team_destroy_single(handle);
+        }
+        return status;
+    }
+    handle->state = UCC_TEAM_CACHE_AGREE;
+    *new_team     = handle;
+    return UCC_OK;
+}
+
 ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts,
                                   const ucc_team_params_t *params,
                                   ucc_team_h *new_team)
@@ -249,8 +356,30 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
         return UCC_ERR_INVALID_PARAM;
     }
 
-    /* Direct reuse, when a dormant team with identical membership exists */
+    /* Agreement keeps every member on the same reuse decision.
+
+       Every condition below must evaluate identically on every member. A rank
+       that skips the vote (caching or agreement off, a differing params->mask,
+       no EP_MAP) builds its team directly while its peers wait on a
+       member-scoped allreduce that never completes, so a non-uniform
+       configuration hangs the create rather than degrading it. This is
+       documented for users under "Team-cache settings must be identical on
+       every rank" in docs/user_guide.md. */
     cache = ((ucc_context_t *)contexts[0])->team_cache;
+    if (cache != NULL && cache->agreement &&
+        ucc_team_cache_is_cacheable(params) && team_size > 1 &&
+        (params->mask & UCC_TEAM_PARAM_FIELD_EP_MAP)) {
+        return ucc_team_agreement_create_post(
+            contexts,
+            num_contexts,
+            params,
+            team_size,
+            team_rank,
+            cache,
+            new_team);
+    }
+
+    /* Direct reuse, for a single-rank team or when agreement is disabled */
     if (cache != NULL && ucc_team_cache_is_cacheable(params)) {
         status = ucc_team_cache_identity_build(params, &id);
         if (status == UCC_OK) {
@@ -461,6 +590,7 @@ static inline ucc_status_t ucc_team_exchange(ucc_context_t *context,
             if (UCC_OK != status) {
                 ucc_error("failed to start oob allgather for proc info exchange");
                 ucc_free(team->ctx_ranks);
+                team->ctx_ranks = NULL;
                 return status;
             }
         }
@@ -538,8 +668,15 @@ static void ucc_team_cache_admit(ucc_team_t *team)
 {
     ucc_context_t    *ctx   = team->contexts[0];
     ucc_team_cache_t *cache = ctx->team_cache;
+    uint64_t          new_cookie;
 
     team->cache_pending_insert = 0;
+
+    /* The direct path leaves the vote zeroed, which reuse never consults */
+    new_cookie = ucc_team_cache_vote_new_cookie(team->cache_vote_out);
+    if (new_cookie != 0 && new_cookie != ~(uint64_t)0) {
+        team->cache_identity.instance_cookie = new_cookie;
+    }
 
     if (cache == NULL) {
         return;
@@ -586,14 +723,82 @@ static void ucc_team_cache_admit(ucc_team_t *team)
 ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
                                          ucc_team_t    *team)
 {
-    ucc_status_t status = UCC_OK;
+    ucc_status_t            status = UCC_OK;
+    ucc_team_cache_action_t agreed;
 
     switch (team->state) {
     case UCC_TEAM_CACHE_AGREE:
+        status = ucc_service_coll_test(&team->cache_vote_req);
+        if (status == UCC_INPROGRESS) {
+            return UCC_INPROGRESS;
+        }
+        if (status < 0) {
+            ucc_service_coll_finalize(&team->cache_vote_req);
+            ucc_error(
+                "team cache: agreement vote failed: %s",
+                ucc_status_string(status));
+            goto out;
+        }
+        ucc_service_coll_finalize(&team->cache_vote_req);
+
+        agreed = ucc_team_cache_vote_result(team->cache_vote_out);
+        if (agreed == UCC_TEAM_CACHE_ACTION_EXACT_REUSE &&
+            team->cache_local_action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE) {
+            ucc_team_cache_t *vote_cache = context->team_cache;
+
+            ucc_spin_lock(&vote_cache->lock);
+            ucc_team_cache_get(team); /* RESERVED -> LIVE */
+            ucc_team_cache_registry_make_live(vote_cache, team);
+            ucc_spin_unlock(&vote_cache->lock);
+            ucc_debug("team cache: agreed EXACT reuse, team %p", (void *)team);
+            team->state = UCC_TEAM_ACTIVE;
+            return UCC_OK;
+        }
+        /* Not unanimous, so every member builds a fresh team */
+        if (team->cache_local_action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE) {
+            /* Detach the rejected candidate and rebuild the same handle */
+            ucc_team_cache_t *vote_cache = context->team_cache;
+
+            ucc_spin_lock(&vote_cache->lock);
+            ucc_team_cache_table_erase(vote_cache, team);
+            ucc_team_cache_registry_remove(team);
+            ucc_spin_unlock(&vote_cache->lock);
+            team->cache_pending_insert = 1;
+            team->state                = UCC_TEAM_CACHE_MISS_TEARDOWN;
+            ucc_debug(
+                "team cache: agreement lost, rebuilding team %p in place",
+                (void *)team);
+            /* fall through to CACHE_MISS_TEARDOWN */
+        } else {
+            team->state = (team->size > 1) ? UCC_TEAM_ADDR_EXCHANGE
+                                           : UCC_TEAM_CL_CREATE;
+            return UCC_INPROGRESS;
+        }
+        /* fall through */
     case UCC_TEAM_CACHE_MISS_TEARDOWN:
-        /* Only the agreement vote enters these, and it is never posted here */
-        status = UCC_ERR_NOT_IMPLEMENTED;
-        break;
+        /* A candidate that lost the vote is torn down rather than just marked
+           uncached: peers are about to build a fresh team reusing this team's
+           id, and its CL/TL teams still hold the matching wire tags. Destroying
+           them is the alias barrier that keeps a late in-flight message from
+           the retired team out of the rebuilt one's tag space.
+
+           This state is re-entered on every progress call until the teardown
+           completes, so ucc_team_teardown_for_rebuild must be restartable: it
+           advances per component and returns UCC_INPROGRESS without repeating
+           the destroys it already finished. */
+        status = ucc_team_teardown_for_rebuild(team);
+        if (status == UCC_INPROGRESS) {
+            ucc_context_progress(context);
+            return UCC_INPROGRESS;
+        }
+        if (status < 0) {
+            goto out;
+        }
+        status = ucc_team_reset_for_rebuild(context, team);
+        if (status < 0) {
+            goto out;
+        }
+        return UCC_INPROGRESS; /* re-enter at the reset start state */
     case UCC_TEAM_ADDR_EXCHANGE:
         status = ucc_team_exchange(context, team);
         if (UCC_OK != status) {
@@ -674,7 +879,8 @@ ucc_status_t ucc_team_create_test(ucc_team_h team)
     return ucc_team_create_test_single(team->contexts[0], team);
 }
 
-static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
+/* Tear down a team; @for_rebuild keeps what reset_for_rebuild reuses */
+static ucc_status_t ucc_team_destroy_single_ex(ucc_team_h team, int for_rebuild)
 {
     ucc_cl_iface_t *cl_iface;
     int             i;
@@ -700,6 +906,7 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
     }
 
     ucc_topo_cleanup(team->topo);
+    team->topo = NULL;
 
     if (team->contexts[0]->service_team && team->size > 1) {
         ucc_internal_oob_finalize(&team->bp.params.oob);
@@ -711,14 +918,60 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
     }
 
     ucc_coll_score_free_map(team->score_map);
+    team->score_map = NULL;
     ucc_free(team->addr_storage.storage);
     ucc_free(team->ctx_ranks);
+    team->ctx_ranks = NULL;
     ucc_team_release_id(team);
+
+    if (for_rebuild) {
+        /* create_post_single reallocates cl_teams */
+        ucc_free(team->cl_teams);
+        team->cl_teams = NULL;
+        memset(&team->addr_storage, 0, sizeof(team->addr_storage));
+        return UCC_OK;
+    }
     ucc_free(team->cl_teams);
     ucc_free(team->contexts);
     ucc_team_cache_identity_free(&team->cache_identity);
     ucc_free(team);
     return UCC_OK;
+}
+
+static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
+{
+    return ucc_team_destroy_single_ex(team, 0);
+}
+
+/* Polls, returning UCC_INPROGRESS until every component has been destroyed */
+static ucc_status_t ucc_team_teardown_for_rebuild(ucc_team_t *team)
+{
+    return ucc_team_destroy_single_ex(team, 1);
+}
+
+/* Return a torn-down team to its pre-build state, keeping its membership */
+static ucc_status_t ucc_team_reset_for_rebuild(
+    ucc_context_t *context, ucc_team_t *team)
+{
+    ucc_assert(team->service_team == NULL);
+    ucc_assert(team->sreq == NULL);
+
+    team->n_cl_teams = 0;
+    team->seq_num    = 0;
+    /* A pool id was released by the teardown and has to be redrawn */
+    if (!UCC_TEAM_ID_IS_EXTERNAL(team)) {
+        team->id = 0;
+    }
+    team->bp.id                = 0;
+    team->oob_req              = NULL;
+    team->refcount             = 1;
+    team->cache_state          = UCC_TEAM_CACHE_STATE_NONE;
+    team->cache_pending_insert = 1;
+    ucc_list_head_init(&team->cache_link);
+    team->ctx_map.ep_num = 0; /* ucc_team_exchange rebuilds ctx_map/ctx_ranks */
+    team->topo           = NULL;
+
+    return ucc_team_create_post_single(context, team);
 }
 
 ucc_status_t ucc_team_destroy(ucc_team_h team)
