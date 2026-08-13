@@ -153,6 +153,198 @@ static void run_barrier_on_team(ucc_team_h team, ucc_context_h ctx)
     UCC_CHECK(ucc_collective_finalize(req));
 }
 
+/* Fill allreduce(SUM) args for a single int64. @flags carries
+   UCC_COLL_ARGS_FLAG_PERSISTENT for the persistent-handle test. */
+static void fill_allreduce_int64(ucc_coll_args_t *args, int64_t *sbuf,
+                                 int64_t *rbuf, uint64_t flags)
+{
+    memset(args, 0, sizeof(*args));
+    args->coll_type         = UCC_COLL_TYPE_ALLREDUCE;
+    args->op                = UCC_OP_SUM;
+    args->src.info.buffer   = sbuf;
+    args->src.info.count    = 1;
+    args->src.info.datatype = UCC_DT_INT64;
+    args->src.info.mem_type = UCC_MEMORY_TYPE_HOST;
+    args->dst.info.buffer   = rbuf;
+    args->dst.info.count    = 1;
+    args->dst.info.datatype = UCC_DT_INT64;
+    args->dst.info.mem_type = UCC_MEMORY_TYPE_HOST;
+    if (flags) {
+        args->mask  = UCC_COLL_ARGS_FIELD_FLAGS;
+        args->flags = flags;
+    }
+}
+
+/* Blocking allreduce(SUM) of a single int64 over @team; pumps @ctx and aborts
+   on error. Returns the reduced value. */
+static int64_t run_allreduce_int64(ucc_team_h team, ucc_context_h ctx,
+                                   int64_t sbuf, const char *where)
+{
+    int64_t         rbuf = 0;
+    ucc_coll_args_t args;
+    ucc_coll_req_h  req;
+
+    fill_allreduce_int64(&args, &sbuf, &rbuf, 0);
+    UCC_CHECK(ucc_collective_init(&args, &req, team));
+    UCC_CHECK(ucc_collective_post(req));
+    progress_until(ctx, req, where);
+    UCC_CHECK(ucc_collective_finalize(req));
+    return rbuf;
+}
+
+/* Expected allreduce(SUM) of every rank's world_rank. */
+static int64_t rank_sum(int world_size)
+{
+    return (int64_t)world_size * (world_size - 1) / 2;
+}
+
+/* ==========================================================================
+ * dup_coexist_derived: a parent world team and its live derived (MPI_Comm_dup
+ * analogue) run interleaved collectives concurrently. Regression for the alias
+ * hazard where two coexisting identical-membership teams share a team id.
+ *   - ext_ids==false: implicit-id dup (the base regression).
+ *   - ext_ids==true : parent/derived carry DISTINCT external ids and must share
+ *     one artifacts holder.
+ * ========================================================================== */
+
+/* Drive one allreduce(SUM int64) + one bcast(int64 from root 0), in the given
+   order, over MPI_COMM_WORLD membership; validate both results. @order==0:
+   allreduce then bcast; @order==1: reverse. Both are posted before either
+   completes so they are in flight together (and interleave across teams).
+   Returns 0 on success, 1 if a result was wrong. */
+static int drive_ar_bc(ucc_team_h ar_team, ucc_team_h bc_team,
+                       ucc_context_h ctx, int rank, int size, int iter,
+                       int order)
+{
+    int64_t ar_send = 100 + iter;
+    int64_t ar_recv = 0;
+    int64_t ar_exp  = (int64_t)(100 + iter) * size;
+    int64_t bc_buf  = (rank == 0) ? (900000 + iter) : 0;
+    int64_t bc_exp  = 900000 + iter;
+
+    ucc_coll_args_t ar_args, bc_args;
+    ucc_coll_req_h  ar_req, bc_req;
+    ucc_status_t    sa, sb;
+
+    fill_allreduce_int64(&ar_args, &ar_send, &ar_recv, 0);
+
+    memset(&bc_args, 0, sizeof(bc_args));
+    bc_args.coll_type         = UCC_COLL_TYPE_BCAST;
+    bc_args.root              = 0;
+    bc_args.src.info.buffer   = &bc_buf;
+    bc_args.src.info.count    = 1;
+    bc_args.src.info.datatype = UCC_DT_INT64;
+    bc_args.src.info.mem_type = UCC_MEMORY_TYPE_HOST;
+
+    /* Post in the requested relative order (per-rank interleave). */
+    if (order == 0) {
+        UCC_CHECK(ucc_collective_init(&ar_args, &ar_req, ar_team));
+        UCC_CHECK(ucc_collective_post(ar_req));
+        UCC_CHECK(ucc_collective_init(&bc_args, &bc_req, bc_team));
+        UCC_CHECK(ucc_collective_post(bc_req));
+    } else {
+        UCC_CHECK(ucc_collective_init(&bc_args, &bc_req, bc_team));
+        UCC_CHECK(ucc_collective_post(bc_req));
+        UCC_CHECK(ucc_collective_init(&ar_args, &ar_req, ar_team));
+        UCC_CHECK(ucc_collective_post(ar_req));
+    }
+
+    /* Progress both to completion. */
+    do {
+        sa = ucc_collective_test(ar_req);
+        sb = ucc_collective_test(bc_req);
+        if (sa < 0 || sb < 0) {
+            std::cerr << "*** UCC TEST FAIL: coll test ("
+                      << ucc_status_string(sa < 0 ? sa : sb) << ")\n";
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+        ucc_context_progress(ctx);
+    } while (sa != UCC_OK || sb != UCC_OK);
+
+    UCC_CHECK(ucc_collective_finalize(ar_req));
+    UCC_CHECK(ucc_collective_finalize(bc_req));
+
+    if (ar_recv != ar_exp || bc_buf != bc_exp) {
+        std::cerr << "*** UCC TEST FAIL: dup_coexist rank " << rank << " iter "
+                  << iter << ": allreduce got " << ar_recv << " (exp " << ar_exp
+                  << "), bcast got " << bc_buf << " (exp " << bc_exp << ")\n";
+        return 1;
+    }
+    return 0;
+}
+
+static tc_verdict_t test_dup_coexist_derived(ucc_context_h ctx, int world_rank,
+                                             int world_size, bool ext_ids)
+{
+    const int      kIters     = ext_ids ? 8 : 6;
+    const uint64_t parent_id  = ext_ids ? 100 : 0;
+    const uint64_t derived_id = ext_ids ? 200 : 0;
+    const char    *name       = ext_ids ? "dup_coexist_derived[ext_ids]"
+                                        : "dup_coexist_derived";
+    tc_verdict_t   v          = TC_PASS;
+    ucc_team_h     parent, derived;
+
+    if (!cache_of(ctx)->derived) {
+        return tc_skip(name, world_rank, "UCC_TEAM_CACHE_DERIVED not enabled");
+    }
+
+    /* A dup needs a LIVE insertable parent to derive from; drain dormant
+       squatters so the world-membership bucket is clean. */
+    drain_cache(ctx);
+
+    /* Parent world team (derivable), kept live. */
+    parent = create_world_team(ctx, world_size, parent_id);
+    run_barrier_on_team(parent, ctx);
+
+    /* Second identical-membership team while the parent is live -> derived
+       create path (MPI_Comm_dup analogue), with a distinct external id under
+       ext_ids. */
+    derived = create_world_team(ctx, world_size, derived_id);
+
+    /* Distinct team ids: coexisting teams must not alias tag/seq domains. */
+    if (((ucc_team_t *)parent)->id == ((ucc_team_t *)derived)->id) {
+        tc_report_fail(name, world_rank, "coexisting teams share a team id");
+        v = TC_FAIL;
+    }
+    /* Must actually take the derived path (a full-create regression would still
+       pass the distinct-id check above). */
+    if (!((ucc_team_t *)derived)->is_derived) {
+        tc_report_fail(name, world_rank,
+                       "coexisting identical-membership team was not derived "
+                       "(full-create regression)");
+        v = TC_FAIL;
+    }
+    /* External-id variant: derived must share the parent's artifacts holder. */
+    if (ext_ids &&
+        ((ucc_team_t *)parent)->artifacts != ((ucc_team_t *)derived)->artifacts) {
+        tc_report_fail(name, world_rank,
+                       "derived team did not share the parent artifacts holder");
+        v = TC_FAIL;
+    }
+
+    /* Interleaved-order collectives with opposite per-rank ordering across both
+       live teams: even ranks allreduce(parent)+bcast(derived), odd the
+       reverse. */
+    for (int it = 0; it < kIters; it++) {
+        int order = (world_rank % 2 == 0) ? 0 : 1;
+
+        if (drive_ar_bc(parent, derived, ctx, world_rank, world_size, it,
+                        order)) {
+            v = TC_FAIL;
+        }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    destroy_ucc_team(derived, ctx);
+    run_barrier_on_team(parent, ctx); /* parent still usable */
+    destroy_ucc_team(parent, ctx);
+
+    if (v == TC_PASS && 0 == world_rank) {
+        std::cout << "PASS " << name << "\n";
+    }
+    return v;
+}
+
 /* ==========================================================================
  * dormant_reuse_stats: create/destroy/recreate kReuseIters times; from iter 1
  * the dormant team is re-adopted (HIT) every time.
@@ -186,6 +378,71 @@ static tc_verdict_t test_dormant_reuse_stats(ucc_context_h ctx, int world_rank,
                   << " dormant hits, got " << (hitsN - hits0) << "\n";
         v = TC_FAIL;
     }
+    if (v == TC_PASS && 0 == world_rank) {
+        std::cout << "PASS " << name << "\n";
+    }
+    return v;
+}
+
+/* ==========================================================================
+ * derived_reuse: with a live parent kept throughout, create/destroy a derived
+ * team of identical membership kReuseIters times. From iter 1 the dormant
+ * derived is re-adopted (cache HIT).
+ * The derived's external id is stable, so an exact-identity lookup re-adopts
+ * it. Requires UCC_TEAM_CACHE_DERIVED, else it skips.
+ * ========================================================================== */
+static tc_verdict_t test_derived_reuse(ucc_context_h ctx,
+                                       int world_rank, int world_size)
+{
+    const char       *name  = "derived_reuse";
+    ucc_team_cache_t *cache = cache_of(ctx);
+    tc_verdict_t      v     = TC_PASS;
+    ucc_team_h        parent;
+
+    if (!cache->derived) {
+        return tc_skip(name, world_rank, "UCC_TEAM_CACHE_DERIVED not enabled");
+    }
+
+    drain_cache(ctx);
+
+    /* Parent stays live throughout; its stable ext_id=1 is distinct from every
+       derived id used below. */
+    parent = create_world_team(ctx, world_size, /*ext_id=*/1);
+    run_barrier_on_team(parent, ctx);
+
+    for (int i = 0; i < kReuseIters; i++) {
+        uint64_t hits_before = cache->stats.hits;
+        /* Derived: same membership as the parent, under a stable ext_id, so
+           an exact-identity lookup re-adopts it. */
+        ucc_team_h derived    = create_world_team(ctx, world_size, /*ext_id=*/2);
+        int64_t    sbuf       = (int64_t)(100 + i);
+        int64_t    exp        = sbuf * (int64_t)world_size;
+        int64_t    rbuf       = run_allreduce_int64(derived, ctx, sbuf,
+                                                    "allreduce on derived team");
+
+        if (rbuf != exp) {
+            std::cerr << "*** UCC TEST FAIL: " << name << " rank " << world_rank
+                      << " iter " << i << ": allreduce got " << rbuf << " (exp "
+                      << exp << ")\n";
+            v = TC_FAIL;
+        }
+        /* From iter 1 onwards: expect a cache hit re-adopting the dormant
+           derived. */
+        if (i > 0 && cache->stats.hits <= hits_before) {
+            std::cerr << "*** UCC TEST FAIL: " << name << " rank " << world_rank
+                      << " iter " << i
+                      << ": no cache hit for the derived re-adopt\n";
+            v = TC_FAIL;
+        }
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        destroy_ucc_team(derived, ctx); /* -> dormant */
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
+
+    run_barrier_on_team(parent, ctx); /* parent must still be functional */
+    destroy_ucc_team(parent, ctx);
+
     if (v == TC_PASS && 0 == world_rank) {
         std::cout << "PASS " << name << "\n";
     }
@@ -396,6 +653,90 @@ static tc_verdict_t test_overlap_agreement(ucc_context_h ctx, int world_rank,
 }
 
 /* ==========================================================================
+ * derived_exact_rebuild: a dormant DERIVED team that loses the cross-rank vote
+ * must be rebuilt as a full team, not left half-derived. A live parent world
+ * team (ext_id 1) plus a dormant derived world team (ext_id 2) fill the cache on
+ * every rank. A subcomm team created only on ranks {0,1} evicts the dormant
+ * derived there (FIFO), while ranks >=2 keep it. Re-creating the ext_id-2 world
+ * team then splits the vote (ranks >=2 EXACT_REUSE the derived candidate, ranks
+ * {0,1} miss -> DERIVED_FROM_LIVE), forcing a global MISS and the in-place
+ * rebuild on ranks >=2. Without the de-derive fix those ranks skip ADDR_EXCHANGE
+ * and desync/crash; with it, the allreduce below completes and is_derived is 0.
+ * ========================================================================== */
+static tc_verdict_t test_derived_exact_rebuild(ucc_context_h ctx,
+                                               int world_rank, int world_size)
+{
+    const char       *name  = "derived_exact_rebuild";
+    ucc_team_cache_t *cache = cache_of(ctx);
+    tc_verdict_t      v     = TC_PASS;
+    ucc_team_h        parent, derived, rebuilt;
+    MPI_Comm          commAB;
+    int64_t           got, exp;
+
+    if (!cache->derived || world_size < 3 || cache->max_size > 2) {
+        return tc_skip(name, world_rank,
+                       "needs derived caching, >=3 ranks, MAX_SIZE<=2");
+    }
+
+    drain_cache(ctx);
+
+    /* Live parent (ext_id 1) + dormant derived (ext_id 2): 2 entries, which is
+       MAX_SIZE. */
+    parent = create_world_team(ctx, world_size, /*ext_id=*/1);
+    run_barrier_on_team(parent, ctx);
+    derived = create_world_team(ctx, world_size, /*ext_id=*/2);
+    run_barrier_on_team(derived, ctx);
+    MPI_Barrier(MPI_COMM_WORLD);
+    destroy_ucc_team(derived, ctx); /* -> dormant derived */
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    /* Ranks {0,1} only: a subcomm team evicts the dormant derived (cache full);
+       ranks >=2 never create it and keep the dormant derived. */
+    MPI_Comm_split(MPI_COMM_WORLD, (world_rank <= 1) ? 0 : MPI_UNDEFINED,
+                   world_rank, &commAB);
+    if (commAB != MPI_COMM_NULL) {
+        ucc_rank_t ab[2] = {0, 1};
+        ucc_team_h t     = create_array_team(ctx, commAB, ab, 2);
+
+        run_barrier_on_team(t, ctx);
+        destroy_ucc_team(t, ctx);
+        MPI_Comm_free(&commAB);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    /* Re-create the ext_id-2 world team: split vote -> global MISS -> rebuild.
+       The allreduce exercises the ctx_map/topo the rebuild must have
+       populated. */
+    rebuilt = create_world_team(ctx, world_size, /*ext_id=*/2);
+    got     = run_allreduce_int64(rebuilt, ctx, (int64_t)world_rank,
+                                  "allreduce on rebuilt team");
+    exp     = rank_sum(world_size);
+    if (got != exp) {
+        std::cerr << "*** UCC TEST FAIL: " << name << " rank " << world_rank
+                  << ": allreduce got " << got << " (exp " << exp << ")\n";
+        v = TC_FAIL;
+    }
+    if (((ucc_team_t *)rebuilt)->is_derived != 0 ||
+        ((ucc_team_t *)rebuilt)->parent_id != 0) {
+        std::cerr << "*** UCC TEST FAIL: " << name << " rank " << world_rank
+                  << ": rebuilt team still marked derived (is_derived="
+                  << ((ucc_team_t *)rebuilt)->is_derived << ")\n";
+        v = TC_FAIL;
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    destroy_ucc_team(rebuilt, ctx);
+    run_barrier_on_team(parent, ctx); /* parent still functional */
+    destroy_ucc_team(parent, ctx);
+    ucc_team_cache_drain((ucc_context_t *)ctx);
+
+    if (v == TC_PASS && 0 == world_rank) {
+        std::cout << "PASS " << name << "\n";
+    }
+    return v;
+}
+
+/* ==========================================================================
  * nonblocking_create_post: ucc_team_create_post must return promptly (post the
  * vote, not block) even if one rank is late entering it. Rank 0 sleeps briefly;
  * the other ranks call create_post and must return before rank 0 arrives.
@@ -556,7 +897,7 @@ ucc_test_suite_result_t run_team_cache_tests(ucc_context_h ctx, int world_rank,
     /* Must match the number of tc_tally calls below: used to report every test
        as skipped when caching is off, so a disabled run is never mistaken for a
        clean one. */
-    const int               kNumTests = 5;
+    const int               kNumTests = 9;
     ucc_test_suite_result_t r         = {0, 0, 0};
 
     if (0 == world_rank) {
@@ -576,9 +917,13 @@ ucc_test_suite_result_t run_team_cache_tests(ucc_context_h ctx, int world_rank,
         return r;
     }
 
+    tc_tally(&r, test_dup_coexist_derived(ctx, world_rank, world_size, false));
+    tc_tally(&r, test_dup_coexist_derived(ctx, world_rank, world_size, true));
     tc_tally(&r, test_dormant_reuse_stats(ctx, world_rank, world_size));
+    tc_tally(&r, test_derived_reuse(ctx, world_rank, world_size));
     tc_tally(&r, test_ep_map_cb_freed_after_cache(ctx, world_rank, world_size));
     tc_tally(&r, test_overlap_agreement(ctx, world_rank, world_size));
+    tc_tally(&r, test_derived_exact_rebuild(ctx, world_rank, world_size));
     tc_tally(&r, test_nonblocking_create_post(ctx, world_rank, world_size));
     tc_tally(&r, test_singleton_team(ctx, world_rank, world_size));
 
