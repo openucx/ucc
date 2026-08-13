@@ -703,3 +703,105 @@ UCC_TEST_F(test_topo, node_leaders)
     EXPECT_EQ(3, node_leaders[2]);
     EXPECT_EQ(3, node_leaders[3]);
 }
+
+/* ucc_topo_prepare_shared materializes every lazily built field so that a topo
+   can be shared read-only by a derived team. After it returns, no sbgp may
+   still be NOT_INIT and the all_* arrays must be populated, because a later
+   lazy build on a shared topo would be an unsynchronized write from whichever
+   team touched it first. */
+UCC_TEST_F(test_topo, prepare_shared_materializes_all_fields)
+{
+    const ucc_rank_t ctx_size = 8;
+    addr_storage     s(ctx_size);
+    ucc_subset_t     set;
+    int              i;
+
+    /* 2 nodes x 2 sockets, so every sbgp kind and the node-leaders map exist */
+    SET_PI(s, 0, 0xaaa, 0, 0);
+    SET_PI(s, 1, 0xaaa, 0, 1);
+    SET_PI(s, 2, 0xaaa, 1, 2);
+    SET_PI(s, 3, 0xaaa, 1, 3);
+    SET_PI(s, 4, 0xbbb, 0, 4);
+    SET_PI(s, 5, 0xbbb, 0, 5);
+    SET_PI(s, 6, 0xbbb, 1, 6);
+    SET_PI(s, 7, 0xbbb, 1, 7);
+
+    set.map.ep_num = ctx_size;
+    set.map.type   = UCC_EP_MAP_FULL;
+    set.myrank     = 0;
+
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+
+    /* Lazily built, so nothing is materialized yet. */
+    EXPECT_EQ(nullptr, topo->all_sockets);
+    EXPECT_EQ(nullptr, topo->all_nodes);
+    EXPECT_EQ(nullptr, topo->node_leaders);
+
+    EXPECT_EQ(UCC_OK, ucc_topo_prepare_shared(topo));
+
+    for (i = 0; i < UCC_SBGP_LAST; i++) {
+        EXPECT_NE(UCC_SBGP_NOT_INIT, topo->sbgps[i].status)
+            << "sbgp " << i << " left uninitialized for sharing";
+    }
+    EXPECT_NE(nullptr, topo->all_sockets);
+    EXPECT_GT(topo->n_sockets, 0);
+    EXPECT_NE(nullptr, topo->all_nodes);
+    EXPECT_GT(topo->n_nodes, 0);
+    EXPECT_EQ(2, topo->topo->nnodes);
+    /* nnodes > 1, so the node-leaders map is defined and must be built. */
+    EXPECT_NE(nullptr, topo->node_leaders);
+}
+
+/* Preparing twice must be a no-op: a derived team may re-share an already
+   prepared parent topo, and re-running must not rebuild or reallocate. */
+UCC_TEST_F(test_topo, prepare_shared_is_idempotent)
+{
+    const ucc_rank_t ctx_size = 4;
+    addr_storage     s(ctx_size);
+    ucc_subset_t     set;
+    ucc_sbgp_t      *sockets_first;
+    ucc_sbgp_t      *nodes_first;
+
+    SET_PI(s, 0, 0xaaa, 0, 0);
+    SET_PI(s, 1, 0xaaa, 1, 1);
+    SET_PI(s, 2, 0xbbb, 0, 2);
+    SET_PI(s, 3, 0xbbb, 1, 3);
+
+    set.map.ep_num = ctx_size;
+    set.map.type   = UCC_EP_MAP_FULL;
+    set.myrank     = 0;
+
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+
+    EXPECT_EQ(UCC_OK, ucc_topo_prepare_shared(topo));
+    sockets_first = topo->all_sockets;
+    nodes_first   = topo->all_nodes;
+
+    EXPECT_EQ(UCC_OK, ucc_topo_prepare_shared(topo));
+    EXPECT_EQ(sockets_first, topo->all_sockets)
+        << "second prepare reallocated the socket sbgps";
+    EXPECT_EQ(nodes_first, topo->all_nodes)
+        << "second prepare reallocated the node sbgps";
+}
+
+/* A NULL topo is the single-rank case (no topo is ever built) and must be
+   accepted, since the caller shares artifacts without checking. */
+UCC_TEST_F(test_topo, prepare_shared_accepts_null)
+{
+    EXPECT_EQ(UCC_OK, ucc_topo_prepare_shared(NULL));
+
+    /* The fixture destructor cleans these up, so give it something valid. */
+    const ucc_rank_t ctx_size = 2;
+    addr_storage     s(ctx_size);
+    ucc_subset_t     set;
+
+    SET_PI(s, 0, 0xaaa, 0, 0);
+    SET_PI(s, 1, 0xaaa, 0, 1);
+    set.map.ep_num = ctx_size;
+    set.map.type   = UCC_EP_MAP_FULL;
+    set.myrank     = 0;
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+}

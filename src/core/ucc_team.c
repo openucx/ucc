@@ -527,6 +527,16 @@ static ucc_status_t ucc_team_create_cls(ucc_context_t *context,
         status = ucc_topo_init(subset, context->topo, &UCC_TEAM_TOPO(team));
         if (UCC_OK != status) {
             ucc_warn("failed to init team topo");
+        } else if (team->cache_pending_insert) {
+            /* A cacheable topo may be shared, so materialize it up front */
+            status = ucc_topo_prepare_shared(UCC_TEAM_TOPO(team));
+            if (UCC_OK != status) {
+                /* Keep the team, but leave it un-shared and lazily filled */
+                ucc_warn("failed to prepare shared topo (%s); team %p will "
+                         "not be cached",
+                         ucc_status_string(status), (void *)team);
+                team->cache_pending_insert = 0;
+            }
         }
     }
 
