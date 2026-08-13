@@ -10,7 +10,9 @@
 #include "ucc/api/ucc.h"
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_coll_utils.h"
+#include "utils/ucc_list.h"
 #include "ucc_context.h"
+#include "ucc_team_cache.h"
 #include "utils/ucc_math.h"
 #include "components/base/ucc_base_iface.h"
 #include "components/cl/ucc_cl.h"
@@ -48,6 +50,12 @@ typedef struct ucc_team {
     ucc_topo_t             *topo;
     ucc_score_map_t        *score_map; /*< score map of CLs */
     uint32_t                seq_num;
+    int                       refcount; /* live teams backing a cache entry */
+    ucc_team_cache_identity_t cache_identity;
+    ucc_list_link_t           cache_link; /* live, dormant or reserved list */
+    ucc_team_cache_state_t    cache_state;
+    int                       cache_pending_insert; /* cacheable, not yet in */
+    ucc_team_cache_action_t   cache_local_action;   /* this rank's vote */
 } ucc_team_t;
 
 /* If the bit is set then team_id is provided by the user */
