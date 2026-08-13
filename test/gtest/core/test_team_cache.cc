@@ -17,6 +17,31 @@ extern "C" {
 #include <atomic>
 #include <random>
 
+/* RAII guard: snapshots an env var on construction and restores it on
+   destruction so a test that sets a knob cannot leak it into later tests. */
+class ScopedEnv {
+public:
+    explicit ScopedEnv(const char *name) : m_name(name), m_had(false)
+    {
+        const char *v = getenv(name);
+        if (v != NULL) {
+            m_had   = true;
+            m_value = v;
+        }
+    }
+    ~ScopedEnv()
+    {
+        if (m_had) {
+            setenv(m_name.c_str(), m_value.c_str(), 1);
+        } else {
+            unsetenv(m_name.c_str());
+        }
+    }
+private:
+    std::string m_name, m_value;
+    bool        m_had;
+};
+
 /* Unit tests for the team-cache identity (build/hash/equal/free), the
    cacheability policy, the locked cache API and eviction, with no MPI job. */
 
@@ -746,6 +771,49 @@ UCC_TEST_F(test_team_cache, get_put_refcount_and_state)
     erase_and_free(cache, {team});
 }
 
+/* ucc_team_reseat_id rewrites every id the team is known by, and leaves the
+   membership hash alone so the team stays in the same bucket. A stub team has
+   no service team and no CL teams, which also exercises the NULL guards on both
+   fanout hooks. The fanout against real CL/TL teams is covered end to end by
+   the MPI suite's derived_reuse[drift], which runs under
+   UCC_TEAM_CACHE_RESEAT=y in CI. */
+UCC_TEST_F(test_team_cache, reseat_id_rewrites_all_ids)
+{
+    ucc_rank_t  members[3] = {0, 1, 2};
+    ucc_team_t *team       = alloc_stub_team();
+
+    ASSERT_NE(nullptr, team);
+
+    /* A caller-supplied id is stored tagged with the external bit, and the
+       reseat path is fed an already-tagged id, so both use the tagged form. */
+    const uint16_t old_id = (uint16_t)(7 | UCC_TEAM_ID_EXTERNAL_BIT);
+    const uint16_t new_id = (uint16_t)(42 | UCC_TEAM_ID_EXTERNAL_BIT);
+
+    ucc_team_params_t p =
+        make_array_id_params(members, 3, /*self_ep=*/0, /*id=*/7);
+    ASSERT_EQ(UCC_OK, ucc_team_cache_identity_build(&p, &team->cache_identity));
+
+    uint64_t hash_before = team->cache_identity.hash;
+
+    team->is_derived   = 1;
+    team->id           = old_id;
+    team->bp.id        = old_id;
+    team->service_team = NULL;
+    team->n_cl_teams   = 0;
+    ASSERT_EQ(old_id, team->cache_identity.ext_id);
+
+    ucc_team_reseat_id(team, new_id);
+
+    EXPECT_EQ(new_id, team->id);
+    EXPECT_EQ(new_id, team->bp.id);
+    EXPECT_EQ(new_id, team->cache_identity.ext_id)
+        << "a reseated team must be re-keyed under its new external id";
+    EXPECT_EQ(hash_before, team->cache_identity.hash)
+        << "reseat changes the id, not the membership the hash covers";
+
+    free_stub_team(team);
+}
+
 /* RESERVED state (the agreement-vote pin): a DORMANT candidate moved to RESERVED
    is off the dormant/live lists (lookup can't return it) but stays in the bucket
    with refcount unchanged, so a vote-FAIL rolls it back to DORMANT and a vote-PASS
@@ -1097,6 +1165,95 @@ static ucc_team_t *alloc_stub_team_with_id(
         return nullptr;
     }
     return t;
+}
+
+/* Allocate an is_derived stub team with @arr membership and external id @ext_id. */
+static ucc_team_t *alloc_stub_derived_team(
+    ucc_rank_t *arr, ucc_rank_t n, ucc_rank_t self_ep, uint64_t ext_id)
+{
+    ucc_team_t *t = alloc_stub_team_with_id(arr, n, self_ep, ext_id);
+    if (t) {
+        t->is_derived = 1;
+    }
+    return t;
+}
+
+/* lookup_dormant_derived returns the FIRST dormant derived team in chain
+   (insertion) order, skipping LIVE derived teams and non-derived base teams, and
+   advances deterministically as heads are erased, then returns NULL when empty. */
+UCC_TEST_F(test_team_cache, lookup_dormant_derived_selection)
+{
+    ScopedCache cache(16, UCC_TEAM_CACHE_EVICTION_FIFO, 0);
+
+    ucc_rank_t  arr[4]         = {10, 20, 30, 40};
+
+    /* Non-derived dormant base (ineligible), LIVE derived (ineligible), and two
+       DORMANT derived teams that are the valid targets, in insertion order. */
+    ucc_team_t *t_base         = alloc_stub_team_with_id(arr, 4, 0, 10);
+    ucc_team_t *t_live_derived = alloc_stub_derived_team(arr, 4, 0, 20);
+    ucc_team_t *t_d1           = alloc_stub_derived_team(arr, 4, 0, 30);
+    ucc_team_t *t_d2           = alloc_stub_derived_team(arr, 4, 0, 40);
+    ASSERT_NE(nullptr, t_base);
+    ASSERT_NE(nullptr, t_live_derived);
+    ASSERT_NE(nullptr, t_d1);
+    ASSERT_NE(nullptr, t_d2);
+    t_base->is_derived = 0;
+
+    ASSERT_EQ(t_base->cache_identity.hash, t_live_derived->cache_identity.hash);
+    ASSERT_EQ(t_base->cache_identity.hash, t_d1->cache_identity.hash);
+    ASSERT_EQ(t_base->cache_identity.hash, t_d2->cache_identity.hash);
+
+    ucc_spin_lock(&cache->lock);
+
+    ASSERT_EQ(UCC_OK, ucc_team_cache_insert(cache, t_base));
+    ASSERT_EQ(UCC_OK, ucc_team_cache_insert(cache, t_live_derived));
+    ASSERT_EQ(UCC_OK, ucc_team_cache_insert(cache, t_d1));
+    ASSERT_EQ(UCC_OK, ucc_team_cache_insert(cache, t_d2));
+    EXPECT_EQ(4u, cache->size);
+
+    ucc_team_cache_get(t_live_derived);
+    ucc_team_cache_registry_make_live(cache, t_live_derived);
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_LIVE, t_live_derived->cache_state);
+
+    /* Drifted key: same membership, ext_id=99 (no exact match). */
+    ucc_team_cache_identity_t key;
+    build_id_key(arr, 4, 0, 99, key);
+
+    /* Exact lookup misses (membership matches but full identity does not). */
+    EXPECT_EQ(nullptr, ucc_team_cache_lookup(cache, &key));
+
+    /* Only the DORMANT derived teams are eligible; the first in chain order is
+       returned, skipping the LIVE derived and the non-derived base. */
+    ucc_team_t *found = ucc_team_cache_lookup_dormant_derived(cache, &key);
+    EXPECT_EQ(t_d1, found);
+    ASSERT_NE(nullptr, found);
+    EXPECT_EQ(UCC_TEAM_CACHE_STATE_DORMANT, found->cache_state);
+    EXPECT_EQ(1, found->is_derived);
+    EXPECT_NE(t_live_derived, found);
+    EXPECT_NE(t_base, found);
+
+    /* Idempotent without mutation. */
+    EXPECT_EQ(t_d1, ucc_team_cache_lookup_dormant_derived(cache, &key));
+
+    /* Consuming the head advances to the next dormant derived, then NULL. */
+    erase_stub(cache, t_d1);
+    EXPECT_EQ(t_d2, ucc_team_cache_lookup_dormant_derived(cache, &key));
+    erase_stub(cache, t_d2);
+    EXPECT_EQ(nullptr, ucc_team_cache_lookup_dormant_derived(cache, &key))
+        << "no eligible target: only a LIVE derived and a non-derived base "
+           "remain";
+
+    ucc_team_cache_put(t_live_derived);
+    ucc_team_cache_registry_make_dormant(cache, t_live_derived);
+    erase_stub(cache, t_base);
+    erase_stub(cache, t_live_derived);
+    ucc_spin_unlock(&cache->lock);
+
+    ucc_team_cache_identity_free(&key);
+    free_stub_team(t_base);
+    free_stub_team(t_live_derived);
+    free_stub_team(t_d1);
+    free_stub_team(t_d2);
 }
 
 /* Same membership, different ext_ids chain in one membership-only bucket: each

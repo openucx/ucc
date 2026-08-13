@@ -356,6 +356,7 @@ team instead of rebuilding it from scratch.
 | `UCC_TEAM_CACHE_DUMP_STATS` | `n` | Log hit/miss/eviction counters at context destroy. |
 | `UCC_TEAM_CACHE_AGREEMENT` | `y` | Agree on the reuse decision across the members of every cacheable team create. Makes reuse safe for overlapping team scopes, at the cost of one small allreduce per create. |
 | `UCC_TEAM_CACHE_DERIVED` | `y` | Reuse the shared artifacts of a still-live cached team when a create duplicates its membership, as `MPI_Comm_dup` does. No effect unless `UCC_TEAM_CACHE_ENABLE=y`. |
+| `UCC_TEAM_CACHE_RESEAT` | `n` | Experimental: recover reuse under context-id drift by re-adopting a cached dormant derived team of identical membership but a different external id, re-seating its id and tag domain instead of rebuilding it. Requires `UCC_TEAM_CACHE_DERIVED=y`. |
 
 ### Derived teams
 
@@ -374,6 +375,33 @@ derive decision is voted on like any other, and a member that cannot derive forc
 all members to fall back to a full build.
 
 Turn this off to make every such create an independent full build.
+
+### Re-seating under context-id drift (experimental)
+
+A cached team is keyed on its membership *and* its external id, which for MPI is
+the communicator context id. Some workloads never reuse a context id: each
+create/free cycle over the same ranks draws a fresh one, so the id drifts and
+the exact-identity lookup misses every time even though a perfectly good dormant
+team of that membership is sitting in the cache.
+
+`UCC_TEAM_CACHE_RESEAT=y` recovers reuse in that case. When the exact lookup
+misses, the cache is searched a second time for a dormant *derived* team of
+identical membership, ignoring the external id. A match is re-adopted and
+*re-seated*: its team id, and with it the tag and sequence-number domain of its
+service team and of every CL and TL team beneath it, is moved to the caller's
+new external id. Only derived teams are eligible, since only they hold borrowed
+artifacts that make the move cheap relative to a full build.
+
+Re-seating is the reason the id must be pushed all the way down. A team whose
+core id changed while a TL team below it still addressed the retired id would
+put two logically distinct teams in one tag domain, which is exactly the
+aliasing this path exists to avoid.
+
+This knob is experimental and off by default. It requires
+`UCC_TEAM_CACHE_DERIVED=y`; with derived teams off there is nothing eligible to
+re-seat. Under `UCC_TEAM_CACHE_AGREEMENT` the re-seat is voted on like any other
+reuse, and the vote carries the candidate's instance cookie so that all members
+re-seat the same team or none do.
 
 ### Cross-rank agreement
 
