@@ -72,7 +72,8 @@ typedef struct ucc_team {
     uint32_t                seq_num;
     int                       refcount; /* live teams backing a cache entry */
     ucc_team_cache_identity_t cache_identity;
-    ucc_list_link_t           cache_link; /* live, dormant or reserved list */
+    ucc_list_link_t           cache_link;  /* live, dormant or reserved list */
+    ucc_list_link_t           bucket_link; /* same-hash chain off the bucket */
     ucc_team_cache_state_t    cache_state;
     int                       cache_pending_insert; /* cacheable, not yet in */
     ucc_team_cache_action_t   cache_local_action;   /* this rank's vote */
