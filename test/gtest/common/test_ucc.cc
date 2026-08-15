@@ -275,8 +275,13 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
     ta(_n_procs), n_procs(_n_procs), ctx_mode(_ctx_mode)
 
 {
-    ucc_job_env_t env_bkp;
-    char *var;
+    struct env_backup_t {
+        std::string name;
+        std::string value;
+        bool        was_set;
+    };
+    std::vector<env_backup_t> env_bkp;
+    char                     *var;
 
     /* NCCL TL is disabled since it currently can not support non-blocking
        team creation. */
@@ -288,12 +293,18 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
        in a hang in the destruction flow */
     vars.push_back({"UCX_IB_GPU_DIRECT_RDMA", "no"});
 
-    for (auto &v : vars) {
-        var = std::getenv(v.first.c_str());
-        if (var) {
-            /* found env - back it up for later restore
-               after processes creation */
-            env_bkp.push_back(ucc_env_var_t(v.first, var));
+    for (const auto &v : vars) {
+        bool saved = false;
+
+        for (const auto &b : env_bkp) {
+            if (b.name == v.first) {
+                saved = true;
+                break;
+            }
+        }
+        if (!saved) {
+            var = std::getenv(v.first.c_str());
+            env_bkp.push_back({v.first, var ? var : "", var != nullptr});
         }
         setenv(v.first.c_str(), v.second.c_str(), 1);
     }
@@ -302,9 +313,12 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
     }
 
     create_context();
-    for (auto &v : env_bkp) {
-        /*restore original env */
-        setenv(v.first.c_str(), v.second.c_str(), 1);
+    for (const auto &v : env_bkp) {
+        if (v.was_set) {
+            setenv(v.name.c_str(), v.value.c_str(), 1);
+        } else {
+            unsetenv(v.name.c_str());
+        }
     }
 }
 

@@ -44,8 +44,9 @@ ucc_tl_ucp_allreduce_ring_start(ucc_coll_task_t *task)
          * Copy src to dst before starting reduce-scatter.
          *
          * Both sub-collectives run in-place on dst so each rank's reduced
-         * segment lands at rank * (count/tsize).  The source data must
-         * already reside in dst before the pipeline starts.
+         * segment lands at ucc_buffer_block_offset(count, tsize, rank) (equal
+         * blocks with remainder distributed to leading ranks).  The source
+         * data must already reside in dst before the pipeline starts.
          *
          * Performance trade-off: this adds one full-buffer memory pass per
          * out-of-place call.  On large counts or high-latency memory types
@@ -83,7 +84,6 @@ ucc_status_t ucc_tl_ucp_allreduce_ring_init(ucc_base_coll_args_t *coll_args,
                                             ucc_coll_task_t **task_h)
 {
     ucc_tl_ucp_team_t     *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_rank_t             tsize   = UCC_TL_TEAM_SIZE(tl_team);
     size_t                 count   = coll_args->args.dst.info.count;
     ucc_schedule_t        *schedule;
     ucc_coll_task_t       *rs_task;
@@ -101,14 +101,6 @@ ucc_status_t ucc_tl_ucp_allreduce_ring_init(ucc_base_coll_args_t *coll_args,
 
     if (UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.reduce_avg_pre_op &&
         coll_args->args.op == UCC_OP_AVG) {
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
-    /* Check that count is divisible by team size for ring algorithm */
-    if (count % tsize != 0) {
-        tl_debug(team->context->lib,
-                 "ring requires count (%zu) divisible by team size (%u)",
-                 count, tsize);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
