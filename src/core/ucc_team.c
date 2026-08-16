@@ -99,13 +99,15 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
     team->state                   = (team->size > 1) ? UCC_TEAM_ADDR_EXCHANGE
                                                      : UCC_TEAM_CL_CREATE;
     team->last_team_create_posted = -1;
+    team->bp.ep_traffic_class     = team->ep_traffic_class;
+
     return UCC_OK;
 }
 
 ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts,
                                   const ucc_team_params_t *params,
                                   ucc_team_h *new_team)
-{
+{      
     uint64_t     team_size = 0;
     uint64_t     team_rank = UINT64_MAX;
     ucc_team_t  *team;
@@ -201,6 +203,13 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     team->seq_num      = 0;
     team->contexts     = ucc_malloc(sizeof(ucc_context_t *) * num_contexts,
                                     "ucc_team_ctx");
+
+    if (params->mask & UCC_TEAM_PARAM_FIELD_EP_TRAFFIC_CLASS) {
+        team->ep_traffic_class = (uint8_t)params->ep_traffic_class;
+    } else {
+        team->ep_traffic_class = UCC_TL_UCP_NO_TCLASS;
+    }
+
     if (!team->contexts) {
         ucc_error("failed to allocate %zd bytes for ucc team contexts array",
                   sizeof(ucc_context_t) * num_contexts);
@@ -210,6 +219,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
 
     memcpy(team->contexts, contexts, sizeof(ucc_context_t *) * num_contexts);
     ucc_copy_team_params(&team->bp.params, params);
+        
     /* check if user provides team id and if it is not too large */
     if ((params->mask & UCC_TEAM_PARAM_FIELD_ID) &&
         (params->id <= UCC_TEAM_ID_MAX)) {

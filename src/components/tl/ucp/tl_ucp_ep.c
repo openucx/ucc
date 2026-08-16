@@ -17,18 +17,24 @@ static void ucc_tl_ucp_err_handler(void *arg, ucp_ep_h ep, ucs_status_t status)
 
 static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
                                                  int is_service, ucp_ep_h *ep,
-                                                 void *ucp_address)
+                                                 void *ucp_address,uint8_t ep_traffic_class)
 {
     ucp_worker_h worker =
         (is_service) ? ctx->service_worker.ucp_worker : ctx->worker.ucp_worker;
     ucp_ep_params_t ep_params;
     ucs_status_t    status;
+
     if (*ep) {
         /* Already connected */
         return UCC_OK;
     }
     ep_params.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
     ep_params.address    = (ucp_address_t *)ucp_address;
+
+    if (ep_traffic_class != UCC_TL_UCP_NO_TCLASS) {
+        ep_params.field_mask |= UCP_EP_PARAM_FIELD_EP_TRAFFIC_CLASS;
+        ep_params.ep_traffic_class = ep_traffic_class;
+    }
 
     if (!UCC_TL_CTX_HAS_OOB(ctx)) {
         ep_params.err_mode        = UCP_ERR_HANDLING_MODE_PEER;
@@ -37,6 +43,7 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
         ep_params.field_mask     |= UCP_EP_PARAM_FIELD_ERR_HANDLING_MODE |
                                     UCP_EP_PARAM_FIELD_ERR_HANDLER;
     }
+
     status = ucp_ep_create(worker, &ep_params, ep);
 
     if (ucc_unlikely(UCS_OK != status)) {
@@ -65,7 +72,8 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
     addr = use_service_worker ? TL_UCP_EP_ADDR_WORKER_SERVICE(addr)
                               : TL_UCP_EP_ADDR_WORKER(addr);
 
-    return ucc_tl_ucp_connect_ep(ctx, use_service_worker, ep, addr);
+    return ucc_tl_ucp_connect_ep(ctx, use_service_worker, ep, addr, team->ep_traffic_class);
+
 }
 
 /* Finds next non-NULL ep in the storage and returns that handle
