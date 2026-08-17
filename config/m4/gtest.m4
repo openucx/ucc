@@ -12,6 +12,6 @@ dnl Provide a flag to enable or disable Google Test usage.
                   [enable_gtest=no])
 
     AM_CONDITIONAL([HAVE_GTEST],[test "x$enable_gtest" = "xyes"])
-    AS_IF([test "x$enable_gtest" == "xyes"],
+    AS_IF([test "x$enable_gtest" = "xyes"],
           [gtest_enable=enabled], [gtest_enable=disabled])
 ])
