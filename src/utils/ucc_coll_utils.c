@@ -230,7 +230,7 @@ ucc_status_t ucc_copy_asymmetric_buffer(ucc_coll_task_t *task)
     ucc_status_t                          status    = UCC_OK;
     ucc_coll_args_t                      *coll_args = &task->bargs.args;
     ucc_buffer_info_asymmetric_memtype_t *save      = &task->bargs.asymmetric_save_info;
-    ucc_rank_t                            size      = task->team->params.size;
+    ucc_rank_t                            size      = task->bargs.team->size;
 
     if(task->bargs.args.coll_type == UCC_COLL_TYPE_SCATTERV) {
         // copy in
