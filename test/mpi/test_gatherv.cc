@@ -98,6 +98,7 @@ TestGatherv::TestGatherv(ucc_test_team_t &_team, TestCaseParams &params) :
         args.src.info.mem_type = mem_type;
     }
 
+    register_memhs(sbuf, inplace ? 0 : counts[rank] * dt_size, rbuf, rank == root ? count * size * dt_size : 0);
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }

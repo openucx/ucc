@@ -54,7 +54,7 @@ static size_t msgrange[3] = {
 static std::vector<bool>   inplace      = {false};
 static std::vector<bool>   persistent   = {false};
 static std::vector<bool>   triggered    = {false};
-static std::vector<bool>   local_reg    = {false};
+static std::vector<ucc_test_memh_mode_t> local_reg = {UCC_TEST_MEMH_NONE};
 static ucc_test_mpi_root_t root_type    = ROOT_RANDOM;
 static int                 root_value   = 10;
 static ucc_thread_mode_t   thread_mode  = UCC_THREAD_SINGLE;
@@ -109,7 +109,7 @@ void print_help()
        "-T, --thread-multiple\n\tenable multi-threaded testing\n\n"
        "-v, --verbose\n\tlog all test cases\n\n"
        "--triggered            <value>\n\t0 - use post, 1 - use triggered post, 2 - both\n\n"
-       "--local_reg            <value>\n\t0 - no local registration, 1 - local registration, 2 - both\n\n"
+       "--local_reg            <value>\n\t0 - no registration, 1 - local memh, 2 - none+local, 3 - global memh, 4 - none+local+global\n\n"
        "-h, --help\n\tShow help\n";
 }
 
@@ -370,13 +370,20 @@ static void process_local_reg(const char *arg)
     int value = std::stoi(arg);
     switch(value) {
     case 0:
-        local_reg = {false};
+        local_reg = {UCC_TEST_MEMH_NONE};
         return;
     case 1:
-        local_reg = {true};
+        local_reg = {UCC_TEST_MEMH_LOCAL};
         return;
     case 2:
-        local_reg = {false, true};
+        local_reg = {UCC_TEST_MEMH_NONE, UCC_TEST_MEMH_LOCAL};
+        return;
+    case 3:
+        local_reg = {UCC_TEST_MEMH_GLOBAL};
+        return;
+    case 4:
+        local_reg = {UCC_TEST_MEMH_NONE, UCC_TEST_MEMH_LOCAL,
+                     UCC_TEST_MEMH_GLOBAL};
         return;
     default:
         break;
@@ -682,7 +689,7 @@ int main(int argc, char *argv[])
                     test->set_triggered(trig);
                     test->set_inplace(inpl);
                     test->set_persistent(pers);
-                    test->set_local_registration(lr);
+                    test->set_memh_mode(lr);
                     test->run_all();
                 }
             }
@@ -710,6 +717,8 @@ int main(int argc, char *argv[])
             }
         }
     }
+    run_mem_map_tests(test, test->results);
+
     std::cout << std::flush;
 
     for (auto s : test->results) {

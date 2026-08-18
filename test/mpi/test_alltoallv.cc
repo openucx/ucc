@@ -178,6 +178,10 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
         }
         args.dst.info_v.displacements = (ucc_aint_t *)ldisp;
     }
+    if (!is_onesided) {
+        register_memhs(sbuf, inplace ? 0 : (size_t)sncounts * dt_size,
+                       rbuf, (size_t)rncounts * dt_size);
+    }
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }

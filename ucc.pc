@@ -1,0 +1,18 @@
+#
+# Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# See file LICENSE for terms.
+#
+
+prefix = /work/nvidia/curr-work/ucc-cuda-mem-map/install
+exec_prefix = ${prefix}
+bindir = ${prefix}/bin
+libdir = ${exec_prefix}/lib
+includedir = ${prefix}/include
+
+Name: ucc
+Description: Unified Collective Communication Library
+Version: 1.9.0
+Cflags: -I${includedir}
+Libs: -L${libdir} -lucc
+Libs.private: -Wl

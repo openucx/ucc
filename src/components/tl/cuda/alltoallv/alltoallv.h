@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -10,6 +10,26 @@
 
 #include "../tl_cuda.h"
 #include "../tl_cuda_coll.h"
+#include "components/base/ucc_base_iface.h"
+
+enum {
+    UCC_TL_CUDA_ALLTOALLV_ALG_CE   = 0,
+    UCC_TL_CUDA_ALLTOALLV_ALG_PUSH = 1,
+    UCC_TL_CUDA_ALLTOALLV_ALG_LAST
+};
+
+extern ucc_base_coll_alg_info_t
+    ucc_tl_cuda_alltoallv_algs[UCC_TL_CUDA_ALLTOALLV_ALG_LAST + 1];
+
+static inline int ucc_tl_cuda_alltoallv_alg_from_str(const char *str)
+{
+    int i;
+    for (i = 0; i < UCC_TL_CUDA_ALLTOALLV_ALG_LAST; i++) {
+        if (0 == strcasecmp(str, ucc_tl_cuda_alltoallv_algs[i].name))
+            return i;
+    }
+    return -1;
+}
 
 ucc_status_t ucc_tl_cuda_alltoallv_ce_finalize(ucc_coll_task_t *coll_task);
 
@@ -23,6 +43,10 @@ ucc_tl_cuda_alltoallv_ce_triggered_post_setup(ucc_coll_task_t *coll_task);
 ucc_status_t ucc_tl_cuda_alltoallv_init(ucc_base_coll_args_t *coll_args,
                                         ucc_base_team_t      *tl_team,
                                         ucc_coll_task_t     **task_p);
+
+ucc_status_t ucc_tl_cuda_alltoallv_push_init(ucc_base_coll_args_t *coll_args,
+                                              ucc_base_team_t      *tl_team,
+                                              ucc_coll_task_t     **task_p);
 
 /**
  * @brief Post a copy operation using CUDA copy engine

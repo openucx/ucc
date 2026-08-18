@@ -44,6 +44,7 @@ TestReduce::TestReduce(ucc_test_team_t &_team, TestCaseParams &params) :
     args.src.info.datatype    = dt;
     args.src.info.mem_type    = mem_type;
     args.root                 = root;
+    register_memhs(sbuf, msgsize, rbuf, rank == root ? msgsize : 0);
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
