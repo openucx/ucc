@@ -37,9 +37,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
     set.map    = UCC_TL_TEAM_MAP(self);
 
     if (UCC_TL_SHARP_TEAM_LIB(self)->cfg.use_internal_oob) {
-        status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(self)->ctx_map,
-                                 &UCC_TL_TEAM_MAP(self),
-                                 &self->oob_ctx.subset.map);
+        status = ucc_ep_map_create_nested(
+            &UCC_TEAM_CTX_MAP(UCC_TL_CORE_TEAM(self)),
+            &UCC_TL_TEAM_MAP(self),
+            &self->oob_ctx.subset.map);
         if (status != UCC_OK) {
             return status;
         }

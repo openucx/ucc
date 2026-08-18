@@ -342,7 +342,7 @@ static ucc_status_t
 ucc_tl_cuda_team_topo_init_matrix(const ucc_tl_cuda_team_t *team,
                                   ucc_rank_t *matrix)
 {
-    ucc_topo_t          *topo      = UCC_TL_CORE_TEAM(team)->topo;
+    ucc_topo_t          *topo      = UCC_TEAM_TOPO(UCC_TL_CORE_TEAM(team));
     ucc_proc_info_t     *procs     = topo->topo->procs;
     ucc_device_id_t     *dev_ids   = topo->device_map.device_ids;
     int                  size      = UCC_TL_TEAM_SIZE(team);
@@ -406,7 +406,7 @@ ucc_status_t ucc_tl_cuda_team_topo_create(const ucc_tl_team_t *cuda_team,
      * connectivity. This handles NVSwitch, fabric clique, and direct NVLink
      * connections consistently and avoids rescanning the matrix for zeros. */
     {
-        ucc_topo_t *utopo   = UCC_TL_CORE_TEAM(team)->topo;
+        ucc_topo_t *utopo   = UCC_TEAM_TOPO(UCC_TL_CORE_TEAM(team));
         ucc_sbgp_t *node_sg = ucc_topo_get_sbgp(utopo, UCC_SBGP_NODE);
         topo->is_fully_connected =
             ucc_topo_is_nvlink_fully_connected(utopo, node_sg);

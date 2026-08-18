@@ -180,6 +180,9 @@ typedef struct ucc_base_team_iface {
     ucc_status_t (*create_test)(ucc_base_team_t *team);
     ucc_status_t (*destroy)(ucc_base_team_t *team);
     ucc_get_coll_scores_fn_t get_scores;
+    /* Re-seat the team's external id / tag domain in place (CL/BASIC, CL/HIER);
+       left NULL by UCC_BASE_IFACE_DECLARE and NULL-guarded by the core caller. */
+    void (*update_id)(ucc_base_team_t *team, uint16_t id);
 } ucc_base_team_iface_t;
 
 enum {

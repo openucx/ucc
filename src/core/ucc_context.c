@@ -6,6 +6,8 @@
 
 #include "config.h"
 #include "ucc_context.h"
+#include "ucc_team.h"
+#include "ucc_team_cache.h"
 #include "utils/ucc_proc_info.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
@@ -18,51 +20,149 @@
 #include "utils/ucc_debug.h"
 #include "ucc_progress_queue.h"
 
+/* IDs kept free in the team-ID pool (capacity = pool_size*64 - 1, ID 0 reserved)
+ * so a pre-ACTIVE ucc_team_alloc_id never hits an exhausted pool. Cache max_size
+ * is clamped to capacity - headroom. E.g. pool_size=32 -> capacity=2047 -> 2039. */
+#define UCC_TEAM_CACHE_ID_HEADROOM 8U
+
 static uint32_t ucc_context_seq_num = 0;
 static ucc_config_field_t ucc_context_config_table[] = {
-    {"ESTIMATED_NUM_EPS", "0",
+    {"ESTIMATED_NUM_EPS",
+     "0",
      "An optimization hint of how many endpoints will be created on this "
      "context",
      ucc_offsetof(ucc_context_config_t, estimated_num_eps),
      UCC_CONFIG_TYPE_UINT},
 
-    {"LOCK_FREE_PROGRESS_Q", "0",
+    {"LOCK_FREE_PROGRESS_Q",
+     "0",
      "Enable lock free progress queue optimization",
      ucc_offsetof(ucc_context_config_t, lock_free_progress_q),
      UCC_CONFIG_TYPE_UINT},
 
-    {"ESTIMATED_NUM_PPN", "0",
+    {"ESTIMATED_NUM_PPN",
+     "0",
      "An optimization hint of how many endpoints created on this context reside"
      " on the same node",
      ucc_offsetof(ucc_context_config_t, estimated_num_ppn),
      UCC_CONFIG_TYPE_UINT},
 
-    {"TEAM_IDS_POOL_SIZE", "32",
+    {"TEAM_IDS_POOL_SIZE",
+     "32",
      "Defines the size of the team_id_pool. The number of coexisting unique "
      "team ids for a single process is team_ids_pool_size*64. This parameter "
      "is relevant when internal team id allocation takes place.",
      ucc_offsetof(ucc_context_config_t, team_ids_pool_size),
      UCC_CONFIG_TYPE_UINT},
 
-    {"INTERNAL_OOB", "1",
+    {"TEAM_CACHE_ENABLE",
+     "n",
+     "Enable caching and reuse of ucc_team structures with identical "
+     "membership, "
+     "so repeated team creation with matching params may reuse a previously "
+     "built "
+     "team. Experimental, default off.",
+     ucc_offsetof(ucc_context_config_t, team_cache_enable),
+     UCC_CONFIG_TYPE_BOOL},
+
+    {"TEAM_CACHE_MAX_SIZE",
+     "128",
+     "Maximum number of teams retained in the per-context team cache. Cached "
+     "dormant teams each hold a team-id, so the effective limit is also "
+     "clamped "
+     "by UCC_TEAM_IDS_POOL_SIZE.",
+     ucc_offsetof(ucc_context_config_t, team_cache_max_size),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"TEAM_CACHE_EVICTION",
+     "fifo",
+     "Eviction policy when the team cache is at capacity (only dormant teams "
+     "are "
+     "evictable): none (never evict, new team stays uncached), fifo (oldest "
+     "dormant), lfu (fewest collectives served, by seq_num), lru (alias for "
+     "lfu; "
+     "UCC has no wall-clock recency).",
+     ucc_offsetof(ucc_context_config_t, team_cache_eviction),
+     UCC_CONFIG_TYPE_ENUM(ucc_team_cache_eviction_names)},
+
+    {"TEAM_CACHE_DISABLE_LINEAR_CHECK",
+     "n",
+     "Trust the 64-bit identity hash alone in lookup, skipping the exact "
+     "rank-array membership compare. Faster, but a hash collision would yield "
+     "an "
+     "incorrect team reuse. Default off (safe).",
+     ucc_offsetof(ucc_context_config_t, team_cache_disable_linear_check),
+     UCC_CONFIG_TYPE_BOOL},
+
+    {"TEAM_CACHE_DUMP_STATS",
+     "n",
+     "Dump team-cache statistics (lookups, hits and hit rate, misses, inserts, "
+     "evictions) to the log at context destroy. Default off.",
+     ucc_offsetof(ucc_context_config_t, team_cache_dump_stats),
+     UCC_CONFIG_TYPE_BOOL},
+
+    {"TEAM_CACHE_DERIVED",
+     "y",
+     "Cache and reuse derived teams: when a create duplicates the membership "
+     "of a "
+     "still-live cached team (e.g. MPI_Comm_dup), build it with its own "
+     "team-id "
+     "but borrow the parent's shared membership/topology artifacts. When off, "
+     "such "
+     "a create is an independent full build. No effect unless "
+     "UCC_TEAM_CACHE_ENABLE is set.",
+     ucc_offsetof(ucc_context_config_t, team_cache_derived),
+     UCC_CONFIG_TYPE_BOOL},
+
+    {"TEAM_CACHE_RESEAT",
+     "n",
+     "Experimental: re-adopt a cached dormant derived team of identical "
+     "membership but a different external id (drifted MPI context-id) by "
+     "re-seating "
+     "its id/tag domain instead of rebuilding. Requires "
+     "UCC_TEAM_CACHE_DERIVED. "
+     "Default off.",
+     ucc_offsetof(ucc_context_config_t, team_cache_reseat),
+     UCC_CONFIG_TYPE_BOOL},
+
+    {"TEAM_CACHE_AGREEMENT",
+     "y",
+     "Run a cross-rank agreement on every cacheable team create so all members "
+     "reach an identical reuse-vs-fresh decision, making reuse safe for "
+     "overlapping "
+     "subcommunicators (adds one small member-scoped allreduce per cacheable "
+     "create). Default on; set to n only when communicator scopes never "
+     "overlap. "
+     "No effect unless UCC_TEAM_CACHE_ENABLE is set.",
+     ucc_offsetof(ucc_context_config_t, team_cache_agreement),
+     UCC_CONFIG_TYPE_BOOL},
+
+    {"INTERNAL_OOB",
+     "1",
      "Use internal OOB transport for team creation. Available for ucc_context "
      "is configured with OOB (global mode). 0 - disable, 1 - try, 2 - force.",
-     ucc_offsetof(ucc_context_config_t, internal_oob), UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_context_config_t, internal_oob),
+     UCC_CONFIG_TYPE_UINT},
 
-    {"THROTTLE_PROGRESS", "1000",
+    {"THROTTLE_PROGRESS",
+     "1000",
      "Throttle UCC progress to every <n>th invocation",
      ucc_offsetof(ucc_context_config_t, throttle_progress),
      UCC_CONFIG_TYPE_UINT},
 
-    {"NET_DEVICES", "all",
+    {"NET_DEVICES",
+     "all",
      "Specifies which network device(s) to use. The order is not meaningful.\n"
      "\"all\" would use all available devices. Only TLs that support this "
      "parameter will be affected. The parameter is only supported by UCX TL.",
-     ucc_offsetof(ucc_context_config_t, net_devices), UCC_CONFIG_TYPE_STRING_ARRAY},
+     ucc_offsetof(ucc_context_config_t, net_devices),
+     UCC_CONFIG_TYPE_STRING_ARRAY},
 
-    {"NODE_LOCAL_ID", "auto",
+    {"NODE_LOCAL_ID",
+     "auto",
      "An optimization hint for the local identificator on a single node.",
-     ucc_offsetof(ucc_context_config_t, node_local_id), UCC_CONFIG_TYPE_ULUNITS},
+     ucc_offsetof(ucc_context_config_t, node_local_id),
+     UCC_CONFIG_TYPE_ULUNITS},
 
     {NULL}};
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
@@ -741,6 +841,60 @@ ucc_status_t ucc_context_create_proc_info(
     ctx->rank              = UCC_RANK_MAX;
     ctx->lib               = lib;
     ctx->ids.pool_size     = config->team_ids_pool_size;
+    /* ctx is calloc'd, so team_cache is already NULL; init it when enabled */
+    if (config->team_cache_enable) {
+        /* Clamp cache max_size so dormant cached teams can't exhaust the ID pool
+         * before the next pre-ACTIVE ucc_team_alloc_id. External-ID teams don't
+         * draw from the pool, so the headroom covers only pool-allocated teams.
+         * Compute in 64-bit: pool_size*64 can overflow uint32, and pool_size==0
+         * must yield safe_max 0 (not an underflowed huge value). */
+        uint64_t pool_capacity = (uint64_t)config->team_ids_pool_size * 64U;
+        uint32_t safe_max      = (pool_capacity >
+                             (uint64_t)UCC_TEAM_CACHE_ID_HEADROOM + 1U)
+                                     ? (uint32_t)(pool_capacity - 1U -
+                                             UCC_TEAM_CACHE_ID_HEADROOM)
+                                     : 0U; /* -1 for the reserved ID 0 */
+        uint32_t cache_max     = config->team_cache_max_size;
+
+        if (cache_max > safe_max) {
+            ucc_info(
+                "UCC_TEAM_CACHE_MAX_SIZE=%u exceeds the safe bound "
+                "derived from UCC_TEAM_IDS_POOL_SIZE=%u "
+                "(pool_capacity=%llu, headroom=%u, safe_max=%u); "
+                "clamping cache to %u entries. "
+                "Raise UCC_TEAM_IDS_POOL_SIZE to raise the safe ceiling.",
+                cache_max,
+                config->team_ids_pool_size,
+                (unsigned long long)pool_capacity,
+                UCC_TEAM_CACHE_ID_HEADROOM,
+                safe_max,
+                safe_max);
+            cache_max = safe_max;
+        }
+
+        status = ucc_team_cache_init(
+            &ctx->team_cache,
+            cache_max,
+            (ucc_team_cache_eviction_policy_t)config->team_cache_eviction,
+            config->team_cache_disable_linear_check);
+        if (UCC_OK != status) {
+            ucc_warn("failed to init team cache, caching will be disabled");
+            ctx->team_cache = NULL;
+        } else {
+            ctx->team_cache->dump_stats = config->team_cache_dump_stats;
+            ctx->team_cache->derived    = config->team_cache_derived;
+            ctx->team_cache->reseat     = config->team_cache_reseat;
+            ctx->team_cache->agreement  = config->team_cache_agreement;
+            /* cache_gen (per-instance cookie generation) is seeded after
+               ctx->id.seq_num is assigned below. */
+        }
+        ucc_debug(
+            "team cache %s (max_size=%u)",
+            ctx->team_cache ? "enabled" : "disabled (init failed)",
+            cache_max);
+    } else {
+        ucc_debug("team cache disabled by configuration");
+    }
     ucc_list_head_init(&ctx->progress_list);
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
@@ -837,6 +991,13 @@ ucc_status_t ucc_context_create_proc_info(
     }
     ctx->id.pi      = *proc_info;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
+    /* Seed the per-instance cookie generation non-zero and distinct per context
+       (context seq_num in the high bits) so cookies are never 0 (the unstamped
+       sentinel) and do not collide across a process's contexts. Seeded here, after
+       ctx->id.seq_num is assigned. */
+    if (ctx->team_cache != NULL) {
+        ctx->team_cache->cache_gen = ((uint64_t)ctx->id.seq_num << 32);
+    }
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
         params->oob.n_oob_eps > 1) {
         do {
@@ -876,6 +1037,74 @@ ucc_status_t ucc_context_create_proc_info(
                 ucc_debug("context service team cannot be created");
             }
         }
+    }
+
+    /* Cross-rank cache-availability agreement. The cache's per-create vote runs
+       over ctx->service_team, so caching is usable only if every context rank has
+       both a live cache and a service team. Gate on the symmetric knob (not on the
+       local ctx->team_cache pointer, which is NULL on a rank whose cache-init
+       failed - that rank must still enter the allgather and contribute 0, or it
+       would drop out of the collective and hang). If any rank is not viable, all
+       ranks disable the cache (else the enabled ranks hit the very hit/miss
+       divergence the vote prevents). */
+    if (config->team_cache_enable &&
+        (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) &&
+        params->oob.n_oob_eps > 1) {
+        size_t   n        = params->oob.n_oob_eps;
+        uint8_t  local_ok = (ctx->team_cache != NULL &&
+                            ctx->service_team != NULL)
+                                ? 1
+                                : 0;
+        uint8_t *all_ok;
+        void    *oob_req   = NULL;
+        int      global_ok = 1;
+        size_t   vi;
+
+        all_ok = ucc_malloc(n, "cache_avail_vote");
+        if (!all_ok) {
+            ucc_error(
+                "failed to allocate %zu bytes for cache-availability vote", n);
+            goto error_ctx_create;
+        }
+        status = params->oob.allgather(
+            &local_ok,
+            all_ok,
+            sizeof(local_ok),
+            params->oob.coll_info,
+            &oob_req);
+        if (UCC_OK == status) {
+            while (UCC_INPROGRESS == (status = params->oob.req_test(oob_req))) {
+            }
+            params->oob.req_free(oob_req);
+        }
+        if (UCC_OK != status) {
+            ucc_error(
+                "cache-availability agreement allgather failed: %s",
+                ucc_status_string(status));
+            ucc_free(all_ok);
+            goto error_ctx_create;
+        }
+        for (vi = 0; vi < n; vi++) {
+            if (!all_ok[vi]) {
+                global_ok = 0;
+                break;
+            }
+        }
+        ucc_free(all_ok);
+        if (!global_ok) {
+            ucc_info(
+                "team cache disabled: not all ranks have a usable cache and "
+                "context service team (required for the consistency "
+                "agreement)");
+            ucc_team_cache_destroy(ctx->team_cache); /* NULL-safe */
+            ctx->team_cache = NULL;
+        }
+    } else if (ctx->team_cache && ctx->service_team == NULL) {
+        /* No peers to diverge from (single rank / no context OOB), but still no
+           service team: disable the cache locally - trivially symmetric. */
+        ucc_info("team cache disabled: no context service team available");
+        ucc_team_cache_destroy(ctx->team_cache);
+        ctx->team_cache = NULL;
     }
 
     n_tl_ctx = ctx->n_tl_ctx;
@@ -937,6 +1166,9 @@ error_ctx_create:
     }
     ucc_free(ctx->cl_ctx);
 error_ctx:
+    /* This path runs before any team is created, so the cache holds no dormant
+       entries - destroy it directly (no drain needed). Safe on NULL. */
+    ucc_team_cache_destroy(ctx->team_cache);
     ucc_free(ctx);
 error:
     return status;
@@ -970,6 +1202,17 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
 
     if (UCC_OK != ucc_context_free_attr(&context->attr)) {
         ucc_error("failed to free context attributes");
+    }
+    /* Drain dormant cached teams FIRST, before CL/TL context and service-team
+       teardown below: a dormant team still holds CL/TL/service refs and a
+       team-id, and the drain walks the registry, so it must precede destroy. */
+    if (context->team_cache) {
+        if (context->team_cache->dump_stats) {
+            ucc_team_cache_dump_stats(context->team_cache);
+        }
+        ucc_team_cache_drain(context);
+        ucc_team_cache_destroy(context->team_cache);
+        context->team_cache = NULL;
     }
     for (i = 0; i < context->n_cl_ctx; i++) {
         cl_ctx = context->cl_ctx[i];

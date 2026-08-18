@@ -14,12 +14,28 @@ typedef struct ucc_service_coll_req {
     ucc_team_t      *team;
     void *           data;
     ucc_subset_t     subset;
+    uint8_t embedded; /* 1: req storage is caller-owned, not heap; test/
+                         finalize must not ucc_free it (e.g. the vote req) */
 } ucc_service_coll_req_t;
 
 ucc_status_t ucc_service_allreduce(ucc_team_t *team, void *sbuf, void *rbuf,
                                    ucc_datatype_t dt, size_t count,
                                    ucc_reduction_op_t op, ucc_subset_t subset,
                                    ucc_service_coll_req_t **req);
+
+/**
+ * Member-scoped service allreduce whose @subset map already resolves each
+ * agreement-member index directly to a CONTEXT rank (built from params.ep_map),
+ * so it does NOT depend on the team's ctx_map being materialized. Runs over the
+ * persistent ctx->service_team (which must exist) and writes into the
+ * caller-provided embedded @req storage (never heap-freed). Used by the
+ * cache-action agreement vote before ADDR_EXCHANGE has built the team. A post
+ * failure must be treated as fatal by the caller (a silent local fallback would
+ * re-introduce cross-rank divergence). */
+ucc_status_t ucc_service_allreduce_ctx(
+    ucc_team_t *team, ucc_service_coll_req_t *req, void *sbuf, void *rbuf,
+    ucc_datatype_t dt, size_t count, ucc_reduction_op_t op,
+    ucc_subset_t subset);
 
 ucc_status_t ucc_service_allgather(ucc_team_t *team, void *sbuf, void *rbuf,
                                    size_t msgsize, ucc_subset_t subset,

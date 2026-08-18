@@ -128,4 +128,7 @@ __attribute__((constructor)) static void cl_hier_iface_init(void)
         ucc_cl_hier_bcast_algs;
     ucc_cl_hier.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
         ucc_cl_hier_allgatherv_algs;
+    /* Wire update_id (left NULL by UCC_BASE_IFACE_DECLARE): CL/HIER holds
+       per-sbgp UCP TL teams whose tag domains must be re-seated on id change. */
+    ucc_cl_hier.super.team.update_id = ucc_cl_hier_team_update_id;
 }

@@ -18,7 +18,56 @@ uint64_t ucc_service_coll_map_cb(uint64_t ep, void *cb_ctx)
     ucc_rank_t              team_rank;
 
     team_rank = ucc_ep_map_eval(req->subset.map, (ucc_rank_t)ep);
-    return ucc_ep_map_eval(team->ctx_map, team_rank);
+    return ucc_ep_map_eval(UCC_TEAM_CTX_MAP(team), team_rank);
+}
+
+/* Single-level map for ucc_service_allreduce_ctx: @subset.map already yields the
+   context rank for each agreement-member index, so no ctx_map indirection (which
+   is not yet built when the vote runs). */
+uint64_t ucc_service_coll_map_cb_direct(uint64_t ep, void *cb_ctx)
+{
+    ucc_service_coll_req_t *req = cb_ctx;
+
+    return ucc_ep_map_eval(req->subset.map, (ucc_rank_t)ep);
+}
+
+ucc_status_t ucc_service_allreduce_ctx(
+    ucc_team_t *team, ucc_service_coll_req_t *req, void *sbuf, void *rbuf,
+    ucc_datatype_t dt, size_t count, ucc_reduction_op_t op, ucc_subset_t subset)
+{
+    ucc_context_t  *ctx = team->contexts[0];
+    ucc_tl_team_t  *steam;
+    ucc_tl_iface_t *tl_iface;
+    ucc_status_t    status;
+
+    /* The vote requires the persistent context service team (spanning all ctx
+       ranks, 1:1 with service-team ranks). Symmetric cache enablement guarantees
+       it exists whenever caching is on, so a missing service team here is a bug. */
+    ucc_assert(ctx->service_team != NULL);
+
+    req->team            = team;
+    req->subset          = subset;
+    req->embedded        = 1;
+    req->data            = NULL;
+
+    /* Route the agreement over ctx->service_team, mapping agreement index ->
+       ctx rank (== service-team rank) directly. */
+    subset.map.type      = UCC_EP_MAP_CB;
+    subset.map.cb.cb     = ucc_service_coll_map_cb_direct;
+    subset.map.cb.cb_ctx = req;
+
+    steam                = ctx->service_team;
+    tl_iface             = UCC_TL_TEAM_IFACE(steam);
+    status               = tl_iface->scoll.allreduce(
+        &steam->super, sbuf, rbuf, dt, count, op, subset, &req->task);
+    if (status < 0) {
+        ucc_error(
+            "failed to start service agreement allreduce for team %p: %s",
+            (void *)team,
+            ucc_status_string(status));
+        return status;
+    }
+    return UCC_OK;
 }
 
 static inline ucc_status_t
@@ -36,8 +85,9 @@ ucc_service_coll_req_init(ucc_team_t *team, ucc_subset_t *subset,
                   sizeof(*req));
         return UCC_ERR_NO_MEMORY;
     }
-    req->team   = team;
-    req->subset = *subset;
+    req->team     = team;
+    req->subset   = *subset;
+    req->embedded = 0;
 
     if (ctx->service_team) {
         *service_team         = ctx->service_team;
@@ -146,9 +196,14 @@ ucc_status_t ucc_service_coll_test(ucc_service_coll_req_t *req)
 ucc_status_t ucc_service_coll_finalize(ucc_service_coll_req_t *req)
 {
     ucc_status_t status;
+    uint8_t      embedded = req->embedded;
 
     status = ucc_collective_finalize_internal(req->task);
-    ucc_free(req);
+    /* Embedded req storage (e.g. the vote req inside ucc_team_t) is caller-owned;
+       only heap-allocated reqs are freed here. */
+    if (!embedded) {
+        ucc_free(req);
+    }
     return status;
 }
 
