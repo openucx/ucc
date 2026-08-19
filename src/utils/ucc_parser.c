@@ -1273,3 +1273,31 @@ size_t ucc_config_memunits_get(size_t config_size, size_t auto_size,
         return ucs_min(config_size, max_size);
     }
 }
+
+int ucc_config_sscanf_ulunits_auto_topo(const char *buf, void *dest,
+                                        const void *arg)
+{
+    if (!strcasecmp(buf, UCS_VALUE_AUTO_STR)) {
+        *(unsigned long *)dest = UCC_ULUNITS_AUTO;
+        return 1;
+    }
+    if (!strcasecmp(buf, "topo")) {
+        *(unsigned long *)dest = UCC_ULUNITS_TOPO;
+        return 1;
+    }
+    return ucs_config_sscanf_ulong(buf, dest, arg);
+}
+
+int ucc_config_sprintf_ulunits_auto_topo(char *buf, size_t max, const void *src,
+                                         const void *arg)
+{
+    unsigned long val = *(const unsigned long *)src;
+
+    if (val == UCC_ULUNITS_AUTO) {
+        return snprintf(buf, max, UCS_VALUE_AUTO_STR);
+    }
+    if (val == UCC_ULUNITS_TOPO) {
+        return snprintf(buf, max, "topo");
+    }
+    return ucs_config_sprintf_ulong(buf, max, src, arg);
+}
