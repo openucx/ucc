@@ -1,7 +1,7 @@
 #
-# Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-#
-# See file LICENSE for terms.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 
 cl_dirs = components/cl/basic \
 		  components/cl/hier

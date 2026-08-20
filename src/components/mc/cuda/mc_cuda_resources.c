@@ -1,3 +1,9 @@
+/**
+ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ * Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include "mc_cuda_resources.h"
 #include "components/mc/ucc_mc_log.h"
 #include "utils/ucc_malloc.h"

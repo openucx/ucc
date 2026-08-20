@@ -1,0 +1,31 @@
+general:
+  exclude:
+    - "\\.git.*"
+    - "^\\.ci/.*"
+    - "^\\.github/.*"
+    - "^config/.*"
+    - "^contrib/.*"
+    - "^docs/.*"
+    # Non-source files
+    - ".*LICENSE"
+    - ".*AUTHORS"
+    - ".*NEWS"
+    - ".*\\.gitignore"
+    # Extensions
+    - ".*\\.md"
+    - ".*\\.txt"
+    - ".*\\.(yml|yaml)"
+    - ".*\\.json"
+    - ".*\\.(m4|ac)"
+    - ".*\\.conf"
+    - ".*\\.png"
+    - ".*\\.pdf"
+    - ".*\\.graffle"
+    - ".*\\.tex"
+    - ".*\\.xml"
+    - ".*\\.ptini"
+
+bsd:
+  validate-spdx-license: true
+  include:
+    - ".*"

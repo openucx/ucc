@@ -1,6 +1,7 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * RESERVED.  See file LICENSE for terms.
+ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ * Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause * RESERVED.  See file LICENSE for terms.
  */
 extern "C" {
 #include "coll_select/coll_select.h"
