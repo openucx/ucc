@@ -45,3 +45,32 @@ void ucc_mrange_uint_destroy(ucc_mrange_uint_t *param)
         ucc_free(r);
     }
 }
+
+ucc_status_t ucc_mrange_kn_radix_copy(ucc_mrange_kn_radix_t       *dst,
+                                      const ucc_mrange_kn_radix_t *src)
+{
+    ucc_mrange_kn_radix_entry_t *r, *r_dup;
+
+    dst->default_value = src->default_value;
+    ucc_list_head_init(&dst->ranges);
+    ucc_list_for_each(r, &src->ranges, list_elem) {
+        r_dup = ucc_malloc(sizeof(*r_dup), "kn radix range dup");
+        if (ucc_unlikely(!r_dup)) {
+            ucc_mrange_kn_radix_destroy(dst);
+            return UCC_ERR_NO_MEMORY;
+        }
+        *r_dup = *r;
+        ucc_list_add_tail(&dst->ranges, &r_dup->list_elem);
+    }
+    return UCC_OK;
+}
+
+void ucc_mrange_kn_radix_destroy(ucc_mrange_kn_radix_t *param)
+{
+    ucc_mrange_kn_radix_entry_t *r, *r_tmp;
+
+    ucc_list_for_each_safe(r, r_tmp, &param->ranges, list_elem) {
+        ucc_list_del(&r->list_elem);
+        ucc_free(r);
+    }
+}
