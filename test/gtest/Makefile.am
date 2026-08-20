@@ -144,6 +144,10 @@ gtest_LDFLAGS  += $(UCX_LDFLAGS)
 gtest_LDADD    += $(UCX_LIBS) $(UCX_LIBADD)
 endif
 
+if TL_UCP_ENABLED
+gtest_SOURCES += coll/test_knomial_schedule.cc
+endif
+
 noinst_HEADERS =                         \
 	common/gtest.h                       \
 	common/test.h                        \
