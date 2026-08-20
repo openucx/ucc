@@ -7,12 +7,21 @@
 #define UCC_DATASTRUCT_H_
 #include <ucc/api/ucc.h>
 #include "ucc_list.h"
+#include <limits.h>
 #include <stdint.h>
 
 #define UCC_LIST_HEAD UCS_LIST_HEAD
 typedef uint32_t ucc_rank_t;
 #define UCC_RANK_INVALID UINT32_MAX
 #define UCC_RANK_MAX UCC_RANK_INVALID - 1
+
+typedef uint16_t ucc_kn_radix_t;
+#define UCC_KN_MAX_RADIX_PHASES (sizeof(ucc_rank_t) * CHAR_BIT - 1)
+
+typedef struct ucc_kn_radix_schedule {
+    ucc_kn_radix_t radices[UCC_KN_MAX_RADIX_PHASES];
+    uint8_t        n_radices;
+} ucc_kn_radix_schedule_t;
 
 typedef struct ucc_subset {
     ucc_ep_map_t map;
@@ -37,10 +46,28 @@ typedef struct ucc_mrange_uint {
     unsigned        default_value;
 } ucc_mrange_uint_t;
 
+typedef struct ucc_mrange_kn_radix_entry {
+    ucc_list_link_t         list_elem;
+    size_t                  start;
+    size_t                  end;
+    uint32_t                mtypes;
+    ucc_kn_radix_schedule_t value;
+} ucc_mrange_kn_radix_entry_t;
+
+typedef struct ucc_mrange_kn_radix {
+    ucc_list_link_t         ranges;
+    ucc_kn_radix_schedule_t default_value;
+} ucc_mrange_kn_radix_t;
+
 ucc_status_t ucc_mrange_uint_copy(ucc_mrange_uint_t       *dst,
                                   const ucc_mrange_uint_t *src);
 
 void ucc_mrange_uint_destroy(ucc_mrange_uint_t *param);
+
+ucc_status_t ucc_mrange_kn_radix_copy(ucc_mrange_kn_radix_t       *dst,
+                                      const ucc_mrange_kn_radix_t *src);
+
+void ucc_mrange_kn_radix_destroy(ucc_mrange_kn_radix_t *param);
 
 static inline unsigned ucc_mrange_uint_get(
     ucc_mrange_uint_t *param, size_t range_value, ucc_memory_type_t mem_type)
@@ -54,6 +81,21 @@ static inline unsigned ucc_mrange_uint_get(
         }
     }
     return param->default_value;
+}
+
+static inline const ucc_kn_radix_schedule_t *ucc_mrange_kn_radix_get(
+    const ucc_mrange_kn_radix_t *param, size_t range_value,
+    ucc_memory_type_t mem_type)
+{
+    ucc_mrange_kn_radix_entry_t *r;
+
+    ucc_list_for_each(r, &param->ranges, list_elem) {
+        if (r->start <= range_value && range_value <= r->end &&
+            (UCC_BIT(mem_type) & r->mtypes)) {
+            return &r->value;
+        }
+    }
+    return &param->default_value;
 }
 
 #endif
