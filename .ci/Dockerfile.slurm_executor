@@ -1,0 +1,13 @@
+FROM nbu-harbor.gtm.nvidia.com/swx-lab-platform/scctl:latest
+
+RUN apk update && \
+   apk add \
+      shadow \
+      openssh-client \
+      sudo
+
+
+RUN groupadd -g 30 hardware
+RUN useradd --no-create-home --uid 149917 --gid 30 -d /custom_home/svcnbu-swx-hpcx --no-create-home --shell /bin/bash svcnbu-swx-hpcx
+
+USER svcnbu-swx-hpcx
