@@ -5,51 +5,6 @@
 
 #include "allgather.h"
 
-#include <stdlib.h>
-
-ucc_status_t ucc_tl_ucp_allgather_knomial_parse_radices(
-    const char *value, ucc_rank_t team_size, ucc_kn_radix_t *radices,
-    uint8_t *nradices)
-{
-    const char   *p = value;
-    char         *end;
-    unsigned long parsed;
-    ucc_rank_t    product = 1;
-    uint8_t       n       = 0;
-
-    *nradices             = 0;
-    if (value == NULL || value[0] == '\0') {
-        return UCC_ERR_NOT_FOUND;
-    }
-
-    while (*p != '\0') {
-        if (n == UCC_KN_MAX_RADIX_PHASES) {
-            return UCC_ERR_INVALID_PARAM;
-        }
-        parsed = strtoul(p, &end, 10);
-        if (end == p || parsed < 2 || parsed > UINT16_MAX ||
-            product > UCC_RANK_MAX / parsed) {
-            return UCC_ERR_INVALID_PARAM;
-        }
-        radices[n++] = (ucc_kn_radix_t)parsed;
-        product *= (ucc_rank_t)parsed;
-        if (*end == '\0') {
-            break;
-        }
-        if (*end != ',' || end[1] == '\0') {
-            return UCC_ERR_INVALID_PARAM;
-        }
-        p = end + 1;
-    }
-
-    if (product != team_size) {
-        return UCC_ERR_INVALID_PARAM;
-    }
-    *nradices = n;
-    return UCC_OK;
-}
-
-#define UCC_TL_UCP_ALLGATHER_KN_LARGE_MSG_SIZE (1ull << 30)
 #define UCC_TL_UCP_ALLGATHER_KN_MAX_AUTO_RADIX 9
 
 /* Powers of two first, then remaining radices descending. */
@@ -124,22 +79,22 @@ static int ucc_tl_ucp_allgather_knomial_factor_large_msg(
 }
 
 int ucc_tl_ucp_allgather_knomial_select_radices(
-    ucc_rank_t team_size, size_t msg_size, ucc_kn_radix_t *radix,
-    ucc_kn_radix_t *radices, uint8_t *nradices)
+    ucc_rank_t team_size, size_t msg_size,
+    ucc_kn_radix_schedule_t *schedule)
 {
     ucc_kn_radix_t current[UCC_KN_MAX_RADIX_PHASES];
     uint8_t        nphases;
     uint8_t        i;
 
-    *nradices = 0;
+    schedule->n_radices = 0;
     if (team_size < 2) {
         return 0;
     }
 
     if (msg_size >= UCC_TL_UCP_ALLGATHER_KN_LARGE_MSG_SIZE) {
         if (!ucc_tl_ucp_allgather_knomial_factor_large_msg(
-                team_size, radices, nradices)) {
-            *nradices = 0;
+                team_size, schedule->radices, &schedule->n_radices)) {
+            schedule->n_radices = 0;
             return 0;
         }
     } else {
@@ -149,23 +104,23 @@ int ucc_tl_ucp_allgather_knomial_select_radices(
             unsigned best_fanout = UINT_MAX;
 
             ucc_tl_ucp_allgather_knomial_search_small_msg(
-                team_size, 0, current, 0, nphases, 0, radices, &best_fanout);
+                team_size, 0, current, 0, nphases, 0, schedule->radices,
+                &best_fanout);
             if (best_fanout != UINT_MAX) {
-                *nradices = nphases;
+                schedule->n_radices = nphases;
                 break;
             }
         }
-        if (*nradices == 0) {
+        if (schedule->n_radices == 0) {
             return 0;
         }
     }
 
-    for (i = 1; i < *nradices; i++) {
-        if (radices[i] != radices[0]) {
+    for (i = 1; i < schedule->n_radices; i++) {
+        if (schedule->radices[i] != schedule->radices[0]) {
             return 1;
         }
     }
-    *radix    = radices[0];
-    *nradices = 0;
+    schedule->n_radices = 1;
     return 1;
 }

@@ -168,17 +168,11 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatter_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"ALLGATHER_KN_RADIX", "auto", "Radix of the knomial allgather algorithm",
+    {"ALLGATHER_KN_RADIX", "auto",
+     "Radix or ordered exact radix schedule of the knomial allgather "
+     "algorithm, for example 4 or 8x6",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allgather_kn_radix),
-     UCC_CONFIG_TYPE_UINT_RANGED},
-
-    {"ALLGATHER_KN_MIXED_RADICES", "",
-     "Knomial allgather schedule: empty preserves legacy radix selection, "
-     "'auto' selects a message-size-aware exact schedule, and a comma-separated "
-     "list such as 4,4,6 requests that exact schedule. Explicit radices must be "
-     "at least 2 and their product must equal the team size",
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, allgather_kn_mixed_radices),
-     UCC_CONFIG_TYPE_STRING},
+     UCC_CONFIG_TYPE_KN_RADIX},
 
     {"BCAST_KN_RADIX", "4", "Radix of the recursive-knomial bcast algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_kn_radix),

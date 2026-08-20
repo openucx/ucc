@@ -101,11 +101,9 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
     ucc_coll_task_t **task_h, ucc_kn_radix_t radix);
 
-ucc_status_t ucc_tl_ucp_allgather_knomial_parse_radices(
-    const char *value, ucc_rank_t team_size, ucc_kn_radix_t *radices,
-    uint8_t *nradices);
+#define UCC_TL_UCP_ALLGATHER_KN_LARGE_MSG_SIZE (1ull << 30)
 
 int ucc_tl_ucp_allgather_knomial_select_radices(
-    ucc_rank_t team_size, size_t msg_size, ucc_kn_radix_t *radix,
-    ucc_kn_radix_t *radices, uint8_t *nradices);
+    ucc_rank_t team_size, size_t msg_size,
+    ucc_kn_radix_schedule_t *schedule);
 #endif

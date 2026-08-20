@@ -7,12 +7,9 @@
 #ifndef RECURSIVE_KNOMIAL_H_
 #define RECURSIVE_KNOMIAL_H_
 
-#include <limits.h>
+#include "utils/ucc_datastruct.h"
 
 #define UCC_KN_PEER_NULL ((ucc_rank_t)-1)
-/* An exact schedule of radix >= 2 cannot have more phases than this. */
-#define UCC_KN_MAX_RADIX_PHASES (sizeof(ucc_rank_t) * CHAR_BIT - 1)
-typedef uint16_t ucc_kn_radix_t;
 
 enum {
     KN_NODE_BASE,  /* Participates in the main loop of the recursive KN algorithm */
@@ -58,8 +55,7 @@ typedef struct ucc_knomial_pattern {
     ucc_rank_t     block_size;
     ptrdiff_t      block_offset;
     int            is64;
-    uint8_t        is_mixed;
-    ucc_kn_radix_t radices[UCC_KN_MAX_RADIX_PHASES];
+    const ucc_kn_radix_t *radices;
 } ucc_knomial_pattern_t;
 
 /**
@@ -107,7 +103,7 @@ ucc_knomial_pattern_init_impl(ucc_rank_t size, ucc_rank_t rank,
     p->rank          = rank;
     p->backward      = backward;
     p->iteration     = 0;
-    p->is_mixed      = 0;
+    p->radices       = NULL;
     n_full_subtrees  = ucc_kn_pattern_n_full(p);
     p->n_extra       = has_extra ? size - n_full_subtrees * p->full_pow_size : 0;
     p->n_iters       = (p->n_extra && n_full_subtrees == 1) ?
@@ -236,7 +232,7 @@ ucc_knomial_pattern_next_iteration(ucc_knomial_pattern_t *p)
 {
     p->iteration++;
     p->radix_pow *= p->radix;
-    if (p->is_mixed && !ucc_knomial_pattern_loop_done(p)) {
+    if (p->radices && !ucc_knomial_pattern_loop_done(p)) {
         p->radix = p->radices[p->iteration];
     }
 }

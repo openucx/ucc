@@ -7,50 +7,16 @@ extern "C" {
 #include "utils/ucc_coll_utils.h"
 #include "coll_patterns/sra_knomial.h"
 
-ucc_status_t ucc_tl_ucp_allgather_knomial_parse_radices(
-    const char *value, ucc_rank_t team_size, ucc_kn_radix_t *radices,
-    uint8_t *nradices);
-
 int ucc_tl_ucp_allgather_knomial_select_radices(
-    ucc_rank_t team_size, size_t msg_size, ucc_kn_radix_t *radix,
-    ucc_kn_radix_t *radices, uint8_t *nradices);
+    ucc_rank_t team_size, size_t msg_size,
+    ucc_kn_radix_schedule_t *schedule);
 }
 
 #include <common/test.h>
-#include <sstream>
 #include <vector>
 
 class test_knomial_schedule : public ucc::test {
   protected:
-    static void expect_parse_status(
-        const char *value, ucc_rank_t size, ucc_status_t expected)
-    {
-        ucc_kn_radix_t radices[UCC_KN_MAX_RADIX_PHASES];
-        uint8_t        nradices;
-
-        EXPECT_EQ(
-            expected,
-            ucc_tl_ucp_allgather_knomial_parse_radices(
-                value, size, radices, &nradices));
-    }
-
-    static void expect_valid(
-        const char *value, ucc_rank_t size,
-        const std::vector<ucc_kn_radix_t> &expected)
-    {
-        ucc_kn_radix_t radices[UCC_KN_MAX_RADIX_PHASES];
-        uint8_t        nradices;
-
-        ASSERT_EQ(
-            UCC_OK,
-            ucc_tl_ucp_allgather_knomial_parse_radices(
-                value, size, radices, &nradices));
-        ASSERT_EQ(expected.size(), nradices);
-        for (size_t i = 0; i < expected.size(); i++) {
-            EXPECT_EQ(expected[i], radices[i]);
-        }
-    }
-
     static void expect_mixed_pattern(
         ucc_rank_t size, const std::vector<ucc_kn_radix_t> &radices)
     {
@@ -58,9 +24,9 @@ class test_knomial_schedule : public ucc::test {
             ucc_knomial_pattern_t p;
             ucc_rank_t            phase_size = 1;
 
-            ucc_kn_ag_pattern_init_mixed(
-                size, rank, size, radices.data(), radices.size(), &p);
-            ASSERT_TRUE(p.is_mixed);
+            ucc_kn_ag_pattern_init(size, rank, radices[0], radices.data(),
+                                   radices.size(), size, &p);
+            ASSERT_EQ(radices.data(), p.radices);
             ASSERT_EQ(radices.size(), p.n_iters);
             ASSERT_EQ(0, p.n_extra);
             for (size_t phase = 0; phase < radices.size(); phase++) {
@@ -94,55 +60,19 @@ class test_knomial_schedule : public ucc::test {
     }
 
     static void expect_selection(
-        ucc_rank_t size, size_t msg_size, ucc_kn_radix_t expected_fixed_radix,
-        const std::vector<ucc_kn_radix_t> &expected_radices)
+        ucc_rank_t size, size_t msg_size,
+        const std::vector<ucc_kn_radix_t> &expected)
     {
-        ucc_kn_radix_t radices[UCC_KN_MAX_RADIX_PHASES];
-        ucc_kn_radix_t radix;
-        uint8_t        nradices;
+        ucc_kn_radix_schedule_t schedule;
 
         ASSERT_TRUE(ucc_tl_ucp_allgather_knomial_select_radices(
-            size, msg_size, &radix, radices, &nradices));
-        ASSERT_EQ(expected_radices.size(), nradices);
-        if (nradices == 0) {
-            EXPECT_EQ(expected_fixed_radix, radix);
-        }
-        for (size_t i = 0; i < expected_radices.size(); i++) {
-            EXPECT_EQ(expected_radices[i], radices[i]);
+            size, msg_size, &schedule));
+        ASSERT_EQ(expected.size(), schedule.n_radices);
+        for (size_t i = 0; i < expected.size(); i++) {
+            EXPECT_EQ(expected[i], schedule.radices[i]);
         }
     }
 };
-
-UCC_TEST_F(test_knomial_schedule, parse_valid_exact_schedules)
-{
-    expect_valid("8,6", 48, {8, 6});
-    expect_valid("8,9", 72, {8, 9});
-    expect_valid("3,3,2,2,2", 72, {3, 3, 2, 2, 2});
-    expect_valid("4,4,6", 96, {4, 4, 6});
-}
-
-UCC_TEST_F(test_knomial_schedule, parse_invalid_tokens_and_radices)
-{
-    expect_parse_status("", 96, UCC_ERR_NOT_FOUND);
-    expect_parse_status("4,x,6", 96, UCC_ERR_INVALID_PARAM);
-    expect_parse_status("4,0,6", 96, UCC_ERR_INVALID_PARAM);
-    expect_parse_status("4,1,6", 96, UCC_ERR_INVALID_PARAM);
-    expect_parse_status("4,4,4", 96, UCC_ERR_INVALID_PARAM);
-    expect_parse_status("4,4,6,", 96, UCC_ERR_INVALID_PARAM);
-    expect_parse_status("65536", 65536, UCC_ERR_INVALID_PARAM);
-    expect_parse_status("65535,65535,2", 2, UCC_ERR_INVALID_PARAM);
-}
-
-UCC_TEST_F(test_knomial_schedule, parse_overlong_schedule)
-{
-    std::ostringstream value;
-
-    for (unsigned i = 0; i <= UCC_KN_MAX_RADIX_PHASES; i++) {
-        value << (i ? ",2" : "2");
-    }
-    expect_parse_status(
-        value.str().c_str(), UCC_RANK_MAX, UCC_ERR_INVALID_PARAM);
-}
 
 UCC_TEST_F(test_knomial_schedule, fixed_pattern_preserves_legacy_layout)
 {
@@ -155,8 +85,8 @@ UCC_TEST_F(test_knomial_schedule, fixed_pattern_preserves_legacy_layout)
                 ucc_knomial_pattern_t p;
                 ucc_rank_t            legacy_radix_pow = 1;
 
-                ucc_kn_ag_pattern_init(size, rank, radix, size, &p);
-                ASSERT_FALSE(p.is_mixed);
+                ucc_kn_ag_pattern_init(size, rank, radix, NULL, 0, size, &p);
+                ASSERT_EQ(nullptr, p.radices);
                 for (uint8_t phase = 0; phase < p.n_iters; phase++) {
                     ucc_rank_t n_full               = size / p.full_pow_size;
                     ucc_rank_t legacy_segment_radix = radix;
@@ -207,28 +137,27 @@ UCC_TEST_F(test_knomial_schedule, mixed_peer_and_segment_layout)
 
 UCC_TEST_F(test_knomial_schedule, selector_minimizes_small_message_fanout)
 {
-    expect_selection(48, 1 << 20, 0, {8, 6});
-    expect_selection(60, 1 << 20, 0, {4, 5, 3});
-    expect_selection(64, 1 << 20, 8, {});
-    expect_selection(72, 1 << 20, 0, {8, 9});
-    expect_selection(96, 1 << 20, 0, {4, 4, 6});
-    expect_selection(128, (1ull << 30) - 1, 0, {8, 4, 4});
+    expect_selection(48, 1 << 20, {8, 6});
+    expect_selection(60, 1 << 20, {4, 5, 3});
+    expect_selection(64, 1 << 20, {8});
+    expect_selection(72, 1 << 20, {8, 9});
+    expect_selection(96, 1 << 20, {4, 4, 6});
+    expect_selection(128, (1ull << 30) - 1, {8, 4, 4});
 }
 
 UCC_TEST_F(test_knomial_schedule, selector_uses_r2_for_large_messages)
 {
-    expect_selection(96, 1ull << 30, 0, {2, 2, 2, 2, 2, 3});
-    expect_selection(128, 1ull << 30, 2, {});
+    expect_selection(96, 1ull << 30, {2, 2, 2, 2, 2, 3});
+    expect_selection(128, 1ull << 30, {2});
 }
 
 UCC_TEST_F(test_knomial_schedule, selector_handles_odd_factors_and_fallback)
 {
-    ucc_kn_radix_t radices[UCC_KN_MAX_RADIX_PHASES];
-    ucc_kn_radix_t radix;
-    uint8_t        nradices;
+    ucc_kn_radix_schedule_t schedule;
 
-    expect_selection(25, 1 << 20, 5, {});
-    expect_selection(35, 1 << 20, 0, {7, 5});
+    expect_selection(25, 1 << 20, {5});
+    expect_selection(35, 1 << 20, {7, 5});
     EXPECT_FALSE(ucc_tl_ucp_allgather_knomial_select_radices(
-        11, 1 << 20, &radix, radices, &nradices));
+        11, 1 << 20, &schedule));
+    EXPECT_EQ(0, schedule.n_radices);
 }
