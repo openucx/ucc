@@ -247,7 +247,6 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     if (ct == UCC_COLL_TYPE_ALLGATHER) {
         ucc_kn_ag_pattern_init(size, rank, radix, p->radices, p->n_iters,
                                args->dst.info.count, p);
-        radix  = p->radix;
         offset = ucc_buffer_block_offset(args->dst.info.count, size, rank) *
                  ucc_dt_size(args->dst.info.datatype);
         rbuf   = args->dst.info.buffer;
