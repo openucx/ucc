@@ -140,8 +140,10 @@ function main() {
     fi
 
     echo "Uploading to synopsys main coverity server"
+    set +x -v
     cov-commit-defects --ssl --on-new-cert trust --host coverity.mellanox.com --port 8443 \
     --user "${UCC_USERNAME}" --password "${UCC_PASSWORD}" --dir "$COV_BUILD_DIR" --stream ucc_master
+    set +v -x
     return 0
 }
 
