@@ -100,6 +100,7 @@ typedef struct ucc_context_config {
     uint32_t                  throttle_progress;
     ucs_config_names_array_t  net_devices;
     unsigned long             node_local_id;
+    int                       auto_node_local_id;
 } ucc_context_config_t;
 
 typedef struct ucc_mem_map_tl_t {

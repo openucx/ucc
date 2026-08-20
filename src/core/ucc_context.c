@@ -71,6 +71,12 @@ static ucc_config_field_t ucc_context_config_table[] = {
      "before the next begins).",
      ucc_offsetof(ucc_context_config_t, node_local_id), UCC_CONFIG_TYPE_ULUNITS},
 
+    {"AUTO_NODE_LOCAL_ID", "n",
+     "Discover node-local rank via prefix ctx_id/host allgather and topo.\n"
+     "Applies when NODE_LOCAL_ID=auto and multi-rank OOB is present.",
+     ucc_offsetof(ucc_context_config_t, auto_node_local_id),
+     UCC_CONFIG_TYPE_BOOL},
+
     {NULL}};
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
                           ucc_context_config_t, &ucc_config_global_list);
@@ -931,7 +937,8 @@ ucc_status_t ucc_context_create_proc_info(
     ctx->id.pi      = *proc_info;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
 
-    if (config->node_local_id == UCC_ULUNITS_AUTO) {
+    if (config->auto_node_local_id &&
+        config->node_local_id == UCC_ULUNITS_AUTO) {
         if ((params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) &&
             params->oob.n_oob_eps == 1) {
             /* Single-rank OOB: no allgather; local rank on the node is 0. */
