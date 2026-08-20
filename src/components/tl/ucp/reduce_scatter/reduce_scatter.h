@@ -19,7 +19,9 @@ extern ucc_base_coll_alg_info_t
     ucc_tl_ucp_reduce_scatter_algs[UCC_TL_UCP_REDUCE_SCATTER_ALG_LAST + 1];
 
 #define UCC_TL_UCP_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR                       \
-    "reduce_scatter:@ring"
+    "reduce_scatter:@%d"
+
+char *ucc_tl_ucp_reduce_scatter_score_str_get(ucc_tl_ucp_team_t *team);
 
 static inline int ucc_tl_ucp_reduce_scatter_alg_from_str(const char *str)
 {
@@ -48,4 +50,9 @@ ucc_status_t
 ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
                                     ucc_base_team_t *     team,
                                     ucc_coll_task_t **    task_h);
+
+ucc_status_t ucc_tl_ucp_reduce_scatter_ring_init_common(
+    ucc_tl_ucp_task_t *task);
+
+void ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task);
 #endif
