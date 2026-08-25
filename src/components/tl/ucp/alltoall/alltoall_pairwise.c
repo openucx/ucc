@@ -12,8 +12,37 @@
 #include "tl_ucp_sendrecv.h"
 
 /* TODO: add as parameters */
-#define MSG_MEDIUM 66000
-#define NP_THRESH 32
+#define TOTAL_MSG_MEDIUM 66000
+#define PEER_MSG_SMALL   (64 * 1024)
+#define PEER_MSG_MEDIUM  (1 * 1024 * 1024)
+#define PEER_MSG_LARGE   (4 * 1024 * 1024)
+#define PEER_MSG_XLARGE  (8 * 1024 * 1024)
+
+static ucc_rank_t auto_num_posts(ucc_rank_t tsize, size_t total_size,
+                                 size_t peer_size)
+{
+    if (total_size <= TOTAL_MSG_MEDIUM) {
+        return tsize;
+    }
+
+    if (peer_size <= PEER_MSG_SMALL) {
+        return ucc_min(tsize, 32);
+    }
+
+    if (peer_size <= PEER_MSG_MEDIUM) {
+        return ucc_min(tsize, 16);
+    }
+
+    if (peer_size <= PEER_MSG_LARGE) {
+        return tsize <= 16 ? tsize : 8;
+    }
+
+    if (peer_size <= PEER_MSG_XLARGE || tsize <= 32) {
+        return ucc_min(tsize, 4);
+    }
+
+    return 1;
+}
 
 static inline ucc_rank_t get_recv_peer(ucc_rank_t rank, ucc_rank_t size,
                                        ucc_rank_t step)
@@ -32,18 +61,13 @@ static ucc_rank_t get_num_posts(const ucc_tl_ucp_team_t *team,
 {
     unsigned long posts = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoall_pairwise_num_posts;
     ucc_rank_t    tsize = UCC_TL_TEAM_SIZE(team);
-    size_t data_size;
+    size_t        dt_size, data_size, peer_size;
 
-    data_size = (size_t)args->src.info.count *
-                ucc_dt_size(args->src.info.datatype);
+    dt_size   = ucc_dt_size(args->src.info.datatype);
+    data_size = (size_t)args->src.info.count * dt_size;
+    peer_size = (size_t)(args->src.info.count / tsize) * dt_size;
     if (posts == UCC_ULUNITS_AUTO) {
-        if ((data_size > MSG_MEDIUM) && (tsize > NP_THRESH)) {
-            /* use pairwise algorithm */
-            posts = 1;
-        } else {
-            /* use linear algorithm */
-            posts = 0;
-        }
+        posts = auto_num_posts(tsize, data_size, peer_size);
     }
 
     posts = (posts > tsize || posts == 0) ? tsize: posts;
