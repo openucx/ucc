@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -7,42 +7,10 @@
 #include "config.h"
 #include "tl_ucp.h"
 #include "alltoall.h"
+#include "alltoall_pairwise_num_posts.h"
 #include "core/ucc_progress_queue.h"
 #include "utils/ucc_math.h"
 #include "tl_ucp_sendrecv.h"
-
-/* TODO: add as parameters */
-#define TOTAL_MSG_MEDIUM 66000
-#define PEER_MSG_SMALL   (64 * 1024)
-#define PEER_MSG_MEDIUM  (1 * 1024 * 1024)
-#define PEER_MSG_LARGE   (4 * 1024 * 1024)
-#define PEER_MSG_XLARGE  (8 * 1024 * 1024)
-
-static ucc_rank_t auto_num_posts(ucc_rank_t tsize, size_t total_size,
-                                 size_t peer_size)
-{
-    if (total_size <= TOTAL_MSG_MEDIUM) {
-        return tsize;
-    }
-
-    if (peer_size <= PEER_MSG_SMALL) {
-        return ucc_min(tsize, 32);
-    }
-
-    if (peer_size <= PEER_MSG_MEDIUM) {
-        return ucc_min(tsize, 16);
-    }
-
-    if (peer_size <= PEER_MSG_LARGE) {
-        return tsize <= 16 ? tsize : 8;
-    }
-
-    if (peer_size <= PEER_MSG_XLARGE || tsize <= 32) {
-        return ucc_min(tsize, 4);
-    }
-
-    return 1;
-}
 
 static inline ucc_rank_t get_recv_peer(ucc_rank_t rank, ucc_rank_t size,
                                        ucc_rank_t step)
@@ -67,7 +35,8 @@ static ucc_rank_t get_num_posts(const ucc_tl_ucp_team_t *team,
     data_size = (size_t)args->src.info.count * dt_size;
     peer_size = (size_t)(args->src.info.count / tsize) * dt_size;
     if (posts == UCC_ULUNITS_AUTO) {
-        posts = auto_num_posts(tsize, data_size, peer_size);
+        posts = ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
+            tsize, data_size, peer_size);
     }
 
     posts = (posts > tsize || posts == 0) ? tsize: posts;
