@@ -1019,7 +1019,7 @@ static int ucc_config_parse_kn_radix(const char *buf,
     char         *end;
     unsigned long radix;
 
-    schedule->n_radices = 0;
+    *schedule = (ucc_kn_radix_schedule_t){0};
     if (!strcasecmp(buf, UCS_VALUE_AUTO_STR)) {
         return 1;
     }
@@ -1059,7 +1059,7 @@ int ucc_config_sscanf_kn_radix(const char *buf, void *dest,
     int                          have_value;
 
     ucc_list_head_init(&p->ranges);
-    p->default_value.n_radices = 0;
+    p->default_value = (ucc_kn_radix_schedule_t){0};
     if (buf[0] == '\0') {
         return 0;
     }
@@ -1135,6 +1135,7 @@ err:
 static void ucc_config_sprintf_kn_radix_value(
     char *buf, size_t max, const ucc_kn_radix_schedule_t *schedule)
 {
+    char    value[MAX_KN_RADIX_STR];
     size_t  offset = 0;
     uint8_t i;
 
@@ -1143,9 +1144,11 @@ static void ucc_config_sprintf_kn_radix_value(
         return;
     }
     for (i = 0; i < schedule->n_radices; i++) {
-        offset += ucc_snprintf_safe(buf + offset, max - offset, "%s%u",
-                                    i ? "x" : "", schedule->radices[i]);
+        offset += ucc_snprintf_safe(value + offset, sizeof(value) - offset,
+                                    "%s%u", i ? "x" : "",
+                                    schedule->radices[i]);
     }
+    ucc_snprintf_safe(buf, max, "%s", value);
 }
 
 int ucc_config_sprintf_kn_radix(char *buf, size_t max, const void *src,
@@ -1158,6 +1161,10 @@ int ucc_config_sprintf_kn_radix(char *buf, size_t max, const void *src,
     char tmp_end[MAX_TMP_BUF_LENGTH];
     char tmp_mtypes[MAX_TMP_BUF_LENGTH];
     size_t last;
+
+    if (max == 0) {
+        return 1;
+    }
 
     ucc_list_for_each(r, &s->ranges, list_elem) {
         ucc_config_sprintf_kn_radix_value(value, sizeof(value), &r->value);

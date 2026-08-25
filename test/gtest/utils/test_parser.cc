@@ -81,6 +81,9 @@ class test_parse_kn_radix : public ucc::test {
         for (size_t i = 0; i < expected.size(); i++) {
             EXPECT_EQ(expected[i], schedule->radices[i]);
         }
+        for (size_t i = expected.size(); i < UCC_KN_MAX_RADIX_PHASES; i++) {
+            EXPECT_EQ(0, schedule->radices[i]);
+        }
     }
 };
 
@@ -133,6 +136,28 @@ UCC_TEST_F(test_parse_kn_radix, overlong_schedule)
         value << (i ? "x2" : "2");
     }
     EXPECT_FALSE(ucc_config_sscanf_kn_radix(value.str().c_str(), &p, NULL));
+}
+
+UCC_TEST_F(test_parse_kn_radix, maximum_schedule_format_bounds)
+{
+    const size_t          bounds[] = {1, 8, 126};
+    ucc_mrange_kn_radix_t p;
+    std::ostringstream    value;
+
+    for (unsigned i = 0; i < UCC_KN_MAX_RADIX_PHASES; i++) {
+        value << (i ? "x65535" : "65535");
+    }
+    ASSERT_TRUE(ucc_config_sscanf_kn_radix(value.str().c_str(), &p, NULL));
+    for (auto max : bounds) {
+        std::vector<char> buffer(max + 2, '#');
+
+        EXPECT_TRUE(ucc_config_sprintf_kn_radix(buffer.data() + 1, max, &p,
+                                                NULL));
+        EXPECT_EQ('#', buffer.front());
+        EXPECT_EQ('#', buffer.back());
+        EXPECT_EQ('\0', buffer[max]);
+    }
+    ucc_mrange_kn_radix_destroy(&p);
 }
 
 UCC_TEST_F(test_parse_kn_radix, clone)

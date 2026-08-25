@@ -245,7 +245,9 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     task->allgather_kn.copy_task = NULL;
     task->allgather_kn.phase     = UCC_KN_PHASE_INIT;
     if (ct == UCC_COLL_TYPE_ALLGATHER) {
-        ucc_kn_ag_pattern_init(size, rank, radix, p->radices, p->n_iters,
+        ucc_kn_ag_pattern_init(size, rank,
+                               p->radices ? p->radices : &radix,
+                               p->radices ? p->n_iters : 1,
                                args->dst.info.count, p);
         offset = ucc_buffer_block_offset(args->dst.info.count, size, rank) *
                  ucc_dt_size(args->dst.info.datatype);

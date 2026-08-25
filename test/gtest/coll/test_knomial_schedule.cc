@@ -20,8 +20,8 @@ class test_knomial_schedule : public ucc::test {
             ucc_knomial_pattern_t p;
             ucc_rank_t            phase_size = 1;
 
-            ucc_kn_ag_pattern_init(size, rank, radices[0], radices.data(),
-                                   radices.size(), size, &p);
+            ucc_kn_ag_pattern_init(size, rank, radices.data(), radices.size(),
+                                   size, &p);
             ASSERT_EQ(radices.data(), p.radices);
             ASSERT_EQ(radices.size(), p.n_iters);
             ASSERT_EQ(0, p.n_extra);
@@ -67,7 +67,7 @@ UCC_TEST_F(test_knomial_schedule, fixed_pattern_preserves_legacy_layout)
                 ucc_knomial_pattern_t p;
                 ucc_rank_t            legacy_radix_pow = 1;
 
-                ucc_kn_ag_pattern_init(size, rank, radix, NULL, 0, size, &p);
+                ucc_kn_ag_pattern_init(size, rank, &radix, 1, size, &p);
                 ASSERT_EQ(nullptr, p.radices);
                 for (uint8_t phase = 0; phase < p.n_iters; phase++) {
                     ucc_rank_t n_full               = size / p.full_pow_size;
