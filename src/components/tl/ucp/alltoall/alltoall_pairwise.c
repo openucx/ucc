@@ -29,14 +29,13 @@ static ucc_rank_t get_num_posts(const ucc_tl_ucp_team_t *team,
 {
     unsigned long posts = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoall_pairwise_num_posts;
     ucc_rank_t    tsize = UCC_TL_TEAM_SIZE(team);
-    size_t        dt_size, data_size, peer_size;
+    size_t        dt_size, peer_size;
 
     dt_size   = ucc_dt_size(args->src.info.datatype);
-    data_size = (size_t)args->src.info.count * dt_size;
     peer_size = (size_t)(args->src.info.count / tsize) * dt_size;
     if (posts == UCC_ULUNITS_AUTO) {
         posts = ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
-            tsize, data_size, peer_size);
+            tsize, peer_size);
     }
 
     posts = (posts > tsize || posts == 0) ? tsize: posts;

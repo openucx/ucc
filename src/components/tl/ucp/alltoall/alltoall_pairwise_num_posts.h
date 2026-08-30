@@ -9,7 +9,6 @@
 
 #include "utils/ucc_math.h"
 
-#define UCC_TL_UCP_ALLTOALL_TOTAL_SMALL 66000
 #define UCC_TL_UCP_ALLTOALL_PEER_64K    (64 * 1024)
 #define UCC_TL_UCP_ALLTOALL_PEER_1M     (1 * 1024 * 1024)
 #define UCC_TL_UCP_ALLTOALL_PEER_4M     (4 * 1024 * 1024)
@@ -21,10 +20,9 @@
  */
 static inline ucc_rank_t
 ucc_tl_ucp_alltoall_pairwise_auto_num_posts(ucc_rank_t tsize,
-                                             size_t total_size,
                                              size_t peer_size)
 {
-    if (total_size <= UCC_TL_UCP_ALLTOALL_TOTAL_SMALL || tsize <= 8) {
+    if (tsize <= 8) {
         return tsize;
     }
 
@@ -44,7 +42,7 @@ ucc_tl_ucp_alltoall_pairwise_auto_num_posts(ucc_rank_t tsize,
         return ucc_min(tsize, 4);
     }
 
-    return tsize <= 32 ? 4 : 1;
+    return 1;
 }
 
 #endif
