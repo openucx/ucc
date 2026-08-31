@@ -218,6 +218,9 @@ typedef struct ucc_tl_ucp_task {
         struct {
             uint32_t                tokens;
             uint32_t                npolls;
+            uint32_t                nfrags;
+            ucc_rank_t              n_local;
+            ucc_rank_t             *peer_order;
         } alltoall_onesided;
         char                        plugin_data[UCC_TL_UCP_TASK_PLUGIN_MAX_DATA];
     };
