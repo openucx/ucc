@@ -811,12 +811,6 @@ TYPED_TEST(test_allreduce_alg, sra_explicit_single_node_aggressive_pipelined)
     }
 }
 
-/* Cases 4 + 5 combined: explicit override bypasses topology guard regardless
- * of state. The code at line 187-190 (allreduce_sra_knomial.c) returns early
- * before the topology check at line 217, proving override honors user intent
- * whether topo is missing or multi-node. On localhost we verify correctness;
- * in a multi-node environment this same test would prove override works when
- * topo indicates nnodes > 1 (the topology guard cannot block it). */
 TYPED_TEST(test_allreduce_alg, sra_override_bypasses_topology)
 {
     int           n_procs = 8;
@@ -855,9 +849,6 @@ TYPED_TEST(test_allreduce_alg, sra_override_bypasses_topology)
     }
 }
 
-/* Non-host preservation: CUDA non-host memory takes default behavior.
- * This verifies no regression from the topology guard changes in the
- * device-memory fallback path (line 244-253). */
 TYPED_TEST(test_allreduce_alg, sra_cuda_nonhost_unchanged)
 {
     int           n_procs = 8;

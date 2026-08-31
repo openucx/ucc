@@ -10,12 +10,8 @@
 #include "components/base/ucc_base_iface.h"
 
 #define UCC_SCHEDULE_FRAG_MAX_TASKS 8
-/* Upper bound on concurrently in-flight pipeline fragments. This sizes the
-   inline frags[] array below, so raising it grows every embedding schedule
-   object (tl_ucp/cl_hier) by 8 bytes per entry. Was 4; raised to 16 to allow
-   pipeline-depth sweeps up to 16. Depth is clamped to this value rather than
-   rejected, see ucc_schedule_pipelined_init(). */
-#define UCC_SCHEDULE_PIPELINED_MAX_FRAGS 16
+
+#define UCC_SCHEDULE_PIPELINED_MAX_FRAGS 4
 
 typedef struct ucc_schedule_pipelined ucc_schedule_pipelined_t;
 

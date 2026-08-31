@@ -215,20 +215,6 @@ void ucc_tl_ucp_allreduce_sra_knomial_select_pipeline_params(
         pp->order     = UCC_PIPELINE_PARALLEL;
         pp->pdepth    = 2;
     } else if (args->dst.info.mem_type == UCC_MEMORY_TYPE_HOST) {
-        /* Key off dst.info.mem_type: for in-place calls src.info is not the
-         * active buffer and is commonly UCC_MEMORY_TYPE_UNKNOWN, while dst is
-         * always the authoritative type (see CHECK_SAME_MEMTYPE, which only
-         * ties src==dst for out-of-place). */
-        /* Multi-node guard (fail-closed): on a cross-node IB fabric the
-         * pipeline's concurrent fragments compete for NIC bandwidth; the
-         * fragmentation overhead outweighs the RS-AG overlap gain. Measured
-         * -15% to -59% at 8-112 PPN on gaia 4-node (DC transport, 1-16 MB).
-         *
-         * REQUIREMENT: automatic pipelining MUST require positive confirmation
-         * that the team is single-node. Missing topology (NULL) and known
-         * multi-node both select the monolithic path. User override via
-         * UCC_TL_UCP_ALLREDUCE_SRA_KN_PIPELINE can enable pipelining regardless
-         * of topology state. */
         if (topo_nnodes != 1) {
             /* Missing topo OR known multi-node: fail-closed -> monolithic */
             pp->threshold = SIZE_MAX;
@@ -247,14 +233,12 @@ void ucc_tl_ucp_allreduce_sra_knomial_select_pipeline_params(
 
         pp->threshold = 262144; /* start pipelining above 256KB */
         pp->frag_size = 524288; /* ~512KB fragments: fewer/larger frags beat
-                                   256KB by 6-17% at >=1MB across 2-256 ranks
-                                   (thor sweep), tie below, no regression */
+                                   256KB by 6-17% at >=1MB across */
         pp->n_frags   = 2; /* floor: at least 2 frags once over threshold */
         pp->order     = UCC_PIPELINE_PARALLEL;
         /* Pipeline depth scales with fragment count: 2 in flight is optimal up
          * to 1MB (<=2 frags of 512KB), but once >=4 fragments exist (>=2MB) a
-         * 4-deep pipeline adds 6-23% across 8-64 ranks (thor hi-rank sweep,
-         * depths 2/3/4). Depth 3 was never uniquely best. */
+         * 4-deep pipeline adds 6-23% */
         pp->pdepth    = (total >= 4 * pp->frag_size) ? 4 : 2;
     } else {
         /* Non-host, non-CUDA-inplace (e.g. out-of-place CUDA): keep the
