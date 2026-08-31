@@ -74,15 +74,15 @@ UCC_TEST_F(test_parse_mrange, check_range_multiple) {
 class test_parse_kn_radix : public ucc::test {
   protected:
     static void expect_schedule(
-        const ucc_kn_radix_schedule_t *schedule,
+        const ucc_kn_radix_seq_t *seq,
         const std::vector<ucc_kn_radix_t> &expected)
     {
-        ASSERT_EQ(expected.size(), schedule->n_radices);
+        ASSERT_EQ(expected.size(), seq->n_radices);
         for (size_t i = 0; i < expected.size(); i++) {
-            EXPECT_EQ(expected[i], schedule->radices[i]);
+            EXPECT_EQ(expected[i], seq->radices[i]);
         }
         for (size_t i = expected.size(); i < UCC_KN_MAX_RADIX_PHASES; i++) {
-            EXPECT_EQ(0, schedule->radices[i]);
+            EXPECT_EQ(0, seq->radices[i]);
         }
     }
 };

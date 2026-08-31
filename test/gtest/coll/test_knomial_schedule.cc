@@ -8,6 +8,7 @@ extern "C" {
 #include "coll_patterns/sra_knomial.h"
 }
 
+#include <algorithm>
 #include <common/test.h>
 #include <vector>
 
@@ -16,15 +17,22 @@ class test_knomial_schedule : public ucc::test {
     static void expect_mixed_pattern(
         ucc_rank_t size, const std::vector<ucc_kn_radix_t> &radices)
     {
+        ucc_kn_radix_seq_t radix_seq = {};
+
+        ASSERT_LE(radices.size(), UCC_KN_MAX_RADIX_PHASES);
+        radix_seq.n_radices = static_cast<uint8_t>(radices.size());
+        std::copy(radices.begin(), radices.end(), radix_seq.radices);
         for (ucc_rank_t rank = 0; rank < size; rank++) {
             ucc_knomial_pattern_t p;
             ucc_rank_t            phase_size = 1;
 
-            ucc_kn_ag_pattern_init(size, rank, radices.data(), radices.size(),
-                                   size, &p);
-            ASSERT_EQ(radices.data(), p.radices);
+            ucc_kn_ag_pattern_init(size, rank, radix_seq.radices[0],
+                                   &radix_seq, size, &p);
+            ASSERT_EQ(&radix_seq, p.radix_seq);
             ASSERT_EQ(radices.size(), p.n_iters);
+            ASSERT_EQ(size, p.full_pow_size);
             ASSERT_EQ(0, p.n_extra);
+            ASSERT_EQ(KN_NODE_BASE, p.node_type);
             for (size_t phase = 0; phase < radices.size(); phase++) {
                 ucc_kn_radix_t radix      = radices[phase];
                 ucc_rank_t     group_size = phase_size * radix;
@@ -52,6 +60,12 @@ class test_knomial_schedule : public ucc::test {
             }
             EXPECT_TRUE(ucc_knomial_pattern_loop_done(&p));
             EXPECT_EQ(size, phase_size);
+
+            ucc_kn_ag_pattern_init(size, rank, radix_seq.radices[0],
+                                   &radix_seq, size, &p);
+            EXPECT_EQ(0, p.iteration);
+            EXPECT_EQ(radix_seq.radices[0], p.radix);
+            EXPECT_EQ(radix_seq.n_radices, p.n_iters);
         }
     }
 };
@@ -67,8 +81,8 @@ UCC_TEST_F(test_knomial_schedule, fixed_pattern_preserves_legacy_layout)
                 ucc_knomial_pattern_t p;
                 ucc_rank_t            legacy_radix_pow = 1;
 
-                ucc_kn_ag_pattern_init(size, rank, &radix, 1, size, &p);
-                ASSERT_EQ(nullptr, p.radices);
+                ucc_kn_ag_pattern_init(size, rank, radix, nullptr, size, &p);
+                ASSERT_EQ(nullptr, p.radix_seq);
                 for (uint8_t phase = 0; phase < p.n_iters; phase++) {
                     ucc_rank_t n_full               = size / p.full_pow_size;
                     ucc_rank_t legacy_segment_radix = radix;

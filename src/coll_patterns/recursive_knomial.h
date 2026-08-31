@@ -7,7 +7,7 @@
 #ifndef RECURSIVE_KNOMIAL_H_
 #define RECURSIVE_KNOMIAL_H_
 
-#include "utils/ucc_datastruct.h"
+#include "knomial.h"
 
 #define UCC_KN_PEER_NULL ((ucc_rank_t)-1)
 
@@ -55,7 +55,7 @@ typedef struct ucc_knomial_pattern {
     ucc_rank_t     block_size;
     ptrdiff_t      block_offset;
     int            is64;
-    const ucc_kn_radix_t *radices;
+    const ucc_kn_radix_seq_t *radix_seq;
 } ucc_knomial_pattern_t;
 
 /**
@@ -103,7 +103,7 @@ ucc_knomial_pattern_init_impl(ucc_rank_t size, ucc_rank_t rank,
     p->rank          = rank;
     p->backward      = backward;
     p->iteration     = 0;
-    p->radices       = NULL;
+    p->radix_seq     = NULL;
     n_full_subtrees  = ucc_kn_pattern_n_full(p);
     p->n_extra       = has_extra ? size - n_full_subtrees * p->full_pow_size : 0;
     p->n_iters       = (p->n_extra && n_full_subtrees == 1) ?
@@ -232,8 +232,8 @@ ucc_knomial_pattern_next_iteration(ucc_knomial_pattern_t *p)
 {
     p->iteration++;
     p->radix_pow *= p->radix;
-    if (p->radices && !ucc_knomial_pattern_loop_done(p)) {
-        p->radix = p->radices[p->iteration];
+    if (p->radix_seq && !ucc_knomial_pattern_loop_done(p)) {
+        p->radix = p->radix_seq->radices[p->iteration];
     }
 }
 

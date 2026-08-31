@@ -231,8 +231,10 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_context_t       *ctx   = UCC_TL_UCP_TEAM_CTX(team);
     ucc_coll_type_t             ct    = args->coll_type;
     ucc_rank_t                  size  = task->subset.map.ep_num;
-    ucc_kn_radix_t              radix = task->allgather_kn.p.radix;
     ucc_knomial_pattern_t      *p     = &task->allgather_kn.p;
+    const ucc_kn_radix_seq_t   *radix_seq = p->radix_seq;
+    ucc_kn_radix_t              radix = radix_seq ? radix_seq->radices[0] :
+                                                   p->radix;
     ucc_rank_t                  rank  = VRANK(task->subset.myrank,
                                               ct == UCC_COLL_TYPE_BCAST ?
                                               args->root : 0, size);
@@ -245,9 +247,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     task->allgather_kn.copy_task = NULL;
     task->allgather_kn.phase     = UCC_KN_PHASE_INIT;
     if (ct == UCC_COLL_TYPE_ALLGATHER) {
-        ucc_kn_ag_pattern_init(size, rank,
-                               p->radices ? p->radices : &radix,
-                               p->radices ? p->n_iters : 1,
+        ucc_kn_ag_pattern_init(size, rank, radix, radix_seq,
                                args->dst.info.count, p);
         offset = ucc_buffer_block_offset(args->dst.info.count, size, rank) *
                  ucc_dt_size(args->dst.info.datatype);
@@ -313,7 +313,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
 static ucc_status_t ucc_tl_ucp_allgather_knomial_init_common(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
     ucc_coll_task_t **task_h, ucc_kn_radix_t radix,
-    const ucc_kn_radix_schedule_t *schedule)
+    const ucc_kn_radix_seq_t *radix_seq)
 {
     ucc_tl_ucp_team_t    *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_context_t *ctx     = UCC_TL_UCP_TEAM_CTX(tl_team);
@@ -329,13 +329,8 @@ static ucc_status_t ucc_tl_ucp_allgather_knomial_init_common(
         task->subset.map    = sbgp->map;
     }
     task->allgather_kn.p.radix = radix;
-    if (schedule && schedule->n_radices > 1) {
-        task->allgather_kn.p.radices = schedule->radices;
-        task->allgather_kn.p.n_iters = schedule->n_radices;
-    } else {
-        task->allgather_kn.p.radices = NULL;
-        task->allgather_kn.p.n_iters = 0;
-    }
+    task->allgather_kn.p.radix_seq =
+        radix_seq && radix_seq->n_radices > 1 ? radix_seq : NULL;
     if (!UCC_IS_INPLACE(coll_args->args)) {
         if (ctx->cfg.local_copy_type == UCC_TL_UCP_LOCAL_COPY_TYPE_EC) {
             task->super.flags         |= UCC_COLL_TASK_FLAG_EXECUTOR;
@@ -377,20 +372,20 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
         coll_args, team, task_h, radix, NULL);
 }
 
-static int ucc_tl_ucp_allgather_knomial_schedule_matches(
-    const ucc_kn_radix_schedule_t *schedule, ucc_rank_t team_size)
+static int ucc_tl_ucp_allgather_knomial_seq_matches(
+    const ucc_kn_radix_seq_t *seq, ucc_rank_t team_size)
 {
     ucc_rank_t product = 1;
     uint8_t    i;
 
-    if (schedule->n_radices <= 1) {
+    if (seq->n_radices <= 1) {
         return 1;
     }
-    for (i = 0; i < schedule->n_radices; i++) {
-        if (product > team_size / schedule->radices[i]) {
+    for (i = 0; i < seq->n_radices; i++) {
+        if (product > team_size / seq->radices[i]) {
             return 0;
         }
-        product *= schedule->radices[i];
+        product *= seq->radices[i];
     }
     return product == team_size;
 }
@@ -405,28 +400,32 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
     size_t             count   = GET_TOTAL_COUNT(&coll_args->args, tsize);
     ucc_datatype_t     dtype   = GET_DT(&coll_args->args);
     size_t             msgsize = count * ucc_dt_size(dtype);
-    const ucc_kn_radix_schedule_t *schedule;
-    ucc_kn_radix_t                 radix;
+    const ucc_kn_radix_seq_t *radix_seq;
+    ucc_kn_radix_t           radix;
 
-    schedule = ucc_mrange_kn_radix_get(&tl_team->cfg.allgather_kn_radix,
-                                       msgsize, mtype);
-    if (schedule->n_radices == 0) {
+    radix_seq = ucc_mrange_kn_radix_get(&tl_team->cfg.allgather_kn_radix,
+                                        msgsize, mtype);
+    if (radix_seq->n_radices == 0) {
         radix = mtype == UCC_MEMORY_TYPE_HOST ? tl_team->opt_radix_host :
                                                 tl_team->opt_radix;
     } else {
-        radix = schedule->radices[0];
+        radix = radix_seq->radices[0];
     }
     radix = ucc_min(radix, tsize);
     if (coll_args->args.coll_type != UCC_COLL_TYPE_ALLGATHER) {
         return ucc_tl_ucp_allgather_knomial_init_r(
             coll_args, team, task_h, radix);
     }
-    if (!ucc_tl_ucp_allgather_knomial_schedule_matches(schedule, tsize)) {
-        tl_error(UCC_TL_TEAM_LIB(tl_team),
-                 "ALLGATHER_KN_RADIX schedule product must equal team size %u",
+    if (!ucc_tl_ucp_allgather_knomial_seq_matches(radix_seq, tsize)) {
+        tl_debug(UCC_TL_TEAM_LIB(tl_team),
+                 "ALLGATHER_KN_RADIX sequence does not match team size %u; "
+                 "falling back to auto",
                  tsize);
-        return UCC_ERR_INVALID_PARAM;
+        radix_seq = NULL;
+        radix = mtype == UCC_MEMORY_TYPE_HOST ? tl_team->opt_radix_host :
+                                                tl_team->opt_radix;
+        radix = ucc_min(radix, tsize);
     }
     return ucc_tl_ucp_allgather_knomial_init_common(
-        coll_args, team, task_h, radix, schedule);
+        coll_args, team, task_h, radix, radix_seq);
 }

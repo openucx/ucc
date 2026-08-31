@@ -1012,19 +1012,48 @@ void ucc_config_release_uint_ranged(void *ptr, const void *arg) //NOLINT
     ucc_mrange_uint_destroy(ptr);
 }
 
+ucc_status_t ucc_mrange_kn_radix_copy(ucc_mrange_kn_radix_t       *dst,
+                                      const ucc_mrange_kn_radix_t *src)
+{
+    ucc_mrange_kn_radix_entry_t *r, *r_dup;
+
+    dst->default_value = src->default_value;
+    ucc_list_head_init(&dst->ranges);
+    ucc_list_for_each(r, &src->ranges, list_elem) {
+        r_dup = ucc_malloc(sizeof(*r_dup), "kn radix range dup");
+        if (ucc_unlikely(!r_dup)) {
+            ucc_mrange_kn_radix_destroy(dst);
+            return UCC_ERR_NO_MEMORY;
+        }
+        *r_dup = *r;
+        ucc_list_add_tail(&dst->ranges, &r_dup->list_elem);
+    }
+    return UCC_OK;
+}
+
+void ucc_mrange_kn_radix_destroy(ucc_mrange_kn_radix_t *param)
+{
+    ucc_mrange_kn_radix_entry_t *r, *r_tmp;
+
+    ucc_list_for_each_safe(r, r_tmp, &param->ranges, list_elem) {
+        ucc_list_del(&r->list_elem);
+        ucc_free(r);
+    }
+}
+
 static int ucc_config_parse_kn_radix(const char *buf,
-                                     ucc_kn_radix_schedule_t *schedule)
+                                     ucc_kn_radix_seq_t *seq)
 {
     const char   *p = buf;
     char         *end;
     unsigned long radix;
 
-    *schedule = (ucc_kn_radix_schedule_t){0};
+    *seq = (ucc_kn_radix_seq_t){0};
     if (!strcasecmp(buf, UCS_VALUE_AUTO_STR)) {
         return 1;
     }
     while (*p != '\0') {
-        if (schedule->n_radices == UCC_KN_MAX_RADIX_PHASES) {
+        if (seq->n_radices == UCC_KN_MAX_RADIX_PHASES) {
             return 0;
         }
         errno = 0;
@@ -1033,8 +1062,7 @@ static int ucc_config_parse_kn_radix(const char *buf,
             radix > UINT16_MAX) {
             return 0;
         }
-        schedule->radices[schedule->n_radices++] =
-            (ucc_kn_radix_t)radix;
+        seq->radices[seq->n_radices++] = (ucc_kn_radix_t)radix;
         if (*end == '\0') {
             return 1;
         }
@@ -1051,7 +1079,7 @@ int ucc_config_sscanf_kn_radix(const char *buf, void *dest,
 {
     ucc_mrange_kn_radix_t       *p = dest;
     ucc_mrange_kn_radix_entry_t *r = NULL;
-    ucc_kn_radix_schedule_t      value;
+    ucc_kn_radix_seq_t           value;
     char                       **ranges, **tokens;
     unsigned                     n_ranges, n_tokens, i, j;
     size_t                       start, end;
@@ -1059,7 +1087,7 @@ int ucc_config_sscanf_kn_radix(const char *buf, void *dest,
     int                          have_value;
 
     ucc_list_head_init(&p->ranges);
-    p->default_value = (ucc_kn_radix_schedule_t){0};
+    p->default_value = (ucc_kn_radix_seq_t){0};
     if (buf[0] == '\0') {
         return 0;
     }
@@ -1133,20 +1161,20 @@ err:
 
 #define MAX_KN_RADIX_STR (UCC_KN_MAX_RADIX_PHASES * 6 + 1)
 static void ucc_config_sprintf_kn_radix_value(
-    char *buf, size_t max, const ucc_kn_radix_schedule_t *schedule)
+    char *buf, size_t max, const ucc_kn_radix_seq_t *seq)
 {
     char    value[MAX_KN_RADIX_STR];
     size_t  offset = 0;
     uint8_t i;
 
-    if (schedule->n_radices == 0) {
+    if (seq->n_radices == 0) {
         ucc_snprintf_safe(buf, max, "%s", UCS_VALUE_AUTO_STR);
         return;
     }
-    for (i = 0; i < schedule->n_radices; i++) {
+    for (i = 0; i < seq->n_radices; i++) {
         offset += ucc_snprintf_safe(value + offset, sizeof(value) - offset,
                                     "%s%u", i ? "x" : "",
-                                    schedule->radices[i]);
+                                    seq->radices[i]);
     }
     ucc_snprintf_safe(buf, max, "%s", value);
 }

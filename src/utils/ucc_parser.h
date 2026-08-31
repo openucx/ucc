@@ -10,6 +10,7 @@
 #include "config.h"
 #include "ucc/api/ucc_status.h"
 #include "ucc/api/ucc_def.h"
+#include "coll_patterns/knomial.h"
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_compiler_def.h"
 #include "utils/ucc_list.h"
@@ -28,6 +29,39 @@ typedef ucs_config_allow_list_t        ucc_config_allow_list_t;
 
 typedef struct ucc_topo ucc_topo_t;
 typedef struct ucc_file_config ucc_file_config_t;
+
+typedef struct ucc_mrange_kn_radix_entry {
+    ucc_list_link_t    list_elem;
+    size_t             start;
+    size_t             end;
+    uint32_t           mtypes;
+    ucc_kn_radix_seq_t value;
+} ucc_mrange_kn_radix_entry_t;
+
+typedef struct ucc_mrange_kn_radix {
+    ucc_list_link_t    ranges;
+    ucc_kn_radix_seq_t default_value;
+} ucc_mrange_kn_radix_t;
+
+ucc_status_t ucc_mrange_kn_radix_copy(ucc_mrange_kn_radix_t       *dst,
+                                      const ucc_mrange_kn_radix_t *src);
+
+void ucc_mrange_kn_radix_destroy(ucc_mrange_kn_radix_t *param);
+
+static inline const ucc_kn_radix_seq_t *ucc_mrange_kn_radix_get(
+    const ucc_mrange_kn_radix_t *param, size_t range_value,
+    ucc_memory_type_t mem_type)
+{
+    ucc_mrange_kn_radix_entry_t *r;
+
+    ucc_list_for_each(r, &param->ranges, list_elem) {
+        if (r->start <= range_value && range_value <= r->end &&
+            (UCC_BIT(mem_type) & r->mtypes)) {
+            return &r->value;
+        }
+    }
+    return &param->default_value;
+}
 
 #if UCS_HAVE_CONFIG_GLOBAL_LIST_ENTRY_FLAGS
 #define UCC_CONFIG_DECLARE_TABLE(_table, _name, _prefix, _type)                \
@@ -321,7 +355,7 @@ void ucc_config_release_kn_radix(void *ptr, const void *arg);
             ucc_config_clone_kn_radix, ucc_config_release_kn_radix,           \
             ucs_config_help_generic, ucs_config_doc_nop,                      \
             "[<munit>-<munit>:[mtype]:]<radix>[x<radix>...],...,auto\n"      \
-            "#            an x-separated value is an ordered exact schedule" \
+            "#            an x-separated value is an ordered exact sequence" \
     }
 
 #define UCC_CONFIG_TYPE_PIPELINE_PARAMS                                        \
@@ -349,7 +383,7 @@ void ucc_config_release_kn_radix(void *ptr, const void *arg);
             ucc_config_clone_kn_radix, ucc_config_release_kn_radix,           \
             ucs_config_help_generic,                                          \
             "[<munit>-<munit>:[mtype]:]<radix>[x<radix>...],...,auto\n"      \
-            "#            an x-separated value is an ordered exact schedule" \
+            "#            an x-separated value is an ordered exact sequence" \
     }
 
 #define UCC_CONFIG_TYPE_PIPELINE_PARAMS                                        \
