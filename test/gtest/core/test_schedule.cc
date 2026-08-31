@@ -1,13 +1,18 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
+#include <atomic>
 #include <common/test.h>
+
 extern "C" {
+#include "schedule/ucc_schedule.h"
 #include "schedule/ucc_schedule.h"
 #include "schedule/ucc_schedule_pipelined.h"
 #include "core/ucc_context.h"
+#include "components/base/ucc_base_iface.h"
+#include "utils/ucc_malloc.h"
 #include "utils/ucc_spinlock.h"
 }
 
@@ -261,24 +266,6 @@ UCC_TEST_F(test_schedule_pipelined, nested_failure)
         EXPECT_EQ(0, t.lock_held);
         finalize(&t);
     }
-}
-
-/* ==========================================================================
- * Pipelined schedule error-unwind regression tests (task 404)
- *
- * These tests verify that ucc_schedule_pipelined_init() correctly unwinds all
- * initialized fragment schedules when errors occur during either fragment
- * initialization or event subscription, with no double-finalization and
- * exactly-once finalizer invocation per successfully-created fragment.
- * ========================================================================== */
-#include <atomic>
-
-extern "C" {
-#include "schedule/ucc_schedule.h"
-#include "schedule/ucc_schedule_pipelined.h"
-#include "core/ucc_context.h"
-#include "components/base/ucc_base_iface.h"
-#include "utils/ucc_malloc.h"
 }
 
 /* ------------------------------------------------------------------ */
@@ -717,12 +704,6 @@ UCC_TEST_F(test_schedule, pipelined_ordered_failure_at_three)
     destroy_test_team(team);
 }
 
-/* ==========================================================================
- * Pipelined schedule parameter validation regression tests (task 405)
- * Verifies that zero/unusable active pipeline parameters are rejected with
- * UCC_ERR_INVALID_PARAM rather than causing hangs or division by zero.
- * ========================================================================== */
-
 /* ------------------------------------------------------------------ */
 /* Test: n_frags=0 must be rejected at the init entry guard               */
 /* ------------------------------------------------------------------ */
@@ -821,11 +802,6 @@ UCC_TEST_F(test_schedule, pipelined_invalid_order_rejected)
 
     destroy_test_team(team);
 }
-/* ==========================================================================
- * Direct ucc_pipeline_nfrags_pdepth() helper tests (task 471)
- * These tests verify the two headline guards that task 405 claimed but did not
- * directly exercise: active pdepth=0 and active frag_size=0.
- * ========================================================================== */
 
 /* ------------------------------------------------------------------ */
 /* Test: direct pdepth=0 rejection via ucc_pipeline_nfrags_pdepth()    */
@@ -940,7 +916,7 @@ UCC_TEST_F(test_schedule, pipeline_params_disabled_nfrags_zero_ok)
 }
 
 /* ========================================================================== */
-/* Task 474: complete helper boundary and pipelined-init guard coverage.       */
+/* Complete helper boundary and pipelined-init guard coverage.       */
 /* ========================================================================== */
 
 UCC_TEST_F(test_schedule, pipeline_params_exact_threshold_boundaries)
@@ -1097,32 +1073,32 @@ UCC_TEST_F(test_schedule, pipelined_depth_above_limit_clamped)
     destroy_test_team(team);
 }
 
-/* Task 473: real ucc_event_manager_subscribe() failure/unwind oracles. */
-static std::atomic<int> t473_subscribe_attempt(0);
-static std::atomic<int> t473_subscribe_fail_at(-1);
-static std::atomic<int> t473_frag_inits(0);
-static std::atomic<int> t473_task_finalizes(0);
-static std::atomic<int> t473_frag_finalizes(0);
-static std::atomic<int> t473_pool_returns(0);
-static std::atomic<int> t473_live_listeners_at_finalize(0);
-static std::atomic<int> t473_lock_inits(0);
-static std::atomic<int> t473_lock_destroys(0);
-static int              t473_frag_fail_at = -1;
+/* Real ucc_event_manager_subscribe() failure/unwind oracles. */
+static std::atomic<int> g_fault_subscribe_attempt(0);
+static std::atomic<int> g_fault_subscribe_fail_at(-1);
+static std::atomic<int> g_fault_frag_inits(0);
+static std::atomic<int> g_fault_task_finalizes(0);
+static std::atomic<int> g_fault_frag_finalizes(0);
+static std::atomic<int> g_fault_pool_returns(0);
+static std::atomic<int> g_fault_live_listeners_at_finalize(0);
+static std::atomic<int> g_fault_lock_inits(0);
+static std::atomic<int> g_fault_lock_destroys(0);
+static int              g_fault_frag_fail_at = -1;
 
-static ucc_status_t     t473_subscription_fault(void)
+static ucc_status_t     fault_subscribe_cb(void)
 {
-    int attempt = t473_subscribe_attempt.fetch_add(1);
-    return attempt == t473_subscribe_fail_at.load() ? UCC_ERR_NO_MEMORY
+    int attempt = g_fault_subscribe_attempt.fetch_add(1);
+    return attempt == g_fault_subscribe_fail_at.load() ? UCC_ERR_NO_MEMORY
                                                     : UCC_OK;
 }
 
-static void t473_lock_observe(int initialized)
+static void fault_lock_observe(int initialized)
 {
-    initialized ? t473_lock_inits.fetch_add(1)
-                : t473_lock_destroys.fetch_add(1);
+    initialized ? g_fault_lock_inits.fetch_add(1)
+                : g_fault_lock_destroys.fetch_add(1);
 }
 
-static unsigned t473_listener_count(ucc_coll_task_t *task)
+static unsigned fault_listener_count(ucc_coll_task_t *task)
 {
     ucc_event_manager_t *em;
     unsigned             count = 0;
@@ -1132,37 +1108,37 @@ static unsigned t473_listener_count(ucc_coll_task_t *task)
     return count;
 }
 
-static ucc_status_t t473_task_finalize(ucc_coll_task_t *task)
+static ucc_status_t fault_task_finalize(ucc_coll_task_t *task)
 {
-    t473_live_listeners_at_finalize += t473_listener_count(task);
-    t473_task_finalizes++;
-    t473_pool_returns++;
+    g_fault_live_listeners_at_finalize += fault_listener_count(task);
+    g_fault_task_finalizes++;
+    g_fault_pool_returns++;
     ucc_coll_task_destruct(task);
     free(task);
     return UCC_OK;
 }
 
-static ucc_status_t t473_frag_finalize(ucc_coll_task_t *task)
+static ucc_status_t fault_frag_finalize(ucc_coll_task_t *task)
 {
     ucc_schedule_t *frag = ucc_derived_of(task, ucc_schedule_t);
     ucc_status_t    status;
-    t473_live_listeners_at_finalize += t473_listener_count(task);
-    t473_frag_finalizes++;
+    g_fault_live_listeners_at_finalize += fault_listener_count(task);
+    g_fault_frag_finalizes++;
     status = ucc_schedule_finalize(task);
-    t473_pool_returns++;
+    g_fault_pool_returns++;
     ucc_coll_task_destruct(task);
     free(frag);
     return status;
 }
 
-static ucc_status_t t473_frag_init(
+static ucc_status_t fault_frag_init(
     ucc_base_coll_args_t *args, ucc_schedule_pipelined_t *,
     ucc_base_team_t *team, ucc_schedule_t **frag_p)
 {
-    int              index = t473_frag_inits.load();
+    int              index = g_fault_frag_inits.load();
     ucc_schedule_t  *frag;
     ucc_coll_task_t *task;
-    if (index == t473_frag_fail_at) {
+    if (index == g_fault_frag_fail_at) {
         return UCC_ERR_NO_MEMORY;
     }
     frag = (ucc_schedule_t *)calloc(1, sizeof(*frag));
@@ -1176,31 +1152,31 @@ static ucc_status_t t473_frag_init(
     EXPECT_EQ(UCC_OK, ucc_schedule_init(frag, args, team));
     ucc_coll_task_construct(task);
     EXPECT_EQ(UCC_OK, ucc_coll_task_init(task, args, team));
-    task->finalize               = t473_task_finalize;
+    task->finalize               = fault_task_finalize;
     frag->tasks[frag->n_tasks++] = task;
-    frag->super.finalize         = t473_frag_finalize;
+    frag->super.finalize         = fault_frag_finalize;
     *frag_p                      = frag;
-    t473_frag_inits++;
+    g_fault_frag_inits++;
     return UCC_OK;
 }
 
-static void t473_reset(int subscribe_fail, int frag_fail)
+static void fault_reset(int subscribe_fail, int frag_fail)
 {
-    t473_subscribe_attempt          = 0;
-    t473_subscribe_fail_at          = subscribe_fail;
-    t473_frag_inits                 = 0;
-    t473_task_finalizes             = 0;
-    t473_frag_finalizes             = 0;
-    t473_pool_returns               = 0;
-    t473_live_listeners_at_finalize = 0;
-    t473_lock_inits                 = 0;
-    t473_lock_destroys              = 0;
-    t473_frag_fail_at               = frag_fail;
-    ucc_event_manager_set_subscribe_fault_cb(t473_subscription_fault);
-    ucc_schedule_pipelined_set_lock_observer(t473_lock_observe);
+    g_fault_subscribe_attempt          = 0;
+    g_fault_subscribe_fail_at          = subscribe_fail;
+    g_fault_frag_inits                 = 0;
+    g_fault_task_finalizes             = 0;
+    g_fault_frag_finalizes             = 0;
+    g_fault_pool_returns               = 0;
+    g_fault_live_listeners_at_finalize = 0;
+    g_fault_lock_inits                 = 0;
+    g_fault_lock_destroys              = 0;
+    g_fault_frag_fail_at               = frag_fail;
+    ucc_event_manager_set_subscribe_fault_cb(fault_subscribe_cb);
+    ucc_schedule_pipelined_set_lock_observer(fault_lock_observe);
 }
 
-static void t473_set_args(ucc_base_coll_args_t *args)
+static void fault_set_args(ucc_base_coll_args_t *args)
 {
     memset(args, 0, sizeof(*args));
     args->args.coll_type         = UCC_COLL_TYPE_ALLREDUCE;
@@ -1210,7 +1186,7 @@ static void t473_set_args(ucc_base_coll_args_t *args)
     args->args.dst.info.mem_type = UCC_MEMORY_TYPE_HOST;
 }
 
-static void t473_expect_subscription_unwind(
+static void fault_expect_subscription_unwind(
     ucc_pipeline_order_t order, int fail_at, int thread_mode)
 {
     ucc_base_team_t         *team;
@@ -1218,34 +1194,34 @@ static void t473_expect_subscription_unwind(
     ucc_base_coll_args_t     args;
     memset(&sched, 0, sizeof(sched));
     ucc_coll_task_construct(&sched.super.super);
-    t473_set_args(&args);
+    fault_set_args(&args);
     team = create_test_team(thread_mode);
     if (team == nullptr) {
         ADD_FAILURE() << "Failed to create test team";
         return;
     }
-    t473_reset(fail_at, -1);
+    fault_reset(fail_at, -1);
     EXPECT_EQ(
         UCC_ERR_NO_MEMORY,
         ucc_schedule_pipelined_init(
-            &args, team, t473_frag_init, NULL, 6, 6, order, &sched));
-    EXPECT_EQ(fail_at + 1, t473_subscribe_attempt.load());
-    EXPECT_EQ(6, t473_frag_inits.load());
-    EXPECT_EQ(6, t473_task_finalizes.load());
-    EXPECT_EQ(6, t473_frag_finalizes.load());
-    EXPECT_EQ(12, t473_pool_returns.load());
-    EXPECT_EQ(0u, t473_listener_count(&sched.super.super));
-    EXPECT_EQ(0, t473_live_listeners_at_finalize.load());
+            &args, team, fault_frag_init, NULL, 6, 6, order, &sched));
+    EXPECT_EQ(fail_at + 1, g_fault_subscribe_attempt.load());
+    EXPECT_EQ(6, g_fault_frag_inits.load());
+    EXPECT_EQ(6, g_fault_task_finalizes.load());
+    EXPECT_EQ(6, g_fault_frag_finalizes.load());
+    EXPECT_EQ(12, g_fault_pool_returns.load());
+    EXPECT_EQ(0u, fault_listener_count(&sched.super.super));
+    EXPECT_EQ(0, g_fault_live_listeners_at_finalize.load());
     EXPECT_EQ(
-        thread_mode == UCC_THREAD_MULTIPLE ? 1 : 0, t473_lock_inits.load());
-    EXPECT_EQ(t473_lock_inits.load(), t473_lock_destroys.load());
+        thread_mode == UCC_THREAD_MULTIPLE ? 1 : 0, g_fault_lock_inits.load());
+    EXPECT_EQ(g_fault_lock_inits.load(), g_fault_lock_destroys.load());
     ucc_coll_task_destruct(&sched.super.super);
     destroy_test_team(team);
 }
 
 UCC_TEST_F(test_schedule, pipelined_real_subscription_failure_first)
 {
-    t473_expect_subscription_unwind(
+    fault_expect_subscription_unwind(
         UCC_PIPELINE_SEQUENTIAL, 0, UCC_THREAD_SINGLE);
 }
 
@@ -1253,7 +1229,7 @@ UCC_TEST_F(test_schedule, pipelined_real_subscription_failure_later)
 {
     /* Attempt seven is after a dependency and both lifecycle subscription
      * kinds have already been installed, and crosses MAX_LISTENERS. */
-    t473_expect_subscription_unwind(
+    fault_expect_subscription_unwind(
         UCC_PIPELINE_ORDERED, 7, UCC_THREAD_MULTIPLE);
 }
 
@@ -1264,33 +1240,33 @@ UCC_TEST_F(test_schedule, pipelined_depth_16_exact_lifecycle)
     ucc_base_coll_args_t     args;
     memset(&sched, 0, sizeof(sched));
     ucc_coll_task_construct(&sched.super.super);
-    t473_set_args(&args);
+    fault_set_args(&args);
     team = create_test_team(UCC_THREAD_MULTIPLE);
     if (team == nullptr) {
         ADD_FAILURE() << "Failed to create test team";
         return;
     }
-    t473_reset(-1, -1);
+    fault_reset(-1, -1);
     ASSERT_EQ(
         UCC_OK,
         ucc_schedule_pipelined_init(
             &args,
             team,
-            t473_frag_init,
+            fault_frag_init,
             NULL,
             16,
             16,
             UCC_PIPELINE_PARALLEL,
             &sched));
-    EXPECT_EQ(16, t473_frag_inits.load());
-    EXPECT_EQ(32, t473_subscribe_attempt.load());
+    EXPECT_EQ(16, g_fault_frag_inits.load());
+    EXPECT_EQ(32, g_fault_subscribe_attempt.load());
     EXPECT_EQ(UCC_OK, sched.super.super.finalize(&sched.super.super));
-    EXPECT_EQ(16, t473_task_finalizes.load());
-    EXPECT_EQ(16, t473_frag_finalizes.load());
-    EXPECT_EQ(32, t473_pool_returns.load());
-    EXPECT_EQ(0, t473_live_listeners_at_finalize.load());
-    EXPECT_EQ(1, t473_lock_inits.load());
-    EXPECT_EQ(1, t473_lock_destroys.load());
+    EXPECT_EQ(16, g_fault_task_finalizes.load());
+    EXPECT_EQ(16, g_fault_frag_finalizes.load());
+    EXPECT_EQ(32, g_fault_pool_returns.load());
+    EXPECT_EQ(0, g_fault_live_listeners_at_finalize.load());
+    EXPECT_EQ(1, g_fault_lock_inits.load());
+    EXPECT_EQ(1, g_fault_lock_destroys.load());
     ucc_coll_task_destruct(&sched.super.super);
     destroy_test_team(team);
 }
@@ -1304,41 +1280,33 @@ UCC_TEST_F(test_schedule, pipelined_fragment_failure_exact_unwind)
         ucc_base_coll_args_t     args;
         memset(&sched, 0, sizeof(sched));
         ucc_coll_task_construct(&sched.super.super);
-        t473_set_args(&args);
+        fault_set_args(&args);
         team = create_test_team(UCC_THREAD_SINGLE);
         if (team == nullptr) {
             ADD_FAILURE() << "Failed to create test team";
             return;
         }
-        t473_reset(-1, fail_at);
+        fault_reset(-1, fail_at);
         EXPECT_EQ(
             UCC_ERR_NO_MEMORY,
             ucc_schedule_pipelined_init(
                 &args,
                 team,
-                t473_frag_init,
+                fault_frag_init,
                 NULL,
                 8,
                 8,
                 UCC_PIPELINE_PARALLEL,
                 &sched));
-        EXPECT_EQ(fail_at, t473_frag_inits.load());
-        EXPECT_EQ(fail_at, t473_task_finalizes.load());
-        EXPECT_EQ(fail_at, t473_frag_finalizes.load());
-        EXPECT_EQ(2 * fail_at, t473_pool_returns.load());
-        EXPECT_EQ(0, t473_live_listeners_at_finalize.load());
+        EXPECT_EQ(fail_at, g_fault_frag_inits.load());
+        EXPECT_EQ(fail_at, g_fault_task_finalizes.load());
+        EXPECT_EQ(fail_at, g_fault_frag_finalizes.load());
+        EXPECT_EQ(2 * fail_at, g_fault_pool_returns.load());
+        EXPECT_EQ(0, g_fault_live_listeners_at_finalize.load());
         ucc_coll_task_destruct(&sched.super.super);
         destroy_test_team(team);
     }
 }
-
-/* ==========================================================================
- * Event-manager lifecycle regression tests (task 475)
- *
- * These tests verify that ucc_coll_task_init() no longer destructively
- * reconstructs em_list on pooled-task reuse, ensuring event-manager nodes
- * remain reachable and are freed exactly once.
- * ========================================================================== */
 
 /* ------------------------------------------------------------------ */
 /* EM node counting helper                                            */

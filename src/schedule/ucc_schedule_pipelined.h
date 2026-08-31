@@ -71,12 +71,6 @@ static inline ucc_status_t ucc_pipeline_nfrags_pdepth(
         return UCC_OK;
     }
 
-    /* ==========================================================================
-     * Validation contract (task 405): reject unusable active pipeline parameters
-     * An active pipeline with pdepth=0 produces zero pipeline depth while retaining
-     * positive fragment count, causing the collective to hang with no completion.
-     * A frag_size=0 when msgsize > threshold would cause division by zero.
-     * ========================================================================== */
     if (p->pdepth <= 0) {
         /* Active pipeline specified but pdepth=0 - this will hang */
         return UCC_ERR_INVALID_PARAM;

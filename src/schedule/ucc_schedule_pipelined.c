@@ -219,14 +219,6 @@ ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
     ucc_status_t     status;
     ucc_schedule_t **frags;
 
-    /* ==========================================================================
-     * Validation contract (task 405): reject zero/unusable active pipeline params
-     * Before any fragment instantiation or schedule construction, validate that:
-     *   1. n_frags >= 1 for an active pipeline (n_frags=0 means disabled)
-     *   2. n_frags_total >= n_frags and > 0 for a runnable schedule
-     *   3. order is valid (parallel/ordered/sequential) - checked below at line ~214
-     * Return UCC_ERR_INVALID_PARAM rather than hanging or dividing by zero.
-     * ========================================================================== */
     if (ucc_unlikely(n_frags < 1)) {
         ucc_error(
             "n_frags=%d is invalid for active pipeline; must be >= 1", n_frags);

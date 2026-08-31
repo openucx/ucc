@@ -304,8 +304,8 @@ using test_allreduce_alg_type = ::testing::Types<
 >;
 TYPED_TEST_CASE(test_allreduce_alg, test_allreduce_alg_type);
 
-/* Task 474 caller oracle: invalid active TL/UCP pipeline parameters must fail
- * collective initialization on every rank; no request may be posted or hang. */
+/* invalid active TL/UCP pipeline parameters must fail collective
+ * initialization on every rank; no request may be posted or hang. */
 TYPED_TEST(test_allreduce_alg, sra_invalid_pipeline_depth_returns_error)
 {
     const int     n_procs = 2;
@@ -692,12 +692,6 @@ TYPED_TEST(test_allreduce_avg_order, avg_post_op)
         }
     }
 }
-/* ==========================================================================
- * SRA pipeline parameter-selection oracles (task 472)
- * ==========================================================================
- * The older collective-completion coverage below is retained as an integration
- * check. Parameter-level selection assertions follow it.
- */
 
 /* Test: auto pipeline selection with sra_knomial algorithm */
 TYPED_TEST(test_allreduce_alg, sra_topology_guard_auto)
@@ -775,10 +769,6 @@ TYPED_TEST(test_allreduce_alg, sra_topology_guard_override)
         }
     }
 }
-
-/* Legacy task-469 collective-completion coverage. These integration tests do
- * not identify selected parameters and are not selection oracles; the direct
- * production-selector tests below provide that evidence. */
 
 /* Explicit override with an aggressive threshold and MAX_FRAGS fragments. */
 TYPED_TEST(test_allreduce_alg, sra_explicit_single_node_aggressive_pipelined)
@@ -864,17 +854,6 @@ TYPED_TEST(test_allreduce_alg, sra_override_bypasses_topology)
         }
     }
 }
-
-/* Historical task-469 gap: tagged selection was only checked by inspection.
- * The guard at line 170-185 in allreduce_sra_knomial.c checks
- * `args->mask & UCC_COLL_ARGS_FIELD_TAG` and forces monolithic params
- * unconditionally. This path cannot be directly exercised from gtest because
- * manually setting coll->mask |= UCC_COLL_ARGS_FIELD_TAG with a valid tag
- * value causes ucc_collective_init to return UCC_ERR_INVALID_PARAM — the
- * UCX TL layer rejects manually-tagged coll_args that weren't produced by
- * the public UCC API. The active_set test (test_active_set.cc:62) proves
- * tagged collectives work when set up through proper channels, confirming
- * the monolithic path is taken successfully there too. */
 
 /* Non-host preservation: CUDA non-host memory takes default behavior.
  * This verifies no regression from the topology guard changes in the
