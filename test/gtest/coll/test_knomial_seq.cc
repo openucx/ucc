@@ -8,27 +8,26 @@ extern "C" {
 #include "coll_patterns/sra_knomial.h"
 }
 
-#include <algorithm>
 #include <common/test.h>
 #include <vector>
 
-class test_knomial_schedule : public ucc::test {
+class test_knomial_seq : public ucc::test {
   protected:
-    static void expect_mixed_pattern(
+    static void expect_exact_pattern(
         ucc_rank_t size, const std::vector<ucc_kn_radix_t> &radices)
     {
         ucc_kn_radix_seq_t radix_seq = {};
 
         ASSERT_LE(radices.size(), UCC_KN_MAX_RADIX_PHASES);
+        radix_seq.radices   = radices.data();
         radix_seq.n_radices = static_cast<uint8_t>(radices.size());
-        std::copy(radices.begin(), radices.end(), radix_seq.radices);
         for (ucc_rank_t rank = 0; rank < size; rank++) {
             ucc_knomial_pattern_t p;
             ucc_rank_t            phase_size = 1;
 
-            ucc_kn_ag_pattern_init(size, rank, radix_seq.radices[0],
-                                   &radix_seq, size, &p);
-            ASSERT_EQ(&radix_seq, p.radix_seq);
+            ucc_kn_ag_pattern_init(size, rank, &radix_seq, size, &p);
+            ASSERT_EQ(radix_seq.radices, p.radix_seq.radices);
+            ASSERT_EQ(radix_seq.n_radices, p.radix_seq.n_radices);
             ASSERT_EQ(radices.size(), p.n_iters);
             ASSERT_EQ(size, p.full_pow_size);
             ASSERT_EQ(0, p.n_extra);
@@ -61,16 +60,15 @@ class test_knomial_schedule : public ucc::test {
             EXPECT_TRUE(ucc_knomial_pattern_loop_done(&p));
             EXPECT_EQ(size, phase_size);
 
-            ucc_kn_ag_pattern_init(size, rank, radix_seq.radices[0],
-                                   &radix_seq, size, &p);
+            ucc_kn_ag_pattern_init(size, rank, &radix_seq, size, &p);
             EXPECT_EQ(0, p.iteration);
-            EXPECT_EQ(radix_seq.radices[0], p.radix);
+            EXPECT_EQ(ucc_kn_radix_seq_get(&radix_seq, 0), p.radix);
             EXPECT_EQ(radix_seq.n_radices, p.n_iters);
         }
     }
 };
 
-UCC_TEST_F(test_knomial_schedule, fixed_pattern_preserves_legacy_layout)
+UCC_TEST_F(test_knomial_seq, fixed_pattern_preserves_legacy_layout)
 {
     const ucc_rank_t     sizes[]   = {16, 48, 72, 96};
     const ucc_kn_radix_t radices[] = {2, 3, 4, 6, 8};
@@ -79,10 +77,14 @@ UCC_TEST_F(test_knomial_schedule, fixed_pattern_preserves_legacy_layout)
         for (auto radix : radices) {
             for (ucc_rank_t rank = 0; rank < size; rank++) {
                 ucc_knomial_pattern_t p;
+                ucc_kn_radix_seq_t    radix_seq =
+                    ucc_kn_radix_seq_from_radix(radix);
                 ucc_rank_t            legacy_radix_pow = 1;
 
-                ucc_kn_ag_pattern_init(size, rank, radix, nullptr, size, &p);
-                ASSERT_EQ(nullptr, p.radix_seq);
+                ucc_kn_ag_pattern_init(size, rank, &radix_seq, size, &p);
+                ASSERT_EQ(1, p.radix_seq.n_radices);
+                ASSERT_EQ(radix,
+                          ucc_kn_radix_seq_get(&p.radix_seq, 0));
                 for (uint8_t phase = 0; phase < p.n_iters; phase++) {
                     ucc_rank_t n_full               = size / p.full_pow_size;
                     ucc_rank_t legacy_segment_radix = radix;
@@ -123,9 +125,45 @@ UCC_TEST_F(test_knomial_schedule, fixed_pattern_preserves_legacy_layout)
     }
 }
 
-UCC_TEST_F(test_knomial_schedule, mixed_peer_and_segment_layout)
+UCC_TEST_F(test_knomial_seq, exact_peer_and_segment_layout)
 {
-    expect_mixed_pattern(48, {8, 6});
-    expect_mixed_pattern(72, {3, 3, 2, 2, 2});
-    expect_mixed_pattern(96, {4, 4, 6});
+    expect_exact_pattern(48, {8, 6});
+    expect_exact_pattern(16, {8, 2});
+    expect_exact_pattern(16, {2, 8});
+    expect_exact_pattern(72, {8, 9});
+    expect_exact_pattern(72, {3, 3, 2, 2, 2});
+    expect_exact_pattern(96, {4, 4, 6});
+}
+
+UCC_TEST_F(test_knomial_seq, validation)
+{
+    const ucc_kn_radix_t valid_radices[]    = {8, 6};
+    const ucc_kn_radix_t zero_radices[]     = {8, 0, 6};
+    const ucc_kn_radix_t overflow_radices[] = {UINT16_MAX, UINT16_MAX, 2};
+    ucc_kn_radix_seq_t   seq                = {};
+
+    EXPECT_TRUE(ucc_kn_radix_seq_is_valid(&seq, 48));
+
+    seq = ucc_kn_radix_seq_from_radix(0);
+    EXPECT_FALSE(ucc_kn_radix_seq_is_valid(&seq, 48));
+
+    seq.radices   = valid_radices;
+    seq.n_radices = 2;
+    EXPECT_TRUE(ucc_kn_radix_seq_is_valid(&seq, 48));
+    EXPECT_FALSE(ucc_kn_radix_seq_is_valid(&seq, 64));
+
+    seq.radices   = zero_radices;
+    seq.n_radices = 3;
+    EXPECT_FALSE(ucc_kn_radix_seq_is_valid(&seq, 48));
+
+    seq.radices   = overflow_radices;
+    seq.n_radices = 3;
+    EXPECT_FALSE(ucc_kn_radix_seq_is_valid(&seq, UINT32_MAX));
+
+    seq.radices   = nullptr;
+    seq.n_radices = 2;
+    EXPECT_FALSE(ucc_kn_radix_seq_is_valid(&seq, 48));
+
+    seq.n_radices = UCC_KN_MAX_RADIX_PHASES + 1;
+    EXPECT_FALSE(ucc_kn_radix_seq_is_valid(&seq, 48));
 }

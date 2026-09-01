@@ -31,16 +31,18 @@ typedef struct ucc_topo ucc_topo_t;
 typedef struct ucc_file_config ucc_file_config_t;
 
 typedef struct ucc_mrange_kn_radix_entry {
-    ucc_list_link_t    list_elem;
-    size_t             start;
-    size_t             end;
-    uint32_t           mtypes;
-    ucc_kn_radix_seq_t value;
+    ucc_list_link_t     list_elem;
+    size_t              start;
+    size_t              end;
+    uint32_t            mtypes;
+    ucc_kn_radix_seq_t  value;
+    ucc_kn_radix_t      radices[UCC_KN_MAX_RADIX_PHASES];
 } ucc_mrange_kn_radix_entry_t;
 
 typedef struct ucc_mrange_kn_radix {
     ucc_list_link_t    ranges;
     ucc_kn_radix_seq_t default_value;
+    ucc_kn_radix_t     default_radices[UCC_KN_MAX_RADIX_PHASES];
 } ucc_mrange_kn_radix_t;
 
 ucc_status_t ucc_mrange_kn_radix_copy(ucc_mrange_kn_radix_t       *dst,

@@ -262,22 +262,22 @@ static inline void ucc_kn_g_pattern_next_iter(ucc_knomial_pattern_t *p)
 
 static inline void
 ucc_kn_ag_pattern_init(ucc_rank_t size, ucc_rank_t rank,
-                       ucc_kn_radix_t radix,
                        const ucc_kn_radix_seq_t *radix_seq, size_t count,
                        ucc_knomial_pattern_t *p)
 {
-    ucc_assert(!radix_seq ||
-               (radix_seq->n_radices > 1 &&
-                radix_seq->n_radices <= UCC_KN_MAX_RADIX_PHASES &&
-                radix == radix_seq->radices[0]));
+    ucc_kn_radix_t radix;
+
+    ucc_assert(radix_seq && radix_seq->n_radices > 0 &&
+               radix_seq->n_radices <= UCC_KN_MAX_RADIX_PHASES);
+    radix = ucc_kn_radix_seq_get(radix_seq, 0);
 
     ucc_knomial_pattern_init(size, rank, radix, p);
-    if (radix_seq) {
+    if (radix_seq->n_radices > 1) {
         p->n_iters       = radix_seq->n_radices;
         p->full_pow_size = size;
         p->n_extra       = 0;
         p->node_type     = KN_NODE_BASE;
-        p->radix_seq     = radix_seq;
+        p->radix_seq     = *radix_seq;
     }
 
     p->type         = KN_PATTERN_ALLGATHER;

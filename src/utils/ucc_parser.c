@@ -1012,12 +1012,27 @@ void ucc_config_release_uint_ranged(void *ptr, const void *arg) //NOLINT
     ucc_mrange_uint_destroy(ptr);
 }
 
+static void ucc_kn_radix_seq_copy(ucc_kn_radix_seq_t       *dst,
+                                  ucc_kn_radix_t            *dst_radices,
+                                  const ucc_kn_radix_seq_t *src)
+{
+    *dst = *src;
+    memset(dst_radices, 0,
+           UCC_KN_MAX_RADIX_PHASES * sizeof(*dst_radices));
+    if (src->n_radices > 1) {
+        memcpy(dst_radices, src->radices,
+               src->n_radices * sizeof(*dst_radices));
+        dst->radices = dst_radices;
+    }
+}
+
 ucc_status_t ucc_mrange_kn_radix_copy(ucc_mrange_kn_radix_t       *dst,
                                       const ucc_mrange_kn_radix_t *src)
 {
     ucc_mrange_kn_radix_entry_t *r, *r_dup;
 
-    dst->default_value = src->default_value;
+    ucc_kn_radix_seq_copy(&dst->default_value, dst->default_radices,
+                          &src->default_value);
     ucc_list_head_init(&dst->ranges);
     ucc_list_for_each(r, &src->ranges, list_elem) {
         r_dup = ucc_malloc(sizeof(*r_dup), "kn radix range dup");
@@ -1026,6 +1041,7 @@ ucc_status_t ucc_mrange_kn_radix_copy(ucc_mrange_kn_radix_t       *dst,
             return UCC_ERR_NO_MEMORY;
         }
         *r_dup = *r;
+        ucc_kn_radix_seq_copy(&r_dup->value, r_dup->radices, &r->value);
         ucc_list_add_tail(&dst->ranges, &r_dup->list_elem);
     }
     return UCC_OK;
@@ -1042,13 +1058,16 @@ void ucc_mrange_kn_radix_destroy(ucc_mrange_kn_radix_t *param)
 }
 
 static int ucc_config_parse_kn_radix(const char *buf,
-                                     ucc_kn_radix_seq_t *seq)
+                                     ucc_kn_radix_seq_t *seq,
+                                     ucc_kn_radix_t *radices)
 {
     const char   *p = buf;
     char         *end;
     unsigned long radix;
 
     *seq = (ucc_kn_radix_seq_t){0};
+    memset(radices, 0,
+           UCC_KN_MAX_RADIX_PHASES * sizeof(*radices));
     if (!strcasecmp(buf, UCS_VALUE_AUTO_STR)) {
         return 1;
     }
@@ -1062,8 +1081,13 @@ static int ucc_config_parse_kn_radix(const char *buf,
             radix > UINT16_MAX) {
             return 0;
         }
-        seq->radices[seq->n_radices++] = (ucc_kn_radix_t)radix;
+        radices[seq->n_radices++] = (ucc_kn_radix_t)radix;
         if (*end == '\0') {
+            if (seq->n_radices == 1) {
+                seq->radix = radices[0];
+            } else {
+                seq->radices = radices;
+            }
             return 1;
         }
         if (*end != 'x' || end[1] == '\0') {
@@ -1080,6 +1104,7 @@ int ucc_config_sscanf_kn_radix(const char *buf, void *dest,
     ucc_mrange_kn_radix_t       *p = dest;
     ucc_mrange_kn_radix_entry_t *r = NULL;
     ucc_kn_radix_seq_t           value;
+    ucc_kn_radix_t               value_radices[UCC_KN_MAX_RADIX_PHASES];
     char                       **ranges, **tokens;
     unsigned                     n_ranges, n_tokens, i, j;
     size_t                       start, end;
@@ -1088,6 +1113,7 @@ int ucc_config_sscanf_kn_radix(const char *buf, void *dest,
 
     ucc_list_head_init(&p->ranges);
     p->default_value = (ucc_kn_radix_seq_t){0};
+    memset(p->default_radices, 0, sizeof(p->default_radices));
     if (buf[0] == '\0') {
         return 0;
     }
@@ -1106,7 +1132,8 @@ int ucc_config_sscanf_kn_radix(const char *buf, void *dest,
             goto err_tokens;
         }
         if (n_tokens == 1) {
-            if (!ucc_config_parse_kn_radix(tokens[0], &p->default_value)) {
+            if (!ucc_config_parse_kn_radix(tokens[0], &p->default_value,
+                                           p->default_radices)) {
                 goto err_tokens;
             }
         } else {
@@ -1119,11 +1146,12 @@ int ucc_config_sscanf_kn_radix(const char *buf, void *dest,
             r->mtypes  = UCC_MEM_TYPE_MASK_FULL;
             have_value = 0;
             for (j = 0; j < n_tokens; j++) {
-                if (ucc_config_parse_kn_radix(tokens[j], &value)) {
+                if (ucc_config_parse_kn_radix(tokens[j], &value,
+                                              value_radices)) {
                     if (have_value) {
                         goto err_tokens;
                     }
-                    r->value   = value;
+                    ucc_kn_radix_seq_copy(&r->value, r->radices, &value);
                     have_value = 1;
                     continue;
                 }
@@ -1174,7 +1202,7 @@ static void ucc_config_sprintf_kn_radix_value(
     for (i = 0; i < seq->n_radices; i++) {
         offset += ucc_snprintf_safe(value + offset, sizeof(value) - offset,
                                     "%s%u", i ? "x" : "",
-                                    seq->radices[i]);
+                                    ucc_kn_radix_seq_get(seq, i));
     }
     ucc_snprintf_safe(buf, max, "%s", value);
 }

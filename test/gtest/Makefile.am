@@ -89,6 +89,7 @@ gtest_SOURCES =                           \
 	coll/test_alltoallv.cc                \
 	coll/test_allgather.cc                \
 	coll/test_allgatherv.cc               \
+	coll/test_knomial_seq.cc              \
 	coll/test_gather.cc                   \
 	coll/test_gatherv.cc                  \
 	coll/test_bcast.cc                    \
@@ -143,10 +144,6 @@ gtest_CXXFLAGS += $(UCX_CXXFLAGS)
 gtest_CPPFLAGS += $(UCX_CPPFLAGS)
 gtest_LDFLAGS  += $(UCX_LDFLAGS)
 gtest_LDADD    += $(UCX_LIBS) $(UCX_LIBADD)
-endif
-
-if TL_UCP_ENABLED
-gtest_SOURCES += coll/test_knomial_schedule.cc
 endif
 
 noinst_HEADERS =                         \
