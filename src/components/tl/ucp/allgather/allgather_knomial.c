@@ -231,8 +231,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_rank_t                  size  = task->subset.map.ep_num;
     ucc_knomial_pattern_t      *p     = &task->allgather_kn.p;
     ucc_kn_radix_seq_t          radix_seq = p->radix_seq;
-    ucc_kn_radix_t              radix     =
-        ucc_kn_radix_seq_get(&radix_seq, 0);
+    ucc_kn_radix_t              radix     = ucc_kn_radix_seq_get(&radix_seq, 0);
     ucc_rank_t                  rank  = VRANK(task->subset.myrank,
                                               ct == UCC_COLL_TYPE_BCAST ?
                                               args->root : 0, size);

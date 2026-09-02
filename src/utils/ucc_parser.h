@@ -351,13 +351,13 @@ void ucc_config_release_kn_radix(void *ptr, const void *arg);
             "#            value and default_value can be \"auto\""             \
     }
 
-#define UCC_CONFIG_TYPE_KN_RADIX                                              \
+#define UCC_CONFIG_TYPE_KN_RADIX                                               \
     {                                                                          \
-        ucc_config_sscanf_kn_radix, ucc_config_sprintf_kn_radix,              \
-            ucc_config_clone_kn_radix, ucc_config_release_kn_radix,           \
-            ucs_config_help_generic, ucs_config_doc_nop,                      \
-            "[<munit>-<munit>:[mtype]:]<radix>[x<radix>...],...,auto\n"      \
-            "#            an x-separated value is an ordered exact sequence" \
+        ucc_config_sscanf_kn_radix, ucc_config_sprintf_kn_radix,               \
+            ucc_config_clone_kn_radix, ucc_config_release_kn_radix,            \
+            ucs_config_help_generic, ucs_config_doc_nop,                       \
+            "[<munit>-<munit>:[mtype]:]<radix>[x<radix>...],...,auto\n"        \
+            "#            an x-separated value is an ordered exact sequence"   \
     }
 
 #define UCC_CONFIG_TYPE_PIPELINE_PARAMS                                        \
@@ -379,13 +379,13 @@ void ucc_config_release_kn_radix(void *ptr, const void *arg);
             "#            value and default_value can be \"auto\""             \
     }
 
-#define UCC_CONFIG_TYPE_KN_RADIX                                              \
+#define UCC_CONFIG_TYPE_KN_RADIX                                               \
     {                                                                          \
-        ucc_config_sscanf_kn_radix, ucc_config_sprintf_kn_radix,              \
-            ucc_config_clone_kn_radix, ucc_config_release_kn_radix,           \
-            ucs_config_help_generic,                                          \
-            "[<munit>-<munit>:[mtype]:]<radix>[x<radix>...],...,auto\n"      \
-            "#            an x-separated value is an ordered exact sequence" \
+        ucc_config_sscanf_kn_radix, ucc_config_sprintf_kn_radix,               \
+            ucc_config_clone_kn_radix, ucc_config_release_kn_radix,            \
+            ucs_config_help_generic,                                           \
+            "[<munit>-<munit>:[mtype]:]<radix>[x<radix>...],...,auto\n"        \
+            "#            an x-separated value is an ordered exact sequence"   \
     }
 
 #define UCC_CONFIG_TYPE_PIPELINE_PARAMS                                        \

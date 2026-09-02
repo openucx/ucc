@@ -24,7 +24,7 @@ ucc_kn_radix_seq_from_radix(ucc_kn_radix_t radix)
 {
     ucc_kn_radix_seq_t seq = {0};
 
-    seq.radix      = radix;
+    seq.radix     = radix;
     seq.n_radices = 1;
     return seq;
 }
