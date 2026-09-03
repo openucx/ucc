@@ -10,20 +10,24 @@
 #include "ucc/api/ucc.h"
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_coll_utils.h"
+#include "utils/ucc_list.h"
 #include "ucc_context.h"
+#include "ucc_team_cache.h"
 #include "utils/ucc_math.h"
 #include "components/base/ucc_base_iface.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
 #include "coll_score/ucc_coll_score.h"
+#include "ucc_service_coll.h" /* ucc_service_coll_req_t is embedded below */
 
-typedef struct ucc_service_coll_req ucc_service_coll_req_t;
 typedef enum {
-    UCC_TEAM_ADDR_EXCHANGE,
+    UCC_TEAM_ADDR_EXCHANGE, /* zero, so it is the calloc default */
     UCC_TEAM_SERVICE_TEAM,
     UCC_TEAM_ALLOC_ID,
     UCC_TEAM_CL_CREATE,
     UCC_TEAM_ACTIVE,
+    UCC_TEAM_CACHE_AGREE,         /* cache-action vote in flight */
+    UCC_TEAM_CACHE_MISS_TEARDOWN, /* vote lost, draining before a rebuild */
 } ucc_team_state_t;
 
 typedef struct ucc_team {
@@ -48,6 +52,15 @@ typedef struct ucc_team {
     ucc_topo_t             *topo;
     ucc_score_map_t        *score_map; /*< score map of CLs */
     uint32_t                seq_num;
+    int                       refcount; /* live teams backing a cache entry */
+    ucc_team_cache_identity_t cache_identity;
+    ucc_list_link_t           cache_link; /* live, dormant or reserved list */
+    ucc_team_cache_state_t    cache_state;
+    int                       cache_pending_insert; /* cacheable, not yet in */
+    ucc_team_cache_action_t   cache_local_action;   /* this rank's vote */
+    ucc_service_coll_req_t    cache_vote_req;       /* embedded, never freed */
+    uint64_t                  cache_vote_in[UCC_TEAM_CACHE_VOTE_LANES];
+    uint64_t                  cache_vote_out[UCC_TEAM_CACHE_VOTE_LANES];
 } ucc_team_t;
 
 /* If the bit is set then team_id is provided by the user */
@@ -56,6 +69,19 @@ typedef struct ucc_team {
 #define UCC_TEAM_ID_MAX ((uint16_t)UCC_BIT(15) - 1)
 
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src);
+
+/* Team-id pool bit helpers; bit (pos - 1) of word i encodes id i * 64 + pos */
+int  ucc_team_id_pool_ffs_clear(uint64_t *value);
+void ucc_team_id_pool_set_bit(uint64_t *local, int id);
+
+/* Destroy every dormant team; call before the CL/TL contexts are destroyed */
+void ucc_team_cache_drain(ucc_context_t *context);
+
+/* Drive one teardown attempt for each team on the pending-destroy list */
+void ucc_team_cache_progress_pending(ucc_team_cache_t *cache);
+
+/* Move the eviction victim to the pending-destroy list and start its teardown */
+ucc_status_t ucc_team_cache_evict_one(ucc_team_cache_t *cache);
 
 /* Returns addressing information for "rank" in a team.
    If ucc context was created with OOB then addr storage is located on context.
