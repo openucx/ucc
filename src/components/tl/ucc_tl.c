@@ -188,7 +188,7 @@ static ucc_status_t ucc_tl_is_reachable(const ucc_base_team_params_t *params,
     for (i = 0; i < params->size; i++) {
         rank = ucc_ep_map_eval(params->map, i);
         if (use_ctx) {
-            rank = ucc_ep_map_eval(core_team->ctx_map, rank);
+            rank = ucc_ep_map_eval(UCC_TEAM_CTX_MAP(core_team), rank);
         }
         addr_header = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, rank);
         for (j = 0; j < addr_header->n_components; j++) {

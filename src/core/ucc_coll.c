@@ -328,6 +328,9 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
 
 print_trace:
     *request = &task->super;
+    if (UCC_IS_PERSISTENT(task->bargs.args)) {
+        team->persistent_coll_count++;
+    }
     if (ucc_unlikely(ucc_global_config.coll_trace.log_level >=
                      UCC_LOG_LEVEL_DIAG)) {
         char coll_str[256];
@@ -478,6 +481,10 @@ ucc_status_t ucc_collective_finalize_internal(ucc_coll_task_t *task)
         if (ucc_unlikely(st != UCC_OK)) {
             ucc_error("executor finalize error: %s", ucc_status_string(st));
         }
+    }
+    if (UCC_IS_PERSISTENT(task->bargs.args) && task->bargs.team != NULL) {
+        ucc_assert(task->bargs.team->persistent_coll_count > 0);
+        task->bargs.team->persistent_coll_count--;
     }
     return task->finalize(task);
 }
