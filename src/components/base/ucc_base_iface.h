@@ -180,6 +180,8 @@ typedef struct ucc_base_team_iface {
     ucc_status_t (*create_test)(ucc_base_team_t *team);
     ucc_status_t (*destroy)(ucc_base_team_t *team);
     ucc_get_coll_scores_fn_t get_scores;
+    /* Optional: re-seats the team id and tag domain in place */
+    void (*update_id)(ucc_base_team_t *team, uint16_t id);
 } ucc_base_team_iface_t;
 
 enum {
@@ -264,6 +266,7 @@ typedef struct ucc_base_coll_alg_info {
         .super.team.create_test = ucc_##_f##_name##_team_create_test,          \
         .super.team.destroy     = ucc_##_f##_name##_team_destroy,              \
         .super.team.get_scores  = ucc_##_f##_name##_team_get_scores,           \
+        .super.team.update_id   = NULL,                                        \
         .super.coll.init        = ucc_##_f##_name##_coll_init,                 \
         .super.alg_info         = {NULL}};                                     \
     UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_##_f##_name.super._f##lib_config,     \
