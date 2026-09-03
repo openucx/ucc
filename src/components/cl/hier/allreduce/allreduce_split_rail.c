@@ -296,7 +296,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_split_rail_init,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (!ucc_topo_isoppn(team->params.team->topo)) {
+    if (!ucc_topo_isoppn(UCC_TEAM_TOPO(team->params.team))) {
         cl_debug(team->context->lib, "split_rail algorithm does not support "
                                      "teams with non-uniform ppn across nodes");
         return UCC_ERR_NOT_SUPPORTED;

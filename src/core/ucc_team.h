@@ -10,21 +10,51 @@
 #include "ucc/api/ucc.h"
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_coll_utils.h"
+#include "utils/ucc_list.h"
 #include "ucc_context.h"
+#include "ucc_team_cache.h"
 #include "utils/ucc_math.h"
 #include "components/base/ucc_base_iface.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
 #include "coll_score/ucc_coll_score.h"
+#include "ucc_service_coll.h" /* ucc_service_coll_req_t is embedded below */
 
-typedef struct ucc_service_coll_req ucc_service_coll_req_t;
 typedef enum {
-    UCC_TEAM_ADDR_EXCHANGE,
+    UCC_TEAM_ADDR_EXCHANGE, /* zero, so it is the calloc default */
     UCC_TEAM_SERVICE_TEAM,
     UCC_TEAM_ALLOC_ID,
     UCC_TEAM_CL_CREATE,
     UCC_TEAM_ACTIVE,
+    UCC_TEAM_CACHE_AGREE,         /* cache-action vote in flight */
+    UCC_TEAM_CACHE_MISS_TEARDOWN, /* vote lost, draining before a rebuild */
 } ucc_team_state_t;
+
+/* Refcounted holder of the per-team state that derived teams may share */
+typedef struct ucc_team_artifacts {
+    ucc_ep_map_t   ctx_map;   /*< map to the ctx ranks, set if CTX is global */
+    ucc_rank_t    *ctx_ranks; /*< UCC-owned backing array of ctx_map, or NULL */
+    ucc_topo_t    *topo;      /*< subset topology */
+    int            refcount;  /*< number of teams pointing at this holder */
+    ucc_spinlock_t lock;      /*< guards refcount */
+    uint8_t        heap;      /*< 1: heap-allocated, 0: embedded in a team */
+} ucc_team_artifacts_t;
+
+/* Allocate a shareable heap holder, refcount 1, artifacts zeroed */
+ucc_team_artifacts_t *ucc_team_artifacts_alloc(void);
+
+/* Init an embedded holder in place: refcount 1, heap 0 */
+void ucc_team_artifacts_init_inline(ucc_team_artifacts_t *a);
+
+/* Add a reference and return @a, for call site convenience */
+ucc_team_artifacts_t *ucc_team_artifacts_get(ucc_team_artifacts_t *a);
+
+/* Drop a reference; at zero release contents, free the struct if heap */
+void ucc_team_artifacts_put(ucc_team_artifacts_t *a);
+
+#define UCC_TEAM_CTX_MAP(_team)   ((_team)->artifacts->ctx_map)
+#define UCC_TEAM_CTX_RANKS(_team) ((_team)->artifacts->ctx_ranks)
+#define UCC_TEAM_TOPO(_team)      ((_team)->artifacts->topo)
 
 typedef struct ucc_team {
     ucc_team_state_t        state;
@@ -41,13 +71,28 @@ typedef struct ucc_team {
     ucc_tl_team_t *         service_team;
     ucc_service_coll_req_t *sreq;
     ucc_addr_storage_t      addr_storage; /*< addresses of team endpoints */
-    ucc_rank_t *            ctx_ranks;
     void *                  oob_req;
-    ucc_ep_map_t            ctx_map; /*< map to the ctx ranks, defined if CTX
-                                  type is global (oob provided) */
-    ucc_topo_t             *topo;
+    ucc_team_artifacts_t   *artifacts; /*< ctx_map/ctx_ranks/topo holder */
+    ucc_team_artifacts_t    artifacts_inline; /*< holder used when not shared */
     ucc_score_map_t        *score_map; /*< score map of CLs */
     uint32_t                seq_num;
+    int                       refcount; /* live teams backing a cache entry */
+    ucc_team_cache_identity_t cache_identity;
+    ucc_list_link_t           cache_link;  /* live, dormant or reserved list */
+    ucc_list_link_t           bucket_link; /* same-hash chain off the bucket */
+    ucc_team_cache_state_t    cache_state;
+    int                       cache_pending_insert; /* cacheable, not yet in */
+    int                       is_derived; /* borrows a parent's artifacts */
+    uint16_t                  parent_id;  /* id borrowed from, if derived */
+    ucc_team_cache_action_t   cache_local_action; /* this rank's vote */
+    ucc_service_coll_req_t    cache_vote_req;     /* embedded, never freed */
+    uint64_t                  cache_vote_in[UCC_TEAM_CACHE_VOTE_LANES];
+    uint64_t                  cache_vote_out[UCC_TEAM_CACHE_VOTE_LANES];
+    /* Parent pin held across the vote, consumed by ucc_team_init_derived */
+    ucc_team_artifacts_t     *cache_derive_artifacts;
+    uint16_t                  cache_derive_parent_id;
+    uint64_t                  cache_parent_instance_cookie;
+    uint16_t                  cache_reseat_new_id; /* drifted ext_id, RESEAT */
 } ucc_team_t;
 
 /* If the bit is set then team_id is provided by the user */
@@ -56,6 +101,29 @@ typedef struct ucc_team {
 #define UCC_TEAM_ID_MAX ((uint16_t)UCC_BIT(15) - 1)
 
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src);
+
+/* Team-id pool bit helpers; bit (pos - 1) of word i encodes id i * 64 + pos */
+int  ucc_team_id_pool_ffs_clear(uint64_t *value);
+void ucc_team_id_pool_set_bit(uint64_t *local, int id);
+
+/* Non-zero if @parent is ACTIVE with materialized artifacts to lend */
+int ucc_team_can_derive_from(const ucc_team_t *parent);
+
+/* Move @team and every CL/TL team it owns to the tag domain of @new_ext_id */
+void ucc_team_reseat_id(ucc_team_t *team, uint16_t new_ext_id);
+
+/* Attach @team to @held_artifacts, consuming that reference */
+void ucc_team_init_derived(
+    ucc_team_t *team, ucc_team_artifacts_t *held_artifacts, uint16_t parent_id);
+
+/* Destroy every dormant team; call before the CL/TL contexts are destroyed */
+void ucc_team_cache_drain(ucc_context_t *context);
+
+/* Drive one teardown attempt for each team on the pending-destroy list */
+void ucc_team_cache_progress_pending(ucc_team_cache_t *cache);
+
+/* Move the eviction victim to the pending-destroy list and start its teardown */
+ucc_status_t ucc_team_cache_evict_one(ucc_team_cache_t *cache);
 
 /* Returns addressing information for "rank" in a team.
    If ucc context was created with OOB then addr storage is located on context.
@@ -73,7 +141,8 @@ ucc_get_team_ep_header(ucc_context_t *context, ucc_team_t *team,
                                            : &team->addr_storage;
     ucc_rank_t          storage_rank =
         context->addr_storage.storage
-                     ? (team ? ucc_ep_map_eval(team->ctx_map, rank) : rank)
+                     ? (team ? ucc_ep_map_eval(UCC_TEAM_CTX_MAP(team), rank)
+                             : rank)
                      : rank;
 
     return UCC_ADDR_STORAGE_RANK_HEADER(storage, storage_rank);
@@ -103,12 +172,14 @@ static inline void *ucc_get_team_ep_addr(ucc_context_t *context,
 
 static inline ucc_rank_t ucc_get_ctx_rank(ucc_team_t *team, ucc_rank_t team_rank)
 {
-    return ucc_ep_map_eval(team->ctx_map, team_rank);
+    return ucc_ep_map_eval(UCC_TEAM_CTX_MAP(team), team_rank);
 }
 
 static inline ucc_host_id_t ucc_team_rank_host_id(ucc_rank_t rank, ucc_team_t *team)
 {
-    return team->topo->topo->procs[ucc_get_ctx_rank(team, rank)].host_id;
+    ucc_topo_t *topo = UCC_TEAM_TOPO(team);
+
+    return topo->topo->procs[ucc_get_ctx_rank(team, rank)].host_id;
 }
 
 static inline int ucc_team_ranks_on_same_node(ucc_rank_t rank1, ucc_rank_t rank2,
