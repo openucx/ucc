@@ -57,7 +57,8 @@ static inline ucc_cpu_vendor_t ucc_arch_get_cpu_vendor()
         return UCC_CPU_VENDOR_FUJITSU_ARM;
     }
 
-    if ((cpuid.implementer == 0x41) && (cpuid.architecture == 8)) {
+    if (((cpuid.implementer == 0x41) || (cpuid.implementer == 0x4e)) &&
+        (cpuid.architecture == 8)) {
         return UCC_CPU_VENDOR_NVIDIA;
     }
 
@@ -69,9 +70,14 @@ static inline ucc_cpu_model_t ucc_arch_get_cpu_model()
     ucc_aarch64_cpuid_t cpuid;
     ucc_aarch64_cpuid(&cpuid);
 
-    if ((ucc_arch_get_cpu_vendor() == UCC_CPU_VENDOR_NVIDIA) &&
-        (cpuid.part == 0xd4f)) {
-        return UCC_CPU_MODEL_NVIDIA_GRACE;
+    if (ucc_arch_get_cpu_vendor() == UCC_CPU_VENDOR_NVIDIA) {
+        if (cpuid.part == 0xd4f) {
+            return UCC_CPU_MODEL_NVIDIA_GRACE;
+        }
+
+        if (cpuid.part == 0x010) {
+            return UCC_CPU_MODEL_NVIDIA_VERA;
+        }
     }
 
     if (ucc_arch_get_cpu_vendor() == UCC_CPU_VENDOR_FUJITSU_ARM) {
