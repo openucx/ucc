@@ -155,29 +155,6 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
         args.src.info_v.displacements = (ucc_aint_t*)sdispls;
         args.dst.info_v.displacements = (ucc_aint_t*)rdispls;
     }
-    if (is_onesided) {
-        MPI_Datatype datatype;
-        size_t       disp_size;
-        void        *ldisp;
-        int          alltoall_status;
-
-        if (TEST_FLAG_VSIZE_64BIT == displ_bits) {
-            datatype  = MPI_LONG;
-            disp_size = sizeof(uint64_t);
-        } else {
-            datatype  = MPI_INT;
-            disp_size = sizeof(uint32_t);
-        }
-        ldisp = ucc_calloc(nprocs, disp_size, "displacements");
-        UCC_MALLOC_CHECK(ldisp);
-        alltoall_status = MPI_Alltoall(args.dst.info_v.displacements, 1,
-                                       datatype, ldisp, 1, datatype, team.comm);
-        if (MPI_SUCCESS != alltoall_status) {
-            std::cerr << "*** MPI ALLTOALL FAILED" << std::endl;
-            MPI_Abort(MPI_COMM_WORLD, -1);
-        }
-        args.dst.info_v.displacements = (ucc_aint_t *)ldisp;
-    }
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
