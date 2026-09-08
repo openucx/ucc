@@ -1,3 +1,9 @@
+/**
+ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ * Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include "ucc_mpool.h"
 #include "ucc_malloc.h"
 #include "ucc_log.h"

@@ -2,8 +2,6 @@
  * @file ucc_status.h
  * @date 2020
  * @copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- *
- * See file LICENSE for terms.
  */
 
 #ifndef UCC_STATUS_H_

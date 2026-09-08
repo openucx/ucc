@@ -1,14 +1,7 @@
 /*
- * Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES, ALL RIGHTS RESERVED.
- *
- * This software product is a proprietary product of NVIDIA CORPORATION &
- * AFFILIATES (the "Company") and all right, title, and interest in and to the
- * software product, including all associated intellectual property rights, are
- * and shall remain exclusively with the Company.
- *
- * This software product is governed by the End User License Agreement
- * provided with the software product.
- *
+ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ * Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #ifndef _GNU_SOURCE

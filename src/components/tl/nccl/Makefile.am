@@ -1,7 +1,7 @@
 #
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-#
-if TL_NCCL_ENABLED
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clauseif TL_NCCL_ENABLED
 
 allgatherv =                      \
 	allgatherv/allgatherv.h       \

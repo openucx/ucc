@@ -1,7 +1,7 @@
 /**
- * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- *
- * See file LICENSE for terms.
+ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ * Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 #ifndef REDUCE_H_
 #define REDUCE_H_

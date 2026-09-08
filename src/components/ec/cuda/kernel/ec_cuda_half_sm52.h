@@ -1,7 +1,8 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ * Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
  *
- * See file LICENSE for terms of ucc.
  *
  * This file is copy-pasted from cuda_fp16.hpp in the CUDA toolkit and modified.
  * See the original cuda_fp16.hpp for terms of cuda_fp16.hpp.

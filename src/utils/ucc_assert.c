@@ -1,8 +1,8 @@
 /**
-* Copyright (c) NVIDIA CORPORATION & AFFILIATES, 2001-2022. ALL RIGHTS RESERVED.
-*
-* See file LICENSE for terms.
-*/
+ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ * Copyright (c) 2001-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 
 #include "ucc_assert.h"
 #include "ucc_log.h"

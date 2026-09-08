@@ -1,7 +1,7 @@
 #
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-#
-
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 cmakedir = $(libdir)/cmake/ucc
 cmake_DATA =                       \
     ucc-targets.cmake              \
