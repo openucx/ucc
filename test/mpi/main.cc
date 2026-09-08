@@ -54,7 +54,7 @@ static size_t msgrange[3] = {
 static std::vector<bool>   inplace      = {false};
 static std::vector<bool>   persistent   = {false};
 static std::vector<bool>   triggered    = {false};
-static std::vector<bool>   local_reg    = {false};
+static std::vector<ucc_test_memh_mode_t> local_reg = {UCC_TEST_MEMH_NONE};
 static ucc_test_mpi_root_t root_type    = ROOT_RANDOM;
 static int                 root_value   = 10;
 static ucc_thread_mode_t   thread_mode  = UCC_THREAD_SINGLE;
@@ -109,7 +109,7 @@ void print_help()
        "-T, --thread-multiple\n\tenable multi-threaded testing\n\n"
        "-v, --verbose\n\tlog all test cases\n\n"
        "--triggered            <value>\n\t0 - use post, 1 - use triggered post, 2 - both\n\n"
-       "--local_reg            <value>\n\t0 - no local registration, 1 - local registration, 2 - both\n\n"
+       "--local_reg            <value>\n\t0 - no registration, 1 - local memh, 2 - none+local, 3 - global memh, 4 - none+local+global\n\n"
        "-h, --help\n\tShow help\n";
 }
 
@@ -370,13 +370,20 @@ static void process_local_reg(const char *arg)
     int value = std::stoi(arg);
     switch(value) {
     case 0:
-        local_reg = {false};
+        local_reg = {UCC_TEST_MEMH_NONE};
         return;
     case 1:
-        local_reg = {true};
+        local_reg = {UCC_TEST_MEMH_LOCAL};
         return;
     case 2:
-        local_reg = {false, true};
+        local_reg = {UCC_TEST_MEMH_NONE, UCC_TEST_MEMH_LOCAL};
+        return;
+    case 3:
+        local_reg = {UCC_TEST_MEMH_GLOBAL};
+        return;
+    case 4:
+        local_reg = {UCC_TEST_MEMH_NONE, UCC_TEST_MEMH_LOCAL,
+                     UCC_TEST_MEMH_GLOBAL};
         return;
     default:
         break;
@@ -602,6 +609,7 @@ int main(int argc, char *argv[])
 {
     int failed = 0;
     int total_done_skipped_failed[ucc_ilog2(UCC_COLL_TYPE_LAST) + 1][4];
+    int mem_map_tally[4];
     std::chrono::steady_clock::time_point begin;
     int size, required, provided, completed, rank;
     UccTestMpi *test;
@@ -682,7 +690,7 @@ int main(int argc, char *argv[])
                     test->set_triggered(trig);
                     test->set_inplace(inpl);
                     test->set_persistent(pers);
-                    test->set_local_registration(lr);
+                    test->set_memh_mode(lr);
                     test->run_all();
                 }
             }
@@ -710,6 +718,10 @@ int main(int argc, char *argv[])
             }
         }
     }
+    run_mem_map_tests(test, mem_map_tally);
+    MPI_Allreduce(MPI_IN_PLACE, mem_map_tally, 4, MPI_INT, MPI_MAX,
+                  MPI_COMM_WORLD);
+
     std::cout << std::flush;
 
     for (auto s : test->results) {
@@ -770,6 +782,20 @@ int main(int argc, char *argv[])
                 std::setw(10) << std::right << total_done_skipped_failed[coll_num][2] <<
                 std::endl;
 
+        }
+
+        if (mem_map_tally[0] > 0) {
+            num_all += mem_map_tally[0];
+            num_done += mem_map_tally[1];
+            num_skipped += mem_map_tally[2];
+            num_failed += mem_map_tally[3];
+            std::cout <<
+                std::setw(22) << std::left << "mem_map" <<
+                std::setw(10) << std::right << mem_map_tally[0] <<
+                std::setw(10) << std::right << mem_map_tally[1] <<
+                std::setw(10) << std::right << mem_map_tally[3] <<
+                std::setw(10) << std::right << mem_map_tally[2] <<
+                std::endl;
         }
         std::cout <<
             " \n===== UCC MPI TEST SUMMARY =====\n" <<

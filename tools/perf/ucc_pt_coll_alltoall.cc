@@ -96,7 +96,7 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
 
         dst_memh_global = new ucc_mem_map_mem_h[comm->get_size()];
         for (int i = 0; i < comm->get_size(); i++) {
-            dst_memh_global[i] = new char[dst_memh_size_max];
+            dst_memh_global[i] = ucc_malloc(dst_memh_size_max, "dst memh blob");
             if (i == comm->get_rank()) {
                 memcpy(dst_memh_global[i], dst_memh, dst_memh_size);
             }
@@ -123,7 +123,7 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
 
             src_memh_global = new ucc_mem_map_mem_h[comm->get_size()];
             for (int i = 0; i < comm->get_size(); i++) {
-                src_memh_global[i] = new char[src_memh_size_max];
+                src_memh_global[i] = ucc_malloc(src_memh_size_max, "src memh blob");
                 if (i == comm->get_rank()) {
                     memcpy(src_memh_global[i], src_memh, src_memh_size);
                 }
@@ -216,8 +216,8 @@ ucc_pt_coll_alltoall::~ucc_pt_coll_alltoall()
     if (dst_memh_global) {
         for (int i = 0; i < comm->get_size(); i++) {
             if (dst_memh_global[i]) {
+                /* ucc_mem_unmap frees the ucc_malloc'd blob and nulls it. */
                 ucc_mem_unmap(&dst_memh_global[i]);
-                delete[] static_cast<char*>(dst_memh_global[i]);
             }
         }
         delete[] dst_memh_global;
@@ -226,8 +226,8 @@ ucc_pt_coll_alltoall::~ucc_pt_coll_alltoall()
     if (src_memh_global) {
         for (int i = 0; i < comm->get_size(); i++) {
             if (src_memh_global[i]) {
+                /* ucc_mem_unmap frees the ucc_malloc'd blob and nulls it. */
                 ucc_mem_unmap(&src_memh_global[i]);
-                delete[] static_cast<char*>(src_memh_global[i]);
             }
         }
         delete[] src_memh_global;

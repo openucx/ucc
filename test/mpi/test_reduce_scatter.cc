@@ -50,6 +50,8 @@ TestReduceScatter::TestReduceScatter(ucc_test_team_t &_team,
     args.dst.info.buffer   = rbuf;
     args.dst.info.datatype = dt;
     args.dst.info.mem_type = mem_type;
+    register_memhs(sbuf, inplace ? 0 : msgsize, rbuf,
+                   inplace ? msgsize : msgsize / comm_size);
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }

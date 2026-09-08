@@ -245,6 +245,7 @@ UCC_TEST_F(test_mem_map_import, basic_import)
     import_memh = (ucc_mem_map_mem_h)malloc(export_memh_size);
     ASSERT_NE(nullptr, import_memh);
     memcpy(import_memh, export_memh, export_memh_size);
+    import_memh_size = export_memh_size;
 
     import_status = ucc_mem_map(ctx_h, UCC_MEM_MAP_MODE_IMPORT,
                                 &export_params, &import_memh_size,
@@ -311,6 +312,7 @@ UCC_TEST_F(test_mem_map_import, import_different_sizes)
         import_memh = (ucc_mem_map_mem_h)malloc(export_memh_size);
         ASSERT_NE(nullptr, import_memh);
         memcpy(import_memh, export_memh, export_memh_size);
+        import_memh_size = export_memh_size;
 
         import_status = ucc_mem_map(ctx_h, UCC_MEM_MAP_MODE_IMPORT,
                                    &export_params, &import_memh_size,

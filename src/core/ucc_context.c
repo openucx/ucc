@@ -1256,7 +1256,8 @@ ucc_status_t ucc_mem_map_import(ucc_context_h        context,
     ucc_context_t            *ctx    = (ucc_context_t *)context;
     ucc_status_t              status = UCC_OK;
     ucc_config_names_array_t *tls    = &ctx->all_tls;
-    size_t                    offset = 0;
+    size_t                    offset  = 0;
+    size_t                    pack_len;
     int                       i;
     ucc_mem_map_memh_t       *local_memh;
     ucc_tl_lib_t             *tl_lib;
@@ -1285,9 +1286,14 @@ ucc_status_t ucc_mem_map_import(ucc_context_h        context,
         local_memh->tl_h    = NULL;
         local_memh->mode    = mode;
         local_memh->context = ctx;
-        *memh_size          = 0;
         return UCC_OK;
     }
+
+    /* The imported handle carries its own serialized size in pack_buffer_len.
+     * memh_size is output-only per the public contract and must not be read
+     * here; the import contract requires a valid handle, so bound parsing by
+     * the handle's own size. */
+    pack_len = local_memh->pack_buffer_len;
 
     /* memh should have been used in exchanges or from a remote process,
        addresses, etc. likely garbage. fix it */
@@ -1302,46 +1308,67 @@ ucc_status_t ucc_mem_map_import(ucc_context_h        context,
     for (i = 0; i < ctx->n_tl_ctx; i++) {
         offset = 0;
         for (int j = 0; j < local_memh->num_tls; j++) {
+            const size_t hdr_len = UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t);
+
+            if (offset > pack_len || hdr_len > pack_len - offset) {
+                ucc_error("imported memh record %d header exceeds pack_buffer "
+                          "bounds", j);
+                status = UCC_ERR_INVALID_PARAM;
+                goto err_import;
+            }
+
             char *name          = PTR_OFFSET(local_memh->pack_buffer, offset);
-            size_t *packed_size = PTR_OFFSET(local_memh->pack_buffer, offset + UCC_MEM_MAP_TL_NAME_LEN);
+            size_t *packed_size = PTR_OFFSET(local_memh->pack_buffer,
+                                             offset + UCC_MEM_MAP_TL_NAME_LEN);
+
+            if (*packed_size > pack_len - offset - hdr_len) {
+                ucc_error("imported memh record %d payload exceeds pack_buffer "
+                          "bounds", j);
+                status = UCC_ERR_INVALID_PARAM;
+                goto err_import;
+            }
+
             if (strcmp(name, tls->names[i]) == 0) {
                 tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
-                strncpy(local_memh->tl_h[j].tl_name, tls->names[i], UCC_MEM_MAP_TL_NAME_LEN - 1);
+                strncpy(local_memh->tl_h[j].tl_name, tls->names[i],
+                        UCC_MEM_MAP_TL_NAME_LEN - 1);
                 status = tl_lib->iface->context.mem_map(
                     (const ucc_base_context_t *)ctx->tl_ctx[i], mode,
                     local_memh, &local_memh->tl_h[j]);
                 if (status < UCC_ERR_NOT_IMPLEMENTED) {
                     ucc_error("failed to import mem map memh %d", status);
-                    /* unmap slots that were successfully mapped using
-                       name-based matching (data is indexed by exporter slot) */
-                    for (int m = 0; m < (int)local_memh->num_tls; m++) {
-                        if (!local_memh->tl_h[m].tl_data) {
-                            continue;
-                        }
-                        for (int k = 0; k < ctx->n_tl_ctx; k++) {
-                            if (strcmp(local_memh->tl_h[m].tl_name,
-                                       tls->names[k]) == 0) {
-                                ucc_tl_lib_t *rl = ucc_derived_of(
-                                    ctx->tl_ctx[k]->super.lib, ucc_tl_lib_t);
-                                rl->iface->context.mem_unmap(
-                                    (const ucc_base_context_t *)ctx->tl_ctx[k],
-                                    mode, &local_memh->tl_h[m]);
-                                break;
-                            }
-                        }
-                    }
-                    ucc_free(local_memh->tl_h);
-                    return status;
+                    goto err_import;
                 }
             }
-            offset += UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t) + *packed_size;
+            offset += hdr_len + *packed_size;
         }
     }
     local_memh->mode    = mode;
     /* fix context as it will be incorrect on a different system */
     local_memh->context = ctx;
-    *memh_size          = 0;
 
+    return status;
+
+err_import:
+    /* unmap slots that were successfully mapped using name-based matching
+       (data is indexed by exporter slot) */
+    for (int m = 0; m < (int)local_memh->num_tls; m++) {
+        if (!local_memh->tl_h[m].tl_data) {
+            continue;
+        }
+        for (int k = 0; k < ctx->n_tl_ctx; k++) {
+            if (strcmp(local_memh->tl_h[m].tl_name, tls->names[k]) == 0) {
+                ucc_tl_lib_t *rl = ucc_derived_of(
+                    ctx->tl_ctx[k]->super.lib, ucc_tl_lib_t);
+                rl->iface->context.mem_unmap(
+                    (const ucc_base_context_t *)ctx->tl_ctx[k], mode,
+                    &local_memh->tl_h[m]);
+                break;
+            }
+        }
+    }
+    ucc_free(local_memh->tl_h);
+    local_memh->tl_h = NULL;
     return status;
 }
 
@@ -1550,6 +1577,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     exported_memh->address     = local_memh->address;
     exported_memh->len         = local_memh->len;
     exported_memh->num_tls     = packed_tls;
+    exported_memh->pack_buffer_len = offset;
     *memh                      = exported_memh;
     *memh_size                 = sizeof(ucc_mem_map_memh_t) + offset;
     ucc_free(local_memh->tl_h);

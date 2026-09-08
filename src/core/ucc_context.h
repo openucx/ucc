@@ -112,6 +112,7 @@ typedef struct ucc_mem_map_memh_t {
     size_t             len;
     ucc_mem_map_tl_t  *tl_h;
     int                num_tls;
+    size_t             pack_buffer_len;
     char               pack_buffer[0];
 } ucc_mem_map_memh_t;
 

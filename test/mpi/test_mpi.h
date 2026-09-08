@@ -245,11 +245,17 @@ typedef struct ucc_test_team {
 
 } ucc_test_team_t;
 
+typedef enum {
+    UCC_TEST_MEMH_NONE   = 0, /* no user memory registration */
+    UCC_TEST_MEMH_LOCAL  = 1, /* args.*_memh.local_memh */
+    UCC_TEST_MEMH_GLOBAL = 2, /* args.*_memh.global_memh + *_MEMH_GLOBAL flag */
+} ucc_test_memh_mode_t;
+
 struct TestCaseParams {
     size_t msgsize;
     bool inplace;
     bool persistent;
-    bool local_registration;
+    ucc_test_memh_mode_t memh_mode;
     ucc_datatype_t dt;
     ucc_reduction_op_t op;
     ucc_memory_type_t mt;
@@ -268,12 +274,19 @@ protected:
     size_t msgsize;
     bool inplace;
     bool persistent;
-    bool local_registration;
+    ucc_test_memh_mode_t memh_mode;
+    ucc_status_t register_memhs(void *sbuf, size_t ssize, void *dbuf, size_t dsize);
+    ucc_status_t register_memh_global(void *buf, size_t size,
+                                      ucc_mem_map_mem_h *local_memh,
+                                      ucc_mem_map_mem_h **global_memh);
     ucc_coll_req_h req;
     ucc_mem_map_mem_h src_memh;
     size_t src_memh_size;
     ucc_mem_map_mem_h dst_memh;
     size_t dst_memh_size;
+    ucc_mem_map_mem_h *src_global_memh;
+    ucc_mem_map_mem_h *dst_global_memh;
+    int               memh_global_size;
     ucc_mc_buffer_header_t *sbuf_mc_header, *rbuf_mc_header;
     void *sbuf;
     void *rbuf;
@@ -327,7 +340,7 @@ class UccTestMpi {
     void *                    onesided_buffers[3];
     size_t                    test_max_size;
     bool                      triggered;
-    bool                      local_registration;
+    ucc_test_memh_mode_t      memh_mode;
     void create_team(ucc_test_mpi_team_t t, bool is_onesided = false);
     void destroy_team(ucc_test_team_t &team);
     ucc_team_h create_ucc_team(MPI_Comm comm, bool is_onesided = false);
@@ -370,9 +383,9 @@ public:
     {
         triggered = _triggered;
     }
-    void set_local_registration(bool _local_registration)
+    void set_memh_mode(ucc_test_memh_mode_t _memh_mode)
     {
-        local_registration = _local_registration;
+        memh_mode = _memh_mode;
     }
     void set_count_vsizes(std::vector<ucc_test_vsize_flag_t> &_counts_vsize);
     void set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vsize);
@@ -533,9 +546,12 @@ class TestScatterv : public TestCase {
 public:
     TestScatterv(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input(int iter_persistent = 0) override;
-    ucc_status_t check();
+    ucc_status_t check() override;
     ~TestScatterv();
 };
+
+
+void run_mem_map_tests(UccTestMpi *test, int tally[4]);
 
 void init_buffer(void *buf, size_t count, ucc_datatype_t dt,
                  ucc_memory_type_t mt, int value, int offset = 0);
