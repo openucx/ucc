@@ -378,10 +378,9 @@ TYPED_TEST(test_allreduce_alg, dbt) {
 
 TYPED_TEST(test_allreduce_alg, ring) {
     int           n_procs = 15;
-    /* "0-inf:@ring" forces ring for all message sizes; ring returns
-     * UCC_ERR_NOT_SUPPORTED when count % team_size != 0 (see
-     * ring_count_not_divisible).  All counts below are chosen to be
-     * divisible by n_procs so that this tune is valid here. */
+    /* "0-inf:@ring" forces ring for all message sizes. Ring now handles any
+     * count regardless of divisibility by team size (see
+     * ring_count_not_divisible). */
     ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
                              {"UCC_TL_UCP_TUNE", "allreduce:0-inf:@ring"}};
     UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
@@ -444,6 +443,49 @@ TYPED_TEST(test_allreduce_alg, ring_edge_cases) {
                     this->set_inplace(inplace);
                     this->data_init(team_size, TypeParam::dt, count, ctxs,
                                     false);
+                    UccReq req(team, ctxs);
+                    ASSERT_EQ(UCC_OK, req.status);
+
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, this->data_validate(ctxs));
+                    this->data_fini(ctxs);
+                }
+            }
+        }
+    }
+}
+
+TYPED_TEST(test_allreduce_alg, ring_count_not_divisible)
+{
+    // Test remainder handling: counts where count % team_size != 0.
+    // Team sizes {3, 5, 7}; each count is non-divisible by all three.
+    for (auto team_size : {3, 5, 7}) {
+        ucc_job_env_t env = {
+            {"UCC_CL_BASIC_TUNE", "inf"},
+            {"UCC_TL_UCP_TUNE", "allreduce:0-inf:@ring"}};
+        UccJob        job(team_size, UccJob::UCC_JOB_CTX_GLOBAL, env);
+        UccTeam_h     team = job.create_team(team_size);
+        UccCollCtxVec ctxs;
+        std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+        if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+            mt.push_back(UCC_MEMORY_TYPE_CUDA);
+        }
+        if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {
+            mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);
+        }
+
+        // 101%3=2, 101%5=1, 101%7=3  (small)
+        // 1001%3=2, 1001%5=1, 1001%7=6  (medium)
+        // 4000001%3=2, %5=1, %7=3  (large, spans the 4m default threshold)
+        for (auto count : {101, 1001, 4000001}) {
+            for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
+                for (auto m : mt) {
+                    SET_MEM_TYPE(m);
+                    this->set_inplace(inplace);
+                    this->data_init(
+                        team_size, TypeParam::dt, count, ctxs, false);
                     UccReq req(team, ctxs);
                     ASSERT_EQ(UCC_OK, req.status);
 
@@ -661,6 +703,95 @@ TYPED_TEST(test_allreduce_avg_order, avg_post_op)
                 }
                 this->data_fini(ctxs);
             }
+        }
+    }
+}
+
+/* Ring reduce-scatter only implements post-op AVG and returns
+ * UCC_ERR_NOT_SUPPORTED for AVG when REDUCE_AVG_PRE_OP=1 (the default).
+ * When ring is selected for such a call the score-map fallback must
+ * transparently complete it on a pre-op-capable algorithm (knomial/sra).
+ * This forces ring for all message sizes under the default pre-op config
+ * and checks the collective still succeeds with correctly averaged results.
+ * A hard failure here means the fallback (or the ring AVG guard) is broken. */
+TYPED_TEST(test_allreduce_avg_order, avg_ring_pre_op_fallback)
+{
+    int           n_procs = 3;
+    /* Pin the default pre-op mode so ambient settings cannot bypass the
+     * ring rejection and the score-map fallback under test. */
+    ucc_job_env_t env     = {
+        {"UCC_TL_UCP_REDUCE_AVG_PRE_OP", "1"},
+        {"UCC_CL_BASIC_TUNE", "inf"},
+        {"UCC_TL_UCP_TUNE", "allreduce:0-inf:@ring"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team = job.create_team(n_procs);
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);
+    }
+
+    /* All counts have remainder 2 for this three-rank team. */
+    for (auto count : {8, 257, 65537}) {
+        for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
+            for (auto m : mt) {
+                CHECK_TYPE_OP_SKIP(TypeParam::dt, TypeParam::redop, m);
+                SET_MEM_TYPE(m);
+                this->set_inplace(inplace);
+                this->data_init(n_procs, TypeParam::dt, count, ctxs, false);
+                UccReq req(team, ctxs);
+                ASSERT_EQ(UCC_OK, req.status);
+                req.start();
+                EXPECT_EQ(UCC_OK, req.wait());
+                EXPECT_EQ(true, this->data_validate(ctxs));
+                this->data_fini(ctxs);
+            }
+        }
+    }
+}
+
+/* Regression guard for the default selector routing >=4MB allreduce to ring
+ * (allreduce:4m-inf:@4).  Under the default REDUCE_AVG_PRE_OP=1 a large AVG
+ * allreduce is first offered to ring, which rejects it; the score-map
+ * fallback must transparently complete it.  Uses the default config (no TUNE
+ * overrides) and a message size above the 4 MiB ring threshold for every
+ * datatype. */
+TYPED_TEST(test_allreduce_avg_order, avg_large_default_selection)
+{
+    int           n_procs = 3;
+    /* One element above 4 MiB exercises the ring threshold with the smallest
+     * qualifying buffer for every datatype. */
+    size_t        count   = (4 * 1024 * 1024) / ucc_dt_size(TypeParam::dt) + 1;
+    /* Pin the default pre-op mode, but leave the algorithm selector untuned. */
+    ucc_job_env_t env     = {{"UCC_TL_UCP_REDUCE_AVG_PRE_OP", "1"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team = job.create_team(n_procs);
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);
+    }
+
+    for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
+        for (auto m : mt) {
+            CHECK_TYPE_OP_SKIP(TypeParam::dt, TypeParam::redop, m);
+            SET_MEM_TYPE(m);
+            this->set_inplace(inplace);
+            this->data_init(n_procs, TypeParam::dt, count, ctxs, false);
+            UccReq req(team, ctxs);
+            ASSERT_EQ(UCC_OK, req.status);
+            req.start();
+            EXPECT_EQ(UCC_OK, req.wait());
+            EXPECT_EQ(true, this->data_validate(ctxs));
+            this->data_fini(ctxs);
         }
     }
 }
