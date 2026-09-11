@@ -324,10 +324,6 @@ ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
     }
     return UCC_OK;
 err:
-    /* Subscriptions point at fragment tasks and schedules. Remove every
-     * installed listener before any of those referenced objects is finalized
-     * or returned to its pool. Destruct leaves a valid empty list, so fragment
-     * finalizers that destruct their tasks remain safe. */
     ucc_coll_task_destruct(&schedule->super.super);
     for (i = 0; i < n_frags_initd; i++) {
         ucc_coll_task_destruct(&frags[i]->super);
