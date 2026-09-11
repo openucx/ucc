@@ -84,6 +84,26 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->topo            = NULL;
     self->opt_radix       = UCC_UUNITS_AUTO_RADIX;
     self->opt_radix_host  = UCC_UUNITS_AUTO_RADIX;
+    
+    if (params->params.mask & UCC_TEAM_PARAM_FIELD_EP_TRAFFIC_CLASS) {
+        self->ep_traffic_class = params->ep_traffic_class;
+    } else {
+        self->ep_traffic_class = UCC_TL_UCP_NO_TCLASS;
+    }
+
+    /* A team carrying a traffic class gets its own ep store, so it creates
+       dedicated QPs with its DSCP instead of reusing the shared worker eps.
+       Only supported in the OOB array ep mode (worker->eps != NULL). */
+    if ((self->ep_traffic_class != UCC_TL_UCP_NO_TCLASS) &&
+        (ctx->worker.eps != NULL)) {
+        self->prio_eps = (ucp_ep_h *)ucc_calloc(UCC_TL_CTX_OOB(ctx).n_oob_eps,
+                                                sizeof(ucp_ep_h), "prio_eps");
+        if (NULL == self->prio_eps) {
+            return UCC_ERR_NO_MEMORY;
+        }
+    } else {
+        self->prio_eps = NULL;
+    }
     self->cuda_ring       = NULL;
 
     status = ucc_config_clone_table(&UCC_TL_UCP_TEAM_LIB(self)->cfg, &self->cfg,
@@ -190,6 +210,30 @@ ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
         ucc_ep_map_destroy_nested(&team->ctx_map);
         ucc_topo_cleanup(team->topo);
     }
+
+    if (team->prio_eps != NULL) {
+        ucc_rank_t          n = UCC_TL_CTX_OOB(UCC_TL_UCP_TEAM_CTX(team)).n_oob_eps;
+        ucp_request_param_t param;
+        ucs_status_ptr_t    close_req;
+        ucc_rank_t          i;
+
+        param.op_attr_mask = UCP_OP_ATTR_FIELD_FLAGS;
+        param.flags        = 0; /* 0 means FLUSH */
+        for (i = 0; i < n; i++) {
+            if (team->prio_eps[i] != NULL) {
+                close_req = ucp_ep_close_nbx(team->prio_eps[i], &param);
+                if (UCS_PTR_IS_PTR(close_req)) {
+                    while (ucp_request_check_status(close_req) == UCS_INPROGRESS) {
+                        ucp_worker_progress(team->worker->ucp_worker);
+                    }
+                    ucp_request_free(close_req);
+                }
+            }
+        }
+        ucc_free(team->prio_eps);
+        team->prio_eps = NULL;
+    }
+
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_ucp_team_t)(tl_team);
     return UCC_OK;
 }

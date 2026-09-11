@@ -60,6 +60,22 @@ static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team,
     ucc_status_t               status;
     ucc_rank_t                 core_rank;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), rank);
+    if (team->prio_eps != NULL) {
+        /* Prioritized team: dedicated ep store so a fresh QP is created with
+           the team's traffic class, leaving the shared worker eps untouched. */
+        ctx_rank = ucc_get_ctx_rank(UCC_TL_CORE_TEAM(team), core_rank);
+        *ep      = team->prio_eps[ctx_rank];
+        if (NULL == (*ep)) {
+            status = ucc_tl_ucp_connect_team_ep(team, core_rank, ep);
+            if (ucc_unlikely(UCC_OK != status)) {
+                tl_error(UCC_TL_TEAM_LIB(team), "failed to connect prio team ep");
+                *ep = NULL;
+                return status;
+            }
+            team->prio_eps[ctx_rank] = *ep;
+        }
+        return UCC_OK;
+    }
     if (team->worker->eps) {
         ucc_team_t *core_team = UCC_TL_CORE_TEAM(team);
         /* Core super.super.team ptr is NULL for service_team

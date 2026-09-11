@@ -1,6 +1,7 @@
 #include <ios>
 #include <iostream>
 #include <cstring>
+#include <cstdlib>
 #include <iomanip>
 #include "ucc_pt_comm.h"
 #include "ucc_pt_bootstrap_mpi.h"
@@ -190,6 +191,15 @@ ucc_status_t ucc_pt_comm::init()
     team_params.oob      = bootstrap->get_team_oob();
     team_params.ep       = bootstrap->get_rank();
     team_params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
+    /* Optional: set the team endpoint traffic class (RoCEv2 DSCP) from the
+     * environment, to exercise the QoS collective-prioritization path. */
+    {
+        const char *tc_env = getenv("UCC_PT_EP_TRAFFIC_CLASS");
+        if (tc_env != nullptr) {
+            team_params.mask           |= UCC_TEAM_PARAM_FIELD_EP_TRAFFIC_CLASS;
+            team_params.ep_traffic_class = (uint8_t)atoi(tc_env);
+        }
+    }
     UCCCHECK_GOTO(ucc_team_create_post(&context, 1, &team_params, &team),
                   free_ctx, st);
     do {
