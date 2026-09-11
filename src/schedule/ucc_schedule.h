@@ -189,8 +189,6 @@ ucc_status_t ucc_event_manager_subscribe(ucc_coll_task_t *parent_task,
                                          ucc_coll_task_t *task,
                                          ucc_task_event_handler_p handler);
 
-/* Internal fault-observer seams used by scheduler ownership tests. Passing
- * NULL restores normal production behavior. */
 void         ucc_event_manager_set_subscribe_fault_cb(ucc_status_t (*cb)(void));
 
 ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,

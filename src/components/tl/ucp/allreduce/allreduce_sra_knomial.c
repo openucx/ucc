@@ -94,7 +94,8 @@ ucc_tl_ucp_allreduce_sra_knomial_frag_init(ucc_base_coll_args_t *coll_args,
     ucc_memory_type_t    mem_type = coll_args->args.dst.info.mem_type;
     ucc_base_coll_args_t args     = *coll_args;
     ucc_mrange_uint_t   *p        = &tl_team->cfg.allreduce_sra_kn_radix;
-    ucc_coll_task_t     *task = NULL, *rs_task = NULL;
+    ucc_coll_task_t     *task     = NULL;
+    ucc_coll_task_t     *rs_task  = NULL;
     ucc_schedule_t      *schedule;
     ucc_status_t         status;
     ucc_kn_radix_t       radix;
@@ -231,14 +232,10 @@ void ucc_tl_ucp_allreduce_sra_knomial_select_pipeline_params(
         size_t total = args->dst.info.count *
                        ucc_dt_size(args->dst.info.datatype);
 
-        pp->threshold = 262144; /* start pipelining above 256KB */
-        pp->frag_size = 524288; /* ~512KB fragments: fewer/larger frags beat
-                                   256KB by 6-17% at >=1MB across */
-        pp->n_frags   = 2; /* floor: at least 2 frags once over threshold */
+        pp->threshold = 262144;
+        pp->frag_size = 524288;
+        pp->n_frags   = 2;
         pp->order     = UCC_PIPELINE_PARALLEL;
-        /* Pipeline depth scales with fragment count: 2 in flight is optimal up
-         * to 1MB (<=2 frags of 512KB), but once >=4 fragments exist (>=2MB) a
-         * 4-deep pipeline adds 6-23% */
         pp->pdepth    = (total >= 4 * pp->frag_size) ? 4 : 2;
     } else {
         /* Non-host, non-CUDA-inplace (e.g. out-of-place CUDA): keep the

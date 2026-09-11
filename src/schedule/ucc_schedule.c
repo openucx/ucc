@@ -41,9 +41,6 @@ static ucc_status_t ucc_event_manager_init(ucc_coll_task_t *task)
     return UCC_OK;
 }
 
-/* Test binaries may interpose this weak symbol to inject a failure at an exact
- * subscription attempt. Production builds always take the zero-cost success
- * path below. */
 static ucc_status_t (*ucc_event_manager_subscribe_fault_cb)(void);
 
 void ucc_event_manager_set_subscribe_fault_cb(ucc_status_t (*cb)(void))

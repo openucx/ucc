@@ -162,7 +162,8 @@ ucc_tl_ucp_reduce_srg_knomial_frag_init(ucc_base_coll_args_t *coll_args,
     ucc_base_coll_args_t   args    = *coll_args;
     ucc_mrange_uint_t     *p       = &tl_team->cfg.reduce_srg_kn_radix;
     int                    n_frags = sp->super.n_tasks;
-    ucc_coll_task_t       *g_task = NULL, *rs_task = NULL;
+    ucc_coll_task_t       *g_task  = NULL;
+    ucc_coll_task_t       *rs_task = NULL;
     ucc_kn_radix_t         radix, cfg_radix;
     ucc_schedule_t        *schedule;
     ucc_status_t           status;
