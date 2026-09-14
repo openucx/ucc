@@ -8,6 +8,7 @@
 #include "ucc_schedule_pipelined.h"
 #include "coll_score/ucc_coll_score.h"
 #include "core/ucc_context.h"
+#include <stdatomic.h>
 
 const char* ucc_pipeline_order_names[] = {
     [UCC_PIPELINE_PARALLEL]   = "parallel",
@@ -16,17 +17,24 @@ const char* ucc_pipeline_order_names[] = {
     [UCC_PIPELINE_LAST]       =  NULL
 };
 
-static void (*ucc_schedule_pipelined_lock_observer)(int initialized);
+/* Test-only observer, invoked on lock init/destroy, potentially from
+   multiple scheduler threads. Keep the access atomic; tests must restore it
+   to NULL (the default) when done. */
+static void (*_Atomic ucc_schedule_pipelined_lock_observer)(int initialized);
 
 void ucc_schedule_pipelined_set_lock_observer(void (*cb)(int initialized))
 {
-    ucc_schedule_pipelined_lock_observer = cb;
+    atomic_store_explicit(&ucc_schedule_pipelined_lock_observer, cb,
+                          memory_order_relaxed);
 }
 
 static void ucc_schedule_pipelined_lock_observe(int initialized)
 {
-    if (ucc_schedule_pipelined_lock_observer) {
-        ucc_schedule_pipelined_lock_observer(initialized);
+    void (*observer)(int) =
+        atomic_load_explicit(&ucc_schedule_pipelined_lock_observer,
+                             memory_order_relaxed);
+    if (observer) {
+        observer(initialized);
     }
 }
 
