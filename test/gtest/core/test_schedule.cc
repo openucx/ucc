@@ -45,6 +45,15 @@ public:
         ts->rst.push_back(rst_t((test_coll_task*)parent, 2));
         return UCC_OK;
     }
+    /* The fault-injection callbacks (subscribe fault cb, lock observer) are
+       process-wide globals that schedule code reads from any thread. The
+       fault_* tests install both; restore them to NULL after every test so
+       later, unrelated schedules in this binary never invoke test
+       instrumentation. */
+    void TearDown() override {
+        ucc_event_manager_set_subscribe_fault_cb(NULL);
+        ucc_schedule_pipelined_set_lock_observer(NULL);
+    }
 };
 
 /* Tasks subscribes on 2 tasks to EVENT_COMPLETED with the same

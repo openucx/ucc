@@ -189,7 +189,11 @@ ucc_status_t ucc_event_manager_subscribe(ucc_coll_task_t *parent_task,
                                          ucc_coll_task_t *task,
                                          ucc_task_event_handler_p handler);
 
-void         ucc_event_manager_set_subscribe_fault_cb(ucc_status_t (*cb)(void));
+/* Test-only fault-injection hook: every ucc_event_manager_subscribe() invokes
+   the callback before registering and propagates a non-OK result. Install it
+   only for the duration of a single test and pass NULL to restore the
+   default (no fault injection) behavior. */
+void ucc_event_manager_set_subscribe_fault_cb(ucc_status_t (*cb)(void));
 
 ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                                       ucc_event_t event);
