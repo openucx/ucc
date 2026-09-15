@@ -143,14 +143,14 @@ static ucc_base_team_t *create_test_team(int thread_mode)
     }
     ctx->thread_mode = (ucc_thread_mode_t)thread_mode;
 
-    base_ctx         = (ucc_base_context_t *)calloc(1, sizeof(*base_ctx));
+    base_ctx = (ucc_base_context_t *)calloc(1, sizeof(*base_ctx));
     if (!base_ctx) {
         free(ctx);
         return NULL;
     }
     base_ctx->ucc_context = ctx;
 
-    team                  = (ucc_base_team_t *)calloc(1, sizeof(*team));
+    team = (ucc_base_team_t *)calloc(1, sizeof(*team));
     if (!team) {
         free(base_ctx);
         free(ctx);
@@ -206,9 +206,10 @@ static ucc_status_t mock_frag_init(
     ucc_base_coll_args_t *coll_args, ucc_schedule_pipelined_t *schedule_p,
     ucc_base_team_t *team, ucc_schedule_t **frag_p)
 {
-    int             my_idx = std::atomic_load(&g_frag_init_count);
-    ucc_status_t    status;
-    ucc_schedule_t *frag;
+    int              my_idx = std::atomic_load(&g_frag_init_count);
+    ucc_status_t     status;
+    ucc_schedule_t  *frag;
+    ucc_coll_task_t *task;
 
     (void)schedule_p;
 
@@ -231,21 +232,19 @@ static ucc_status_t mock_frag_init(
     }
 
     /* Add one synthetic task per fragment. */
-    {
-        ucc_coll_task_t *task = (ucc_coll_task_t *)calloc(1, sizeof(*task));
-        if (!task) {
-            ucc_schedule_finalize(&frag->super);
-            free(frag);
-            return UCC_ERR_NO_MEMORY;
-        }
-        task->post = [](ucc_coll_task_t *t) -> ucc_status_t {
-            (void)t;
-            return UCC_OK;
-        };
-        task->finalize = count_task_finalize;
-        ucc_coll_task_construct(task);
-        frag->tasks[frag->n_tasks++] = task;
+    task = (ucc_coll_task_t *)calloc(1, sizeof(*task));
+    if (!task) {
+        ucc_schedule_finalize(&frag->super);
+        free(frag);
+        return UCC_ERR_NO_MEMORY;
     }
+    task->post = [](ucc_coll_task_t *t) -> ucc_status_t {
+        (void)t;
+        return UCC_OK;
+    };
+    task->finalize = count_task_finalize;
+    ucc_coll_task_construct(task);
+    frag->tasks[frag->n_tasks++] = task;
 
     frag->super.finalize = count_schedule_finalize;
     *frag_p              = frag;
@@ -261,19 +260,18 @@ static ucc_status_t mock_frag_init(
 /* ------------------------------------------------------------------ */
 UCC_TEST_F(test_schedule, pipelined_init_depth_16_success)
 {
-    g_frag_init_count.store(0);
-    g_total_finalizes.store(0);
-    g_fail_after_frag_idx         = -1; /* no failure */
-
+    ucc_base_coll_args_t     bargs = {0};
     ucc_base_team_t         *team;
     ucc_schedule_pipelined_t sched;
-    ucc_base_coll_args_t     bargs = {0};
     ucc_status_t             status;
+
+    g_frag_init_count.store(0);
+    g_total_finalizes.store(0);
+    g_fail_after_frag_idx = -1; /* no failure */
 
     memset(&sched, 0, sizeof(sched));
     ucc_coll_task_construct(&sched.super.super);
     memset(&bargs, 0, sizeof(bargs));
-    /* bargs.mask intentionally zero — ucc_coll_task_init copies struct via memcpy. */
     bargs.args.coll_type         = UCC_COLL_TYPE_ALLREDUCE;
     bargs.args.src.info.count    = 1024;
     bargs.args.src.info.datatype = UCC_DT_INT32;
@@ -313,19 +311,18 @@ UCC_TEST_F(test_schedule, pipelined_init_depth_16_success)
 /* ------------------------------------------------------------------ */
 UCC_TEST_F(test_schedule, pipelined_init_failure_at_zero)
 {
-    g_frag_init_count.store(0);
-    g_total_finalizes.store(0);
-    g_fail_after_frag_idx         = 0; /* fail on first frag init */
-
+    ucc_base_coll_args_t     bargs = {0};
     ucc_base_team_t         *team;
     ucc_schedule_pipelined_t sched;
-    ucc_base_coll_args_t     bargs = {0};
     ucc_status_t             status;
+
+    g_frag_init_count.store(0);
+    g_total_finalizes.store(0);
+    g_fail_after_frag_idx = 0; /* fail on first frag init */
 
     memset(&sched, 0, sizeof(sched));
     ucc_coll_task_construct(&sched.super.super);
     memset(&bargs, 0, sizeof(bargs));
-    /* bargs.mask intentionally zero — ucc_coll_task_init copies struct via memcpy. */
     bargs.args.coll_type         = UCC_COLL_TYPE_ALLREDUCE;
     bargs.args.src.info.count    = 1024;
     bargs.args.src.info.datatype = UCC_DT_INT32;
@@ -366,18 +363,18 @@ UCC_TEST_F(test_schedule, pipelined_init_failure_at_zero)
 /* ------------------------------------------------------------------ */
 UCC_TEST_F(test_schedule, pipelined_init_failure_at_middle)
 {
+    ucc_base_coll_args_t     bargs = {0};
+    ucc_base_team_t         *team;
+    ucc_schedule_pipelined_t sched;
+    ucc_status_t             status;
+
     g_frag_init_count.store(0);
     g_total_finalizes.store(0);
     g_fail_after_frag_idx         = 3; /* fail on 4th frag (index 3) */
 
-    ucc_base_team_t         *team;
-    ucc_schedule_pipelined_t sched;
-    ucc_base_coll_args_t     bargs = {0};
-    ucc_status_t             status;
     memset(&sched, 0, sizeof(sched));
     ucc_coll_task_construct(&sched.super.super);
     memset(&bargs, 0, sizeof(bargs));
-    /* bargs.mask intentionally zero — ucc_coll_task_init copies struct via memcpy. */
     bargs.args.coll_type         = UCC_COLL_TYPE_ALLREDUCE;
     bargs.args.src.info.count    = 1024;
     bargs.args.src.info.datatype = UCC_DT_INT32;
@@ -418,14 +415,15 @@ UCC_TEST_F(test_schedule, pipelined_init_failure_at_middle)
 /* ------------------------------------------------------------------ */
 UCC_TEST_F(test_schedule, pipelined_init_failure_at_last)
 {
+    ucc_base_coll_args_t     bargs = {0};
+    ucc_base_team_t         *team;
+    ucc_schedule_pipelined_t sched;
+    ucc_status_t             status;
+
     g_frag_init_count.store(0);
     g_total_finalizes.store(0);
     g_fail_after_frag_idx         = 7; /* fail on last frag (index 7 of 8) */
 
-    ucc_base_team_t         *team;
-    ucc_schedule_pipelined_t sched;
-    ucc_base_coll_args_t     bargs = {0};
-    ucc_status_t             status;
     memset(&sched, 0, sizeof(sched));
     ucc_coll_task_construct(&sched.super.super);
     memset(&bargs, 0, sizeof(bargs));
@@ -472,14 +470,14 @@ UCC_TEST_F(test_schedule, pipelined_init_failure_at_last)
 /* ------------------------------------------------------------------ */
 UCC_TEST_F(test_schedule, pipelined_init_failure_middle_of_two)
 {
-    g_frag_init_count.store(0);
-    g_total_finalizes.store(0);
-    g_fail_after_frag_idx         = 1; /* fail on second frag (index 1 of 2) */
-
+    ucc_base_coll_args_t     bargs = {0};
     ucc_base_team_t         *team;
     ucc_schedule_pipelined_t sched;
-    ucc_base_coll_args_t     bargs = {0};
     ucc_status_t             status;
+
+    g_frag_init_count.store(0);
+    g_total_finalizes.store(0);
+    g_fail_after_frag_idx = 1; /* fail on second frag (index 1 of 2) */
 
     memset(&sched, 0, sizeof(sched));
     ucc_coll_task_construct(&sched.super.super);
@@ -523,14 +521,14 @@ UCC_TEST_F(test_schedule, pipelined_init_failure_middle_of_two)
 /* ------------------------------------------------------------------ */
 UCC_TEST_F(test_schedule, pipelined_ordered_failure_at_three)
 {
-    g_frag_init_count.store(0);
-    g_total_finalizes.store(0);
-    g_fail_after_frag_idx         = 3; /* fail on 4th frag (index 3 of 6) */
-
     ucc_base_team_t         *team;
     ucc_schedule_pipelined_t sched;
     ucc_base_coll_args_t     bargs = {0};
     ucc_status_t             status;
+
+    g_frag_init_count.store(0);
+    g_total_finalizes.store(0);
+    g_fail_after_frag_idx = 3; /* fail on 4th frag (index 3 of 6) */
 
     memset(&sched, 0, sizeof(sched));
     ucc_coll_task_construct(&sched.super.super);
@@ -625,9 +623,9 @@ UCC_TEST_F(test_schedule, pipelined_nfrags_total_zero_rejected)
 
 UCC_TEST_F(test_schedule, pipelined_invalid_order_rejected)
 {
+    ucc_base_coll_args_t     bargs = {0};
     ucc_base_team_t         *team;
     ucc_schedule_pipelined_t sched;
-    ucc_base_coll_args_t     bargs = {0};
     ucc_status_t             status;
 
     memset(&sched, 0, sizeof(sched));
@@ -667,8 +665,9 @@ UCC_TEST_F(test_schedule, pipelined_invalid_order_rejected)
 /* ------------------------------------------------------------------ */
 UCC_TEST_F(test_schedule, pipeline_params_pdepth_zero_rejected)
 {
-    ucc_pipeline_params_t params  = {0};
-    int                   n_frags = 77, pipeline_depth = 88;
+    ucc_pipeline_params_t params         = {0};
+    int                   n_frags        = 77;
+    int                   pipeline_depth = 88;
     ucc_status_t          status;
 
     /* Configure an active pipeline (n_frags > 0) with pdepth=0 */
@@ -677,7 +676,7 @@ UCC_TEST_F(test_schedule, pipeline_params_pdepth_zero_rejected)
     params.frag_size = 1024;
     params.threshold = SIZE_MAX;
 
-    status           = ucc_pipeline_nfrags_pdepth(
+    status = ucc_pipeline_nfrags_pdepth(
         &params, 2048, &n_frags, &pipeline_depth);
     EXPECT_EQ(UCC_ERR_INVALID_PARAM, status)
         << "Active pipeline with pdepth=0 must be rejected by helper";

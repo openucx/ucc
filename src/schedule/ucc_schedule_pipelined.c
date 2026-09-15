@@ -238,11 +238,6 @@ ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_INVALID_PARAM;
     }
 
-    /* Clamp rather than fail: an over-large requested pipeline depth is a
-       tuning mistake, not a correctness problem -- the pipeline is valid at any
-       depth >= 1. Failing here aborts the whole collective with
-       UCC_ERR_INVALID_PARAM partway through a size sweep, which is far worse
-       than quietly running shallower. */
     if (ucc_unlikely(n_frags > UCC_SCHEDULE_PIPELINED_MAX_FRAGS)) {
         ucc_warn(
             "n_frags %d exceeds max limit of %d, clamping",
