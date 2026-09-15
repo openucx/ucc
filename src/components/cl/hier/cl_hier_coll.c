@@ -15,7 +15,8 @@ const char *
     UCC_CL_HIER_ALLREDUCE_DEFAULT_ALG_SELECT_STR,
     UCC_CL_HIER_BCAST_DEFAULT_ALG_SELECT_STR,
     UCC_CL_HIER_REDUCE_DEFAULT_ALG_SELECT_STR,
-    UCC_CL_HIER_ALLGATHERV_DEFAULT_ALG_SELECT_STR};
+    UCC_CL_HIER_ALLGATHERV_DEFAULT_ALG_SELECT_STR,
+    UCC_CL_HIER_ALLGATHER_DEFAULT_ALG_SELECT_STR};
 
 ucc_status_t ucc_cl_hier_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t      *team,
@@ -34,6 +35,10 @@ ucc_status_t ucc_cl_hier_coll_init(ucc_base_coll_args_t *coll_args,
         return ucc_cl_hier_bcast_2step_init(coll_args, team, task);
     case UCC_COLL_TYPE_REDUCE:
         return ucc_cl_hier_reduce_2step_init(coll_args, team, task);
+    case UCC_COLL_TYPE_ALLGATHER:
+        return ucc_cl_hier_allgather_init(coll_args, team, task);
+    case UCC_COLL_TYPE_ALLGATHERV:
+        return ucc_cl_hier_allgatherv_init(coll_args, team, task);
     default:
         cl_error(team->context->lib, "coll_type %s is not supported",
                  ucc_coll_type_str(coll_args->args.coll_type));
@@ -57,6 +62,8 @@ static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
         return ucc_cl_hier_reduce_alg_from_str(str);
     case UCC_COLL_TYPE_ALLGATHERV:
         return ucc_cl_hier_allgatherv_alg_from_str(str);
+    case UCC_COLL_TYPE_ALLGATHER:
+        return ucc_cl_hier_allgather_alg_from_str(str);
     default:
         break;
     }
@@ -131,6 +138,16 @@ ucc_status_t ucc_cl_hier_alg_id_to_init(int alg_id, const char *alg_id_str,
         switch(alg_id) {
         case UCC_CL_HIER_ALLGATHERV_ALG_GAB:
             *init = ucc_cl_hier_allgatherv_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+        }
+        break;
+    case UCC_COLL_TYPE_ALLGATHER:
+        switch(alg_id) {
+        case UCC_CL_HIER_ALLGATHER_ALG_GAB:
+            *init = ucc_cl_hier_allgather_init;
             break;
         default:
             status = UCC_ERR_INVALID_PARAM;

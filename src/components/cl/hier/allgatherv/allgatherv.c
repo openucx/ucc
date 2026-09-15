@@ -134,8 +134,12 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     ucc_count_t            *node_counts      = NULL;
     ucc_aint_t             *leader_disps     = NULL;
     ucc_count_t            *leader_counts    = NULL;
-    size_t                  dt_size          = ucc_dt_size(coll_args->args.
-                                                           dst.info_v.datatype);
+    int                     is_allgather     = (coll_args->args.coll_type ==
+                                                UCC_COLL_TYPE_ALLGATHER);
+    uint64_t               *ag_counts_disps  = NULL;
+    size_t                  ag_counts_disps_size = is_allgather
+        ? 2 * (size_t)team_size * sizeof(uint64_t) : 0;
+    size_t                  dt_size;
     int                     in_place         = 0;
     int                     is_contig        = 1;
     size_t                  disp_counter     = 0;
@@ -149,8 +153,9 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     size_t                  node_disps_size;
     size_t                  leader_counts_size;
     size_t                  leader_disps_size;
-    size_t                  total_count;
+    size_t                  total_count = 0;
     void                   *buffer;
+    void                   *scratch_tail;
     void                   *node_gathered_data;
     ucc_rank_t              leader_team_rank;
     ucc_rank_t              leader_sbgp_rank;
@@ -159,15 +164,27 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     size_t                  add_count, new_count;
     int                     block_ordered;
     int                     ldr_sbgp_only;
+    int                     leader_counts_uniform = 0;
+    size_t                  first_leader_count    = 0;
 
-    memcpy(&args,     coll_args, sizeof(args));
-    memcpy(&args_old, coll_args, sizeof(args));
+    memcpy(&args, coll_args, sizeof(args));
+    if (is_allgather) {
+        total_count                   = coll_args->args.dst.info.count;
+        args.args.dst.info_v.buffer   = coll_args->args.dst.info.buffer;
+        args.args.dst.info_v.datatype = coll_args->args.dst.info.datatype;
+        args.args.dst.info_v.mem_type = coll_args->args.dst.info.mem_type;
+        args.args.mask               |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.args.flags              |= UCC_COLL_ARGS_FLAG_COUNT_64BIT |
+                                        UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT;
+    }
 
     in_place = UCC_IS_INPLACE(args.args);
+    dt_size  = ucc_dt_size(args.args.dst.info_v.datatype);
 
     if (args.args.dst.info_v.mem_type != UCC_MEMORY_TYPE_HOST ||
         (!in_place && args.args.src.info.mem_type != UCC_MEMORY_TYPE_HOST) ||
-        UCC_IS_PERSISTENT(args.args)) {
+        UCC_IS_PERSISTENT(args.args) ||
+        UCC_COLL_ARGS_ACTIVE_SET(&args.args)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -179,26 +196,27 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
 
     n_tasks   = 0;
     UCC_CHECK_GOTO(is_block_ordered(cl_team, &block_ordered), free_sched, status);
-    is_contig = block_ordered && ucc_coll_args_is_disp_contig(&args.args, team_size);
+    is_contig = block_ordered &&
+        (is_allgather || ucc_coll_args_is_disp_contig(&args.args, team_size));
 
     /* handle the case where this rank may be the only one on this node */
     ldr_sbgp_only = !SBGP_ENABLED(cl_team, NODE) && SBGP_ENABLED(cl_team, NODE_LEADERS);
-
-    UCC_CHECK_GOTO(ucc_schedule_init(schedule, &args, team), free_sched, status);
-
     node_counts_size   = node_sbgp_size * sizeof(ucc_count_t);
     node_disps_size    = node_sbgp_size * sizeof(ucc_aint_t);
     leader_counts_size = leader_sbgp_size * sizeof(ucc_count_t);
     leader_disps_size  = leader_sbgp_size * sizeof(ucc_aint_t);
-    total_count        = ucc_coll_args_get_total_count(&args.args,
+    if (!is_allgather) {
+        total_count = ucc_coll_args_get_total_count(&args.args,
                             args.args.dst.info_v.counts, team_size);
+    }
     scratch_size       = node_counts_size + node_disps_size
                          + leader_counts_size + leader_disps_size;
     /* If the dst buf isn't contig, allocate and work on a contig scratch buffer */
     scratch_size      += (is_contig ? 0 : (total_count * dt_size));
 
     UCC_CHECK_GOTO(
-        ucc_mc_alloc(&cl_schedule->scratch, scratch_size, UCC_MEMORY_TYPE_HOST),
+        ucc_mc_alloc(&cl_schedule->scratch, scratch_size + ag_counts_disps_size,
+                     UCC_MEMORY_TYPE_HOST),
         free_sched, status);
     memset(cl_schedule->scratch->addr, 0, scratch_size);
 
@@ -206,10 +224,25 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     node_disps         = PTR_OFFSET(node_counts, node_counts_size);
     leader_counts      = PTR_OFFSET(node_disps, node_disps_size);
     leader_disps       = PTR_OFFSET(leader_counts, leader_counts_size);
+    scratch_tail       = PTR_OFFSET(leader_disps, leader_disps_size);
+    if (is_allgather) {
+        ag_counts_disps = PTR_OFFSET(cl_schedule->scratch->addr, scratch_size);
+        for (i = 0; i < team_size; i++) {
+            ag_counts_disps[i] =
+                ucc_buffer_block_count(total_count, team_size, i);
+            ag_counts_disps[team_size + i] =
+                ucc_buffer_block_offset(total_count, team_size, i);
+        }
+        args.args.dst.info_v.counts        = (ucc_count_t *)ag_counts_disps;
+        args.args.dst.info_v.displacements =
+            (ucc_aint_t *)(ag_counts_disps + team_size);
+    }
+    UCC_CHECK_GOTO(ucc_schedule_init(schedule, &args, team), free_scratch, status);
+    memcpy(&args_old, &args, sizeof(args_old));
     if (is_contig) {
         buffer         = args.args.dst.info_v.buffer;
     } else {
-        buffer         = PTR_OFFSET(leader_disps, leader_disps_size);
+        buffer         = scratch_tail;
     }
     node_gathered_data = NULL;
 
@@ -246,6 +279,21 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
             disp_counter += ucc_coll_args_get_count(&args.args,
                                                     leader_counts,
                                                     i);
+        }
+
+        if (is_allgather) {
+            leader_counts_uniform = 1;
+            first_leader_count    = leader_sbgp_size > 0
+                                        ? ucc_coll_args_get_count(&args.args,
+                                                                  leader_counts, 0)
+                                        : 0;
+            for (i = 1; i < leader_sbgp_size; i++) {
+                if (ucc_coll_args_get_count(&args.args, leader_counts, i) !=
+                    first_leader_count) {
+                    leader_counts_uniform = 0;
+                    break;
+                }
+            }
         }
 
         if (SBGP_ENABLED(cl_team, NODE_LEADERS)) {
@@ -328,17 +376,23 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
         }
     }
 
-    args = args_old;
-
     if (SBGP_ENABLED(cl_team, NODE_LEADERS)) {
         ucc_assert(cl_team->top_sbgp == UCC_HIER_SBGP_NODE_LEADERS);
-        args.args.coll_type                = UCC_COLL_TYPE_ALLGATHERV;
-        args.args.mask                    |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.args.flags                   |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-        args.args.flags                   |= UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
-        args.args.dst.info_v.buffer        = buffer;
-        args.args.dst.info_v.displacements = leader_disps;
-        args.args.dst.info_v.counts        = leader_counts;
+        args.args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+        if (is_allgather && leader_counts_uniform) {
+            args.args.coll_type        = UCC_COLL_TYPE_ALLGATHER;
+            args.args.dst.info.buffer   = buffer;
+            args.args.dst.info.count    = first_leader_count * leader_sbgp_size;
+            args.args.dst.info.datatype = args_old.args.dst.info_v.datatype;
+            args.args.dst.info.mem_type = args_old.args.dst.info_v.mem_type;
+        } else {
+            args.args.coll_type                = UCC_COLL_TYPE_ALLGATHERV;
+            args.args.flags                   |= UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
+            args.args.dst.info_v.buffer        = buffer;
+            args.args.dst.info_v.displacements = leader_disps;
+            args.args.dst.info_v.counts        = leader_counts;
+        }
         UCC_CHECK_GOTO(ucc_coll_init(SCORE_MAP(cl_team, NODE_LEADERS), &args,
                                      &tasks[n_tasks]),
                        free_scratch, status);
@@ -410,6 +464,6 @@ free_sched:
         tasks[i]->finalize(tasks[i]);
     }
     ucc_cl_hier_put_schedule(schedule);
-    cl_error(team->context->lib, "failed to init cl hier allgatherv");
+    cl_debug(team->context->lib, "failed to init cl hier allgatherv");
     return status;
 }
