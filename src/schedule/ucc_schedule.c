@@ -8,6 +8,7 @@
 #include "components/base/ucc_base_iface.h"
 #include "coll_score/ucc_coll_score.h"
 #include "core/ucc_context.h"
+#include <stdatomic.h>
 
 static void ucc_coll_task_mpool_obj_init(ucc_mpool_t *mp, void *obj, //NOLINT
                                          void *chunk) //NOLINT
@@ -41,11 +42,33 @@ static ucc_status_t ucc_event_manager_init(ucc_coll_task_t *task)
     return UCC_OK;
 }
 
+/* Test-only fault-injection hook, read on every ucc_event_manager_subscribe()
+   call, potentially from multiple scheduler threads. Keep the access atomic;
+   tests must restore it to NULL (the default) when done. */
+static ucc_status_t (*_Atomic ucc_event_manager_subscribe_fault_cb)(void);
+
+void ucc_event_manager_set_subscribe_fault_cb(ucc_status_t (*cb)(void))
+{
+    atomic_store_explicit(&ucc_event_manager_subscribe_fault_cb, cb,
+                          memory_order_relaxed);
+}
+
 ucc_status_t ucc_event_manager_subscribe(ucc_coll_task_t *parent_task,
                                          ucc_event_t event, ucc_coll_task_t *task,
                                          ucc_task_event_handler_p handler)
 {
     ucc_event_manager_t *em;
+    ucc_status_t         status;
+
+    ucc_status_t (*fault_cb)(void) =
+        atomic_load_explicit(&ucc_event_manager_subscribe_fault_cb,
+                             memory_order_relaxed);
+    if (ucc_unlikely(fault_cb != NULL)) {
+        status = fault_cb();
+        if (ucc_unlikely(status != UCC_OK)) {
+            return status;
+        }
+    }
 
     ucc_list_for_each(em, &parent_task->em_list, list_elem) {
         if (em->n_listeners < MAX_LISTENERS) {
