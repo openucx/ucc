@@ -370,16 +370,42 @@ ucc_status_t thread_allgather_req_free(void *request)
     return UCC_OK;
 }
 
+/* Assign a deterministic multi-node topology to a simulated process so that
+ * the global/onesided contexts see multiple nodes, sockets, and NUMA domains.
+ * Mirrors the layout the non-onesided global context has always used. */
+static void set_simulated_proc_info(ucc_proc_info_t *proc_info, int id,
+                                    int job_size)
+{
+    /* ucc_context_create_proc_info copies the whole struct into the context
+     * id (and it is allgathered to every rank), and the topology construction
+     * reads cpu_vendor/cpu_model. Seed from the local probe so no field is
+     * indeterminate, then override only the topology coordinates. */
+    *proc_info = ucc_local_proc;
+
+    const int nnodes   = 2;
+    const int nsockets = 2;
+    const int nnumas   = 3;
+    int       node, local_ppn, local_rank, block;
+
+    block      = ucc_buffer_block_count(job_size, nnodes, 0);
+    node       = id / block;
+    local_ppn  = ucc_buffer_block_count(job_size, nnodes, node);
+    local_rank = id - ucc_buffer_block_offset(job_size, nnodes, node);
+
+    proc_info->host_hash = node + 1;
+    block                = ucc_buffer_block_count(local_ppn, nsockets, 0);
+    proc_info->socket_id = local_rank / block;
+    block                = ucc_buffer_block_count(local_ppn, nnumas, 0);
+    proc_info->numa_id   = local_rank / block;
+    proc_info->pid       = id + 1;
+}
+
 void proc_context_create(UccProcess_h proc, int id, ThreadAllgather *ta, bool is_global)
 {
-    const int            nnodes   = 2;
-    const int            nsockets = 2;
-    const int            nnumas   = 3;
     ucc_status_t         status;
     ucc_context_config_h ctx_config;
     std::stringstream    err_msg;
     ucc_proc_info_t      proc_info;
-    int node, local_ppn, local_rank, job_size, block;
 
     status = ucc_context_config_read(proc->lib_h, NULL, &ctx_config);
     if (status != UCC_OK) {
@@ -394,23 +420,7 @@ void proc_context_create(UccProcess_h proc, int id, ThreadAllgather *ta, bool is
         proc->ctx_params.oob.coll_info = (void*) &ta->reqs[id];
         proc->ctx_params.oob.n_oob_eps = ta->n_procs;
         proc->ctx_params.oob.oob_ep    = id;
-
-
-        /* Simulate multi-node topology for larger gtest coverage */
-        job_size = ta->n_procs;
-        block = ucc_buffer_block_count(job_size, nnodes, 0);
-        node    = id / block;
-        local_ppn = ucc_buffer_block_count(job_size, nnodes, node);
-        local_rank = id - ucc_buffer_block_offset(job_size, nnodes, node);
-
-        proc_info.host_hash = node + 1;
-        block = ucc_buffer_block_count(local_ppn, nsockets, 0);
-        proc_info.socket_id = local_rank / block;
-
-        block = ucc_buffer_block_count(local_ppn, nnumas, 0);
-        proc_info.numa_id = local_rank / block;
-
-        proc_info.pid = id + 1;
+        set_simulated_proc_info(&proc_info, id, ta->n_procs);
     } else {
         proc_info = ucc_local_proc;
     }
@@ -434,6 +444,7 @@ void proc_context_create_mem_params(UccProcess_h proc, int id,
     ucc_context_config_h ctx_config;
     std::stringstream    err_msg;
     ucc_mem_map_t        map[UCC_TEST_N_MEM_SEGMENTS];
+    ucc_proc_info_t      proc_info;
 
     status = ucc_context_config_read(proc->lib_h, NULL, &ctx_config);
     if (status != UCC_OK) {
@@ -457,8 +468,10 @@ void proc_context_create_mem_params(UccProcess_h proc, int id,
     proc->ctx_params.oob.oob_ep            = id;
     proc->ctx_params.mem_params.segments   = map;
     proc->ctx_params.mem_params.n_segments = UCC_TEST_N_MEM_SEGMENTS;
-    status = ucc_context_create(proc->lib_h, &proc->ctx_params, ctx_config,
-                                &proc->ctx_h);
+    set_simulated_proc_info(&proc_info, id, ta->n_procs);
+    status = ucc_context_create_proc_info(proc->lib_h, &proc->ctx_params,
+                                          ctx_config, &proc->ctx_h,
+                                          &proc_info);
     ucc_context_config_release(ctx_config);
     if (status != UCC_OK) {
         err_msg << "ucc_context_create for one-sided context failed";
