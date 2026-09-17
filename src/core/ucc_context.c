@@ -995,6 +995,22 @@ ucc_status_t ucc_context_create_proc_info(
         }
     }
 
+    /* The agreement vote runs over the context service team, which is only
+       created above and whose absence is not fatal. Without it the vote cannot
+       run, so drop the cache entirely: reusing teams without agreement is safe
+       only when team scopes never overlap, and silently assuming that would
+       trade a performance feature for a correctness risk. The decision is
+       taken from configuration alone, so it is identical on every rank. */
+    if (ctx->team_cache != NULL && ctx->team_cache->agreement &&
+        ctx->service_team == NULL) {
+        ucc_warn("team cache disabled: the cross-rank agreement vote requires "
+                 "a context service team, which is not available. Set "
+                 "UCC_TEAM_CACHE_AGREEMENT=n to cache without it, which is "
+                 "only safe when team scopes never overlap.");
+        ucc_team_cache_destroy(ctx->team_cache);
+        ctx->team_cache = NULL;
+    }
+
     n_tl_ctx = ctx->n_tl_ctx;
     for (i = 0; i < n_tl_ctx; i++) {
         tl_ctx = ctx->tl_ctx[i];
