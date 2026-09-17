@@ -210,7 +210,7 @@ static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.timeout),
      UCC_CONFIG_TYPE_INT},
 
-    {"MCAST_BCAST_ENABLE", "0", "Enable Mcast-based Bcast",
+    {"MCAST_BCAST_ENABLE", "1", "Enable Mcast-based Bcast",
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.mcast_bcast_enabled),
      UCC_CONFIG_TYPE_BOOL},
 
@@ -218,7 +218,7 @@ static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.mcast_allgather_enabled),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"MCAST_ENABLE", "n",
+    {"MCAST_ENABLE", "try",
      "Enable Mcast\n"
      "n - disable mcast entirely\n"
      "try - try to enable, continue without mcast if resources unavailable (silent except debug/trace)\n"
