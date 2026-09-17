@@ -44,8 +44,8 @@ ucc_service_coll_req_init(ucc_team_t *team, ucc_subset_t *subset,
                   sizeof(*req));
         return UCC_ERR_NO_MEMORY;
     }
-    req->team   = team;
-    req->subset = *subset;
+    req->team     = team;
+    req->subset   = *subset;
     req->embedded = 0;
 
     if (ctx->service_team) {
@@ -100,7 +100,17 @@ ucc_status_t ucc_service_allreduce_ctx(ucc_team_t *team, void *sbuf,
     ucc_tl_iface_t *tl_iface;
     ucc_status_t    status;
 
-    ucc_assert(ctx->service_team != NULL);
+    /* A context service team exists only when the context was created with an
+       OOB and UCC_INTERNAL_OOB allowed it, and its creation is non-fatal, so
+       NULL is a supported state rather than a caller error. There is no
+       fallback: this collective addresses context ranks directly, which the
+       per-team service team cannot do. */
+    if (ucc_unlikely(ctx->service_team == NULL)) {
+        ucc_debug("context %p has no service team, ctx-scoped service "
+                  "allreduce is not available",
+                  ctx);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     req->team     = team;
     req->subset   = subset;
@@ -189,8 +199,8 @@ ucc_status_t ucc_service_coll_test(ucc_service_coll_req_t *req)
 
 ucc_status_t ucc_service_coll_finalize(ucc_service_coll_req_t *req)
 {
-    ucc_status_t status;
     uint8_t      embedded = req->embedded;
+    ucc_status_t status;
 
     status = ucc_collective_finalize_internal(req->task);
     if (!embedded) {
