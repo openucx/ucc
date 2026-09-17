@@ -21,6 +21,14 @@ uint64_t ucc_service_coll_map_cb(uint64_t ep, void *cb_ctx)
     return ucc_ep_map_eval(team->ctx_map, team_rank);
 }
 
+/* Maps a subset index straight to a context rank, bypassing team->ctx_map */
+static uint64_t ucc_service_coll_map_cb_direct(uint64_t ep, void *cb_ctx)
+{
+    ucc_service_coll_req_t *req = cb_ctx;
+
+    return ucc_ep_map_eval(req->subset.map, (ucc_rank_t)ep);
+}
+
 static inline ucc_status_t
 ucc_service_coll_req_init(ucc_team_t *team, ucc_subset_t *subset,
                           ucc_tl_team_t          **service_team,
@@ -36,8 +44,9 @@ ucc_service_coll_req_init(ucc_team_t *team, ucc_subset_t *subset,
                   sizeof(*req));
         return UCC_ERR_NO_MEMORY;
     }
-    req->team   = team;
-    req->subset = *subset;
+    req->team     = team;
+    req->subset   = *subset;
+    req->embedded = 0;
 
     if (ctx->service_team) {
         *service_team         = ctx->service_team;
@@ -73,6 +82,51 @@ ucc_status_t ucc_service_allreduce(ucc_team_t *team, void *sbuf, void *rbuf,
     if (status < 0) {
         ucc_free(*req);
         ucc_error("failed to start service allreduce for team %p: %s", team,
+                  ucc_status_string(status));
+        return status;
+    }
+
+    return UCC_OK;
+}
+
+ucc_status_t ucc_service_allreduce_ctx(ucc_team_t *team, void *sbuf,
+                                       void *rbuf, ucc_datatype_t dt,
+                                       size_t count, ucc_reduction_op_t op,
+                                       ucc_subset_t subset,
+                                       ucc_service_coll_req_t *req)
+{
+    ucc_context_t  *ctx = team->contexts[0];
+    ucc_tl_team_t  *steam;
+    ucc_tl_iface_t *tl_iface;
+    ucc_status_t    status;
+
+    /* A context service team exists only when the context was created with an
+       OOB and UCC_INTERNAL_OOB allowed it, and its creation is non-fatal, so
+       NULL is a supported state rather than a caller error. There is no
+       fallback: this collective addresses context ranks directly, which the
+       per-team service team cannot do. */
+    if (ucc_unlikely(ctx->service_team == NULL)) {
+        ucc_debug("context %p has no service team, ctx-scoped service "
+                  "allreduce is not available",
+                  ctx);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    req->team     = team;
+    req->subset   = subset;
+    req->data     = NULL;
+    req->embedded = 1;
+
+    subset.map.type      = UCC_EP_MAP_CB;
+    subset.map.cb.cb     = ucc_service_coll_map_cb_direct;
+    subset.map.cb.cb_ctx = req;
+
+    steam    = ctx->service_team;
+    tl_iface = UCC_TL_TEAM_IFACE(steam);
+    status   = tl_iface->scoll.allreduce(&steam->super, sbuf, rbuf, dt, count,
+                                         op, subset, &req->task);
+    if (status < 0) {
+        ucc_error("failed to start ctx service allreduce for team %p: %s", team,
                   ucc_status_string(status));
         return status;
     }
@@ -145,10 +199,13 @@ ucc_status_t ucc_service_coll_test(ucc_service_coll_req_t *req)
 
 ucc_status_t ucc_service_coll_finalize(ucc_service_coll_req_t *req)
 {
+    uint8_t      embedded = req->embedded;
     ucc_status_t status;
 
     status = ucc_collective_finalize_internal(req->task);
-    ucc_free(req);
+    if (!embedded) {
+        ucc_free(req);
+    }
     return status;
 }
 
