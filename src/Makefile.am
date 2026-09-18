@@ -29,9 +29,86 @@ if HAVE_IBVERBS
 topo_dirs += components/topo/ib
 endif
 
-SUBDIRS = . $(cl_dirs) $(mc_dirs) $(ec_dirs) $(topo_dirs)
+SUBDIRS = .
+
+# Component directories built in parallel after libucc.la.
+# All components depend only on libucc.la, not on each other,
+# so GNU make's job server can schedule them concurrently with -j.
+COMPONENT_DIRS = $(cl_dirs) $(mc_dirs) $(ec_dirs) $(topo_dirs)
+
+# All possible component subdirectories (including conditional ones)
+# needed for make dist to find all source files.
+# TL directories are appended by the generated components/tl/makefile.am.
+DIST_SUBDIRS = .                       \
+    components/cl/basic                \
+    components/cl/hier                 \
+    components/cl/doca_urom            \
+    components/mc/cpu                  \
+    components/mc/cuda                 \
+    components/mc/rocm                 \
+    components/ec/cpu                  \
+    components/ec/cuda                 \
+    components/ec/cuda/kernel          \
+    components/ec/rocm                 \
+    components/ec/rocm/kernel          \
+    components/topo/cuda               \
+    components/topo/ib
 
 include components/tl/makefile.am
+
+# Kernel-only subdirectories whose .cu compilation can overlap with libucc.la.
+# NVCC only needs headers (source tree + config.h from configure), so there is
+# no build-time dependency on the compiled core library.  The final link of the
+# parent component (libucc_ec_cuda.la, etc.) still waits for libucc.la below.
+early_cuda_kernel_dirs =
+if HAVE_CUDA
+early_cuda_kernel_dirs += components/ec/cuda/kernel
+endif
+if TL_CUDA_NVLS_ENABLED
+early_cuda_kernel_dirs += components/tl/cuda/kernels
+endif
+
+all-local: $(early_cuda_kernel_dirs:%=compile-kernels/%) $(COMPONENT_DIRS:%=all-component/%)
+
+# FORCE is a phony prerequisite that ensures pattern-rule targets are always
+# re-evaluated even if a directory with a matching name exists on disk.
+.PHONY: FORCE
+FORCE:
+
+# Start CUDA kernel compilation immediately (no libucc.la dependency).
+compile-kernels/%: FORCE
+	+$(MAKE) -C $* all
+
+# Components wait for libucc.la before linking.
+all-component/%: libucc.la FORCE
+	+$(MAKE) -C $* all
+
+# Components that contain CUDA kernels must also wait for the early kernel
+# compilation to finish, so two make processes never run in the same directory.
+if HAVE_CUDA
+all-component/components/ec/cuda: compile-kernels/components/ec/cuda/kernel
+endif
+if TL_CUDA_NVLS_ENABLED
+all-component/components/tl/cuda: compile-kernels/components/tl/cuda/kernels
+endif
+
+# Component installs must wait for libucc.la to be installed to the prefix
+# first, otherwise libtool relinking fails with "cannot find -lucc".
+install-exec-local: install-libLTLIBRARIES $(COMPONENT_DIRS:%=install-component/%)
+install-component/%: libucc.la install-libLTLIBRARIES FORCE
+	+$(MAKE) -C $* install
+
+clean-local: $(COMPONENT_DIRS:%=clean-component/%)
+clean-component/%: FORCE
+	+$(MAKE) -C $* clean
+
+uninstall-local: $(COMPONENT_DIRS:%=uninstall-component/%)
+uninstall-component/%: FORCE
+	+$(MAKE) -C $* uninstall
+
+distclean-local: $(COMPONENT_DIRS:%=distclean-component/%)
+distclean-component/%: FORCE
+	-+$(MAKE) -C $* distclean
 
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =
