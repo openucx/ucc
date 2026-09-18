@@ -271,12 +271,16 @@ UccTeam::~UccTeam()
     destroy_team();
 }
 
-UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
+UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars,
+               ucc_thread_mode_t thread_mode) :
     ta(_n_procs), n_procs(_n_procs), ctx_mode(_ctx_mode)
 
 {
-    ucc_job_env_t env_bkp;
-    char *var;
+    ucc_job_env_t    env_bkp;
+    ucc_lib_params_t lib_params = UccProcess::default_lib_params;
+    char            *var;
+
+    lib_params.thread_mode = thread_mode;
 
     /* NCCL TL is disabled since it currently can not support non-blocking
        team creation. */
@@ -298,7 +302,7 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
         setenv(v.first.c_str(), v.second.c_str(), 1);
     }
     for (int i = 0; i < n_procs; i++) {
-        procs.push_back(std::make_shared<UccProcess>(i));
+        procs.push_back(std::make_shared<UccProcess>(i, lib_params));
     }
 
     create_context();

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -29,6 +29,13 @@ const char *ucc_tl_ucp_alltoall_onesided_names[] = {
     [UCC_TL_UCP_ALLTOALL_ONESIDED_GET]   = "get",
     [UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO]  = "auto",
     [UCC_TL_UCP_ALLTOALL_ONESIDED_LAST]  = NULL
+};
+
+static const char *alltoall_pairwise_schedules[] = {
+    [UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE_RING] = "ring",
+    [UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE_RING_NODE_INTERLEAVED] =
+        "ring_node_interleaved",
+    [UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE_LAST] = NULL
 };
 
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib,
@@ -63,6 +70,14 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      "pairwise algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_pairwise_num_posts),
      UCC_CONFIG_TYPE_ULUNITS},
+
+    {"ALLTOALL_PAIRWISE_SCHEDULE", "ring",
+     "Peer ordering for alltoall pairwise algorithm\n"
+     "ring                  - directed ring over team ranks\n"
+     "ring_node_interleaved - directed ring over node-interleaved rank "
+     "labels",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_pairwise_schedule),
+     UCC_CONFIG_TYPE_ENUM(alltoall_pairwise_schedules)},
 
     {"ALLTOALLV_PAIRWISE_NUM_POSTS", "auto",
      "Maximum number of outstanding send and receive messages in alltoallv "

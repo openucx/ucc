@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -13,6 +13,7 @@
 #include "utils/ucc_parser.h"
 #include "coll_score/ucc_coll_score.h"
 #include "coll_patterns/ring.h"
+#include "alltoall/alltoall_pairwise_schedule.h"
 
 static inline ucc_status_t ucc_tl_ucp_get_topo(ucc_tl_ucp_team_t *team)
 {
@@ -44,6 +45,104 @@ static inline ucc_status_t ucc_tl_ucp_get_topo(ucc_tl_ucp_team_t *team)
 err_topo_init:
     ucc_ep_map_destroy_nested(&team->ctx_map);
     return status;
+}
+
+static void ucc_tl_ucp_init_alltoall_node_interleaved(ucc_tl_ucp_team_t *team)
+{
+    ucc_sbgp_t *nodes;
+    ucc_ep_map_t *node_maps;
+    ucc_rank_t  nnodes, ppn, size, node;
+    ucc_status_t status;
+    int          n_nodes;
+
+    if (team->cfg.alltoall_pairwise_schedule !=
+        UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE_RING_NODE_INTERLEAVED) {
+        return;
+    }
+    if (!team->topo || ucc_topo_is_single_node(team->topo) ||
+        !ucc_topo_isoppn(team->topo)) {
+        tl_debug(UCC_TL_UCP_TEAM_LIB(team),
+                 "alltoall node-interleaved ring unavailable: topology is "
+                 "missing, "
+                 "single-node, or has uneven ppn; using ordinary ring");
+        return;
+    }
+
+    size   = UCC_TL_TEAM_SIZE(team);
+    nnodes = ucc_topo_nnodes(team->topo);
+    ppn    = ucc_topo_min_ppn(team->topo);
+    if (nnodes <= 1 || ppn <= 1 || size / nnodes != ppn ||
+        size % nnodes != 0) {
+        tl_debug(UCC_TL_UCP_TEAM_LIB(team),
+                 "alltoall node-interleaved ring unavailable: invalid team "
+                 "geometry "
+                 "size %u nnodes %u ppn %u; using ordinary ring",
+                 size, nnodes, ppn);
+        return;
+    }
+
+    status = ucc_topo_get_all_nodes(team->topo, &nodes, &n_nodes);
+    if (status != UCC_OK || (ucc_rank_t)n_nodes != nnodes) {
+        tl_debug(UCC_TL_UCP_TEAM_LIB(team),
+                 "alltoall node-interleaved ring unavailable: failed to "
+                 "obtain all "
+                 "node groups; using ordinary ring");
+        return;
+    }
+
+    node_maps = ucc_malloc(nnodes * sizeof(*node_maps),
+                           "alltoall_node_interleaved_node_maps");
+    team->alltoall_node_interleaved.rank_order =
+        ucc_malloc(size * sizeof(*team->alltoall_node_interleaved.rank_order),
+                   "alltoall_node_interleaved_rank_order");
+    team->alltoall_node_interleaved.rank_labels =
+        ucc_malloc(size * sizeof(*team->alltoall_node_interleaved.rank_labels),
+                   "alltoall_node_interleaved_rank_labels");
+    if (!node_maps || !team->alltoall_node_interleaved.rank_order ||
+        !team->alltoall_node_interleaved.rank_labels) {
+        tl_debug(UCC_TL_UCP_TEAM_LIB(team),
+                 "alltoall node-interleaved ring unavailable: allocation "
+                 "failed; "
+                 "using ordinary ring");
+        goto out;
+    }
+
+    for (node = 0; node < nnodes; node++) {
+        if (nodes[node].group_size != ppn) {
+            tl_debug(UCC_TL_UCP_TEAM_LIB(team),
+                     "alltoall node-interleaved ring unavailable: node %u "
+                     "has "
+                     "invalid endpoint map; using ordinary ring",
+                     node);
+            goto out;
+        }
+        node_maps[node] = nodes[node].map;
+    }
+
+    status = ucc_tl_ucp_alltoall_node_interleaved_build_map(
+        node_maps, size, nnodes, ppn,
+        team->alltoall_node_interleaved.rank_order,
+        team->alltoall_node_interleaved.rank_labels);
+    if (status != UCC_OK) {
+        tl_debug(UCC_TL_UCP_TEAM_LIB(team),
+                 "alltoall node-interleaved ring unavailable: invalid rank "
+                 "permutation; using ordinary ring");
+        goto out;
+    }
+
+    team->alltoall_node_interleaved.available = 1;
+    tl_debug(UCC_TL_UCP_TEAM_LIB(team),
+             "alltoall node-interleaved ring available: size %u nnodes %u "
+             "ppn %u", size, nnodes, ppn);
+
+out:
+    ucc_free(node_maps);
+    if (!team->alltoall_node_interleaved.available) {
+        ucc_free(team->alltoall_node_interleaved.rank_order);
+        ucc_free(team->alltoall_node_interleaved.rank_labels);
+        team->alltoall_node_interleaved.rank_order  = NULL;
+        team->alltoall_node_interleaved.rank_labels = NULL;
+    }
 }
 
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
@@ -82,6 +181,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->status          = UCC_INPROGRESS;
     self->tuning_str      = "";
     self->topo            = NULL;
+    self->alltoall_node_interleaved.rank_order  = NULL;
+    self->alltoall_node_interleaved.rank_labels = NULL;
+    self->alltoall_node_interleaved.available   = 0;
     self->opt_radix       = UCC_UUNITS_AUTO_RADIX;
     self->opt_radix_host  = UCC_UUNITS_AUTO_RADIX;
     self->cuda_ring       = NULL;
@@ -161,6 +263,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         }
     }
 
+    ucc_tl_ucp_init_alltoall_node_interleaved(self);
+
     ctx->n_teams++;
 
     tl_debug(tl_context->lib, "posted tl team: %p", self);
@@ -179,6 +283,12 @@ UCC_CLASS_DEFINE(ucc_tl_ucp_team_t, ucc_tl_team_t);
 ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 {
     ucc_tl_ucp_team_t *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
+
+    ucc_free(team->alltoall_node_interleaved.rank_order);
+    ucc_free(team->alltoall_node_interleaved.rank_labels);
+    team->alltoall_node_interleaved.rank_order  = NULL;
+    team->alltoall_node_interleaved.rank_labels = NULL;
+    team->alltoall_node_interleaved.available   = 0;
 
     if (team->cuda_ring) {
         ucc_ring_pattern_destroy(team->cuda_ring);
