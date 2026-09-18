@@ -151,6 +151,11 @@ typedef struct ucc_tl_ucp_task ucc_tl_ucp_task_t;
 typedef struct ucc_tl_ucp_context ucc_tl_ucp_context_t;
 typedef union ucc_tl_ucp_copy_task ucc_tl_ucp_copy_task_t;
 
+typedef struct ucc_tl_ucp_allgather_kn_seq_storage {
+    ucc_kn_radix_seq_t seq;
+    ucc_kn_radix_t     radices[UCC_KN_MAX_RADIX_PHASES];
+} ucc_tl_ucp_allgather_kn_seq_storage_t;
+
 typedef ucc_status_t (*ucc_tl_ucp_copy_post_fn_t)(void *dst,
                                                   ucc_memory_type_t dst_mtype,
                                                   ucp_mem_h dst_memh,
@@ -179,6 +184,8 @@ typedef struct ucc_tl_ucp_team {
     ucc_rank_t                 opt_radix; /* generic opt radix */
     ucc_rank_t                 opt_radix_host; /* host specific opt radix */
     ucc_ring_pattern_t         *cuda_ring;
+    ucc_tl_ucp_allgather_kn_seq_storage_t allgather_kn_auto_small;
+    ucc_tl_ucp_allgather_kn_seq_storage_t allgather_kn_auto_large;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
