@@ -103,6 +103,7 @@ gtest_SOURCES =                           \
 	utils/test_string.cc                  \
 	utils/test_ep_map.cc                  \
 	utils/test_lock_free_queue.cc         \
+	utils/test_alltoall_pairwise_num_posts.cc \
 	utils/test_math.cc                    \
 	utils/test_cfg_file.cc                \
 	utils/test_parser.cc                  \
