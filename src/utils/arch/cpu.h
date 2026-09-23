@@ -37,6 +37,7 @@ typedef enum ucc_cpu_model {
     UCC_CPU_MODEL_ZHAOXIN_WUDAOKOU,
     UCC_CPU_MODEL_ZHAOXIN_LUJIAZUI,
     UCC_CPU_MODEL_NVIDIA_GRACE,
+    UCC_CPU_MODEL_NVIDIA_VERA,
     UCC_CPU_MODEL_FUJITSU_A64FX,
     UCC_CPU_MODEL_FUJITSU_MONAKA,
     UCC_CPU_MODEL_LAST
@@ -111,6 +112,8 @@ static inline ucc_cpu_model_t ucc_get_model_from_str(const char *m_name)
         return UCC_CPU_MODEL_ZHAOXIN_LUJIAZUI;
     if (strcasecmp(m_name, "grace") == 0)
         return UCC_CPU_MODEL_NVIDIA_GRACE;
+    if (strcasecmp(m_name, "vera") == 0)
+        return UCC_CPU_MODEL_NVIDIA_VERA;
     if (strcasecmp(m_name, "a64fx") == 0)
         return UCC_CPU_MODEL_FUJITSU_A64FX;
     if (strcasecmp(m_name, "monaka") == 0)

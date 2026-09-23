@@ -11,6 +11,8 @@
 #include "ucc_string.h"
 #include "ini.h"
 #include "components/topo/ucc_topo.h"
+
+#include <errno.h>
 #include "schedule/ucc_schedule.h"
 #include "schedule/ucc_schedule_pipelined.h"
 
@@ -1010,6 +1012,258 @@ void ucc_config_release_uint_ranged(void *ptr, const void *arg) //NOLINT
     ucc_mrange_uint_destroy(ptr);
 }
 
+static void ucc_kn_radix_seq_copy(ucc_kn_radix_seq_t       *dst,
+                                  ucc_kn_radix_t            *dst_radices,
+                                  const ucc_kn_radix_seq_t *src)
+{
+    *dst = *src;
+    memset(dst_radices, 0,
+           UCC_KN_MAX_RADIX_PHASES * sizeof(*dst_radices));
+    if (src->n_radices > 1) {
+        memcpy(dst_radices, src->radices,
+               src->n_radices * sizeof(*dst_radices));
+        dst->radices = dst_radices;
+    }
+}
+
+ucc_status_t ucc_mrange_kn_radix_copy(ucc_mrange_kn_radix_t       *dst,
+                                      const ucc_mrange_kn_radix_t *src)
+{
+    ucc_mrange_kn_radix_entry_t *r, *r_dup;
+
+    ucc_kn_radix_seq_copy(&dst->default_value, dst->default_radices,
+                          &src->default_value);
+    ucc_list_head_init(&dst->ranges);
+    ucc_list_for_each(r, &src->ranges, list_elem) {
+        r_dup = ucc_malloc(sizeof(*r_dup), "kn radix range dup");
+        if (ucc_unlikely(!r_dup)) {
+            ucc_mrange_kn_radix_destroy(dst);
+            return UCC_ERR_NO_MEMORY;
+        }
+        *r_dup = *r;
+        ucc_kn_radix_seq_copy(&r_dup->value, r_dup->radices, &r->value);
+        ucc_list_add_tail(&dst->ranges, &r_dup->list_elem);
+    }
+    return UCC_OK;
+}
+
+void ucc_mrange_kn_radix_destroy(ucc_mrange_kn_radix_t *param)
+{
+    ucc_mrange_kn_radix_entry_t *r, *r_tmp;
+
+    ucc_list_for_each_safe(r, r_tmp, &param->ranges, list_elem) {
+        ucc_list_del(&r->list_elem);
+        ucc_free(r);
+    }
+}
+
+static int ucc_config_parse_kn_radix(const char *buf,
+                                     ucc_kn_radix_seq_t *seq,
+                                     ucc_kn_radix_t *radices)
+{
+    const char   *p = buf;
+    char         *end;
+    unsigned long radix;
+
+    *seq = (ucc_kn_radix_seq_t){0};
+    memset(radices, 0,
+           UCC_KN_MAX_RADIX_PHASES * sizeof(*radices));
+    if (!strcasecmp(buf, UCS_VALUE_AUTO_STR)) {
+        return 1;
+    }
+    while (*p != '\0') {
+        if (seq->n_radices == UCC_KN_MAX_RADIX_PHASES) {
+            return 0;
+        }
+        errno = 0;
+        radix = strtoul(p, &end, 10);
+        if (errno == ERANGE || end == p || radix < 2 ||
+            radix > UINT16_MAX) {
+            return 0;
+        }
+        radices[seq->n_radices++] = (ucc_kn_radix_t)radix;
+        if (*end == '\0') {
+            if (seq->n_radices == 1) {
+                seq->radix = radices[0];
+            } else {
+                seq->radices = radices;
+            }
+            return 1;
+        }
+        if (*end != 'x' || end[1] == '\0') {
+            return 0;
+        }
+        p = end + 1;
+    }
+    return 0;
+}
+
+int ucc_config_sscanf_kn_radix(const char *buf, void *dest,
+                               const void *arg) //NOLINT
+{
+    ucc_mrange_kn_radix_t       *p = dest;
+    ucc_mrange_kn_radix_entry_t *r = NULL;
+    ucc_kn_radix_seq_t           value;
+    ucc_kn_radix_t               value_radices[UCC_KN_MAX_RADIX_PHASES];
+    char                       **ranges, **tokens;
+    unsigned                     n_ranges, n_tokens, i, j;
+    size_t                       start, end;
+    uint32_t                     mt_map;
+    int                          have_value;
+
+    ucc_list_head_init(&p->ranges);
+    p->default_value = (ucc_kn_radix_seq_t){0};
+    memset(p->default_radices, 0, sizeof(p->default_radices));
+    if (buf[0] == '\0') {
+        return 0;
+    }
+    ranges = ucc_str_split(buf, ",");
+    if (!ranges) {
+        return 0;
+    }
+    n_ranges = ucc_str_split_count(ranges);
+    for (i = 0; i < n_ranges; i++) {
+        tokens = ucc_str_split(ranges[i], ":");
+        if (!tokens) {
+            goto err;
+        }
+        n_tokens = ucc_str_split_count(tokens);
+        if (n_tokens == 0 || n_tokens > 3) {
+            goto err_tokens;
+        }
+        if (n_tokens == 1) {
+            if (!ucc_config_parse_kn_radix(tokens[0], &p->default_value,
+                                           p->default_radices)) {
+                goto err_tokens;
+            }
+        } else {
+            r = ucc_malloc(sizeof(*r), "kn radix range");
+            if (!r) {
+                goto err_tokens;
+            }
+            r->start   = 0;
+            r->end     = SIZE_MAX;
+            r->mtypes  = UCC_MEM_TYPE_MASK_FULL;
+            have_value = 0;
+            for (j = 0; j < n_tokens; j++) {
+                if (ucc_config_parse_kn_radix(tokens[j], &value,
+                                              value_radices)) {
+                    if (have_value) {
+                        goto err_tokens;
+                    }
+                    ucc_kn_radix_seq_copy(&r->value, r->radices, &value);
+                    have_value = 1;
+                    continue;
+                }
+                if (UCC_OK == ucc_str_to_mtype_map(tokens[j], "^", &mt_map)) {
+                    r->mtypes = mt_map;
+                    continue;
+                }
+                if (UCC_OK ==
+                    ucc_str_to_memunits_range(tokens[j], &start, &end)) {
+                    r->start = start;
+                    r->end   = end;
+                    continue;
+                }
+                goto err_tokens;
+            }
+            if (!have_value) {
+                goto err_tokens;
+            }
+            ucc_list_add_tail(&p->ranges, &r->list_elem);
+            r = NULL;
+        }
+        ucc_str_split_free(tokens);
+    }
+    ucc_str_split_free(ranges);
+    return 1;
+
+err_tokens:
+    ucc_free(r);
+    ucc_str_split_free(tokens);
+err:
+    ucc_str_split_free(ranges);
+    ucc_mrange_kn_radix_destroy(p);
+    return 0;
+}
+
+#define MAX_KN_RADIX_STR (UCC_KN_MAX_RADIX_PHASES * 6 + 1)
+static void ucc_config_sprintf_kn_radix_value(
+    char *buf, size_t max, const ucc_kn_radix_seq_t *seq)
+{
+    char    value[MAX_KN_RADIX_STR];
+    size_t  offset = 0;
+    uint8_t i;
+
+    if (seq->n_radices == 0) {
+        ucc_snprintf_safe(buf, max, "%s", UCS_VALUE_AUTO_STR);
+        return;
+    }
+    for (i = 0; i < seq->n_radices; i++) {
+        offset += ucc_snprintf_safe(value + offset, sizeof(value) - offset,
+                                    "%s%u", i ? "x" : "",
+                                    ucc_kn_radix_seq_get(seq, i));
+    }
+    ucc_snprintf_safe(buf, max, "%s", value);
+}
+
+int ucc_config_sprintf_kn_radix(char *buf, size_t max, const void *src,
+                                const void *arg) //NOLINT
+{
+    const ucc_mrange_kn_radix_t *s = src;
+    ucc_mrange_kn_radix_entry_t *r;
+    char value[MAX_KN_RADIX_STR];
+    char tmp_start[MAX_TMP_BUF_LENGTH];
+    char tmp_end[MAX_TMP_BUF_LENGTH];
+    char tmp_mtypes[MAX_TMP_BUF_LENGTH];
+    size_t last;
+
+    if (max == 0) {
+        return 1;
+    }
+
+    ucc_list_for_each(r, &s->ranges, list_elem) {
+        ucc_config_sprintf_kn_radix_value(value, sizeof(value), &r->value);
+        ucs_memunits_to_str(r->start, tmp_start, sizeof(tmp_start));
+        ucs_memunits_to_str(r->end, tmp_end, sizeof(tmp_end));
+        if (r->start == 0 && r->end == SIZE_MAX &&
+            r->mtypes != UCC_MEM_TYPE_MASK_FULL) {
+            ucc_mtype_map_to_str(r->mtypes, "^", tmp_mtypes,
+                                 sizeof(tmp_mtypes));
+            ucc_snprintf_safe(buf, max, "%s:%s", value, tmp_mtypes);
+        } else if (r->mtypes == UCC_MEM_TYPE_MASK_FULL) {
+            ucc_snprintf_safe(buf, max, "%s-%s:%s", tmp_start, tmp_end,
+                              value);
+        } else {
+            ucc_mtype_map_to_str(r->mtypes, "^", tmp_mtypes,
+                                 sizeof(tmp_mtypes));
+            ucc_snprintf_safe(buf, max, "%s-%s:%s:%s", tmp_start, tmp_end,
+                              tmp_mtypes, value);
+        }
+        last = strlen(buf);
+        if (max - last <= 1) {
+            return 1;
+        }
+        buf[last]     = ',';
+        buf[last + 1] = '\0';
+        max -= last + 1;
+        buf += last + 1;
+    }
+    ucc_config_sprintf_kn_radix_value(buf, max, &s->default_value);
+    return 1;
+}
+
+ucs_status_t ucc_config_clone_kn_radix(const void *src, void *dest,
+                                       const void *arg) //NOLINT
+{
+    return ucc_status_to_ucs_status(ucc_mrange_kn_radix_copy(dest, src));
+}
+
+void ucc_config_release_kn_radix(void *ptr, const void *arg) //NOLINT
+{
+    ucc_mrange_kn_radix_destroy(ptr);
+}
+
 size_t ucc_config_memunits_get(size_t config_size, size_t auto_size,
                                size_t max_size)
 {
@@ -1018,4 +1272,32 @@ size_t ucc_config_memunits_get(size_t config_size, size_t auto_size,
     } else {
         return ucs_min(config_size, max_size);
     }
+}
+
+int ucc_config_sscanf_ulunits_auto_topo(const char *buf, void *dest,
+                                        const void *arg)
+{
+    if (!strcasecmp(buf, UCS_VALUE_AUTO_STR)) {
+        *(unsigned long *)dest = UCC_ULUNITS_AUTO;
+        return 1;
+    }
+    if (!strcasecmp(buf, "topo")) {
+        *(unsigned long *)dest = UCC_ULUNITS_TOPO;
+        return 1;
+    }
+    return ucs_config_sscanf_ulong(buf, dest, arg);
+}
+
+int ucc_config_sprintf_ulunits_auto_topo(char *buf, size_t max, const void *src,
+                                         const void *arg)
+{
+    unsigned long val = *(const unsigned long *)src;
+
+    if (val == UCC_ULUNITS_AUTO) {
+        return snprintf(buf, max, UCS_VALUE_AUTO_STR);
+    }
+    if (val == UCC_ULUNITS_TOPO) {
+        return snprintf(buf, max, "topo");
+    }
+    return ucs_config_sprintf_ulong(buf, max, src, arg);
 }

@@ -1,4 +1,4 @@
-#!/bin/bash -xe
+#!/bin/bash -ve
 
 # Configure enroot credentials if provided
 if [[ -n "${ENROOT_USERNAME}" && -n "${ENROOT_PASSWORD}" ]]; then

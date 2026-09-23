@@ -9,6 +9,8 @@ extern "C" {
 }
 #include <common/test.h>
 #include <common/test_ucc.h>
+#include <sstream>
+#include <vector>
 
 class test_parse_mrange : public ucc::test {
 public:
@@ -69,3 +71,102 @@ UCC_TEST_F(test_parse_mrange, check_range_multiple) {
     ucc_mrange_uint_destroy(p);
 }
 
+class test_parse_kn_radix : public ucc::test {
+  protected:
+    static void expect_sequence(
+        const ucc_kn_radix_seq_t *seq,
+        const std::vector<ucc_kn_radix_t> &expected)
+    {
+        ASSERT_EQ(expected.size(), seq->n_radices);
+        for (size_t i = 0; i < expected.size(); i++) {
+            EXPECT_EQ(expected[i], ucc_kn_radix_seq_get(seq, i));
+        }
+    }
+};
+
+UCC_TEST_F(test_parse_kn_radix, valid_ranged_sequences)
+{
+    ucc_mrange_kn_radix_t p;
+
+    ASSERT_TRUE(ucc_config_sscanf_kn_radix(
+        "0-4K:host:8x6,4K-inf:cuda:4,auto", &p, NULL));
+    expect_sequence(
+        ucc_mrange_kn_radix_get(&p, 1024, UCC_MEMORY_TYPE_HOST), {8, 6});
+    expect_sequence(
+        ucc_mrange_kn_radix_get(&p, 8192, UCC_MEMORY_TYPE_CUDA), {4});
+    expect_sequence(
+        ucc_mrange_kn_radix_get(&p, 8192, UCC_MEMORY_TYPE_HOST), {});
+    ucc_mrange_kn_radix_destroy(&p);
+}
+
+UCC_TEST_F(test_parse_kn_radix, sequence_before_memory_type)
+{
+    ucc_mrange_kn_radix_t p;
+    char                  value[128];
+
+    ASSERT_TRUE(ucc_config_sscanf_kn_radix("8x6:cuda", &p, NULL));
+    expect_sequence(
+        ucc_mrange_kn_radix_get(&p, 1024, UCC_MEMORY_TYPE_CUDA), {8, 6});
+    expect_sequence(
+        ucc_mrange_kn_radix_get(&p, 1024, UCC_MEMORY_TYPE_HOST), {});
+    EXPECT_TRUE(ucc_config_sprintf_kn_radix(value, sizeof(value), &p, NULL));
+    EXPECT_STREQ("8x6:Cuda,auto", value);
+    ucc_mrange_kn_radix_destroy(&p);
+}
+
+UCC_TEST_F(test_parse_kn_radix, invalid_sequences)
+{
+    const char *invalid[] = {"", "8xx6", "8x", "1x8", "0", "65536"};
+    ucc_mrange_kn_radix_t p;
+
+    for (auto value : invalid) {
+        EXPECT_FALSE(ucc_config_sscanf_kn_radix(value, &p, NULL));
+    }
+}
+
+UCC_TEST_F(test_parse_kn_radix, overlong_sequence)
+{
+    ucc_mrange_kn_radix_t p;
+    std::ostringstream    value;
+
+    for (unsigned i = 0; i <= UCC_KN_MAX_RADIX_PHASES; i++) {
+        value << (i ? "x2" : "2");
+    }
+    EXPECT_FALSE(ucc_config_sscanf_kn_radix(value.str().c_str(), &p, NULL));
+}
+
+UCC_TEST_F(test_parse_kn_radix, maximum_sequence_format_bounds)
+{
+    const size_t          bounds[] = {1, 8, 126};
+    ucc_mrange_kn_radix_t p;
+    std::ostringstream    value;
+
+    for (unsigned i = 0; i < UCC_KN_MAX_RADIX_PHASES; i++) {
+        value << (i ? "x65535" : "65535");
+    }
+    ASSERT_TRUE(ucc_config_sscanf_kn_radix(value.str().c_str(), &p, NULL));
+    for (auto max : bounds) {
+        std::vector<char> buffer(max + 2, '#');
+
+        EXPECT_TRUE(ucc_config_sprintf_kn_radix(buffer.data() + 1, max, &p,
+                                                NULL));
+        EXPECT_EQ('#', buffer.front());
+        EXPECT_EQ('#', buffer.back());
+        EXPECT_EQ('\0', buffer[max]);
+    }
+    ucc_mrange_kn_radix_destroy(&p);
+}
+
+UCC_TEST_F(test_parse_kn_radix, clone)
+{
+    ucc_mrange_kn_radix_t src, dst;
+
+    ASSERT_TRUE(ucc_config_sscanf_kn_radix("8x6:cuda,4", &src, NULL));
+    ASSERT_EQ(UCC_OK, ucc_mrange_kn_radix_copy(&dst, &src));
+    ucc_mrange_kn_radix_destroy(&src);
+    expect_sequence(
+        ucc_mrange_kn_radix_get(&dst, 1024, UCC_MEMORY_TYPE_CUDA), {8, 6});
+    expect_sequence(
+        ucc_mrange_kn_radix_get(&dst, 1024, UCC_MEMORY_TYPE_HOST), {4});
+    ucc_mrange_kn_radix_destroy(&dst);
+}

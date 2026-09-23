@@ -57,6 +57,10 @@ typedef struct ucc_team {
 
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src);
 
+/* Team-id pool bit helpers; bit (pos - 1) of word i encodes id i * 64 + pos */
+int  ucc_team_id_pool_ffs_clear(uint64_t *value);
+void ucc_team_id_pool_set_bit(uint64_t *local, int id);
+
 /* Returns addressing information for "rank" in a team.
    If ucc context was created with OOB then addr storage is located on context.
    In that case we need to map rank to ctx_rank first. Otherwise, addr

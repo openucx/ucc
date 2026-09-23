@@ -7,8 +7,9 @@
 #ifndef RECURSIVE_KNOMIAL_H_
 #define RECURSIVE_KNOMIAL_H_
 
+#include "knomial.h"
+
 #define UCC_KN_PEER_NULL ((ucc_rank_t)-1)
-typedef uint16_t ucc_kn_radix_t;
 
 enum {
     KN_NODE_BASE,  /* Participates in the main loop of the recursive KN algorithm */
@@ -29,7 +30,7 @@ enum {
 
 typedef struct ucc_knomial_pattern {
 
-    ucc_kn_radix_t radix;         /* knomial tree radix */
+    ucc_kn_radix_t radix;         /* radix for current iteration */
     uint8_t        type;          /* pattern type */
     uint8_t        iteration;     /* current iteration */
     uint8_t        n_iters;       /* number of iterations in knomial algorithm */
@@ -54,6 +55,7 @@ typedef struct ucc_knomial_pattern {
     ucc_rank_t     block_size;
     ptrdiff_t      block_offset;
     int            is64;
+    ucc_kn_radix_seq_t radix_seq; /* persistent initialization sequence */
 } ucc_knomial_pattern_t;
 
 /**
@@ -101,6 +103,7 @@ ucc_knomial_pattern_init_impl(ucc_rank_t size, ucc_rank_t rank,
     p->rank          = rank;
     p->backward      = backward;
     p->iteration     = 0;
+    p->radix_seq     = ucc_kn_radix_seq_from_radix(radix);
     n_full_subtrees  = ucc_kn_pattern_n_full(p);
     p->n_extra       = has_extra ? size - n_full_subtrees * p->full_pow_size : 0;
     p->n_iters       = (p->n_extra && n_full_subtrees == 1) ?
@@ -229,6 +232,10 @@ ucc_knomial_pattern_next_iteration(ucc_knomial_pattern_t *p)
 {
     p->iteration++;
     p->radix_pow *= p->radix;
+    if (p->radix_seq.n_radices > 1 &&
+        !ucc_knomial_pattern_loop_done(p)) {
+        p->radix = ucc_kn_radix_seq_get(&p->radix_seq, p->iteration);
+    }
 }
 
 static inline void ucc_knomial_pattern_prev_iteration(ucc_knomial_pattern_t *p)

@@ -54,14 +54,15 @@ ucc_status_t ucc_pt_coll_reduce_scatter::init_args(ucc_pt_test_args_t &test_args
     dst_header = nullptr;
     if (UCC_IS_INPLACE(args)) {
         args.src.info.count = 0;
-        args.dst.info.count = generator->get_dst_count();
+        /* In-place dst contains the full source buffer. */
+        args.dst.info.count = generator->get_src_count();
     } else {
         args.src.info.count = generator->get_src_count();
         args.dst.info.count = generator->get_dst_count();
     }
 
     UCCCHECK_GOTO(ucc_pt_alloc(&dst_header,
-                               generator->get_dst_count() * dt_size,
+                               args.dst.info.count * dt_size,
                                args.dst.info.mem_type),
                   exit, st);
     args.dst.info.buffer = dst_header->addr;

@@ -10,6 +10,7 @@
 #include "config.h"
 #include "ucc/api/ucc_status.h"
 #include "ucc/api/ucc_def.h"
+#include "coll_patterns/knomial.h"
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_compiler_def.h"
 #include "utils/ucc_list.h"
@@ -28,6 +29,41 @@ typedef ucs_config_allow_list_t        ucc_config_allow_list_t;
 
 typedef struct ucc_topo ucc_topo_t;
 typedef struct ucc_file_config ucc_file_config_t;
+
+typedef struct ucc_mrange_kn_radix_entry {
+    ucc_list_link_t     list_elem;
+    size_t              start;
+    size_t              end;
+    uint32_t            mtypes;
+    ucc_kn_radix_seq_t  value;
+    ucc_kn_radix_t      radices[UCC_KN_MAX_RADIX_PHASES];
+} ucc_mrange_kn_radix_entry_t;
+
+typedef struct ucc_mrange_kn_radix {
+    ucc_list_link_t    ranges;
+    ucc_kn_radix_seq_t default_value;
+    ucc_kn_radix_t     default_radices[UCC_KN_MAX_RADIX_PHASES];
+} ucc_mrange_kn_radix_t;
+
+ucc_status_t ucc_mrange_kn_radix_copy(ucc_mrange_kn_radix_t       *dst,
+                                      const ucc_mrange_kn_radix_t *src);
+
+void ucc_mrange_kn_radix_destroy(ucc_mrange_kn_radix_t *param);
+
+static inline const ucc_kn_radix_seq_t *ucc_mrange_kn_radix_get(
+    const ucc_mrange_kn_radix_t *param, size_t range_value,
+    ucc_memory_type_t mem_type)
+{
+    ucc_mrange_kn_radix_entry_t *r;
+
+    ucc_list_for_each(r, &param->ranges, list_elem) {
+        if (r->start <= range_value && range_value <= r->end &&
+            (UCC_BIT(mem_type) & r->mtypes)) {
+            return &r->value;
+        }
+    }
+    return &param->default_value;
+}
 
 #if UCS_HAVE_CONFIG_GLOBAL_LIST_ENTRY_FLAGS
 #define UCC_CONFIG_DECLARE_TABLE(_table, _name, _prefix, _type)                \
@@ -77,6 +113,7 @@ typedef struct ucc_file_config ucc_file_config_t;
 #define UCC_CONFIG_TYPE_ENUM            UCS_CONFIG_TYPE_ENUM
 #define UCC_CONFIG_TYPE_MEMUNITS        UCS_CONFIG_TYPE_MEMUNITS
 #define UCC_ULUNITS_AUTO                UCS_ULUNITS_AUTO
+#define UCC_ULUNITS_TOPO                ((unsigned long)-3)
 #define UCC_CONFIG_TYPE_BITMAP          UCS_CONFIG_TYPE_BITMAP
 #define UCC_CONFIG_TYPE_BOOL            UCS_CONFIG_TYPE_BOOL
 #define UCC_CONFIG_ALLOW_LIST_NEGATE    UCS_CONFIG_ALLOW_LIST_NEGATE
@@ -279,10 +316,26 @@ int ucc_config_sscanf_uint_ranged(const char *buf, void *dest, const void *arg);
 int ucc_config_sprintf_uint_ranged(char *buf, size_t max, const void *src,
                                    const void *arg);
 
+int ucc_config_sscanf_ulunits_auto_topo(const char *buf, void *dest,
+                                        const void *arg);
+
+int ucc_config_sprintf_ulunits_auto_topo(char *buf, size_t max, const void *src,
+                                         const void *arg);
+
 ucs_status_t ucc_config_clone_uint_ranged(const void *src, void *dest,
                                           const void *arg);
 
 void ucc_config_release_uint_ranged(void *ptr, const void *arg);
+
+int ucc_config_sscanf_kn_radix(const char *buf, void *dest, const void *arg);
+
+int ucc_config_sprintf_kn_radix(char *buf, size_t max, const void *src,
+                                const void *arg);
+
+ucs_status_t ucc_config_clone_kn_radix(const void *src, void *dest,
+                                       const void *arg);
+
+void ucc_config_release_kn_radix(void *ptr, const void *arg);
 
 /**
  * Translate configuration value of "MEMUNITS" type to actual value.
@@ -305,6 +358,15 @@ void ucc_config_release_uint_ranged(void *ptr, const void *arg);
             "#            value and default_value can be \"auto\""             \
     }
 
+#define UCC_CONFIG_TYPE_KN_RADIX                                               \
+    {                                                                          \
+        ucc_config_sscanf_kn_radix, ucc_config_sprintf_kn_radix,               \
+            ucc_config_clone_kn_radix, ucc_config_release_kn_radix,            \
+            ucs_config_help_generic, ucs_config_doc_nop,                       \
+            "[<munit>-<munit>:[mtype]:]<radix>[x<radix>...],...,auto\n"        \
+            "#            an x-separated value is an ordered exact sequence"   \
+    }
+
 #define UCC_CONFIG_TYPE_PIPELINE_PARAMS                                        \
     {                                                                          \
         ucc_config_sscanf_pipeline_params, ucc_config_sprintf_pipeline_params, \
@@ -313,6 +375,15 @@ void ucc_config_release_uint_ranged(void *ptr, const void *arg);
             ucs_config_doc_nop,                                                \
             "thresh=<memunit>:fragsize=<memunit>:nfrags="                      \
             "<uint>:pdepth=<uint>:<ordered/parallel/sequential>"               \
+    }
+
+#define UCC_CONFIG_TYPE_ULUNITS_AUTO_TOPO                                      \
+    {                                                                          \
+        ucc_config_sscanf_ulunits_auto_topo,                                   \
+            ucc_config_sprintf_ulunits_auto_topo, ucs_config_clone_ulong,      \
+            ucs_config_release_nop, ucs_config_help_generic,                   \
+            ucs_config_doc_nop,                                                \
+            "unsigned long: <number>, \"topo\", or \"auto\""                   \
     }
 #else
 #define UCC_CONFIG_TYPE_UINT_RANGED                                            \
@@ -324,6 +395,15 @@ void ucc_config_release_uint_ranged(void *ptr, const void *arg);
             "#            value and default_value can be \"auto\""             \
     }
 
+#define UCC_CONFIG_TYPE_KN_RADIX                                               \
+    {                                                                          \
+        ucc_config_sscanf_kn_radix, ucc_config_sprintf_kn_radix,               \
+            ucc_config_clone_kn_radix, ucc_config_release_kn_radix,            \
+            ucs_config_help_generic,                                           \
+            "[<munit>-<munit>:[mtype]:]<radix>[x<radix>...],...,auto\n"        \
+            "#            an x-separated value is an ordered exact sequence"   \
+    }
+
 #define UCC_CONFIG_TYPE_PIPELINE_PARAMS                                        \
     {                                                                          \
         ucc_config_sscanf_pipeline_params, ucc_config_sprintf_pipeline_params, \
@@ -331,6 +411,14 @@ void ucc_config_release_uint_ranged(void *ptr, const void *arg);
             ucc_config_release_pipeline_params, ucs_config_help_generic,       \
             "thresh=<memunit>:fragsize=<memunit>:nfrags="                      \
             "<uint>:pdepth=<uint>:<ordered/parallel/sequential>"               \
+    }
+
+#define UCC_CONFIG_TYPE_ULUNITS_AUTO_TOPO                                      \
+    {                                                                          \
+        ucc_config_sscanf_ulunits_auto_topo,                                   \
+            ucc_config_sprintf_ulunits_auto_topo, ucs_config_clone_ulong,      \
+            ucs_config_release_nop, ucs_config_help_generic,                   \
+            "unsigned long: <number>, \"topo\", or \"auto\""                   \
     }
 #endif
 
