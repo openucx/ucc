@@ -1,8 +1,8 @@
 /**
-* Copyright (c) NVIDIA CORPORATION & AFFILIATES, 2001-2022. ALL RIGHTS RESERVED.
-*
-* See file LICENSE for terms.
-*/
+ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ * Copyright (c) 2001-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 
 #ifndef UCC_ASSERT_H
 #define UCC_ASSERT_H

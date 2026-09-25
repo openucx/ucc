@@ -1,6 +1,7 @@
 /**
- * Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * See file LICENSE for terms.
+ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ * Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #ifndef TEST_MEM_MAP_H

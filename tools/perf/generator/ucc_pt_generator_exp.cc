@@ -1,3 +1,9 @@
+/**
+ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ * Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include "ucc_pt_generator.h"
 
 ucc_pt_generator_exponential::ucc_pt_generator_exponential(size_t min, size_t max,

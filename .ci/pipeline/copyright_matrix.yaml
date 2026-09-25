@@ -1,0 +1,28 @@
+---
+job: "copyright"
+
+registry_host: "nbu-harbor.gtm.nvidia.com"
+
+credentials:
+  - {credentialsId: 'svcnbu-swx-hpcx-github-token', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GITHUB_TOKEN'}
+
+kubernetes:
+  cloud: il-ipp-blossom-prod
+  namespace: hpcx
+  limits: "{memory: 2Gi, cpu: 1000m}"
+  requests: "{memory: 2Gi, cpu: 1000m}"
+
+runs_on_dockers:
+  - {url: '${registry_host}/toolbox/header_check:latest',
+      name: 'header-check',
+      tag: 'latest',
+      arch: 'x86_64',
+      category: 'tool'
+    }
+
+timeout_minutes: 10
+
+steps:
+  - name: Copyrights
+    run: |
+      .ci/scripts/copyright_check.sh

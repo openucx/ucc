@@ -1,7 +1,7 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-#
-
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 sources =                           \
 	cl_doca_urom.h                  \
 	cl_doca_urom.c                  \

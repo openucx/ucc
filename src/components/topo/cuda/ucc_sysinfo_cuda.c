@@ -1,3 +1,9 @@
+/**
+ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ * Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include "config.h"
 #include "ucc_sysinfo_cuda.h"
 #include "components/topo/ucc_sysinfo.h"
