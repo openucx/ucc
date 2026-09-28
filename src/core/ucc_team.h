@@ -28,6 +28,8 @@ typedef enum {
     UCC_TEAM_ACTIVE,
     UCC_TEAM_CACHE_AGREE,         /* cache-action vote in flight */
     UCC_TEAM_CACHE_MISS_TEARDOWN, /* vote lost, draining before a rebuild */
+    /* Terminal, vote failed: destroy frees a shell, rejects a cache-owned one */
+    UCC_TEAM_CREATE_FAILED,
 } ucc_team_state_t;
 
 /* Refcounted holder of the per-team state that derived teams may share */
