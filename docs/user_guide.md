@@ -424,6 +424,13 @@ disjoint or strictly nested communicators, such as a fixed set of row/column
 communicators recreated over and over, satisfy that condition. Single-rank teams
 never vote, since they cannot diverge.
 
+If the vote itself fails (as opposed to being lost), `ucc_team_create_test`
+returns the error and the handle is terminal. A handle the create allocated may
+still be passed to `ucc_team_destroy`, which releases it. A handle that named a
+cached team has already been handed back to the cache; `ucc_team_destroy` rejects
+it and the caller must simply drop it. Either way, do not call
+`ucc_team_create_test` on it again.
+
 ### Team-cache settings must be identical on every rank
 
 > **The team-cache settings above are not per-rank tunables. A rank whose
