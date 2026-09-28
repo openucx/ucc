@@ -1041,28 +1041,45 @@ static tc_verdict_t test_nccl_dormant_reuse(ucc_context_h ctx, int world_rank,
 {
     const char *name    = "nccl_dormant_reuse";
     const char *gpu_env = std::getenv("UCC_TEAM_CACHE_GPU_TESTS");
+    const char *tls_env = std::getenv("UCC_TLS");
+    /* Skip reasons are agreed with MPI_MIN so no rank returns before the
+       barriers in drain_cache while its peers proceed */
+    int can_run   = 1;
+    int dev_count = 0;
 
     if (!gpu_env ||
         (gpu_env[0] != 'y' && gpu_env[0] != 'Y' && gpu_env[0] != '1')) {
+        can_run = 0;
+    }
+    /* TL/UCP or TL/CUDA could serve the CUDA allreduce; NCCL must be forced */
+    if (!tls_env || std::string(tls_env).find("nccl") == std::string::npos) {
+        can_run = 0;
+    }
+#ifdef HAVE_CUDA
+    if (cudaGetDeviceCount(&dev_count) != cudaSuccess) {
+        dev_count = 0;
+    }
+#endif
+    if (dev_count == 0) {
+        can_run = 0;
+    }
+    MPI_Allreduce(MPI_IN_PLACE, &can_run, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    if (!can_run) {
         return tc_skip(name, world_rank,
-                       "set UCC_TEAM_CACHE_GPU_TESTS=y to enable");
+                       "needs UCC_TEAM_CACHE_GPU_TESTS=y, UCC_TLS containing "
+                       "nccl, a CUDA build and a CUDA device on every rank");
     }
 
 #ifdef HAVE_CUDA
-    ucc_team_cache_t *cache     = cache_of(ctx);
-    tc_verdict_t      v         = TC_PASS;
-    int               dev_count = 0;
-    int64_t          *d_send    = NULL;
-    int64_t          *d_recv    = NULL;
-    int64_t           h_send    = (int64_t)(world_rank + 1);
-    int64_t           h_recv    = 0;
-    int64_t           expect    = (int64_t)world_size * (world_size + 1) / 2;
+    ucc_team_cache_t *cache  = cache_of(ctx);
+    tc_verdict_t      v      = TC_PASS;
+    int64_t          *d_send = NULL;
+    int64_t          *d_recv = NULL;
+    int64_t           h_send = (int64_t)(world_rank + 1);
+    int64_t           h_recv = 0;
+    int64_t           expect = (int64_t)world_size * (world_size + 1) / 2;
     uint64_t          hits_before;
-    ucc_team_h        team;
-
-    if (cudaGetDeviceCount(&dev_count) != cudaSuccess || dev_count == 0) {
-        return tc_skip(name, world_rank, "no CUDA devices available");
-    }
+    ucc_team_h        team, first_team;
 
     drain_cache(ctx);
 
@@ -1101,19 +1118,25 @@ static tc_verdict_t test_nccl_dormant_reuse(ucc_context_h ctx, int world_rank,
     };
 
     /* Create -> run -> destroy (-> DORMANT). */
-    team = create_world_team(ctx, world_size);
-    run_cuda_allreduce(team, "first allreduce");
+    first_team = create_world_team(ctx, world_size);
+    run_cuda_allreduce(first_team, "first allreduce");
     MPI_Barrier(MPI_COMM_WORLD);
-    destroy_ucc_team(team, ctx); /* ncclComm_t stays alive in the DORMANT team */
+    destroy_ucc_team(first_team, ctx); /* ncclComm_t stays alive, DORMANT */
     MPI_Barrier(MPI_COMM_WORLD);
 
-    /* Re-create the identical team: must be a DORMANT cache hit, otherwise the
-       re-adopted-ncclComm_t path below is never exercised. */
+    /* Must be a DORMANT hit. Hits are booked before the vote, so handle
+       identity is the proof: a rebuild or fresh shell is a different object */
     hits_before = cache->stats.hits;
     team        = create_world_team(ctx, world_size);
     if (cache->stats.hits <= hits_before) {
         tc_report_fail(name, world_rank,
                        "re-create did not hit the dormant cache");
+        v = TC_FAIL;
+    }
+    if (team != first_team) {
+        tc_report_fail(name, world_rank,
+                       "re-create returned a different team object, so the "
+                       "dormant NCCL communicator was not the one re-adopted");
         v = TC_FAIL;
     }
 
