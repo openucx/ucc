@@ -1534,6 +1534,18 @@ void ucc_team_cache_progress_pending(ucc_team_cache_t *cache)
     }
 }
 
+unsigned ucc_team_cache_progress_cb(void *arg)
+{
+    ucc_team_cache_t *cache = arg;
+
+    /* Unlocked peek; a stale read only delays the retry to the next call */
+    if (ucc_list_is_empty(&cache->pending_destroy)) {
+        return 0;
+    }
+    ucc_team_cache_progress_pending(cache);
+    return 0;
+}
+
 ucc_status_t ucc_team_cache_evict_one(ucc_team_cache_t *cache)
 {
     ucc_team_t *victim;
@@ -1621,6 +1633,8 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
         ucc_subset_t subset = {.map.type   = UCC_EP_MAP_FULL,
                                .map.ep_num = team->size,
                                .myrank     = team->rank};
+        /* Let finished evictions return their ids before voting on the pool */
+        ucc_team_cache_progress_pending(ctx->team_cache);
         status = ucc_service_allreduce(team, local, global, UCC_DT_UINT64,
                                        ctx->ids.pool_size,
                                        UCC_OP_BAND, subset,
