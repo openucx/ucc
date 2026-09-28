@@ -163,6 +163,7 @@ typedef struct ucc_base_team_params {
     uint16_t          id;   /* core level team id */
     ucc_team_t *      team; /* core team pointer */
     ucc_ep_map_t      map;  /* ranks map to the core ucc team */
+    uint8_t           ep_traffic_class;
 } ucc_base_team_params_t;
 
 typedef struct ucc_base_team {
