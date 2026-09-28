@@ -411,8 +411,9 @@ static ucc_team_t *ucc_team_cache_bucket_find(
         if (team->cache_state != want_state) {
             continue;
         }
-        /* Only a derived team may be re-seated into another tag domain */
-        if (require_derived && !team->is_derived) {
+        /* RESEAT: derived only, and never a pool id (the re-key would orphan it) */
+        if (require_derived &&
+            (!team->is_derived || team->cache_identity.ext_id == 0)) {
             continue;
         }
         return team;
@@ -457,6 +458,10 @@ ucc_team_t *ucc_team_cache_lookup_live(
 ucc_team_t *ucc_team_cache_lookup_dormant_derived(
     ucc_team_cache_t *cache, const ucc_team_cache_identity_t *id)
 {
+    /* RESEAT is external-to-external; a pool-id request would re-key to id 0 */
+    if (id->ext_id == 0) {
+        return NULL;
+    }
     /* A drifted cid makes the exact lookup miss, so match membership only */
     return ucc_team_cache_bucket_find(
         cache, id, 0, UCC_TEAM_CACHE_STATE_DORMANT, 1);

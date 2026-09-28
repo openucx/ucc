@@ -1295,6 +1295,51 @@ UCC_TEST_F(test_team_cache, lookup_dormant_derived_selection)
     free_stub_team(t_d2);
 }
 
+/* RESEAT is external-to-external: a pool-id request (no FIELD_ID) never
+   re-seats, and a pool-id dormant derived team is never a candidate. */
+UCC_TEST_F(test_team_cache, lookup_dormant_derived_requires_ext_ids)
+{
+    ScopedCache       cache(16, UCC_TEAM_CACHE_EVICTION_FIFO, 0);
+    ucc_rank_t        arr[4] = {10, 20, 30, 40};
+    ucc_team_params_t p_pool = make_array_params(arr, 4, 0);
+    ucc_team_t       *t_pool = alloc_stub_team(); /* derived, pool id */
+    ucc_team_t       *t_ext  = alloc_stub_derived_team(arr, 4, 0, 30);
+    ucc_team_cache_identity_t key_pool, key_ext;
+
+    ASSERT_NE(nullptr, t_pool);
+    ASSERT_NE(nullptr, t_ext);
+    ASSERT_EQ(UCC_OK, ucc_team_cache_identity_build(&p_pool,
+                                                    &t_pool->cache_identity));
+    ASSERT_EQ(0, t_pool->cache_identity.ext_id);
+    ASSERT_NE(0, t_ext->cache_identity.ext_id);
+    t_pool->is_derived = 1;
+
+    ucc_spin_lock(&cache->lock);
+    ASSERT_EQ(UCC_OK, ucc_team_cache_insert(cache, t_pool));
+    ASSERT_EQ(UCC_OK, ucc_team_cache_insert(cache, t_ext));
+
+    /* Request without an external id: nothing may be re-seated to id 0 */
+    build_identity(p_pool, key_pool);
+    EXPECT_EQ(nullptr, ucc_team_cache_lookup_dormant_derived(cache, &key_pool));
+
+    /* Drifted external id: only the external-id candidate is eligible */
+    build_id_key(arr, 4, 0, 99, key_ext);
+    EXPECT_EQ(t_ext, ucc_team_cache_lookup_dormant_derived(cache, &key_ext));
+    erase_stub(cache, t_ext);
+    EXPECT_EQ(nullptr, ucc_team_cache_lookup_dormant_derived(cache, &key_ext))
+        << "a pool-id derived team must not be re-seated";
+
+    /* Exact reuse of the pool-id team still works */
+    EXPECT_EQ(t_pool, ucc_team_cache_lookup(cache, &key_pool));
+    erase_stub(cache, t_pool);
+    ucc_spin_unlock(&cache->lock);
+
+    ucc_team_cache_identity_free(&key_pool);
+    ucc_team_cache_identity_free(&key_ext);
+    free_stub_team(t_pool);
+    free_stub_team(t_ext);
+}
+
 /* Same membership, different ext_ids chain in one membership-only bucket: each
    insert increments size (not de-duped), full-identity lookup finds each by
    ext_id, and head + sibling erase collapse the chain and drop size correctly. */
