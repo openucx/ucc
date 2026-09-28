@@ -304,6 +304,11 @@ re-seat. Under `UCC_TEAM_CACHE_AGREEMENT` the re-seat is voted on like any other
 reuse, and the vote carries the candidate's instance cookie so that all members
 re-seat the same team or none do.
 
+Re-seating moves a team between two *external* ids only. A create that does not
+pass `UCC_TEAM_PARAM_FIELD_ID` never re-seats, and a dormant derived team whose id
+came from the internal pool is never a re-seat candidate: the pool owns that id,
+and re-keying the team would orphan it. Such teams still take part in exact reuse.
+
 ### Cross-rank agreement
 
 Each rank classifies a create as a cache hit or a miss from its own cache
