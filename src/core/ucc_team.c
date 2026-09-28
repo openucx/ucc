@@ -1117,16 +1117,15 @@ ucc_status_t ucc_team_destroy(ucc_team_h team)
     return ucc_team_destroy_single(team);
 }
 
-/* Reclaim the team id after a failed teardown; the rest is a bounded leak */
+/* Terminal teardown failure: leak the id too, surviving TL teams still use it */
 static void ucc_team_cache_abandon_failed(ucc_team_t *team, ucc_status_t status)
 {
     ucc_error(
-        "cached team %p teardown failed terminally (%s); reclaiming "
-        "team-id %u and abandoning partially destroyed component state",
+        "cached team %p teardown failed terminally (%s); abandoning "
+        "team-id %u together with the partially destroyed component state",
         (void *)team,
         ucc_status_string(status),
         (unsigned)team->id);
-    ucc_team_release_id(team);
 }
 
 void ucc_team_cache_drain(ucc_context_t *context)
