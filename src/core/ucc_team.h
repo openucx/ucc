@@ -83,6 +83,9 @@ void ucc_team_cache_drain(ucc_context_t *context);
 /* Drive one teardown attempt for each team on the pending-destroy list */
 void ucc_team_cache_progress_pending(ucc_team_cache_t *cache);
 
+/* Context progress callback for the above; @arg is the cache */
+unsigned ucc_team_cache_progress_cb(void *arg);
+
 /* Move the eviction victim to the pending-destroy list and start its teardown */
 ucc_status_t ucc_team_cache_evict_one(ucc_team_cache_t *cache);
 
