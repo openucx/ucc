@@ -79,6 +79,7 @@ typedef struct ucc_team {
     ucc_service_coll_req_t    cache_vote_req;       /* embedded, never freed */
     uint64_t                  cache_vote_in[UCC_TEAM_CACHE_VOTE_LANES];
     uint64_t                  cache_vote_out[UCC_TEAM_CACHE_VOTE_LANES];
+    uint8_t                   internal_oob; /* bp.params.oob is UCC-owned */
 } ucc_team_t;
 
 /* If the bit is set then team_id is provided by the user */
