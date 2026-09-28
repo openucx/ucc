@@ -333,28 +333,57 @@ static void ucc_team_cache_rebook_hit_as_miss(ucc_team_cache_t *cache)
     cache->stats.misses++;
 }
 
+/* Return a RESERVED candidate to dormant; no refcount or reseat happened yet */
+static void ucc_team_agreement_release_reserved(
+    ucc_team_cache_t *cache, ucc_team_t *handle, ucc_team_cache_action_t action)
+{
+    ucc_assert(action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE ||
+               action == UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED);
+    ucc_spin_lock(&cache->lock);
+    handle->cache_state = UCC_TEAM_CACHE_STATE_DORMANT;
+    ucc_team_cache_registry_make_dormant(cache, handle);
+    if (action == UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED) {
+        ucc_team_cache_rebook_hit_as_miss(cache);
+    }
+    ucc_spin_unlock(&cache->lock);
+}
+
+/* Drop the parent pin a DERIVED_FROM_LIVE candidate holds across the vote */
+static void ucc_team_agreement_release_derive_pin(
+    ucc_team_t *handle, ucc_team_cache_action_t action)
+{
+    if (action == UCC_TEAM_CACHE_ACTION_DERIVED_FROM_LIVE &&
+        handle->cache_derive_artifacts) {
+        ucc_team_artifacts_put(handle->cache_derive_artifacts);
+        handle->cache_derive_artifacts = NULL;
+    }
+}
+
 /* Undo a posted vote setup after a fatal post failure */
 static void ucc_team_agreement_rollback(
     ucc_team_cache_t *cache, ucc_team_t *handle, ucc_team_cache_action_t action)
 {
     if (action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE ||
         action == UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED) {
-        /* Neither bumped the refcount, and a reseat has not happened yet */
-        ucc_spin_lock(&cache->lock);
-        handle->cache_state = UCC_TEAM_CACHE_STATE_DORMANT;
-        ucc_team_cache_registry_make_dormant(cache, handle);
-        if (action == UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED) {
-            ucc_team_cache_rebook_hit_as_miss(cache);
-        }
-        ucc_spin_unlock(&cache->lock);
+        ucc_team_agreement_release_reserved(cache, handle, action);
         return;
     }
-    if (action == UCC_TEAM_CACHE_ACTION_DERIVED_FROM_LIVE &&
-        handle->cache_derive_artifacts) {
-        ucc_team_artifacts_put(handle->cache_derive_artifacts);
-        handle->cache_derive_artifacts = NULL;
-    }
+    ucc_team_agreement_release_derive_pin(handle, action);
     ucc_team_destroy_single(handle);
+}
+
+/* Vote error (not a lost vote): hand back or park, and never re-test the req */
+static void ucc_team_agreement_fail(ucc_context_t *context, ucc_team_t *team)
+{
+    ucc_team_cache_action_t action = team->cache_local_action;
+
+    if (action == UCC_TEAM_CACHE_ACTION_EXACT_REUSE ||
+        action == UCC_TEAM_CACHE_ACTION_RESEAT_DERIVED) {
+        ucc_team_agreement_release_reserved(context->team_cache, team, action);
+    } else {
+        ucc_team_agreement_release_derive_pin(team, action);
+    }
+    team->state = UCC_TEAM_CREATE_FAILED;
 }
 
 /* Classify this rank's cache action and post the vote that reconciles it */
@@ -1052,7 +1081,8 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
             ucc_error(
                 "team cache: agreement vote failed: %s",
                 ucc_status_string(status));
-            goto out;
+            ucc_team_agreement_fail(context, team);
+            return status;
         }
         ucc_service_coll_finalize(&team->cache_vote_req);
 
@@ -1193,6 +1223,9 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
         break;
     case UCC_TEAM_ACTIVE:
         return UCC_OK;
+    case UCC_TEAM_CREATE_FAILED:
+        ucc_error("team %p: create already failed, handle is terminal", team);
+        return UCC_ERR_INVALID_PARAM;
     }
 out:
     if (UCC_OK == status) {
@@ -1272,8 +1305,10 @@ static ucc_status_t ucc_team_destroy_single_ex(ucc_team_h team, int for_rebuild)
         ucc_info("team destroyed, team_id %d", team->id);
     }
 
-    ucc_coll_score_free_map(team->score_map);
-    team->score_map = NULL;
+    if (team->score_map) { /* NULL for a shell that never finished building */
+        ucc_coll_score_free_map(team->score_map);
+        team->score_map = NULL;
+    }
     ucc_free(team->addr_storage.storage);
     ucc_team_release_id(team);
 
@@ -1340,8 +1375,28 @@ ucc_status_t ucc_team_destroy(ucc_team_h team)
         return UCC_ERR_INVALID_PARAM;
     }
 
+    if (team->state == UCC_TEAM_CREATE_FAILED) {
+        if (team->cache_state != UCC_TEAM_CACHE_STATE_NONE) {
+            /* Failed adoption: the cache already reclaimed this team */
+            ucc_error("team %p failed to adopt a cached team; the handle is "
+                      "not the caller's to destroy",
+                      team);
+            return UCC_ERR_INVALID_PARAM;
+        }
+        return ucc_team_destroy_single(team); /* shell owned by this create */
+    }
+
     if (team->state != UCC_TEAM_ACTIVE) {
         ucc_error("team %p is used before team_create is completed", team);
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    /* A dormant team is cache-owned; only a live user may release it */
+    if (team->cache_state == UCC_TEAM_CACHE_STATE_DORMANT ||
+        team->cache_state == UCC_TEAM_CACHE_STATE_RESERVED) {
+        ucc_error("team %p is retained by the team cache and has no live "
+                  "user; refusing to destroy it",
+                  team);
         return UCC_ERR_INVALID_PARAM;
     }
 
