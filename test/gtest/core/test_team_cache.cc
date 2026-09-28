@@ -795,6 +795,36 @@ UCC_TEST_F(test_team_cache, reserved_state_pin_and_rollback)
     erase_and_free(cache, {t});
 }
 
+/* ucc_team_destroy must never tear down a handle the cache owns: a dormant or
+   reserved team, or a terminal handle from a failed adoption. */
+UCC_TEST_F(test_team_cache, destroy_rejects_cache_owned_handle)
+{
+    ucc_context_t *ctxs[1] = {nullptr}; /* never dereferenced on these paths */
+    ucc_team_t    *t       = alloc_stub_team();
+    ASSERT_NE(nullptr, t);
+
+    t->contexts     = ctxs;
+    t->num_contexts = 1;
+    t->state        = UCC_TEAM_ACTIVE;
+    t->cache_state  = UCC_TEAM_CACHE_STATE_DORMANT;
+    EXPECT_EQ(UCC_ERR_INVALID_PARAM, ucc_team_destroy(t));
+
+    t->cache_state = UCC_TEAM_CACHE_STATE_RESERVED;
+    EXPECT_EQ(UCC_ERR_INVALID_PARAM, ucc_team_destroy(t));
+
+    /* Failed adoption: terminal state on a team the cache reclaimed */
+    t->state       = UCC_TEAM_CREATE_FAILED;
+    t->cache_state = UCC_TEAM_CACHE_STATE_DORMANT;
+    EXPECT_EQ(UCC_ERR_INVALID_PARAM, ucc_team_destroy(t));
+
+    /* A terminal handle is not re-testable either */
+    EXPECT_EQ(UCC_ERR_INVALID_PARAM, ucc_team_create_test(t));
+
+    /* The stub was never touched, so it is still ours to free */
+    EXPECT_EQ(UCC_TEAM_CREATE_FAILED, t->state);
+    free_stub_team(t);
+}
+
 /* Build a stub team with @arr membership and insert it into @cache as DORMANT. */
 static ucc_team_t *insert_stub_dormant(
     ucc_team_cache_t *cache, ucc_rank_t *arr, ucc_rank_t n, ucc_rank_t self_ep)
