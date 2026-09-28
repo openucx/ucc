@@ -1004,19 +1004,18 @@ ucc_status_t ucc_context_create_proc_info(
             (ucc_team_cache_eviction_policy_t)config->team_cache_eviction,
             config->team_cache_disable_linear_check);
         if (UCC_OK != status) {
-            ucc_warn("failed to init team cache, caching will be disabled");
-            ctx->team_cache = NULL;
-        } else {
-            ctx->team_cache->dump_stats = config->team_cache_dump_stats;
-            ctx->team_cache->derived    = config->team_cache_derived;
-            ctx->team_cache->reseat     = config->team_cache_reseat;
-            ctx->team_cache->agreement  = config->team_cache_agreement;
-            /* cache_gen is seeded once ctx->id.seq_num is assigned below */
+            /* Fatal, not degraded: a cache-less rank would skip the vote its
+               peers wait on, so only configuration may decide caching */
+            ucc_error("failed to init team cache: %s",
+                      ucc_status_string(status));
+            goto error_ctx;
         }
-        ucc_debug(
-            "team cache %s (max_size=%u)",
-            ctx->team_cache ? "enabled" : "disabled (init failed)",
-            cache_max);
+        ctx->team_cache->dump_stats = config->team_cache_dump_stats;
+        ctx->team_cache->derived    = config->team_cache_derived;
+        ctx->team_cache->reseat     = config->team_cache_reseat;
+        ctx->team_cache->agreement  = config->team_cache_agreement;
+        /* cache_gen is seeded once ctx->id.seq_num is assigned below */
+        ucc_debug("team cache enabled (max_size=%u)", cache_max);
     } else {
         ucc_debug("team cache disabled by configuration");
     }
