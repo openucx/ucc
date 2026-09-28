@@ -1268,6 +1268,16 @@ ucc_status_t ucc_context_create_proc_info(
         ucc_team_cache_destroy(ctx->team_cache);
         ctx->team_cache = NULL;
     }
+    if (ctx->team_cache != NULL) {
+        /* Registered only once the cache is final for this context */
+        status = ucc_context_progress_register(
+            ctx, ucc_team_cache_progress_cb, ctx->team_cache);
+        if (UCC_OK != status) {
+            ucc_error("failed to register team cache progress: %s",
+                      ucc_status_string(status));
+            goto error_ctx_create;
+        }
+    }
 
     n_tl_ctx = ctx->n_tl_ctx;
     for (i = 0; i < n_tl_ctx; i++) {
@@ -1373,6 +1383,8 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
         if (context->team_cache->dump_stats) {
             ucc_team_cache_dump_stats(context->team_cache);
         }
+        ucc_context_progress_deregister(
+            context, ucc_team_cache_progress_cb, context->team_cache);
         ucc_team_cache_drain(context);
         ucc_team_cache_destroy(context->team_cache);
         context->team_cache = NULL;
