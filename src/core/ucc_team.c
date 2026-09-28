@@ -202,8 +202,9 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
                                .map.type   = UCC_EP_MAP_FULL};
         status = ucc_internal_oob_init(team, subset, &team->bp.params.oob);
         if (UCC_OK != status) {
-            return status;
+            return status; /* bp.params.oob is still the caller's */
         }
+        team->internal_oob = 1;
         team->bp.params.mask |= UCC_TEAM_PARAM_FIELD_OOB;
     }
 
@@ -1260,8 +1261,10 @@ static ucc_status_t ucc_team_destroy_single_ex(ucc_team_h team, int for_rebuild)
     ucc_team_artifacts_put(team->artifacts);
     team->artifacts = NULL;
 
-    if (team->contexts[0]->service_team && team->size > 1) {
+    /* Ownership, not service-team presence: a failed init leaves the caller's */
+    if (team->internal_oob) {
         ucc_internal_oob_finalize(&team->bp.params.oob);
+        team->internal_oob = 0;
     }
 
     if ((ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_INFO) &&
