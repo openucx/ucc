@@ -525,28 +525,25 @@ static tc_verdict_t test_ep_map_cb_freed_after_cache(ucc_context_h ctx,
     ucc_team_cache_t  *cache = cache_of(ctx);
     tc_verdict_t       v     = TC_PASS;
     uint64_t           hits_before;
-    struct cb_ctx_box *box;
+    struct cb_ctx_box *old_box, *box;
     ucc_team_h         team, team2;
     ucc_team_t        *t;
 
     drain_cache(ctx);
     hits_before = cache->stats.hits;
-    box         = alloc_cb_box(world_size);
+    old_box     = alloc_cb_box(world_size);
 
     /* First create + use + destroy -> the team goes dormant. */
-    team = create_cb_team(ctx, world_size, box);
+    team = create_cb_team(ctx, world_size, old_box);
     run_barrier_on_team(team, ctx);
     destroy_ucc_team(team, ctx);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    /* Free the callback context (as MPI_Comm_free would). A cached team that
-       still points here would now be dangling. */
-    box->magic = 0xDEADDEADULL; /* poison so a stale deref is caught */
-    free(box);
+    /* Poison but keep the box: freeing it could hand its address to the new
+       box, so a stale deref would read a valid magic and go unnoticed */
+    old_box->magic = 0xDEADDEADULL; /* poisonable_rank_cb aborts on this */
 
-    /* Re-create the identical team. On a cache hit this re-adopts the dormant
-       team whose operational map is UCC-owned, so it never touches the freed
-       box. The fresh box only satisfies the create API. */
+    /* Re-create; a hit re-adopts the dormant team with its UCC-owned map */
     box   = alloc_cb_box(world_size);
     team2 = create_cb_team(ctx, world_size, box);
     run_barrier_on_team(team2, ctx);
@@ -579,6 +576,7 @@ static tc_verdict_t test_ep_map_cb_freed_after_cache(ucc_context_h ctx,
 
     destroy_ucc_team(team2, ctx);
     free(box);
+    free(old_box);
 
     if (v == TC_PASS && 0 == world_rank) {
         std::cout << "PASS " << name << "\n";
