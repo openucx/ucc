@@ -391,7 +391,9 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
     auto_radix = ucc_min(auto_radix, tsize);
     radix_seq = ucc_kn_radix_seq_from_radix(auto_radix);
 
-    if (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHER) {
+    /* Keep the legacy fixed-radix auto choice for host buffers. */
+    if (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHER &&
+        mtype != UCC_MEMORY_TYPE_HOST) {
         auto_radix_seq = msgsize >= UCC_TL_UCP_ALLGATHER_KN_LARGE_MSG_SIZE
                              ? &tl_team->allgather_kn_auto_large.seq
                              : &tl_team->allgather_kn_auto_small.seq;
