@@ -223,10 +223,11 @@ alltoall_onesided_build_peer_order(ucc_tl_ucp_task_t *task,
 
     /* Odd local rank: remote-first so half the node's ranks hit the NIC
      * immediately while even ranks saturate SHM, halving peak NIC pressure.
-     * Even local rank: local-first. Both then drain the remaining set. */
+     * Even local rank: local-first. Both then drain the remaining set.
+     * Parity comes from the task (set once in _init) so it stays consistent
+     * with the position-based classification in the mixed progress path. */
     out = 0;
-    if ((sbgp && sbgp->status == UCC_SBGP_ENABLED ? sbgp->group_rank
-                                                   : grank) % 2) {
+    if (!task->alltoall_onesided.local_first) {
         for (i = 0; i < n_remote; i++) peers[out++] = remote[i];
         for (i = 0; i < n_local;  i++) peers[out++] = local[i];
     } else {
@@ -444,10 +445,9 @@ void ucc_tl_ucp_alltoall_onesided_mixed_progress(ucc_coll_task_t *ctask)
         (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL)
             ? TASK_ARGS(task).src_memh.global_memh[grank]
             : TASK_ARGS(task).src_memh.local_memh;
-    ucc_sbgp_t        *sbgp       = ucc_topo_get_sbgp(team->topo, UCC_SBGP_NODE);
-    int                local_first =
-        ((sbgp && sbgp->status == UCC_SBGP_ENABLED ? sbgp->group_rank
-                                                    : grank) % 2 == 0);
+    /* Parity set once in _init alongside the peer-order build; must match the
+     * layout build_peer_order chose. */
+    int                local_first = task->alltoall_onesided.local_first;
     size_t             nelems;
     uint32_t           total, total_posted, inflight;
     int64_t            polls;
@@ -634,6 +634,13 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     }
     task->super.finalize = ucc_tl_ucp_alltoall_onesided_finalize;
     a2a_task             = &task->super;
+
+    /* Single source of truth for the even/odd stagger parity: build_peer_order
+     * lays the order out accordingly and the mixed progress path classifies
+     * local vs. remote by position, so both must agree. Computed once here. */
+    task->alltoall_onesided.local_first =
+        ((sbgp && sbgp->status == UCC_SBGP_ENABLED ? sbgp->group_rank
+                 : UCC_TL_TEAM_RANK(tl_team)) % 2 == 0);
 
     status = alltoall_onesided_build_peer_order(task, tl_team, sbgp, alg);
     if (status != UCC_OK) {
