@@ -219,7 +219,7 @@ UCC_TEST_P(test_alltoall_0, single_onesided)
     const int            count          = std::get<4>(GetParam());
     UccTeam_h            reference_team = UccJob::getStaticTeams()[team_id];
     int                  size           = reference_team->procs.size();
-    ucc_job_env_t        env       = {{"UCC_TL_UCP_TUNE", "alltoall:0-inf:@1"}};
+    ucc_job_env_t        env       = {{"UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided"}};
     bool                 is_contig = true;
     UccJob               job(size, UccJob::UCC_JOB_CTX_GLOBAL_ONESIDED, env);
     UccTeam_h            team;
@@ -332,3 +332,97 @@ INSTANTIATE_TEST_CASE_P(
 #endif
         ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE),
         ::testing::Values(1,3,8192))); // count
+
+using Param_onesided = std::tuple<int, int>; /* order index, nfrags */
+
+/* Exercises the onesided alltoall peer-ordering and fragmentation additions:
+ * each of the three issue orders (seq/stride/full) crossed with the
+ * fragmentation modes (1 = whole message, 4 = forced fragments). The job is
+ * built with a simulated 2-node topology so the full order and the
+ * mixed GET/PUT progress path actually see a local/remote split. */
+class test_alltoall_onesided : public test_alltoall,
+        public ::testing::WithParamInterface<Param_onesided> {};
+
+UCC_TEST_P(test_alltoall_onesided, ordering)
+{
+    static const char *order_names[] = {"seq", "stride", "full"};
+    const int            order  = std::get<0>(GetParam());
+    const int            nfrags = std::get<1>(GetParam());
+    const int            nprocs = UccJob::staticUccJobSize; /* 16 */
+    const ucc_datatype_t dtype  = UCC_DT_INT8;
+    /* 32 KiB per peer -> 4 fragments at the 8 KiB min-fragment floor */
+    const int            count  = 32768;
+    ucc_job_env_t        env    = {
+        {"UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided"},
+        {"UCC_TL_UCP_ALLTOALL_ONESIDED_ORDER", order_names[order]},
+        {"UCC_TL_UCP_ALLTOALL_ONESIDED_NFRAGS", std::to_string(nfrags)},
+    };
+    UccJob        job(nprocs, UccJob::UCC_JOB_CTX_GLOBAL_ONESIDED, env);
+    UccTeam_h     team = job.create_team(nprocs, true, true, true);
+    UccCollCtxVec ctxs;
+
+    this->set_inplace(TEST_NO_INPLACE);
+    SET_MEM_TYPE(UCC_MEMORY_TYPE_HOST);
+    data_init(nprocs, dtype, count, ctxs, team, false);
+
+    UccReq req(team, ctxs);
+    req.start();
+    req.wait();
+    EXPECT_EQ(true, data_validate(ctxs));
+    data_fini_onesided(ctxs);
+}
+
+INSTANTIATE_TEST_CASE_P(
+    , test_alltoall_onesided,
+    ::testing::Combine(
+        ::testing::Range(0, 3),      /* seq, stride, full */
+        ::testing::Values(1, 4)));   /* whole msg, forced fragmentation */
+
+using Param_onesided_mixed = std::tuple<int, int>; /* order index, nfrags */
+
+/* Exercises the explicit MIXED algorithm under the non-AUTO issue orders.
+ * Under the auto tune (the `ordering` test above) the mixed GET/PUT progress
+ * path is only reached via `full`; `stride`/`seq` route to GET. Forcing
+ * ALG=mixed drives the mixed path under every order, which is what
+ * build_peer_order's local/remote split requirement depends on. Seq is
+ * omitted: it is the default order and is covered by the auto path. The job
+ * is built with the simulated 2-node topology so the split actually has
+ * local and remote peers. */
+class test_alltoall_onesided_mixed : public test_alltoall,
+        public ::testing::WithParamInterface<Param_onesided_mixed> {};
+
+UCC_TEST_P(test_alltoall_onesided_mixed, ordering)
+{
+    static const char *order_names[] = {"stride", "full"};
+    const int            order  = std::get<0>(GetParam());
+    const int            nfrags = std::get<1>(GetParam());
+    const int            nprocs = UccJob::staticUccJobSize; /* 16 */
+    const ucc_datatype_t dtype  = UCC_DT_INT8;
+    /* 32 KiB per peer -> 4 fragments at the 8 KiB min-fragment floor */
+    const int            count  = 32768;
+    ucc_job_env_t        env    = {
+        {"UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided"},
+        {"UCC_TL_UCP_ALLTOALL_ONESIDED_ORDER", order_names[order]},
+        {"UCC_TL_UCP_ALLTOALL_ONESIDED_ALG", "mixed"},
+        {"UCC_TL_UCP_ALLTOALL_ONESIDED_NFRAGS", std::to_string(nfrags)},
+    };
+    UccJob        job(nprocs, UccJob::UCC_JOB_CTX_GLOBAL_ONESIDED, env);
+    UccTeam_h     team = job.create_team(nprocs, true, true, true);
+    UccCollCtxVec ctxs;
+
+    this->set_inplace(TEST_NO_INPLACE);
+    SET_MEM_TYPE(UCC_MEMORY_TYPE_HOST);
+    data_init(nprocs, dtype, count, ctxs, team, false);
+
+    UccReq req(team, ctxs);
+    req.start();
+    req.wait();
+    EXPECT_EQ(true, data_validate(ctxs));
+    data_fini_onesided(ctxs);
+}
+
+INSTANTIATE_TEST_CASE_P(
+    , test_alltoall_onesided_mixed,
+    ::testing::Combine(
+        ::testing::Range(0, 2),      /* stride, full */
+        ::testing::Values(1, 4)));   /* whole msg, forced fragmentation */
