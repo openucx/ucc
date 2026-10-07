@@ -45,8 +45,7 @@ static ucs_config_field_t ucc_tl_nccl_context_config_table[] = {
     {"SYNC", "auto",
      "Determines how UCC tests completion of NCCL collective",
      ucs_offsetof(ucc_tl_nccl_context_config_t, sync_type),
-     UCS_CONFIG_TYPE_ENUM(ucc_tl_nccl_completion_sync_names)
-    },
+     UCS_CONFIG_TYPE_ENUM(ucc_tl_nccl_completion_sync_names)},
 
     {"BLOCKING", "yes",
      "If set to no will use non-blocking mode communicator behavior, "
@@ -58,6 +57,12 @@ static ucs_config_field_t ucc_tl_nccl_context_config_table[] = {
      "Initialize NCCL communicator on first collective",
      ucc_offsetof(ucc_tl_nccl_context_config_t, nccl_lazy_init),
      UCC_CONFIG_TYPE_BOOL},
+
+    {"ENABLE_UBR", "try",
+     "Enable NCCL User Buffer Registration for zero-copy operations. "
+     "Requires NCCL v2.19+.",
+     ucc_offsetof(ucc_tl_nccl_context_config_t, enable_ubr),
+     UCC_CONFIG_TYPE_TERNARY},
 
     {NULL}};
 
