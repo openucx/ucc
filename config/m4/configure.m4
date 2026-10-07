@@ -40,7 +40,7 @@ AC_DEFUN([CHECK_NEED_TL_PROFILING], [
     AS_IF([ test x"$with_profiling" = "xall" ], [TL_PROFILING_REQUIRED=y],
     [
        for t in $(echo ${with_profiling} | tr ":" " "); do
-           AS_IF([ test "$t" == "$tl_name" ], [TL_PROFILING_REQUIRED=y], [])
+           AS_IF([ test "$t" = "$tl_name" ], [TL_PROFILING_REQUIRED=y], [])
        done
     ])
 ])
