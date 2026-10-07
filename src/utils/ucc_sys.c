@@ -169,6 +169,13 @@ ucc_open_output_stream(const char *config_str, ucc_log_level_t err_log_level,
         ucc_fill_filename_template(template, filename, sizeof(filename));
         free(template);
 
+        if (strstr(filename, "..") != NULL) {
+            ucc_log(err_log_level,
+                    "log file path '%s' contains '..', rejected for safety",
+                    filename);
+            return UCC_ERR_INVALID_PARAM;
+        }
+
         output_stream = fopen(filename, "w");
         if (output_stream == NULL) {
             ucc_log(err_log_level, "failed to open '%s' for writing: %m",
