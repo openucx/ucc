@@ -51,8 +51,8 @@ const ucc_tl_ucp_default_alg_desc_t
             .str_get_fn = NULL
         },
         {
-            .select_str = UCC_TL_UCP_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR,
-            .str_get_fn = NULL
+            .select_str = NULL,
+            .str_get_fn = ucc_tl_ucp_reduce_scatter_score_str_get
         },
         {
             .select_str = UCC_TL_UCP_REDUCE_SCATTERV_DEFAULT_ALG_SELECT_STR,
