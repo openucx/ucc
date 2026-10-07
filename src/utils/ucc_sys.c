@@ -21,7 +21,7 @@ ucc_status_t ucc_sysv_alloc(size_t *size, void **addr, int *shm_id)
 
     alloc_size = ucc_align_up(*size, getpagesize());
 
-    *shm_id = shmget(IPC_PRIVATE, alloc_size, IPC_CREAT | 0666);
+    *shm_id = shmget(IPC_PRIVATE, alloc_size, IPC_CREAT | 0600);
     if (*shm_id < 0) {
         ucc_error("failed to shmget with IPC_PRIVATE, size %zd, IPC_CREAT "
                   "errno: %d(%s)", alloc_size, errno, strerror(errno));
