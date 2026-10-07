@@ -42,11 +42,20 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_start(ucc_coll_task_t *task)
         {
             if (!in_place) {
                 keys.src_len = src_ebuf->packed_memh_len;
-                memcpy(keys.rkeys, src_ebuf->packed_memh, keys.src_len);
             } else {
                 keys.src_len = 0;
             }
             keys.dst_len = dst_ebuf->packed_memh_len;
+            if (keys.src_len + keys.dst_len > sizeof(keys.rkeys)) {
+                cl_error(&cl_lib->super,
+                         "packed memh too large for rkeys buffer: "
+                         "src_len %zu + dst_len %zu > %zu",
+                         keys.src_len, keys.dst_len, sizeof(keys.rkeys));
+                return UCC_ERR_NO_MEMORY;
+            }
+            if (!in_place) {
+                memcpy(keys.rkeys, src_ebuf->packed_memh, keys.src_len);
+            }
             memcpy(keys.rkeys + keys.src_len,
                    dst_ebuf->packed_memh,
                    keys.dst_len);
