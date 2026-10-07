@@ -459,7 +459,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_req {
     uint32_t                                            start_psn;
     int                                                 num_packets;
     int                                                 last_pkt_len;
-    int                                                 offset;
+    size_t                                              offset;
     ucc_memory_type_t                                   buf_mem_type;
     enum ucc_tl_mlx5_mcast_one_sided_reliability_scheme one_sided_reliability_scheme;
     uint32_t                                            ag_counter;
