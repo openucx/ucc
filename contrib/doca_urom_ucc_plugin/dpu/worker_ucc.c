@@ -467,19 +467,24 @@ static doca_error_t urom_worker_ucc_cmd_unpack(void  *packed_cmd,
                                 sizeof(uint64_t) :
                                 sizeof(uint32_t)) * team_size;
 
+            extended_mem += 2 * count_pack_size + 2 * disp_pack_size;
+            if ((*cmd)->len != extended_mem +
+                sizeof(struct urom_worker_ucc_cmd)) {
+                DOCA_LOG_ERR("Invalid UCC command length: team_size "
+                             "%zu produces oversized variable counts",
+                             team_size);
+                return DOCA_ERROR_INVALID_VALUE;
+            }
+
             coll_args->src.info_v.counts = ptr;
             ptr += count_pack_size;
-            extended_mem += count_pack_size;
             coll_args->dst.info_v.counts = ptr;
             ptr += count_pack_size;
-            extended_mem += count_pack_size;
 
             coll_args->src.info_v.displacements = ptr;
             ptr += disp_pack_size;
-            extended_mem += disp_pack_size;
             coll_args->dst.info_v.displacements = ptr;
             ptr += disp_pack_size;
-            extended_mem += disp_pack_size;
         }
         break;
 
