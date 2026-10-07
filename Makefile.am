@@ -5,23 +5,53 @@
 #
 
 if !DOCS_ONLY
-SUBDIRS =      \
-	src        \
-	contrib    \
-	tools/info \
-	cmake
+SUBDIRS = src
+
+PARALLEL_SUBDIRS = contrib tools/info cmake
 
 if HAVE_MPICXX
-SUBDIRS +=     \
-	tools/perf \
-	test/mpi
+PARALLEL_SUBDIRS += tools/perf test/mpi
 endif
 
 if HAVE_GTEST
-SUBDIRS += test/gtest
+PARALLEL_SUBDIRS += test/gtest
 gtest:
 	@make -C test/gtest test
 endif
+
+DIST_SUBDIRS = src contrib tools/info cmake tools/perf test/mpi test/gtest
+
+all-local: $(PARALLEL_SUBDIRS:%=all-par/%)
+
+# FORCE is a phony prerequisite that ensures pattern-rule targets are always
+# re-evaluated even if a directory with a matching name exists on disk.
+.PHONY: FORCE
+FORCE:
+
+all-par/%: FORCE
+	+$(MAKE) -C $* all
+
+install-data-local: $(PARALLEL_SUBDIRS:%=install-par/%)
+install-exec-local: $(PARALLEL_SUBDIRS:%=install-par/%)
+install-par/%: FORCE
+	+$(MAKE) -C $* install
+
+clean-local: $(PARALLEL_SUBDIRS:%=clean-par/%)
+clean-par/%: FORCE
+	+$(MAKE) -C $* clean
+
+uninstall-local: $(PARALLEL_SUBDIRS:%=uninstall-par/%)
+uninstall-par/%: FORCE
+	+$(MAKE) -C $* uninstall
+
+check-local: $(PARALLEL_SUBDIRS:%=check-par/%)
+check-par/%: FORCE
+	+$(MAKE) -C $* check
+
+distclean-local: $(PARALLEL_SUBDIRS:%=distclean-par/%)
+distclean-par/%: FORCE
+	-+$(MAKE) -C $* distclean
+
 endif #!DOCS_ONLY
 
 include $(srcdir)/docs/doxygen/doxygen.am
