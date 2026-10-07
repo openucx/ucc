@@ -35,12 +35,15 @@ set -x
 module load hpcx-gcc
 module load dev/cuda12.9.0
 module load dev/nccl_2.26.5-1_cuda12.9.0
-module load tools/cov-2021.12
+module load tools/cov-2026.03
 ./autogen.sh
 ./configure --with-nccl --with-tls=cuda,nccl,self,sharp,shm,ucp,mlx5 --with-ucx="${HPCX_UCX_DIR}" --with-sharp="${HPCX_SHARP_DIR}" --with-nvcc-gencode="-gencode arch=compute_86,code=sm_86"
 make_opt="-j${NPROC:-$(($(nproc) / 2 + 1))}"
 COV_BUILD_DIR="${SCRIPT_DIR}/cov-build"
+COV_CONFIG_FILE="${SCRIPT_DIR}/coverity_config.xml"
 mkdir -p "$COV_BUILD_DIR"
+cov-configure --gcc --config "$COV_CONFIG_FILE"
+
 COV_ANALYSE_OPTIONS+=" --all"
 COV_ANALYSE_OPTIONS+=" --enable-fnptr"
 COV_ANALYSE_OPTIONS+=" --fnptr-models"
@@ -81,7 +84,7 @@ function build_with_coverity() {
 
     make clean >/dev/null
     # Run cov-build
-    cov-build --dir "${COV_BUILD_DIR}" make $make_opt all >/dev/null
+    cov-build --config "${COV_CONFIG_FILE}" --dir "${COV_BUILD_DIR}" make $make_opt all >/dev/null
     err_code=$?
     return $err_code
 }
