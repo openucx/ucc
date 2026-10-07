@@ -162,6 +162,12 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
     }
 
     plugin_name = self->cfg.plugin_name;
+    if (strchr(plugin_name, '/') || strstr(plugin_name, "..")) {
+        cl_error(cl_config->super.cl_lib,
+                 "invalid plugin name '%s': must not contain '/' or '..'",
+                 plugin_name);
+        return UCC_ERR_INVALID_PARAM;
+    }
     device      = self->cfg.device;
 
     result = doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
