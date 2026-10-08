@@ -11,6 +11,7 @@
 #include "tl_ucp_copy.h"
 #include "core/ucc_progress_queue.h"
 #include "allgather.h"
+#include "allgather_knomial_select.h"
 #include "coll_patterns/sra_knomial.h"
 #include "tl_ucp_task.h"
 #include "ucc/api/ucc.h"
@@ -379,6 +380,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_datatype_t     dtype   = GET_DT(&coll_args->args);
     size_t             msgsize = count * ucc_dt_size(dtype);
     const ucc_kn_radix_seq_t *cfg_radix_seq;
+    const ucc_kn_radix_seq_t *auto_radix_seq;
     ucc_kn_radix_seq_t        radix_seq;
     ucc_kn_radix_t            auto_radix;
 
@@ -389,6 +391,14 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
     auto_radix = ucc_min(auto_radix, tsize);
     radix_seq = ucc_kn_radix_seq_from_radix(auto_radix);
 
+    if (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHER) {
+        auto_radix_seq = msgsize >= UCC_TL_UCP_ALLGATHER_KN_LARGE_MSG_SIZE
+                             ? &tl_team->allgather_kn_auto_large.seq
+                             : &tl_team->allgather_kn_auto_small.seq;
+        if (auto_radix_seq->n_radices > 0) {
+            radix_seq = *auto_radix_seq;
+        }
+    }
     if (coll_args->args.coll_type != UCC_COLL_TYPE_ALLGATHER) {
         if (cfg_radix_seq->n_radices > 0 &&
             ucc_kn_radix_seq_get(cfg_radix_seq, 0) >= 2) {
