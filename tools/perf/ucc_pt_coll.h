@@ -126,7 +126,7 @@ public:
 
 class ucc_pt_coll_barrier: public ucc_pt_coll {
 public:
-    ucc_pt_coll_barrier(ucc_pt_comm *communicator,
+    ucc_pt_coll_barrier(bool is_persistent, ucc_pt_comm *communicator,
                         ucc_pt_generator_base *generator);
     ucc_status_t init_args(ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;
