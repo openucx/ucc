@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 if TL_UCP_ENABLED
@@ -30,6 +30,7 @@ alltoall =                       \
 	alltoall/alltoall.c          \
 	alltoall/alltoall_onesided.c \
 	alltoall/alltoall_pairwise.c \
+	alltoall/alltoall_pairwise_num_posts.h \
 	alltoall/alltoall_bruck.c
 
 alltoallv =                        \
