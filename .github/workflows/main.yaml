@@ -209,6 +209,13 @@ jobs:
           /tmp/ompi/install/bin/mpirun "${MPI_ARGS[@]}" \
             /tmp/ucc/install/bin/ucc_perftest -c "${c}" "${PERFTEST_ARGS[@]}" -i
         done
+        # Persistent mode: the benchmark re-posts the same request, so every
+        # collective it builds must carry the persistent flag
+        for c in barrier allreduce; do
+          echo "Running ucc_perftest (persistent) -c ${c}"
+          /tmp/ompi/install/bin/mpirun "${MPI_ARGS[@]}" \
+            /tmp/ucc/install/bin/ucc_perftest -c "${c}" "${PERFTEST_ARGS[@]}" -p
+        done
         # Single process, no launcher
         /tmp/ucc/install/bin/ucc_perftest -c allreduce "${PERFTEST_ARGS[@]}"
 
