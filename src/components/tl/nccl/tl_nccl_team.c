@@ -87,6 +87,7 @@ ucc_status_t ucc_tl_nccl_team_destroy(ucc_base_team_t *tl_team)
     if (team->nccl_comm) {
         if (team->comm_state == TL_NCCL_COMM_STATE_ERROR) {
             ncclCommAbort(team->nccl_comm);
+            team->nccl_comm = NULL;
         } else {
 #if NCCL_USE_NON_BLOCKING
             ncclCommFinalize(team->nccl_comm);
@@ -97,16 +98,19 @@ check_finalize:
                          st != ncclSuccess ? st : nccl_status,
                 ncclGetErrorString(st != ncclSuccess ? st : nccl_status));
                 ncclCommAbort(team->nccl_comm);
+                team->nccl_comm = NULL;
                 return UCC_ERR_NO_MESSAGE;
             } else if (nccl_status == ncclInProgress) {
                 team->comm_state = TL_NCCL_COMM_STATE_DESTROY_COMM;
                 return UCC_INPROGRESS;
             } else {
                 ncclCommDestroy(team->nccl_comm);
+                team->nccl_comm = NULL;
             }
             team->comm_state = UCC_OK;
 #else
             ncclCommDestroy(team->nccl_comm);
+            team->nccl_comm = NULL;
 #endif
         }
     }
