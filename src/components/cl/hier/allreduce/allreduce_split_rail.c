@@ -307,10 +307,18 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_split_rail_init,
         return UCC_ERR_NO_MEMORY;
     }
 
-    ucc_pipeline_nfrags_pdepth(&cfg->allreduce_split_rail_pipeline,
-                               coll_args->args.dst.info.count *
-                               ucc_dt_size(coll_args->args.dst.info.datatype),
-                               &n_frags, &pipeline_depth);
+    status = ucc_pipeline_nfrags_pdepth(
+        &cfg->allreduce_split_rail_pipeline,
+        coll_args->args.dst.info.count *
+            ucc_dt_size(coll_args->args.dst.info.datatype),
+        &n_frags,
+        &pipeline_depth);
+    if (ucc_unlikely(status != UCC_OK)) {
+        cl_error(
+            team->context->lib,
+            "invalid pipeline parameters for allreduce split rail");
+        goto err_pipe_init;
+    }
 
     status = ucc_schedule_pipelined_init(
         coll_args, team, ucc_cl_hier_allreduce_split_rail_frag_init,

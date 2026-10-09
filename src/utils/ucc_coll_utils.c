@@ -513,7 +513,7 @@ int ucc_coll_args_is_rooted(ucc_coll_type_t ct)
     return 0;
 }
 
-#define COLL_ARGS_HEADER_STR_MAX_SIZE 32
+#define COLL_ARGS_HEADER_STR_MAX_SIZE 64
 void ucc_coll_args_str(const ucc_coll_args_t *args, ucc_rank_t trank,
                        ucc_rank_t tsize, char *str, size_t len)
 {
@@ -531,26 +531,34 @@ void ucc_coll_args_str(const ucc_coll_args_t *args, ucc_rank_t trank,
     if (ucc_coll_args_is_reduction(ct)) {
         ucc_snprintf_safe(tmp, sizeof(tmp), " %s",
                           ucc_reduction_op_str(args->op));
-        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr);
-        strncat(hdr, tmp, left);
+        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr) - 1;
+        if (left > 0) {
+            strncat(hdr, tmp, left);
+        }
     }
 
     if (UCC_IS_INPLACE(*args)) {
         ucc_snprintf_safe(tmp, sizeof(tmp), " inplace");
-        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr);
-        strncat(hdr, tmp, left);
+        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr) - 1;
+        if (left > 0) {
+            strncat(hdr, tmp, left);
+        }
     }
 
     if (UCC_IS_PERSISTENT(*args)) {
         ucc_snprintf_safe(tmp, sizeof(tmp), " persistent");
-        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr);
-        strncat(hdr, tmp, left);
+        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr) - 1;
+        if (left > 0) {
+            strncat(hdr, tmp, left);
+        }
     }
 
     if (ucc_coll_args_is_rooted(ct)) {
         ucc_snprintf_safe(tmp, sizeof(tmp), " root %u", root);
-        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr);
-        strncat(hdr, tmp, left);
+        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr) - 1;
+        if (left > 0) {
+            strncat(hdr, tmp, left);
+        }
     }
 
     has_src = has_dst = 0;
@@ -760,7 +768,10 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
         if (rc < 0) {
             return;
         }
-        strncat(str, task_info, len - strlen(str));
+        size_t left = len - strlen(str);
+        if (left > 1) {
+            strncat(str, task_info, left - 1);
+        }
     }
 
     if (verbosity >= UCC_LOG_LEVEL_DEBUG) {
@@ -770,7 +781,10 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
                           team->rank,
                           ucc_ep_map_eval(team->ctx_map, team->rank),
                           task->seq_num, task);
-        strncat(str, task_info, len - strlen(str));
+        size_t left = len - strlen(str);
+        if (left > 1) {
+            strncat(str, task_info, left - 1);
+        }
     }
 }
 

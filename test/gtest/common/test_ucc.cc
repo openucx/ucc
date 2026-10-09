@@ -277,6 +277,7 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
 {
     ucc_job_env_t env_bkp;
     char *var;
+    std::vector<std::string> newly_set;
 
     /* NCCL TL is disabled since it currently can not support non-blocking
        team creation. */
@@ -294,6 +295,10 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
             /* found env - back it up for later restore
                after processes creation */
             env_bkp.push_back(ucc_env_var_t(v.first, var));
+        } else {
+            /* env var was not set - track it so we can restore
+               (unset) it after processes creation */
+            newly_set.push_back(v.first);
         }
         setenv(v.first.c_str(), v.second.c_str(), 1);
     }
@@ -305,6 +310,9 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
     for (auto &v : env_bkp) {
         /*restore original env */
         setenv(v.first.c_str(), v.second.c_str(), 1);
+    }
+    for (auto &v : newly_set) {
+        unsetenv(v.c_str());
     }
 }
 

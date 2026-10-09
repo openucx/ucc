@@ -151,3 +151,25 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Values(2, 8, 11),
         ::testing::Values(UCC_DT_INT32, UCC_DT_UINT128, UCC_DT_FLOAT64),
         ::testing::Values(32, 4096, 65533)));
+
+UCC_TEST_P(test_coll_args_msgsize, coll_args_str_no_overflow)
+{
+    auto p = GetParam();
+    char str[256];
+    _init(std::get<0>(p), std::get<1>(p), std::get<2>(p));
+    /* Worst-case reduction header ("Allreduce sum inplace persistent" is
+       32 chars + NUL = 33 bytes) used to overflow the fixed 32-byte hdr
+       buffer in ucc_coll_args_str on the error-logging path. */
+    args.args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
+    args.args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE |
+                      UCC_COLL_ARGS_FLAG_PERSISTENT;
+    args.args.dst.info.buffer   = (void *)0x1;
+    args.args.dst.info.count    = 16;
+    args.args.dst.info.datatype = UCC_DT_INT32;
+    args.args.dst.info.mem_type = UCC_MEMORY_TYPE_HOST;
+
+    args.args.coll_type         = UCC_COLL_TYPE_ALLREDUCE;
+    args.args.op                = UCC_OP_SUM;
+    ucc_coll_args_str(&args.args, team.rank, team.size, str, sizeof(str));
+    EXPECT_EQ(0, strncmp(str, "Allreduce sum inplace persistent", 32));
+}

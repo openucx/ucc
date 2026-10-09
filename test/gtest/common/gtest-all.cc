@@ -7718,6 +7718,7 @@ ScopedTrace::~ScopedTrace()
 # include <errno.h>
 # include <fcntl.h>
 # include <limits.h>
+#include <cstdint>
 
 # if GTEST_OS_LINUX
 #  include <signal.h>

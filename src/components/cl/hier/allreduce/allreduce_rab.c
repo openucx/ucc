@@ -233,10 +233,18 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     if (coll_args->args.op == UCC_OP_AVG) {
         return UCC_ERR_NOT_SUPPORTED;
     }
-    ucc_pipeline_nfrags_pdepth(&cfg->allreduce_rab_pipeline,
-                               coll_args->args.dst.info.count *
-                               ucc_dt_size(coll_args->args.dst.info.datatype),
-                               &n_frags, &pipeline_depth);
+    status = ucc_pipeline_nfrags_pdepth(
+        &cfg->allreduce_rab_pipeline,
+        coll_args->args.dst.info.count *
+            ucc_dt_size(coll_args->args.dst.info.datatype),
+        &n_frags,
+        &pipeline_depth);
+    if (ucc_unlikely(status != UCC_OK)) {
+        cl_error(
+            team->context->lib,
+            "invalid pipeline parameters for allreduce RAB");
+        return status;
+    }
 
     if (n_frags == 1) {
         return ucc_cl_hier_allreduce_rab_init_schedule(
