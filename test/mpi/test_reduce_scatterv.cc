@@ -66,6 +66,8 @@ TestReduceScatterv::TestReduceScatterv(ucc_test_team_t &_team, TestCaseParams &p
     args.dst.info_v.buffer   = rbuf;
     args.dst.info_v.datatype = dt;
     args.dst.info_v.mem_type = mem_type;
+    register_memhs(sbuf, inplace ? 0 : msgsize, rbuf,
+                   inplace ? msgsize : (size_t)counts[rank] * dt_size);
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }

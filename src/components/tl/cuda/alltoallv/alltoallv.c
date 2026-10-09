@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -7,6 +7,19 @@
 
 #include "alltoallv.h"
 #include "components/mc/ucc_mc.h"
+
+ucc_base_coll_alg_info_t
+    ucc_tl_cuda_alltoallv_algs[UCC_TL_CUDA_ALLTOALLV_ALG_LAST + 1] = {
+        [UCC_TL_CUDA_ALLTOALLV_ALG_CE] =
+            {.id   = UCC_TL_CUDA_ALLTOALLV_ALG_CE,
+             .name = "ce",
+             .desc = "copy-engine alltoallv algorithm"},
+        [UCC_TL_CUDA_ALLTOALLV_ALG_PUSH] =
+            {.id   = UCC_TL_CUDA_ALLTOALLV_ALG_PUSH,
+             .name = "push",
+             .desc = "push-based alltoallv using pre-registered dst handles"},
+        [UCC_TL_CUDA_ALLTOALLV_ALG_LAST] = {
+            .id = 0, .name = NULL, .desc = NULL}};
 
 ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task);
 

@@ -6,6 +6,7 @@
 
 #include "test_mpi.h"
 #include "mpi_util.h"
+#include <climits>
 #include <cstring>
 #include <vector>
 #include "components/mc/ucc_mc.h"
@@ -84,11 +85,17 @@ public:
 
     void run(bool triggered) override
     {
-        ucc_mem_map_params_t map_params;
-        ucc_mem_map_t        segment;
-        int                  rank;
+        (void)triggered; /* mem_map tests don't support triggered mode */
+        ucc_mem_map_mem_h    export_memh = nullptr;
+        ucc_mem_map_params_t map_params = {};
+        ucc_mem_map_t        segment    = {};
+        size_t               export_size = 0;
+        uint64_t             recv_size   = 0;
+        int                  comm_size, peer, rank;
+        ucc_status_t         status;
 
         MPI_Comm_rank(team.comm, &rank);
+        MPI_Comm_size(team.comm, &comm_size);
 
         /* Set up memory map parameters */
         segment.address       = test_buffer;
@@ -96,12 +103,56 @@ public:
         map_params.segments   = &segment;
         map_params.n_segments = 1;
 
+        if (!is_export_test) {
+            /* Import operates on an exchanged serialized export handle. Send
+             * each rank's blob to its next peer so import never receives a
+             * NULL or otherwise uninitialized handle.
+             */
+            status = ucc_mem_map(team.ctx, UCC_MEM_MAP_MODE_EXPORT,
+                                 &map_params, &export_size, &export_memh);
+            if (status != UCC_OK) {
+                if (status == UCC_ERR_NOT_SUPPORTED ||
+                    status == UCC_ERR_NOT_IMPLEMENTED) {
+                    test_skip = TEST_SKIP_NOT_SUPPORTED;
+                    return;
+                }
+                UCC_CHECK(status);
+            }
+            if (!export_memh || export_size == 0) {
+                UCC_CHECK(UCC_ERR_INVALID_PARAM);
+            }
+
+            peer = (rank + 1) % comm_size;
+            uint64_t send_size = export_size;
+            MPI_Sendrecv(&send_size, 1, MPI_UINT64_T, peer, 1001,
+                         &recv_size, 1, MPI_UINT64_T,
+                         (rank + comm_size - 1) % comm_size, 1001,
+                         team.comm, MPI_STATUS_IGNORE);
+
+            if (send_size > INT_MAX || recv_size > INT_MAX) {
+                UCC_CHECK(UCC_ERR_INVALID_PARAM);
+            }
+            memh = ucc_malloc(recv_size, "import memh blob");
+            UCC_MALLOC_CHECK(memh);
+            MPI_Sendrecv(export_memh, static_cast<int>(send_size), MPI_BYTE,
+                         peer, 1002, memh, static_cast<int>(recv_size), MPI_BYTE,
+                         (rank + comm_size - 1) % comm_size, 1002,
+                         team.comm, MPI_STATUS_IGNORE);
+            memh_size = recv_size;
+        }
+
         /* Test memory map */
-        ucc_status_t status = ucc_mem_map(team.ctx, mode, &map_params,
-                                          &memh_size, &memh);
+        status = ucc_mem_map(team.ctx, mode, &map_params, &memh_size, &memh);
         if (status != UCC_OK) {
+            if (export_memh) {
+                UCC_CHECK(ucc_mem_unmap(&export_memh));
+            }
             if (status == UCC_ERR_NOT_SUPPORTED ||
                 status == UCC_ERR_NOT_IMPLEMENTED) {
+                if (memh) {
+                    ucc_free(memh);
+                    memh = nullptr;
+                }
                 test_skip = TEST_SKIP_NOT_SUPPORTED;
                 return;
             }
@@ -111,12 +162,12 @@ public:
         if (!memh) {
             std::cerr << "Rank " << rank << ": Memory handle is NULL"
                       << std::endl;
-            return;
+            UCC_CHECK(UCC_ERR_INVALID_PARAM);
         }
-        if (memh_size == 0) {
+        if (is_export_test && memh_size == 0) {
             std::cerr << "Rank " << rank << ": Memory handle size is 0"
                       << std::endl;
-            return;
+            UCC_CHECK(UCC_ERR_INVALID_PARAM);
         }
 
         /* Verify data integrity after mapping */
@@ -124,6 +175,9 @@ public:
 
         /* Test unmap */
         UCC_CHECK(ucc_mem_unmap(&memh));
+        if (export_memh) {
+            UCC_CHECK(ucc_mem_unmap(&export_memh));
+        }
         if (memh != nullptr) {
             std::cerr << "Rank " << rank
                       << ": Memory handle not NULL after unmap" << std::endl;
@@ -204,9 +258,6 @@ public:
                 ucc_mem_unmap(&memh);
             }
         }
-        if (test_buffer) {
-            ucc_free(test_buffer);
-        }
     }
 
     ucc_status_t set_input(int iter_persistent = 0) override
@@ -240,6 +291,7 @@ public:
 
     void run(bool triggered) override
     {
+        (void)triggered; /* mem_map tests don't support triggered mode */
         ucc_mem_map_params_t map_params;
         ucc_mem_map_t        segment;
         int                  rank;
@@ -258,8 +310,8 @@ public:
             ucc_mem_map_mem_h memh;
             size_t             memh_size;
 
-            /* Fill buffer with iteration-specific pattern */
-            memset(test_buffer, 0xCC + rank + i, buffer_size);
+            /* Keep the contents stable while repeatedly mapping the buffer. */
+            memset(test_buffer, 0xBB + rank, buffer_size);
 
             ucc_status_t status = ucc_mem_map(team.ctx, UCC_MEM_MAP_MODE_EXPORT,
                                               &map_params, &memh_size, &memh);
@@ -398,6 +450,7 @@ public:
 
     void run(bool triggered) override
     {
+        (void)triggered; /* mem_map tests don't support triggered mode */
         ucc_mem_map_params_t map_params;
         ucc_mem_map_t        segment;
         int                  rank;
@@ -472,6 +525,7 @@ std::shared_ptr<TestCase> TestMemMapExport::init_single(ucc_test_team_t &_team,
                                                         ucc_coll_type_t _type,
                                                         TestCaseParams params)
 {
+    (void)_type; /* mem_map tests only use BARRIER */
     return std::make_shared<TestMemMapExport>(_team, params);
 }
 
@@ -479,6 +533,7 @@ std::shared_ptr<TestCase> TestMemMapImport::init_single(ucc_test_team_t &_team,
                                                         ucc_coll_type_t _type,
                                                         TestCaseParams params)
 {
+    (void)_type; /* mem_map tests only use BARRIER */
     return std::make_shared<TestMemMapImport>(_team, params);
 }
 
@@ -486,12 +541,63 @@ std::shared_ptr<TestCase> TestMemMapStress::init_single(ucc_test_team_t &_team,
                                                         ucc_coll_type_t _type,
                                                         TestCaseParams params)
 {
+    (void)_type; /* mem_map tests only use BARRIER */
     return std::make_shared<TestMemMapStress>(_team, params);
 }
 
 std::shared_ptr<TestCase> TestMemMapMultiSize::init_single(ucc_test_team_t &_team,
-                                                           ucc_coll_type_t _type,
-                                                           TestCaseParams params)
+                                                            ucc_coll_type_t _type,
+                                                            TestCaseParams params)
 {
+    (void)_type; /* mem_map tests only use BARRIER */
     return std::make_shared<TestMemMapMultiSize>(_team, params);
+}
+
+void run_mem_map_tests(UccTestMpi *test, int tally[4])
+{
+    static std::shared_ptr<TestCase> (*mem_map_factories[])(
+        ucc_test_team_t &, ucc_coll_type_t, TestCaseParams) = {
+            TestMemMapExport::init_single,
+            TestMemMapImport::init_single,
+            TestMemMapStress::init_single,
+            TestMemMapMultiSize::init_single
+    };
+
+    /* tally = {tests, passed, skipped, failed}. Reported separately from the
+       collective results so a mem_map failure does not masquerade as BARRIER. */
+    tally[0] = tally[1] = tally[2] = tally[3] = 0;
+
+    for (auto &team : test->teams) {
+        TestCaseParams params;
+        memset(&params, 0, sizeof(params));
+        params.max_size = 8 * 1024 * 1024;
+        params.msgsize  = 0;
+        params.inplace  = false;
+        params.persistent = false;
+        params.memh_mode = UCC_TEST_MEMH_NONE;
+
+        for (auto &factory : mem_map_factories) {
+            auto tc = factory(team, UCC_COLL_TYPE_BARRIER, params);
+            if (!tc) continue;
+
+            tally[0]++;
+            if (TEST_SKIP_NONE != tc->test_skip) {
+                tally[2]++;
+                continue;
+            }
+
+            UCC_CHECK(tc->set_input());
+            tc->run(false);
+            if (TEST_SKIP_NONE != tc->test_skip) {
+                tally[2]++;
+                continue;
+            }
+
+            if (tc->check() == UCC_OK) {
+                tally[1]++;
+            } else {
+                tally[3]++;
+            }
+        }
+    }
 }

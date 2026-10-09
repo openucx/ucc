@@ -63,6 +63,7 @@ TestScatter::TestScatter(ucc_test_team_t &_team, TestCaseParams &params) :
         args.dst.info.mem_type = mem_type;
     }
 
+    register_memhs(sbuf, rank == root ? (inplace ? 0 : msgsize * size) : 0, rbuf, msgsize);
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }

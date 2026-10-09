@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -9,6 +9,7 @@
 
 #include "tl_cuda.h"
 #include "components/mc/ucc_mc.h"
+#include "core/ucc_context.h"
 
 #define UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR 6
 extern const char
@@ -213,6 +214,39 @@ static inline void ucc_tl_cuda_put_sync(ucc_tl_cuda_task_t *task)
 
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
                                       ucc_tl_cuda_mem_info_t *mi);
+
+/**
+ * @brief Extract CUDA IPC memory info from a pre-registered mem_map handle
+ *
+ * This function extracts the CUDA IPC handle from a memory region that was
+ * previously registered via ucc_mem_map(). This allows collectives to skip
+ * the expensive cudaIpcGetMemHandle() call on the critical path.
+ *
+ * @param [in]  memh    Pre-registered memory map handle (from ucc_mem_map)
+ * @param [out] mi      Output memory info structure with IPC handle
+ *
+ * @return UCC_OK if CUDA TL handle found and extracted, error otherwise
+ */
+ucc_status_t ucc_tl_cuda_mem_info_from_memh(ucc_mem_map_mem_h       memh,
+                                            ucc_tl_cuda_mem_info_t *mi);
+
+/**
+ * @brief Extract CUDA IPC memory info from a peer's global_memh handle
+ *
+ * This function extracts the CUDA IPC handle from a peer rank's memory handle
+ * in the global_memh array. This is used when all ranks have exchanged their
+ * mem_map handles upfront (global mode), allowing collectives to skip the
+ * shared memory exchange phase.
+ *
+ * @param [in]  global_memh  Array of memory handles from all ranks
+ * @param [in]  peer_rank    Rank index to get handle for
+ * @param [out] mi           Output memory info structure
+ *
+ * @return UCC_OK if handle found, UCC_ERR_NOT_FOUND if no CUDA handle for peer
+ */
+ucc_status_t ucc_tl_cuda_mem_info_from_global_memh(
+    ucc_mem_map_mem_h *global_memh, ucc_rank_t peer_rank,
+    ucc_tl_cuda_mem_info_t *mi);
 
 ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
                                     ucc_base_team_t *team,

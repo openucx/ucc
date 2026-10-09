@@ -117,6 +117,7 @@ class ucc_pt_coll_alltoallv: public ucc_pt_coll {
 public:
     ucc_pt_coll_alltoallv(ucc_datatype_t dt, ucc_memory_type mt,
                           bool is_inplace, bool is_persistent,
+                          ucc_pt_map_type_t map_type,
                           ucc_pt_comm *communicator,
                           ucc_pt_generator_base *generator);
     ucc_status_t init_args(ucc_pt_test_args_t &args) override;

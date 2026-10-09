@@ -12,6 +12,7 @@
 #include "components/tl/ucc_tl_log.h"
 #include "components/mc/ucc_mc.h"
 #include "components/cl/ucc_cl_type.h" // for UCC_CL_HIER
+#include "core/ucc_context.h"
 #include "utils/ucc_mpool.h"
 #include "utils/ucc_datastruct.h"
 #include "tl_cuda_ep_hash.h"
@@ -135,6 +136,10 @@ typedef struct ucc_tl_cuda_shm_barrier {
     int          sense;
     ucc_status_t state[UCC_TL_CUDA_MAX_PEERS];
     int          local_sense[UCC_TL_CUDA_MAX_PEERS];
+    /* Per-sense shared error slots. A rank that hits a local CUDA error
+       records it in error[local_sense] before entering the barrier; the last
+       arriver resets the *other* slot for the next barrier round. */
+    ucc_status_t error[2];
 } ucc_tl_cuda_shm_barrier_t;
 
 typedef struct ucc_tl_cuda_sync_data {
@@ -147,6 +152,13 @@ typedef struct ucc_tl_cuda_mem_info {
     size_t             offset;
     cudaIpcMemHandle_t handle;
 } ucc_tl_cuda_mem_info_t;
+
+typedef struct ucc_tl_cuda_memh_data {
+    cudaIpcMemHandle_t ipc_handle;
+    void              *base_address; /* allocation base (arg to cudaIpcGetMemHandle) */
+    size_t             length;       /* full allocation length */
+    ptrdiff_t          offset;       /* user pointer - base_address */
+} ucc_tl_cuda_memh_data_t;
 
 typedef struct ucc_tl_cuda_rank_id {
     ucc_tl_cuda_device_pci_id_t pci_id;
@@ -209,6 +221,24 @@ struct ucc_tl_cuda_task {
     ucc_tl_cuda_shm_barrier_t *bar;     // Pointer to the reserved barrier for this task in the CUDA team
     ucc_subset_t               subset;  // Mapping information for the active set, if it is present
     union {
+        struct {
+            int                stage;
+            void              *evt_completion;
+            void              *sbuf;
+            void              *rbuf;
+            ucc_datatype_t     sdt;
+            ucc_datatype_t     rdt;
+            ucc_count_t       *scnts;
+            ucc_count_t       *rcnts;
+            ucc_aint_t        *sdispl;
+            ucc_aint_t        *rdispl;
+            /* alltoallv exchanges peer rdispl via a SETUP barrier; alltoall
+             * computes dst offset locally (rank * chunk) and skips it. */
+            int                needs_setup;
+            ucc_mem_map_mem_h *global_memh_dst;
+            void              *peer_map_addr[UCC_TL_CUDA_MAX_PEERS]; /* pre-mapped peer rbuf+offset */
+            void              *peer_map_raw[UCC_TL_CUDA_MAX_PEERS];  /* raw cudaIpcOpenMemHandle addr */
+        } alltoallv_push;
         struct {
             int                    stage;
             ucc_tl_cuda_mem_info_t mem_info_src;

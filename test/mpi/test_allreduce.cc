@@ -46,6 +46,7 @@ TestAllreduce::TestAllreduce(ucc_test_team_t &_team, TestCaseParams &params) :
     args.dst.info.count    = count;
     args.dst.info.datatype = dt;
     args.dst.info.mem_type = mem_type;
+    register_memhs(sbuf, inplace ? 0 : msgsize, rbuf, msgsize);
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }

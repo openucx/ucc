@@ -129,7 +129,7 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
     root_value         = 10;
     iterations         = 1;
     triggered          = false;
-    local_registration = false;
+    memh_mode          = UCC_TEST_MEMH_NONE;
 }
 
 void UccTestMpi::set_iter(int iter)
@@ -551,7 +551,7 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
     params.max_size           = test_max_size;
     params.inplace            = inplace;
     params.persistent         = persistent;
-    params.local_registration = local_registration;
+    params.memh_mode          = memh_mode;
 
     for (auto i = 0; i < iterations; i++) {
         for (auto &c : colls) {

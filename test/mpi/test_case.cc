@@ -5,6 +5,8 @@
  */
 
 #include "test_mpi.h"
+#include <climits>
+#include <cstring>
 
 std::vector<std::shared_ptr<TestCase>>
 TestCase::init(ucc_test_team_t &_team, ucc_coll_type_t _type, int num_tests,
@@ -131,7 +133,8 @@ std::string TestCase::str() {
             " mtype=" + ucc_memory_type_names[mem_type] +
             " msgsize=" + std::to_string(msgsize) +
             " persistent=" + (persistent ? "1" : "0") +
-            " local_registration=" + (local_registration ? "1" : "0");
+            " memh=" + (memh_mode == UCC_TEST_MEMH_GLOBAL ? "global" :
+                        memh_mode == UCC_TEST_MEMH_LOCAL  ? "local" : "none");
     if (ucc_coll_inplace_supported(args.coll_type)) {
         _str += std::string(" inplace=") + (inplace ? "1" : "0");
     }
@@ -172,11 +175,137 @@ void TestCase::tc_progress_ctx()
     ucc_context_progress(team.ctx);
 }
 
+/* Export a buffer's local handle, exchange the serialized blobs across the team
+   comm, and import every peer's handle into an array indexed by rank -- the
+   layout the *_MEMH_GLOBAL collective paths (e.g. TL/CUDA push) consume. The
+   local export handle is returned via local_memh so the dtor can unmap it. */
+ucc_status_t TestCase::register_memh_global(void *buf, size_t size,
+                                            ucc_mem_map_mem_h *local_memh,
+                                            ucc_mem_map_mem_h **global_memh)
+{
+    ucc_mem_map_t        segments[1];
+    ucc_mem_map_params_t params = {};
+    ucc_mem_map_mem_h   *arr;
+    size_t               memh_size;
+    uint64_t             local_size, max_size;
+    int                  comm_size, rank, i;
+
+    MPI_Comm_size(team.comm, &comm_size);
+    MPI_Comm_rank(team.comm, &rank);
+
+    params.n_segments   = 1;
+    params.segments     = segments;
+    segments[0].address = buf;
+    segments[0].len     = size;
+
+    UCC_CHECK(ucc_mem_map(team.ctx, UCC_MEM_MAP_MODE_EXPORT, &params,
+                          &memh_size, local_memh));
+
+    /* Serialized handles may differ in length across ranks; exchange the max
+       so every slot in the broadcast below is uniformly sized. */
+    local_size = memh_size;
+    MPI_Allreduce(&local_size, &max_size, 1, MPI_UINT64_T, MPI_MAX, team.comm);
+    if (max_size > INT_MAX) {
+        UCC_CHECK(UCC_ERR_INVALID_PARAM);
+    }
+
+    arr = new ucc_mem_map_mem_h[comm_size];
+    for (i = 0; i < comm_size; i++) {
+        /* ucc_malloc (not new[]) so ucc_mem_unmap's ucc_free matches. */
+        arr[i] = ucc_malloc(max_size, "global memh blob");
+        UCC_MALLOC_CHECK(arr[i]);
+        /* Zero the padding beyond this rank's serialized handle so the
+           broadcast never reads uninitialized bytes. */
+        memset(arr[i], 0, max_size);
+        if (i == rank) {
+            memcpy(arr[i], *local_memh, memh_size);
+        }
+        MPI_Bcast(arr[i], (int)max_size, MPI_BYTE, i, team.comm);
+    }
+
+    /* Import each peer's blob in place into a usable handle. */
+    for (i = 0; i < comm_size; i++) {
+        size_t import_size = max_size;
+        UCC_CHECK(ucc_mem_map(team.ctx, UCC_MEM_MAP_MODE_IMPORT, &params,
+                              &import_size, &arr[i]));
+    }
+
+    *global_memh     = arr;
+    memh_global_size = comm_size;
+    return UCC_OK;
+}
+
+ucc_status_t TestCase::register_memhs(void *sbuf, size_t ssize, void *dbuf, size_t dsize)
+{
+    int all_have_dbuf, has_dbuf;
+
+    if (memh_mode == UCC_TEST_MEMH_NONE) {
+        return UCC_OK;
+    }
+
+    if (memh_mode == UCC_TEST_MEMH_GLOBAL) {
+        /* Global destination handles are consumed by alltoall/alltoallv
+         * algorithms, including TL/CUDA push and TL/UCP one-sided paths.
+         * Other collective types have consumers that treat a present memh
+         * field as a local handle and must not be given an array.
+         */
+        if (args.coll_type != UCC_COLL_TYPE_ALLTOALL &&
+            args.coll_type != UCC_COLL_TYPE_ALLTOALLV) {
+            return UCC_OK;
+        }
+
+        /* register_memh_global contains MPI collectives. Enter it only when
+         * every rank has a destination buffer so all ranks execute the same
+         * exchange sequence (including zero-count alltoallv cases).
+         */
+        has_dbuf = dbuf && dsize > 0;
+        MPI_Allreduce(&has_dbuf, &all_have_dbuf, 1, MPI_INT, MPI_MIN,
+                      team.comm);
+        if (!all_have_dbuf) {
+            return UCC_OK;
+        }
+
+        UCC_CHECK(register_memh_global(dbuf, dsize, &dst_memh,
+                                       &dst_global_memh));
+        args.dst_memh.global_memh = dst_global_memh;
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS |
+                      UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH;
+        args.flags |= UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL;
+        return UCC_OK;
+    }
+
+    /* UCC_TEST_MEMH_LOCAL */
+    ucc_mem_map_t segments[1];
+    ucc_mem_map_params_t params = {};
+    params.n_segments = 1;
+    params.segments   = segments;
+
+    if (sbuf && ssize > 0) {
+        segments[0].address = sbuf;
+        segments[0].len     = ssize;
+        UCC_CHECK(ucc_mem_map(team.ctx, UCC_MEM_MAP_MODE_EXPORT, &params,
+                              &src_memh_size, &src_memh));
+        args.src_memh.local_memh = src_memh;
+        args.mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH;
+    }
+
+    if (dbuf && dsize > 0) {
+        segments[0].address = dbuf;
+        segments[0].len     = dsize;
+        UCC_CHECK(ucc_mem_map(team.ctx, UCC_MEM_MAP_MODE_EXPORT, &params,
+                              &dst_memh_size, &dst_memh));
+        args.dst_memh.local_memh = dst_memh;
+        args.mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH;
+    }
+
+    return UCC_OK;
+}
+
 TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
                    TestCaseParams params) :
     team(_team), mem_type(params.mt), msgsize(params.msgsize),
     inplace(params.inplace), persistent(params.persistent),
-    local_registration(params.local_registration),
+    memh_mode(params.memh_mode),
     test_max_size(params.max_size), dt(params.dt)
 {
     int rank;
@@ -186,10 +315,14 @@ TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
     check_buf      = NULL;
     sbuf_mc_header = NULL;
     rbuf_mc_header = NULL;
-    src_memh       = NULL;
-    dst_memh       = NULL;
-    src_memh_size  = 0;
-    dst_memh_size  = 0;
+    src_memh         = NULL;
+    dst_memh         = NULL;
+    src_memh_size    = 0;
+    dst_memh_size    = 0;
+    src_global_memh  = NULL;
+    dst_global_memh  = NULL;
+    memh_global_size = 0;
+    req              = NULL;
     test_skip      = TEST_SKIP_NONE;
     args.flags     = 0;
     args.mask      = 0;
@@ -216,7 +349,7 @@ TestCase::~TestCase()
     MPI_Cancel(&progress_request);
     MPI_Wait(&progress_request, &status);
 
-    if (TEST_SKIP_NONE == test_skip) {
+    if (TEST_SKIP_NONE == test_skip && req) {
         UCC_CHECK(ucc_collective_finalize(req));
     }
 
@@ -239,4 +372,22 @@ TestCase::~TestCase()
         UCC_CHECK(ucc_mem_unmap(&dst_memh));
     }
 
+    /* Each entry is an imported handle backed by a ucc_malloc'd blob;
+       ucc_mem_unmap frees the blob (ucc_free) and NULLs the slot. */
+    if (src_global_memh) {
+        for (int i = 0; i < memh_global_size; i++) {
+            if (src_global_memh[i]) {
+                UCC_CHECK(ucc_mem_unmap(&src_global_memh[i]));
+            }
+        }
+        delete[] src_global_memh;
+    }
+    if (dst_global_memh) {
+        for (int i = 0; i < memh_global_size; i++) {
+            if (dst_global_memh[i]) {
+                UCC_CHECK(ucc_mem_unmap(&dst_global_memh[i]));
+            }
+        }
+        delete[] dst_global_memh;
+    }
 }

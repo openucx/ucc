@@ -35,6 +35,7 @@ TestBcast::TestBcast(ucc_test_team_t &_team, TestCaseParams &params) :
     args.src.info.datatype = dt;
     args.src.info.mem_type = mem_type;
     args.root              = root;
+    register_memhs(sbuf, msgsize, sbuf, msgsize);
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
