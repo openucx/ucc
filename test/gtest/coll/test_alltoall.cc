@@ -4,7 +4,94 @@
  */
 
 #include "common/test_ucc.h"
+#include "components/cl/basic/cl_basic.h"
+#include "components/tl/ucp/tl_ucp.h"
+#include "core/ucc_team.h"
 #include "utils/ucc_math.h"
+
+#include <cstdlib>
+#include <cstring>
+#include <string>
+
+namespace {
+
+class ScopedEnvironment {
+    struct SavedVariable {
+        std::string name;
+        bool        was_set;
+        std::string value;
+    };
+
+    std::vector<SavedVariable> saved;
+
+public:
+    explicit ScopedEnvironment(const ucc_job_env_t &env)
+    {
+        const char *value;
+
+        for (const auto &var : env) {
+            value = std::getenv(var.first.c_str());
+            saved.push_back({var.first, value != NULL, value ? value : ""});
+            setenv(var.first.c_str(), var.second.c_str(), 1);
+        }
+    }
+
+    ScopedEnvironment(const ScopedEnvironment &) = delete;
+    ScopedEnvironment &operator=(const ScopedEnvironment &) = delete;
+
+    ~ScopedEnvironment()
+    {
+        for (auto var = saved.rbegin(); var != saved.rend(); ++var) {
+            if (var->was_set) {
+                setenv(var->name.c_str(), var->value.c_str(), 1);
+            } else {
+                unsetenv(var->name.c_str());
+            }
+        }
+    }
+};
+
+static ucc_tl_ucp_team_t *get_ucp_team(UccTeam_h team, int rank)
+{
+    ucc_team_t *core_team =
+        reinterpret_cast<ucc_team_t *>(team->procs[rank].team);
+
+    for (int cl = 0; cl < core_team->n_cl_teams; cl++) {
+        ucc_cl_team_t *cl_team = core_team->cl_teams[cl];
+
+        if (std::strcmp(UCC_CL_TEAM_IFACE(cl_team)->super.name, "basic")) {
+            continue;
+        }
+        ucc_cl_basic_team_t *basic_team =
+            ucc_derived_of(cl_team, ucc_cl_basic_team_t);
+        for (unsigned tl = 0; tl < basic_team->n_tl_teams; tl++) {
+            ucc_tl_team_t *tl_team = basic_team->tl_teams[tl];
+
+            if (!std::strcmp(UCC_TL_TEAM_IFACE(tl_team)->super.name, "ucp")) {
+                return ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
+            }
+        }
+    }
+
+    ADD_FAILURE() << "Basic/UCP team not found for rank " << rank;
+    return NULL;
+}
+
+const ucc_job_env_t node_interleaved_schedule_env = {
+    {"UCC_CLS", "basic"},
+    {"UCC_TLS", "ucp"},
+    {"UCC_CL_BASIC_TUNE", "inf"},
+    {"UCC_TL_UCP_TUNE", "alltoall:0-inf:@pairwise"},
+    {"UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE", "ring_node_interleaved"}};
+
+const ucc_job_env_t ring_schedule_env = {
+    {"UCC_CLS", "basic"},
+    {"UCC_TLS", "ucp"},
+    {"UCC_CL_BASIC_TUNE", "inf"},
+    {"UCC_TL_UCP_TUNE", "alltoall:0-inf:@pairwise"},
+    {"UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE", "ring"}};
+
+} // namespace
 
 using Param_0 = std::tuple<int, ucc_datatype_t, ucc_memory_type_t, gtest_ucc_inplace_t, int>;
 using Param_1 = std::tuple<ucc_datatype_t, ucc_memory_type_t, gtest_ucc_inplace_t, int>;
@@ -183,7 +270,103 @@ public:
         }
         return ret;
     }
+
+    void check_topology_schedule(UccJob::ucc_job_ctx_mode_t ctx_mode,
+                                 int nprocs, bool expected_enabled,
+                                 ucc_tl_ucp_alltoall_pairwise_schedule_t
+                                     expected_schedule,
+                                 const std::vector<ucc_rank_t> &expected_order)
+    {
+        UccJob        job(nprocs, ctx_mode, ucc_job_env_t(),
+                          UCC_THREAD_MULTIPLE);
+        UccTeam_h     team = job.create_team(nprocs);
+        UccCollCtxVec ctxs;
+
+        for (int rank = 0; rank < nprocs; rank++) {
+            ucc_tl_ucp_team_t *tl_team = get_ucp_team(team, rank);
+
+            ASSERT_NE(nullptr, tl_team);
+            EXPECT_EQ(expected_enabled,
+                      !!tl_team->alltoall_node_interleaved.available);
+            EXPECT_EQ(expected_schedule,
+                      tl_team->cfg.alltoall_pairwise_schedule);
+            if (expected_enabled) {
+                ASSERT_EQ((size_t)nprocs, expected_order.size());
+                ASSERT_NE(nullptr,
+                          tl_team->alltoall_node_interleaved.rank_order);
+                ASSERT_NE(nullptr,
+                          tl_team->alltoall_node_interleaved.rank_labels);
+                for (ucc_rank_t label = 0; label < (ucc_rank_t)nprocs;
+                     label++) {
+                    EXPECT_EQ(expected_order[label],
+                              tl_team->alltoall_node_interleaved
+                                  .rank_order[label]);
+                    EXPECT_EQ(label,
+                              tl_team->alltoall_node_interleaved.rank_labels[
+                                  expected_order[label]]);
+                }
+            } else {
+                EXPECT_EQ(nullptr,
+                          tl_team->alltoall_node_interleaved.rank_order);
+                EXPECT_EQ(nullptr,
+                          tl_team->alltoall_node_interleaved.rank_labels);
+            }
+        }
+
+        set_inplace(TEST_NO_INPLACE);
+        set_mem_type(UCC_MEMORY_TYPE_HOST);
+        data_init(nprocs, UCC_DT_INT32, 3, ctxs, false);
+        UccReq req(team, ctxs);
+        EXPECT_EQ(UCC_OK, req.status);
+        if (req.status != UCC_OK) {
+            data_fini(ctxs);
+            return;
+        }
+        req.start();
+        ucc_status_t status = req.wait();
+        EXPECT_EQ(UCC_OK, status);
+        if (status == UCC_OK) {
+            EXPECT_TRUE(data_validate(ctxs));
+        }
+        data_fini(ctxs);
+    }
 };
+
+UCC_TEST_F(test_alltoall, topology_schedule_uniform_topology)
+{
+    ScopedEnvironment env(node_interleaved_schedule_env);
+
+    check_topology_schedule(
+        UccJob::UCC_JOB_CTX_GLOBAL, 8, true,
+        UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE_RING_NODE_INTERLEAVED,
+        {0, 4, 1, 5, 2, 6, 3, 7});
+}
+
+UCC_TEST_F(test_alltoall, topology_schedule_uneven_ppn_fallback)
+{
+    ScopedEnvironment env(node_interleaved_schedule_env);
+
+    check_topology_schedule(
+        UccJob::UCC_JOB_CTX_GLOBAL, 11, false,
+        UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE_RING_NODE_INTERLEAVED, {});
+}
+
+UCC_TEST_F(test_alltoall, topology_schedule_no_context_topology_fallback)
+{
+    ScopedEnvironment env(node_interleaved_schedule_env);
+
+    check_topology_schedule(
+        UccJob::UCC_JOB_CTX_LOCAL, 8, false,
+        UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE_RING_NODE_INTERLEAVED, {});
+}
+
+UCC_TEST_F(test_alltoall, topology_schedule_forced_ring_skips_topology)
+{
+    ScopedEnvironment env(ring_schedule_env);
+
+    check_topology_schedule(UccJob::UCC_JOB_CTX_GLOBAL, 8, false,
+                            UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE_RING, {});
+}
 
 class test_alltoall_0 : public test_alltoall,
         public ::testing::WithParamInterface<Param_0> {};

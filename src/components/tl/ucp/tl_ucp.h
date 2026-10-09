@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -43,6 +43,12 @@ typedef struct ucc_tl_ucp_iface {
 /* Extern iface should follow the pattern: ucc_tl_<tl_name> */
 extern ucc_tl_ucp_iface_t ucc_tl_ucp;
 
+typedef enum {
+    UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE_RING,
+    UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE_RING_NODE_INTERLEAVED,
+    UCC_TL_UCP_ALLTOALL_PAIRWISE_SCHEDULE_LAST
+} ucc_tl_ucp_alltoall_pairwise_schedule_t;
+
 typedef enum ucc_tl_ucp_alltoall_onesided_alg_type {
     UCC_TL_UCP_ALLTOALL_ONESIDED_PUT,
     UCC_TL_UCP_ALLTOALL_ONESIDED_GET,
@@ -74,6 +80,8 @@ typedef struct ucc_tl_ucp_lib_config {
     ucc_on_off_auto_value_t            scatter_kn_enable_recv_zcopy;
     uint32_t                           scatterv_linear_num_posts;
     unsigned long                      alltoall_pairwise_num_posts;
+    ucc_tl_ucp_alltoall_pairwise_schedule_t
+                                       alltoall_pairwise_schedule;
     unsigned long                      alltoallv_pairwise_num_posts;
     unsigned long                      allgather_batched_num_posts;
     ucc_pipeline_params_t              allreduce_sra_kn_pipeline;
@@ -164,6 +172,12 @@ typedef ucc_status_t (*ucc_tl_ucp_copy_test_fn_t)(ucc_tl_ucp_context_t *ctx,
                                                   ucc_tl_ucp_copy_task_t *copy_task);
 typedef ucc_status_t (*ucc_tl_ucp_copy_finalize_fn_t)(ucc_tl_ucp_copy_task_t *copy_task);
 
+typedef struct ucc_tl_ucp_alltoall_node_interleaved {
+    ucc_rank_t *rank_order;
+    ucc_rank_t *rank_labels;
+    int         available;
+} ucc_tl_ucp_alltoall_node_interleaved_t;
+
 typedef struct ucc_tl_ucp_team {
     ucc_tl_team_t              super;
     ucc_status_t               status;
@@ -176,6 +190,7 @@ typedef struct ucc_tl_ucp_team {
     const char *               tuning_str;
     ucc_topo_t                *topo;
     ucc_ep_map_t               ctx_map;
+    ucc_tl_ucp_alltoall_node_interleaved_t alltoall_node_interleaved;
     ucc_rank_t                 opt_radix; /* generic opt radix */
     ucc_rank_t                 opt_radix_host; /* host specific opt radix */
     ucc_ring_pattern_t         *cuda_ring;

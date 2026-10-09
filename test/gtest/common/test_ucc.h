@@ -212,7 +212,8 @@ public:
     static const std::vector<UccTeam_h> &getStaticTeams();
     int n_procs;
     UccJob(int _n_procs = 2, ucc_job_ctx_mode_t _ctx_mode = UCC_JOB_CTX_GLOBAL,
-           ucc_job_env_t vars = ucc_job_env_t());
+           ucc_job_env_t vars = ucc_job_env_t(),
+           ucc_thread_mode_t thread_mode = UCC_THREAD_SINGLE);
     ~UccJob();
     std::vector<UccProcess_h> procs;
     UccTeam_h create_team(int n_procs, bool use_team_ep_map = false,

@@ -30,6 +30,7 @@ alltoall =                       \
 	alltoall/alltoall.c          \
 	alltoall/alltoall_onesided.c \
 	alltoall/alltoall_pairwise.c \
+	alltoall/alltoall_pairwise_schedule.h \
 	alltoall/alltoall_bruck.c
 
 alltoallv =                        \

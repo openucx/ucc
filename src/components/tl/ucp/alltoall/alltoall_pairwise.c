@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -7,6 +7,7 @@
 #include "config.h"
 #include "tl_ucp.h"
 #include "alltoall.h"
+#include "alltoall_pairwise_schedule.h"
 #include "core/ucc_progress_queue.h"
 #include "utils/ucc_math.h"
 #include "tl_ucp_sendrecv.h"
@@ -25,6 +26,21 @@ static inline ucc_rank_t get_send_peer(ucc_rank_t rank, ucc_rank_t size,
                                        ucc_rank_t step)
 {
     return (rank - step + size) % size;
+}
+
+static inline ucc_rank_t
+get_peer(const ucc_tl_ucp_team_t *team, ucc_rank_t rank, ucc_rank_t size,
+         ucc_rank_t step, int is_send)
+{
+    if (team->alltoall_node_interleaved.available) {
+        return ucc_tl_ucp_alltoall_node_interleaved_peer(
+            team->alltoall_node_interleaved.rank_order,
+            team->alltoall_node_interleaved.rank_labels, rank, size, step,
+            is_send);
+    }
+
+    return is_send ? get_send_peer(rank, size, step) :
+                     get_recv_peer(rank, size, step);
 }
 
 static ucc_rank_t get_num_posts(const ucc_tl_ucp_team_t *team,
@@ -74,7 +90,7 @@ void ucc_tl_ucp_alltoall_pairwise_progress(ucc_coll_task_t *coll_task)
         while ((task->tagged.recv_posted < gsize) &&
                ((task->tagged.recv_posted - task->tagged.recv_completed) <
                 nreqs)) {
-            peer = get_recv_peer(grank, gsize, task->tagged.recv_posted);
+            peer = get_peer(team, grank, gsize, task->tagged.recv_posted, 0);
             UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)(rbuf + peer * data_size),
                                              data_size, rmem, peer, team, task),
                           task, out);
@@ -83,7 +99,7 @@ void ucc_tl_ucp_alltoall_pairwise_progress(ucc_coll_task_t *coll_task)
         while ((task->tagged.send_posted < gsize) &&
                ((task->tagged.send_posted - task->tagged.send_completed) <
                 nreqs)) {
-            peer = get_send_peer(grank, gsize, task->tagged.send_posted);
+            peer = get_peer(team, grank, gsize, task->tagged.send_posted, 1);
             UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)(sbuf + peer * data_size),
                                              data_size, smem, peer, team, task),
                           task, out);
