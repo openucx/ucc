@@ -29,7 +29,10 @@ ucc_test_mpi_SOURCES = \
 	test_gatherv.cc         \
 	test_scatter.cc         \
 	test_scatterv.cc        \
-	test_mem_map.cc
+	test_mem_map.cc         \
+	test_team_cache.cc
+
+EXTRA_DIST = run_cache_equivalence.sh
 
 CXX=$(MPICXX)
 LD=$(MPICXX)

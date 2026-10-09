@@ -338,7 +338,7 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
         team->scratch.rem[i] = NULL;
     }
 
-    if (!ucc_topo_has_device_info(UCC_TL_CORE_TEAM(team)->topo)) {
+    if (!ucc_topo_has_device_info(UCC_TEAM_TOPO(UCC_TL_CORE_TEAM(team)))) {
         tl_debug(tl_team->context->lib,
                  "not all ranks have visible GPU device info; "
                  "skipping TL/CUDA team creation");

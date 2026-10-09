@@ -58,4 +58,13 @@ ucc_status_t ucc_cl_basic_coll_init(ucc_base_coll_args_t *coll_args,
 
 ucc_status_t ucc_cl_basic_team_get_scores(ucc_base_team_t   *cl_team,
                                           ucc_coll_score_t **score);
+
+void ucc_cl_basic_team_update_id(ucc_base_team_t *cl_team, uint16_t id);
+
 UCC_CL_IFACE_DECLARE(basic, BASIC);
+
+__attribute__((constructor)) static void cl_basic_iface_init(void)
+{
+    /* UCC_BASE_IFACE_DECLARE leaves update_id NULL */
+    ucc_cl_basic.super.team.update_id = ucc_cl_basic_team_update_id;
+}
