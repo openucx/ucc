@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -7,13 +7,10 @@
 #include "config.h"
 #include "tl_ucp.h"
 #include "alltoall.h"
+#include "alltoall_pairwise_num_posts.h"
 #include "core/ucc_progress_queue.h"
 #include "utils/ucc_math.h"
 #include "tl_ucp_sendrecv.h"
-
-/* TODO: add as parameters */
-#define MSG_MEDIUM 66000
-#define NP_THRESH 32
 
 static inline ucc_rank_t get_recv_peer(ucc_rank_t rank, ucc_rank_t size,
                                        ucc_rank_t step)
@@ -32,18 +29,14 @@ static ucc_rank_t get_num_posts(const ucc_tl_ucp_team_t *team,
 {
     unsigned long posts = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoall_pairwise_num_posts;
     ucc_rank_t    tsize = UCC_TL_TEAM_SIZE(team);
-    size_t data_size;
+    size_t        dt_size, data_size, peer_size;
 
-    data_size = (size_t)args->src.info.count *
-                ucc_dt_size(args->src.info.datatype);
+    dt_size   = ucc_dt_size(args->src.info.datatype);
+    data_size = (size_t)args->src.info.count * dt_size;
+    peer_size = (size_t)(args->src.info.count / tsize) * dt_size;
     if (posts == UCC_ULUNITS_AUTO) {
-        if ((data_size > MSG_MEDIUM) && (tsize > NP_THRESH)) {
-            /* use pairwise algorithm */
-            posts = 1;
-        } else {
-            /* use linear algorithm */
-            posts = 0;
-        }
+        posts = ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
+            tsize, data_size, peer_size);
     }
 
     posts = (posts > tsize || posts == 0) ? tsize: posts;
