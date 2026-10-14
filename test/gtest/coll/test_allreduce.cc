@@ -892,7 +892,7 @@ typedef void (*sra_select_fn_t)(
     const ucc_pipeline_params_t *, const ucc_coll_args_t *, size_t,
     ucc_pipeline_params_t *);
 
-sra_select_fn_t sra_select()
+void *sra_tl_ucp_module()
 {
     static void *module = nullptr;
     if (!module) {
@@ -904,6 +904,13 @@ sra_select_fn_t sra_select()
                            "/libucc_tl_ucp.so";
         module = dlopen(path.c_str(), RTLD_NOW | RTLD_NOLOAD | RTLD_LOCAL);
     }
+    return module;
+}
+
+sra_select_fn_t sra_select()
+{
+    void *module = sra_tl_ucp_module();
+
     if (!module) {
         return nullptr;
     }
@@ -947,7 +954,17 @@ void expect_sra_override(
     EXPECT_EQ(expected.order, actual.order);
 }
 
-TEST(sra_pipeline_selection, auto_missing_topology)
+class sra_pipeline_selection : public ::testing::Test {
+  protected:
+    void SetUp() override
+    {
+        if (sra_tl_ucp_module() == nullptr) {
+            GTEST_SKIP() << "TL/UCP is not available";
+        }
+    }
+};
+
+TEST_F(sra_pipeline_selection, auto_missing_topology)
 {
     ASSERT_NE(nullptr, sra_select()) << dlerror();
     auto                  configured = sra_auto_params();
@@ -957,7 +974,7 @@ TEST(sra_pipeline_selection, auto_missing_topology)
     expect_sra_monolithic(selected);
 }
 
-TEST(sra_pipeline_selection, auto_known_multi_node_topology)
+TEST_F(sra_pipeline_selection, auto_known_multi_node_topology)
 {
     ASSERT_NE(nullptr, sra_select()) << dlerror();
     auto                  configured = sra_auto_params();
@@ -967,7 +984,7 @@ TEST(sra_pipeline_selection, auto_known_multi_node_topology)
     expect_sra_monolithic(selected);
 }
 
-TEST(sra_pipeline_selection, auto_known_single_node_topology)
+TEST_F(sra_pipeline_selection, auto_known_single_node_topology)
 {
     ASSERT_NE(nullptr, sra_select()) << dlerror();
     auto configured = sra_auto_params();
@@ -981,7 +998,7 @@ TEST(sra_pipeline_selection, auto_known_single_node_topology)
     EXPECT_EQ(UCC_PIPELINE_PARALLEL, selected.order);
 }
 
-TEST(sra_pipeline_selection, override_missing_topology)
+TEST_F(sra_pipeline_selection, override_missing_topology)
 {
     ASSERT_NE(nullptr, sra_select()) << dlerror();
     ucc_pipeline_params_t configured = {17, 4096, 7, 3, UCC_PIPELINE_ORDERED};
@@ -991,7 +1008,7 @@ TEST(sra_pipeline_selection, override_missing_topology)
     expect_sra_override(configured, selected);
 }
 
-TEST(sra_pipeline_selection, override_known_multi_node_topology)
+TEST_F(sra_pipeline_selection, override_known_multi_node_topology)
 {
     ASSERT_NE(nullptr, sra_select()) << dlerror();
     ucc_pipeline_params_t configured = {
@@ -1002,7 +1019,7 @@ TEST(sra_pipeline_selection, override_known_multi_node_topology)
     expect_sra_override(configured, selected);
 }
 
-TEST(sra_pipeline_selection, tagged_collective_is_monolithic)
+TEST_F(sra_pipeline_selection, tagged_collective_is_monolithic)
 {
     ASSERT_NE(nullptr, sra_select()) << dlerror();
     ucc_pipeline_params_t configured = {1, 1024, 8, 4, UCC_PIPELINE_ORDERED};
@@ -1013,7 +1030,7 @@ TEST(sra_pipeline_selection, tagged_collective_is_monolithic)
     expect_sra_monolithic(selected);
 }
 
-TEST(sra_pipeline_selection, host_auto_threshold_boundary)
+TEST_F(sra_pipeline_selection, host_auto_threshold_boundary)
 {
     ASSERT_NE(nullptr, sra_select()) << dlerror();
     auto                  configured = sra_auto_params();
@@ -1033,7 +1050,7 @@ TEST(sra_pipeline_selection, host_auto_threshold_boundary)
     EXPECT_EQ(2, pdepth);
 }
 
-TEST(sra_pipeline_selection, cuda_out_of_place_auto_is_unchanged)
+TEST_F(sra_pipeline_selection, cuda_out_of_place_auto_is_unchanged)
 {
     ASSERT_NE(nullptr, sra_select()) << dlerror();
     auto                  configured = sra_auto_params();

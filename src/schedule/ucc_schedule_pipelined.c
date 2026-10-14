@@ -167,9 +167,8 @@ ucc_status_t ucc_schedule_pipelined_finalize(ucc_coll_task_t *task)
     int              i;
 
     ucc_trace_req("schedule pipelined %p is complete", schedule_p);
-    /* frag and task em lists stay: the thread that completed the last frag
-       may still be walking them */
-    ucc_coll_task_destruct(&schedule_p->super.super);
+    /* em lists stay with the pooled tasks: the thread that completed the
+       collective may still be walking them */
     for (i = 0; i < schedule_p->n_frags; i++) {
         schedule_p->frags[i]->super.finalize(&frags[i]->super);
     }

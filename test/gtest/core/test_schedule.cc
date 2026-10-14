@@ -453,6 +453,7 @@ UCC_TEST_F(test_schedule, pipelined_init_depth_16_success)
     if (sched.super.super.finalize) {
         sched.super.super.finalize(&sched.super.super);
     }
+    ucc_coll_task_destruct(&sched.super.super);
     destroy_test_team(team);
 }
 
@@ -923,6 +924,31 @@ UCC_TEST_F(test_schedule, pipeline_params_disabled_nfrags_zero_ok)
     EXPECT_EQ(1, pipeline_depth);
 }
 
+/* n_frags=0 splits by frag size; without a frag size it is disabled */
+UCC_TEST_F(test_schedule, pipeline_params_nfrags_zero_uses_frag_size)
+{
+    ucc_pipeline_params_t params = {0};
+    int                   n_frags, pipeline_depth;
+
+    params.threshold = 1024 * 1024;
+    params.frag_size = 64 * 1024;
+    params.pdepth    = 4;
+    EXPECT_EQ(
+        UCC_OK,
+        ucc_pipeline_nfrags_pdepth(
+            &params, 2 * 1024 * 1024, &n_frags, &pipeline_depth));
+    EXPECT_EQ(32, n_frags);
+    EXPECT_EQ(4, pipeline_depth);
+
+    params.frag_size = SIZE_MAX;
+    EXPECT_EQ(
+        UCC_OK,
+        ucc_pipeline_nfrags_pdepth(
+            &params, 2 * 1024 * 1024, &n_frags, &pipeline_depth));
+    EXPECT_EQ(1, n_frags);
+    EXPECT_EQ(1, pipeline_depth);
+}
+
 /* ========================================================================== */
 /* Complete helper boundary and pipelined-init guard coverage.       */
 /* ========================================================================== */
@@ -1042,6 +1068,7 @@ UCC_TEST_F(test_schedule, pipelined_all_valid_orders_at_boundary)
         ASSERT_NE(nullptr, sched.super.super.finalize);
         EXPECT_EQ(UCC_OK, sched.super.super.finalize(&sched.super.super));
         EXPECT_EQ(2, g_total_finalizes.load());
+        ucc_coll_task_destruct(&sched.super.super);
         destroy_test_team(team);
     }
 }
@@ -1078,6 +1105,7 @@ UCC_TEST_F(test_schedule, pipelined_depth_above_limit_clamped)
     ASSERT_NE(nullptr, sched.super.super.finalize);
     EXPECT_EQ(UCC_OK, sched.super.super.finalize(&sched.super.super));
     EXPECT_EQ(2 * UCC_SCHEDULE_PIPELINED_MAX_FRAGS, g_total_finalizes.load());
+    ucc_coll_task_destruct(&sched.super.super);
     destroy_test_team(team);
 }
 

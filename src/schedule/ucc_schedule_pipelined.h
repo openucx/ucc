@@ -58,9 +58,8 @@ static inline ucc_status_t ucc_pipeline_nfrags_pdepth(
 {
     int min_num_frags;
 
-    /* n_frags=0 is the canonical disabled form.  Normalize it to a usable
-     * monolithic schedule even when the unused pdepth/frag_size are zero. */
-    if (p->n_frags == 0) {
+    /* n_frags=0 with no frag size set (0 or SIZE_MAX default): disabled */
+    if (p->n_frags == 0 && (p->frag_size == 0 || p->frag_size == SIZE_MAX)) {
         *n_frags        = 1;
         *pipeline_depth = 1;
         return UCC_OK;
@@ -78,7 +77,7 @@ static inline ucc_status_t ucc_pipeline_nfrags_pdepth(
 
     *n_frags = 1;
     if (msgsize > p->threshold) {
-        min_num_frags = ucc_div_round_up(msgsize, p->frag_size);
+        min_num_frags = ucc_max(ucc_div_round_up(msgsize, p->frag_size), 1);
         *n_frags      = ucc_max(min_num_frags, p->n_frags);
     }
     *pipeline_depth = ucc_min(*n_frags, p->pdepth);
