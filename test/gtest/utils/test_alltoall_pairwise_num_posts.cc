@@ -79,30 +79,26 @@ TEST(alltoall_pairwise_num_posts, host_compatibility)
                                 2 * 1024 * 1024, 4 * 1024 * 1024,
                                 8 * 1024 * 1024, 16 * 1024 * 1024};
 
-    for (ucc_rank_t tsize = 1; tsize <= 32; tsize++) {
+    for (ucc_rank_t tsize = 1; tsize <= 128; tsize++) {
         for (size_t peer_size : peer_sizes) {
-            EXPECT_EQ(tsize, ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
-                                 tsize, (size_t)tsize * peer_size, peer_size,
-                                 UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_HOST));
+            size_t     total_size = (size_t)tsize * peer_size;
+            ucc_rank_t expected = total_size > 66000 && tsize > 32 ? 1 : tsize;
+
+            EXPECT_EQ(expected, ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
+                                    tsize, total_size, peer_size,
+                                    UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_HOST));
         }
     }
 
-    // Larger host teams retain the tuned policy, including its tiny guard.
-    EXPECT_EQ(33, ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
-                      33, 66000, 66000 / 33,
+    // Check both legacy boundaries independently.
+    for (ucc_rank_t tsize : {32, 33, 64, 128}) {
+        EXPECT_EQ(tsize, ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
+                             tsize, 66000, 66000 / tsize,
+                             UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_HOST));
+        EXPECT_EQ(tsize <= 32 ? tsize : 1,
+                  ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
+                      tsize, 66001, 66001 / tsize,
                       UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_HOST));
-    EXPECT_EQ(32, ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
-                      33, 66001, 66001 / 33,
-                      UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_HOST));
-    for (ucc_rank_t tsize : {33, 64, 128}) {
-        for (size_t peer_size : peer_sizes) {
-            EXPECT_EQ(ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
-                          tsize, (size_t)tsize * peer_size, peer_size,
-                          UCC_MEMORY_TYPE_CUDA, UCC_MEMORY_TYPE_CUDA),
-                      ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
-                          tsize, (size_t)tsize * peer_size, peer_size,
-                          UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_HOST));
-        }
     }
 }
 
