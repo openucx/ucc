@@ -56,12 +56,15 @@ ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task,
 {
     ucc_schedule_pipelined_t *schedule =
         ucc_container_of(task, ucc_schedule_pipelined_t, super);
-    ucc_schedule_t *frag = ucc_derived_of(parent_task, ucc_schedule_t);
+    ucc_schedule_t *frag     = ucc_derived_of(parent_task, ucc_schedule_t);
+    ucc_status_t    status   = UCC_OK;
+    int             complete = 0;
     int             i;
 
     if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
         ucc_recursive_spin_lock(&schedule->lock);
     }
+    schedule->handler_depth++;
 
     schedule->super.n_completed_tasks += 1;
     schedule->n_frags_in_pipeline--;
@@ -77,17 +80,15 @@ ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task,
         schedule->n_frags_started, schedule->super.n_tasks);
     if (schedule->super.n_completed_tasks == schedule->super.n_tasks) {
         schedule->super.super.status = UCC_OK;
-        if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
-            ucc_recursive_spin_unlock(&schedule->lock);
-        }
-        ucc_task_complete(task);
-        return UCC_OK;
+        schedule->complete_pending   = 1;
+        goto out;
     }
 
     /* Restart fragments in order, starting from next_frag_to_post.
        Only restart fragments that have the restart_pending flag set. */
-    while (schedule->super.n_completed_tasks + schedule->n_frags_in_pipeline <
-           schedule->super.n_tasks) {
+    while (schedule->super.super.status == UCC_INPROGRESS &&
+           schedule->super.n_completed_tasks + schedule->n_frags_in_pipeline <
+               schedule->super.n_tasks) {
         ucc_status_t st;
 
         frag = schedule->frags[schedule->next_frag_to_post];
@@ -108,18 +109,26 @@ ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task,
         st = ucc_frag_start_handler(&schedule->super.super, &frag->super);
         if (ucc_unlikely(st < 0)) {
             schedule->super.super.status = st;
-            if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
-                ucc_recursive_spin_unlock(&schedule->lock);
-            }
-            ucc_task_complete(task);
-            return st;
+            schedule->complete_pending   = 1;
+            status                       = st;
+            break;
         }
     }
 
+out:
+    /* a fragment can complete inside its post and re-enter this handler:
+       only the outermost call completes the schedule, after unlocking */
+    if (--schedule->handler_depth == 0 && schedule->complete_pending) {
+        schedule->complete_pending = 0;
+        complete                   = 1;
+    }
     if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
         ucc_recursive_spin_unlock(&schedule->lock);
     }
-    return UCC_OK;
+    if (complete) {
+        ucc_task_complete(task);
+    }
+    return status;
 }
 
 ucc_status_t ucc_schedule_pipelined_finalize(ucc_coll_task_t *task)
@@ -153,6 +162,8 @@ ucc_status_t ucc_schedule_pipelined_post(ucc_coll_task_t *task)
     schedule_p->n_frags_started          = 0;
     schedule_p->next_frag_to_post        = 0;
     schedule_p->n_frags_in_pipeline      = 0;
+    schedule_p->handler_depth            = 0;
+    schedule_p->complete_pending         = 0;
 
     for (i = 0; i < schedule_p->n_frags; i++) {
         frags[i]->n_completed_tasks  = 0;
@@ -228,6 +239,8 @@ ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
     schedule->frag_setup           = frag_setup;
     schedule->next_frag_to_post    = 0;
     schedule->n_frags_in_pipeline  = 0;
+    schedule->handler_depth        = 0;
+    schedule->complete_pending     = 0;
     schedule->super.super.finalize = ucc_schedule_pipelined_finalize;
     schedule->super.super.post     = ucc_schedule_pipelined_post;
     frags                          = schedule->frags;
