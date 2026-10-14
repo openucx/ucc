@@ -26,12 +26,11 @@ ucc_tl_ucp_alltoall_pairwise_auto_num_posts(ucc_rank_t tsize,
                                              ucc_memory_type_t src_mem_type,
                                              ucc_memory_type_t dst_mem_type)
 {
-    /* Keep legacy full-team posting for small host teams. The reduced
-     * posting bands regress multi-node CPU Alltoall at these team sizes.
-     */
+    /* Preserve legacy CPU posting until host-specific tuning is validated. */
     if (src_mem_type == UCC_MEMORY_TYPE_HOST &&
-        dst_mem_type == UCC_MEMORY_TYPE_HOST && tsize <= 32) {
-        return tsize;
+        dst_mem_type == UCC_MEMORY_TYPE_HOST) {
+        return total_size > UCC_TL_UCP_ALLTOALL_TOTAL_SMALL && tsize > 32
+                   ? 1 : tsize;
     }
 
     if (total_size <= UCC_TL_UCP_ALLTOALL_TOTAL_SMALL || tsize <= 8) {
