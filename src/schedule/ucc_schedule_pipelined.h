@@ -86,6 +86,8 @@ typedef struct ucc_schedule_pipelined {
     ucc_pipeline_order_t         order;
     int                          next_frag_to_post;
     ucc_schedule_frag_setup_fn_t frag_setup;
+    int                          handler_depth;
+    int                          complete_pending;
     ucc_recursive_spinlock_t     lock;
 } ucc_schedule_pipelined_t;
 
