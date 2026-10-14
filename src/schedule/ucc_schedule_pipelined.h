@@ -87,9 +87,11 @@ static inline ucc_status_t ucc_pipeline_nfrags_pdepth(
 
 extern const char* ucc_pipeline_order_names[];
 
+#ifdef ENABLE_GTEST
 /* Test-only lock lifecycle observer. Install it only for the duration of a
    single test and pass NULL to restore the default (no observation). */
 void ucc_schedule_pipelined_set_lock_observer(void (*cb)(int initialized));
+#endif
 typedef struct ucc_schedule_pipelined {
     ucc_schedule_t               super;
     /* Array of the frag schedules - 1 schedule per pipeline entry */

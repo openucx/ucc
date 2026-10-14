@@ -1272,7 +1272,6 @@ UCC_TEST_F(test_schedule, pipelined_depth_16_exact_lifecycle)
     EXPECT_EQ(16, g_fault_task_finalizes.load());
     EXPECT_EQ(16, g_fault_frag_finalizes.load());
     EXPECT_EQ(32, g_fault_pool_returns.load());
-    EXPECT_EQ(0, g_fault_live_listeners_at_finalize.load());
     EXPECT_EQ(1, g_fault_lock_inits.load());
     EXPECT_EQ(1, g_fault_lock_destroys.load());
     ucc_coll_task_destruct(&sched.super.super);

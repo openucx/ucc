@@ -8,7 +8,9 @@
 #include "ucc_schedule_pipelined.h"
 #include "coll_score/ucc_coll_score.h"
 #include "core/ucc_context.h"
+#ifdef ENABLE_GTEST
 #include <stdatomic.h>
+#endif
 
 const char* ucc_pipeline_order_names[] = {
     [UCC_PIPELINE_PARALLEL]   = "parallel",
@@ -17,6 +19,7 @@ const char* ucc_pipeline_order_names[] = {
     [UCC_PIPELINE_LAST]       =  NULL
 };
 
+#ifdef ENABLE_GTEST
 /* Test-only observer, invoked on lock init/destroy, potentially from
    multiple scheduler threads. Keep the access atomic; tests must restore it
    to NULL (the default) when done. */
@@ -37,6 +40,9 @@ static void ucc_schedule_pipelined_lock_observe(int initialized)
         observer(initialized);
     }
 }
+#else
+#define ucc_schedule_pipelined_lock_observe(_initialized)
+#endif
 
 static ucc_status_t ucc_frag_start_handler(ucc_coll_task_t *parent,
                                            ucc_coll_task_t *task)
@@ -161,13 +167,9 @@ ucc_status_t ucc_schedule_pipelined_finalize(ucc_coll_task_t *task)
     int              i;
 
     ucc_trace_req("schedule pipelined %p is complete", schedule_p);
+    /* frag and task em lists stay: the thread that completed the last frag
+       may still be walking them */
     ucc_coll_task_destruct(&schedule_p->super.super);
-    for (i = 0; i < schedule_p->n_frags; i++) {
-        ucc_coll_task_destruct(&frags[i]->super);
-        for (int j = 0; j < frags[i]->n_tasks; j++) {
-            ucc_coll_task_destruct(frags[i]->tasks[j]);
-        }
-    }
     for (i = 0; i < schedule_p->n_frags; i++) {
         schedule_p->frags[i]->super.finalize(&frags[i]->super);
     }
@@ -221,6 +223,7 @@ ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
                                          ucc_pipeline_order_t order,
                                          ucc_schedule_pipelined_t *schedule)
 {
+    static uint8_t   warned                = 0;
     ucc_event_t      task_dependency_event = UCC_EVENT_LAST;
     int              n_frags_initd         = 0;
     int              i, j;
@@ -250,10 +253,12 @@ ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
     }
 
     if (ucc_unlikely(n_frags > UCC_SCHEDULE_PIPELINED_MAX_FRAGS)) {
-        ucc_warn(
-            "n_frags %d exceeds max limit of %d, clamping",
-            n_frags,
-            UCC_SCHEDULE_PIPELINED_MAX_FRAGS);
+        if (ucc_atomic_bool_cswap8(&warned, 0, 1)) {
+            ucc_warn(
+                "n_frags %d exceeds max limit of %d, clamping",
+                n_frags,
+                UCC_SCHEDULE_PIPELINED_MAX_FRAGS);
+        }
         n_frags = UCC_SCHEDULE_PIPELINED_MAX_FRAGS;
     }
 
