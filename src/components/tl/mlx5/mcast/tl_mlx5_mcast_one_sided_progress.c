@@ -230,7 +230,12 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
              " %d ag_counter %d offset %d", pp->length, source_rank,
              ag_counter, offset);
 
-    ucc_assert(offset < req->num_packets);
+    if (ucc_unlikely(offset >= req->num_packets)) {
+        tl_warn(comm->lib, "mcast: received packet with invalid offset "
+                "%d >= num_packets %d (psn=0x%x), dropping",
+                offset, req->num_packets, pp->psn);
+        return UCC_ERR_NO_MESSAGE;
+    }
     // there are scenarios where we receive a packet with same offset/rank  more than one time
     // this means that a packet which was considered dropped in previous run has not just arrived
     // need to check the allgather call counter and ignore this packet if it does not match

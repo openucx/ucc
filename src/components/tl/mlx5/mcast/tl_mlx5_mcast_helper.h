@@ -70,7 +70,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
     struct ibv_send_wr *swr            = &comm->mcast.swr;
     struct ibv_sge     *ssg            = &comm->mcast.ssg;
     int                 max_per_packet = comm->max_per_packet;
-    int                 offset = req->offset;
+    size_t              offset = req->offset;
     int                 i;
     struct ibv_send_wr *bad_wr;
     struct pp_packet   *pp;
