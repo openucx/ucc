@@ -10,7 +10,8 @@
 #include <utils/ucc_math.h>
 #include <utils/ucc_coll_utils.h>
 
-ucc_pt_coll_barrier::ucc_pt_coll_barrier(ucc_pt_comm *communicator,
+ucc_pt_coll_barrier::ucc_pt_coll_barrier(bool is_persistent,
+                                         ucc_pt_comm *communicator,
                                          ucc_pt_generator_base *generator) :
                                           ucc_pt_coll(communicator, generator)
 {
@@ -20,8 +21,14 @@ ucc_pt_coll_barrier::ucc_pt_coll_barrier(ucc_pt_comm *communicator,
     has_bw_        = false;
     root_shift_    = 0;
 
-    coll_args.mask = 0;
+    coll_args.mask      = 0;
+    coll_args.flags     = 0;
     coll_args.coll_type = UCC_COLL_TYPE_BARRIER;
+
+    if (is_persistent) {
+        coll_args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
+    }
 }
 
 ucc_status_t ucc_pt_coll_barrier::init_args(ucc_pt_test_args_t &test_args)

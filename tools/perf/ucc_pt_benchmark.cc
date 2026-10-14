@@ -80,7 +80,7 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
                                          cfg.persistent, comm, generator);
         break;
     case UCC_PT_OP_TYPE_BARRIER:
-        coll = new ucc_pt_coll_barrier(comm, generator);
+        coll = new ucc_pt_coll_barrier(cfg.persistent, comm, generator);
         break;
     case UCC_PT_OP_TYPE_BCAST:
         coll = new ucc_pt_coll_bcast(cfg.dt, cfg.mt, cfg.root_shift,
