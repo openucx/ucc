@@ -36,7 +36,8 @@ static ucc_rank_t get_num_posts(const ucc_tl_ucp_team_t *team,
     peer_size = (size_t)(args->src.info.count / tsize) * dt_size;
     if (posts == UCC_ULUNITS_AUTO) {
         posts = ucc_tl_ucp_alltoall_pairwise_auto_num_posts(
-            tsize, data_size, peer_size);
+            tsize, data_size, peer_size, args->src.info.mem_type,
+            args->dst.info.mem_type);
     }
 
     posts = (posts > tsize || posts == 0) ? tsize: posts;
