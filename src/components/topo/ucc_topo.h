@@ -108,6 +108,9 @@ ucc_status_t ucc_topo_init(
 
 void ucc_topo_cleanup(ucc_topo_t *subset_topo);
 
+/* Materializes the lazily built topo fields so it can be shared read-only */
+ucc_status_t ucc_topo_prepare_shared(ucc_topo_t *topo);
+
 ucc_sbgp_t *ucc_topo_get_sbgp(ucc_topo_t *topo, ucc_sbgp_type_t type);
 
 int ucc_topo_is_single_node(ucc_topo_t *topo);
