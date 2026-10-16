@@ -13,6 +13,7 @@
 #include "utils/ucc_parser.h"
 #include "coll_score/ucc_coll_score.h"
 #include "coll_patterns/ring.h"
+#include "allgather/allgather_knomial_select.h"
 
 static inline ucc_status_t ucc_tl_ucp_get_topo(ucc_tl_ucp_team_t *team)
 {
@@ -110,6 +111,17 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
             ucc_debug("section not found");
         }
     }
+
+    ucc_tl_ucp_allgather_knomial_select_radix_seq(
+        UCC_TL_TEAM_SIZE(self),
+        0,
+        self->allgather_kn_auto_small.radices,
+        &self->allgather_kn_auto_small.seq);
+    ucc_tl_ucp_allgather_knomial_select_radix_seq(
+        UCC_TL_TEAM_SIZE(self),
+        UCC_TL_UCP_ALLGATHER_KN_LARGE_MSG_SIZE,
+        self->allgather_kn_auto_large.radices,
+        &self->allgather_kn_auto_large.seq);
 
     if (!self->topo && self->cfg.use_reordering) {
         tl_debug(tl_context->lib,
