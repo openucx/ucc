@@ -12,6 +12,30 @@ using Param_1 = std::tuple<ucc_datatype_t, ucc_memory_type_t, gtest_ucc_inplace_
 class test_alltoall : public UccCollArgs, public ucc::test
 {
 public:
+    uint64_t coll_mask;
+    uint64_t coll_flags;
+
+    test_alltoall() : coll_mask(0), coll_flags(0) {}
+
+    /* Collect ranks from a static team and create an onesided team in job. */
+    UccTeam_h make_dyn_seg_team(UccJob &job, int team_id)
+    {
+        UccTeam_h        ref_team = UccJob::getStaticTeams()[team_id];
+        bool             is_contig = true;
+        std::vector<int> reference_ranks;
+
+        for (auto i = 0; i < ref_team->n_procs; i++) {
+            int rank = ref_team->procs[i].p->job_rank;
+            reference_ranks.push_back(rank);
+            if (is_contig && i > 0 &&
+                (rank - reference_ranks[i - 1] > 1 ||
+                 reference_ranks[i - 1] - rank > 1)) {
+                is_contig = false;
+            }
+        }
+        return job.create_team(reference_ranks, true, is_contig, true);
+    }
+
     void data_init(int nprocs, ucc_datatype_t dtype,
                    size_t single_rank_count, UccCollCtxVec &ctxs,
                    UccTeam_h team, bool persistent)
@@ -30,7 +54,7 @@ public:
                 (gtest_ucc_coll_ctx_t *)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
             ctxs[i]->args = coll;
 
-            coll->mask              = 0;
+            coll->mask              = coll_mask;
             coll->coll_type         = UCC_COLL_TYPE_ALLTOALL;
             coll->src.info.mem_type = mem_type;
             coll->src.info.count    = (ucc_count_t)single_rank_count * nprocs;
@@ -52,9 +76,9 @@ public:
                 sbuf        = team->procs[i].p->onesided_buf[0];
                 rbuf        = team->procs[i].p->onesided_buf[1];
                 work_buf    = (long *)team->procs[i].p->onesided_buf[2];
-                coll->mask  = UCC_COLL_ARGS_FIELD_FLAGS |
+                coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS |
                              UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
-                coll->flags = UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+                coll->flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
                 coll->src.info.buffer    = sbuf;
                 coll->src.info.mem_type  = UCC_MEMORY_TYPE_HOST;
                 coll->dst.info.buffer    = rbuf;
@@ -135,9 +159,8 @@ public:
     void data_fini_onesided(UccCollCtxVec ctxs)
     {
         for (gtest_ucc_coll_ctx_t *ctx : ctxs) {
-            ucc_coll_args_t *coll = ctx->args;
             ucc_free(ctx->init_buf);
-            free(coll);
+            free(ctx->args);
             free(ctx);
         }
         ctxs.clear();
@@ -243,6 +266,107 @@ UCC_TEST_P(test_alltoall_0, single_onesided)
     req.start();
     req.wait();
     EXPECT_EQ(true, data_validate(ctxs));
+    data_fini_onesided(ctxs);
+}
+
+UCC_TEST_P(test_alltoall_0, single_onesided_dynamic_segment)
+{
+    const int            team_id  = std::get<0>(GetParam());
+    const ucc_datatype_t dtype    = std::get<1>(GetParam());
+    ucc_memory_type_t    mem_type = std::get<2>(GetParam());
+    gtest_ucc_inplace_t  inplace  = std::get<3>(GetParam());
+    const int            count    = std::get<4>(GetParam());
+    int                  size     = UccJob::getStaticTeams()[team_id]->procs.size();
+    ucc_job_env_t        env      = {{"UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided"}};
+    UccJob               job(size, UccJob::UCC_JOB_CTX_GLOBAL_ONESIDED, env);
+    UccTeam_h            team     = make_dyn_seg_team(job, team_id);
+    UccCollCtxVec        ctxs;
+
+    this->set_inplace(inplace);
+    SET_MEM_TYPE(mem_type);
+    /* for dynamic segments, setup as onesided and override the mask/flags */
+    data_init(size, dtype, count, ctxs, team, false);
+    for (auto i = 0; i < ctxs.size(); i++) {
+        ctxs[i]->args->mask  = UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER |
+                               (ctxs[i]->args->mask & UCC_COLL_ARGS_FIELD_FLAGS);
+        ctxs[i]->args->flags &= UCC_COLL_ARGS_FLAG_IN_PLACE;
+    }
+    UccReq req(team, ctxs);
+    req.start();
+    req.wait();
+    EXPECT_EQ(true, data_validate(ctxs));
+    data_fini_onesided(ctxs);
+}
+
+UCC_TEST_P(test_alltoall_0, persistent_dynamic_segment_get)
+{
+    const int            team_id  = std::get<0>(GetParam());
+    const ucc_datatype_t dtype    = std::get<1>(GetParam());
+    ucc_memory_type_t    mem_type = std::get<2>(GetParam());
+    gtest_ucc_inplace_t  inplace  = std::get<3>(GetParam());
+    const int            count    = std::get<4>(GetParam());
+    int                  size     = UccJob::getStaticTeams()[team_id]->procs.size();
+    ucc_job_env_t        env      = {{"UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided"},
+                                     {"UCC_TL_UCP_ALLTOALL_ONESIDED_ALG", "get"}};
+    UccJob               job(size, UccJob::UCC_JOB_CTX_GLOBAL_ONESIDED, env);
+    UccTeam_h            team     = make_dyn_seg_team(job, team_id);
+    UccCollCtxVec        ctxs;
+
+    this->set_inplace(inplace);
+    SET_MEM_TYPE(mem_type);
+    /* persistent=true so the request may be re-posted across iterations */
+    data_init(size, dtype, count, ctxs, team, true);
+    for (auto i = 0; i < ctxs.size(); i++) {
+        ctxs[i]->args->mask  = UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER |
+                               (ctxs[i]->args->mask & UCC_COLL_ARGS_FIELD_FLAGS);
+        /* keep IN_PLACE and PERSISTENT; drop any buffer/memh flags that would
+         * bypass the dynamic-segment exchange path */
+        ctxs[i]->args->flags &= (UCC_COLL_ARGS_FLAG_IN_PLACE |
+                                 UCC_COLL_ARGS_FLAG_PERSISTENT);
+    }
+    UccReq req(team, ctxs);
+    for (int n = 0; n < 3; n++) {
+        req.start();
+        req.wait();
+        EXPECT_EQ(true, data_validate(ctxs));
+        reset(ctxs);
+    }
+    data_fini_onesided(ctxs);
+}
+
+UCC_TEST_P(test_alltoall_0, persistent_dynamic_segment_put)
+{
+    const int            team_id  = std::get<0>(GetParam());
+    const ucc_datatype_t dtype    = std::get<1>(GetParam());
+    ucc_memory_type_t    mem_type = std::get<2>(GetParam());
+    gtest_ucc_inplace_t  inplace  = std::get<3>(GetParam());
+    const int            count    = std::get<4>(GetParam());
+    int                  size     = UccJob::getStaticTeams()[team_id]->procs.size();
+    ucc_job_env_t        env      = {{"UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided"},
+                                     {"UCC_TL_UCP_ALLTOALL_ONESIDED_ALG", "put"}};
+    UccJob               job(size, UccJob::UCC_JOB_CTX_GLOBAL_ONESIDED, env);
+    UccTeam_h            team     = make_dyn_seg_team(job, team_id);
+    UccCollCtxVec        ctxs;
+
+    this->set_inplace(inplace);
+    SET_MEM_TYPE(mem_type);
+    /* persistent=true so the request may be re-posted across iterations */
+    data_init(size, dtype, count, ctxs, team, true);
+    for (auto i = 0; i < ctxs.size(); i++) {
+        ctxs[i]->args->mask  = UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER |
+                               (ctxs[i]->args->mask & UCC_COLL_ARGS_FIELD_FLAGS);
+        /* keep IN_PLACE and PERSISTENT; drop any buffer/memh flags that would
+         * bypass the dynamic-segment exchange path */
+        ctxs[i]->args->flags &= (UCC_COLL_ARGS_FLAG_IN_PLACE |
+                                 UCC_COLL_ARGS_FLAG_PERSISTENT);
+    }
+    UccReq req(team, ctxs);
+    for (int n = 0; n < 3; n++) {
+        req.start();
+        req.wait();
+        EXPECT_EQ(true, data_validate(ctxs));
+        reset(ctxs);
+    }
     data_fini_onesided(ctxs);
 }
 
