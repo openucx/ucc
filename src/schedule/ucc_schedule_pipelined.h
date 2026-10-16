@@ -10,7 +10,7 @@
 #include "components/base/ucc_base_iface.h"
 
 #define UCC_SCHEDULE_FRAG_MAX_TASKS 8
-#define UCC_SCHEDULE_PIPELINED_MAX_FRAGS 4
+#define UCC_SCHEDULE_PIPELINED_MAX_FRAGS 16
 
 typedef struct ucc_schedule_pipelined ucc_schedule_pipelined_t;
 
@@ -53,21 +53,44 @@ typedef struct ucc_pipeline_params {
     ucc_pipeline_order_t order;
 } ucc_pipeline_params_t;
 
-static inline void ucc_pipeline_nfrags_pdepth(ucc_pipeline_params_t *p,
-                                              size_t msgsize, int *n_frags,
-                                              int *pipeline_depth)
+static inline ucc_status_t ucc_pipeline_nfrags_pdepth(
+    ucc_pipeline_params_t *p, size_t msgsize, int *n_frags, int *pipeline_depth)
 {
     int min_num_frags;
 
+    /* n_frags=0 with no frag size set (0 or SIZE_MAX default): disabled */
+    if (p->n_frags == 0 && (p->frag_size == 0 || p->frag_size == SIZE_MAX)) {
+        *n_frags        = 1;
+        *pipeline_depth = 1;
+        return UCC_OK;
+    }
+
+    if (p->pdepth <= 0) {
+        /* Active pipeline specified but pdepth=0 - this will hang */
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    if (p->frag_size == 0 && msgsize > p->threshold) {
+        /* frag_size=0 with message exceeding threshold would divide by zero */
+        return UCC_ERR_INVALID_PARAM;
+    }
+
     *n_frags = 1;
     if (msgsize > p->threshold) {
-        min_num_frags = ucc_div_round_up(msgsize, p->frag_size);
+        min_num_frags = ucc_max(ucc_div_round_up(msgsize, p->frag_size), 1);
         *n_frags      = ucc_max(min_num_frags, p->n_frags);
     }
     *pipeline_depth = ucc_min(*n_frags, p->pdepth);
+    return UCC_OK;
 }
 
 extern const char* ucc_pipeline_order_names[];
+
+#ifdef ENABLE_GTEST
+/* Test-only lock lifecycle observer. Install it only for the duration of a
+   single test and pass NULL to restore the default (no observation). */
+void ucc_schedule_pipelined_set_lock_observer(void (*cb)(int initialized));
+#endif
 typedef struct ucc_schedule_pipelined {
     ucc_schedule_t               super;
     /* Array of the frag schedules - 1 schedule per pipeline entry */
