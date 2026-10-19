@@ -168,6 +168,12 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
                  plugin_name);
         return UCC_ERR_INVALID_PARAM;
     }
+    if (strcmp(plugin_name, UCC_CL_DOCA_UROM_DEFAULT_PLUGIN_NAME) != 0) {
+        cl_warn(
+            cl_config->super.cl_lib,
+            "using non-default UROM plugin '%s'",
+            plugin_name);
+    }
     device      = self->cfg.device;
 
     result = doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
