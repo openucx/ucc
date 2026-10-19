@@ -176,7 +176,8 @@ ucc_open_output_stream(const char *config_str, ucc_log_level_t err_log_level,
             return UCC_ERR_INVALID_PARAM;
         }
 
-        output_stream = fopen(filename, "w");
+        /* append: never truncate a file that already exists */
+        output_stream = fopen(filename, "a");
         if (output_stream == NULL) {
             ucc_log(err_log_level, "failed to open '%s' for writing: %m",
                     filename);
