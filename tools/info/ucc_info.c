@@ -15,6 +15,7 @@
 #include "components/cl/ucc_cl.h"
 #include <getopt.h>
 #include <stdlib.h>
+#include <string.h>
 
 static void usage()
 {
@@ -26,7 +27,9 @@ static void usage()
     printf("  -a Show also hidden configuration\n");
     printf("  -f Show fully decorated output\n");
     printf("  -s Show default components scores\n");
-    printf("  -A Show collective algorithms available for selection\n");
+    printf(
+        "  -A Show supported collectives and the algorithms available "
+        "for selection\n");
     printf("  -h Show this help message\n");
 
     printf("\n");
@@ -41,30 +44,45 @@ static void print_algorithm_info(ucc_base_coll_alg_info_t *info)
     }
 }
 
-static void print_component_algs(ucc_base_coll_alg_info_t **alg_info,
-                                 const char *component,
-                                 const char *component_name)
+/* collectives a TL supports, whether or not it has selectable algorithms */
+static uint64_t tl_coll_types(ucc_tl_iface_t *tl)
 {
-    int have_algs = 0;
+    ucc_tl_lib_attr_t attr;
+
+    memset(&attr, 0, sizeof(attr));
+    if (UCC_OK != tl->lib.get_attr(NULL, &attr.super)) {
+        return 0;
+    }
+    return attr.super.attr.coll_types;
+}
+
+static void print_component_algs(
+    ucc_base_coll_alg_info_t **alg_info, uint64_t coll_types,
+    const char *component, const char *component_name)
+{
     int i;
 
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
         if (alg_info[i]) {
-            have_algs = 1;
-            break;
+            coll_types |= UCC_BIT(i);
         }
     }
-    if (have_algs) {
-        printf("%s/%s algorithms:\n", component, component_name);
-        for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
-            if (alg_info[i]) {
-                printf("  %s\n",
-                       ucc_coll_type_str((ucc_coll_type_t)UCC_BIT(i)));
-                print_algorithm_info(alg_info[i]);
-            }
-        }
-        printf("\n");
+    if (!coll_types) {
+        return;
     }
+    printf("%s/%s algorithms:\n", component, component_name);
+    for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
+        if (!(coll_types & UCC_BIT(i))) {
+            continue;
+        }
+        printf("  %s\n", ucc_coll_type_str((ucc_coll_type_t)UCC_BIT(i)));
+        if (alg_info[i]) {
+            print_algorithm_info(alg_info[i]);
+        } else {
+            printf("    no selectable algorithms\n");
+        }
+    }
+    printf("\n");
 }
 
 int main(int argc, char **argv)
@@ -172,13 +190,14 @@ int main(int argc, char **argv)
         for (c = 0; c < cfg->cl_framework.n_components; c++) {
             cl =
                 ucc_derived_of(cfg->cl_framework.components[c], ucc_cl_iface_t);
-            print_component_algs(cl->alg_info, "cl", cl->super.name);
+            print_component_algs(cl->alg_info, 0, "cl", cl->super.name);
         }
 
         for (c = 0; c < cfg->tl_framework.n_components; c++) {
             tl =
                 ucc_derived_of(cfg->tl_framework.components[c], ucc_tl_iface_t);
-            print_component_algs(tl->alg_info, "tl", tl->super.name);
+            print_component_algs(
+                tl->alg_info, tl_coll_types(tl), "tl", tl->super.name);
         }
     }
     ucc_finalize(lib);
