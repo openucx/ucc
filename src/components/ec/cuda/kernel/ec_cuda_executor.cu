@@ -20,6 +20,12 @@ using namespace cooperative_groups;
 #include "ec_cuda_reduce_ops.h"
 #define align_pow2(_n, _p) ((_n) & ((_p) - 1))
 
+enum {
+    EXECUTOR_SEPARATE_START_ACK,
+    EXECUTOR_COOPERATIVE,
+    EXECUTOR_SINGLE_BLOCK
+};
+
 __global__ void executor_start(ucc_ec_cuda_executor_state_t *state,
                                int *cidx)
 {
@@ -119,7 +125,7 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
 }
 
 __global__ void executor_kernel(
-    volatile ucc_ec_cuda_executor_t *eee, int q_size, int useCoopLaunch)
+    volatile ucc_ec_cuda_executor_t *eee, int q_size, int mode)
 {
     const uint32_t  worker_id   = blockIdx.x;
     const uint32_t  num_workers = gridDim.x;
@@ -132,7 +138,7 @@ __global__ void executor_kernel(
     __shared__ bool worker_done;
 
     if (is_master) {
-        if (useCoopLaunch) {
+        if (mode != EXECUTOR_SEPARATE_START_ACK) {
             *eee->dev_cidx  = 0;
             *eee->dev_state = UCC_EC_CUDA_EXECUTOR_STARTED;
         }
@@ -143,7 +149,7 @@ __global__ void executor_kernel(
     }
 
     worker_done = false;
-    if (useCoopLaunch) {
+    if (mode == EXECUTOR_COOPERATIVE) {
         grid.sync();
     } else {
         __syncthreads();
@@ -162,11 +168,13 @@ __global__ void executor_kernel(
         }
         __syncthreads();
         if (worker_done) {
-            if (useCoopLaunch) {
+            if (mode == EXECUTOR_COOPERATIVE) {
                 grid.sync();
                 if (is_master && (worker_id == 0)) {
                     *eee->dev_state = UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK;
                 }
+            } else if (mode == EXECUTOR_SINGLE_BLOCK && is_master) {
+                *eee->dev_state = UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK;
             }
             return;
         }
@@ -206,18 +214,23 @@ ucc_status_t ucc_ec_cuda_persistent_kernel_start(
     cudaStream_t stream        = (cudaStream_t)eee->super.ee_context;
     int          q_size        = EC_CUDA_CONFIG->exec_max_tasks;
     int          useCoopLaunch = EC_CUDA_CONFIG->use_cooperative_launch;
-    int          kernelUseCoop = useCoopLaunch;
+    int          mode          = EXECUTOR_SEPARATE_START_ACK;
 
     if (useCoopLaunch) {
-        void *kernelArgs[] = {&eee, &q_size, &kernelUseCoop};
+        void *kernelArgs[] = {&eee, &q_size, &mode};
         dim3  dimBlock(num_threads, 1, 1);
         dim3  dimGrid(num_blocks, 1, 1);
+        mode = EXECUTOR_COOPERATIVE;
         cudaLaunchCooperativeKernel(
             (void *)executor_kernel, dimGrid, dimBlock, kernelArgs, 0, stream);
+    } else if (num_blocks == 1) {
+        /* a single kernel: other streams' copies block behind a queued one */
+        mode = EXECUTOR_SINGLE_BLOCK;
+        executor_kernel<<<1, num_threads, 0, stream>>>(eee, q_size, mode);
     } else {
         executor_start<<<1, 1, 0, stream>>>(eee->dev_state, eee->dev_cidx);
         executor_kernel<<<num_blocks, num_threads, 0, stream>>>(
-            eee, q_size, kernelUseCoop);
+            eee, q_size, mode);
         executor_shutdown_ack<<<1, 1, 0, stream>>>(eee->dev_state);
     }
     CUDA_CHECK(cudaGetLastError());
