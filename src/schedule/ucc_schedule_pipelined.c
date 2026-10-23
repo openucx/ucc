@@ -185,8 +185,10 @@ ucc_status_t ucc_schedule_pipelined_post(ucc_coll_task_t *task)
 {
     ucc_schedule_pipelined_t *schedule_p =
         ucc_derived_of(task, ucc_schedule_pipelined_t);
-    ucc_schedule_t **frags = schedule_p->frags;
+    ucc_schedule_t **frags    = schedule_p->frags;
+    int              complete = 0;
     int              i, j;
+    ucc_status_t     status;
 
     schedule_p->super.super.super.status = UCC_OPERATION_INITIALIZED;
     schedule_p->super.n_completed_tasks  = 0;
@@ -211,7 +213,24 @@ ucc_status_t ucc_schedule_pipelined_post(ucc_coll_task_t *task)
         }
     }
 
-    return ucc_schedule_start(task);
+    /* another thread can complete a frag before all are started: start them
+       under the lock, as the outermost frame of the completed handler */
+    if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
+        ucc_recursive_spin_lock(&schedule_p->lock);
+    }
+    schedule_p->handler_depth++;
+    status = ucc_schedule_start(task);
+    if (--schedule_p->handler_depth == 0 && schedule_p->complete_pending) {
+        schedule_p->complete_pending = 0;
+        complete                     = 1;
+    }
+    if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
+        ucc_recursive_spin_unlock(&schedule_p->lock);
+    }
+    if (complete) {
+        ucc_task_complete(task);
+    }
+    return status;
 }
 
 ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
