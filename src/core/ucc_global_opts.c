@@ -77,6 +77,7 @@ ucc_config_field_t ucc_global_config_table[] = {
 
     {"LOG_FILE", "",
      "If not empty, UCC will print log messages to the specified file instead of stdout.\n"
+     "An existing file is appended to, not truncated.\n"
      "The following substitutions are performed on this string:\n"
      "  %p - Replaced with process ID\n"
      "  %h - Replaced with host name",

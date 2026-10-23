@@ -31,6 +31,8 @@
 #define UCC_CL_DOCA_UROM_ADDR_MAX_LEN  1024
 #define UCC_CL_DOCA_UROM_MAX_TEAMS     16
 
+#define UCC_CL_DOCA_UROM_DEFAULT_PLUGIN_NAME "libucc_doca_urom_plugin"
+
 typedef struct ucc_cl_doca_urom_iface {
     ucc_cl_iface_t super;
 } ucc_cl_doca_urom_iface_t;

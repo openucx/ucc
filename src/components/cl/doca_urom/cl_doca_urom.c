@@ -44,7 +44,7 @@ static ucs_config_field_t ucc_cl_doca_urom_context_config_table[] = {
      ucc_offsetof(ucc_cl_doca_urom_context_config_t, device),
      UCC_CONFIG_TYPE_STRING},
 
-    {"PLUGIN_NAME", "libucc_doca_urom_plugin",
+    {"PLUGIN_NAME", UCC_CL_DOCA_UROM_DEFAULT_PLUGIN_NAME,
      "Name of plugin library",
      ucc_offsetof(ucc_cl_doca_urom_context_config_t, plugin_name),
      UCC_CONFIG_TYPE_STRING},
