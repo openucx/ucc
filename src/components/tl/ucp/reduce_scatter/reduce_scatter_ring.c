@@ -42,7 +42,9 @@ void ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
     size_t              blk_bytes = task->reduce_scatter_ring.max_block_count *
                                    ucc_dt_size(args->dst.info.datatype);
     void               *scratch2  = PTR_OFFSET(scratch, blk_bytes);
-    int                 persistent = UCC_IS_PERSISTENT(*args);
+    /* accumulate in scratch unless in place: src must stay unchanged */
+    int                 use_scratch = UCC_IS_PERSISTENT(*args) ||
+                                      !UCC_IS_INPLACE(*args);
     ucc_memory_type_t   mem_type  = args->dst.info.mem_type;
     ucc_datatype_t      dt        = args->dst.info.datatype;
     size_t              dt_size   = ucc_dt_size(dt);
@@ -66,8 +68,8 @@ void ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
         is_avg = (args->op == UCC_OP_AVG) &&
                  (step == (ucc_rank_t)(tsize - 2));
 
-        recv_buf = persistent ? ((step % 2 == 0) ? scratch : scratch2)
-                              : scratch;
+        recv_buf = use_scratch ? ((step % 2 == 0) ? scratch : scratch2)
+                               : scratch;
 
         for (ring_id = 0; ring_id < nrings; ring_id++) {
             rrank       = ucc_ring_pattern_rank(ring, ring_id);
@@ -85,7 +87,7 @@ void ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
                 } else {
                     reduce_target = PTR_OFFSET(dst, ring_offset * dt_size);
                 }
-            } else if (persistent) {
+            } else if (use_scratch) {
                 reduce_target = PTR_OFFSET(recv_buf, ring_offset * dt_size);
             } else {
                 reduce_target = PTR_OFFSET(
@@ -125,7 +127,7 @@ void ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
 
             data_size  = ring_count * dt_size;
 
-            if (persistent) {
+            if (use_scratch) {
                 send_src      = PTR_OFFSET(recv_buf, ring_offset * dt_size);
                 next_recv_dst = PTR_OFFSET(
                     (step % 2 == 0) ? scratch : scratch2,
@@ -261,8 +263,9 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_ring_init_common(
     dt           = args->dst.info.datatype;
     dt_size      = ucc_dt_size(dt);
     mem_type     = args->dst.info.mem_type;
-    scratch_size = UCC_IS_PERSISTENT(*args) ? 2 * block_count * dt_size
-                                            : block_count * dt_size;
+    scratch_size = (UCC_IS_PERSISTENT(*args) || !UCC_IS_INPLACE(*args))
+                       ? 2 * block_count * dt_size
+                       : block_count * dt_size;
 
     status = ucc_mc_alloc(&scratch_mc_header, scratch_size, mem_type);
     if (ucc_unlikely(UCC_OK != status)) {
