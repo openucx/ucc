@@ -4,6 +4,9 @@
  */
 
 #include <atomic>
+#include <mutex>
+#include <thread>
+#include <vector>
 #include <common/test.h>
 
 extern "C" {
@@ -135,7 +138,47 @@ typedef struct test_pipelined_schedule {
     int                      n_completions;
     ucc_status_t             status;
     int                      lock_held;
+    int                      setup_unlocked;
+    int                      async;
 } test_pipelined_schedule_t;
+
+/* async frag tasks complete on helper threads, joined by the test */
+static std::mutex               test_pipelined_threads_lock;
+static std::vector<std::thread> test_pipelined_threads;
+
+static void test_pipelined_async_complete(ucc_coll_task_t *task)
+{
+    task->status = UCC_OK;
+    ucc_task_complete(task);
+}
+
+static ucc_status_t test_pipelined_async_post(ucc_coll_task_t *task)
+{
+    std::lock_guard<std::mutex> guard(test_pipelined_threads_lock);
+
+    task->status       = UCC_INPROGRESS;
+    task->super.status = UCC_INPROGRESS;
+    test_pipelined_threads.emplace_back(test_pipelined_async_complete, task);
+    return UCC_OK;
+}
+
+static void test_pipelined_join_threads()
+{
+    size_t      i = 0;
+    std::thread th;
+
+    for (;;) {
+        {
+            std::lock_guard<std::mutex> guard(test_pipelined_threads_lock);
+            if (i == test_pipelined_threads.size()) {
+                test_pipelined_threads.clear();
+                return;
+            }
+            th = std::move(test_pipelined_threads[i++]);
+        }
+        th.join();
+    }
+}
 
 static void test_pipelined_completion_cb(void *data, ucc_status_t status)
 {
@@ -163,9 +206,10 @@ static ucc_status_t test_pipelined_frag_finalize(ucc_coll_task_t *task)
 }
 
 static ucc_status_t test_pipelined_frag_init(
-    ucc_base_coll_args_t *coll_args, ucc_schedule_pipelined_t *,
+    ucc_base_coll_args_t *coll_args, ucc_schedule_pipelined_t *sp,
     ucc_base_team_t *team, ucc_schedule_t **frag_p)
 {
+    test_pipelined_schedule_t *t    = (test_pipelined_schedule_t *)sp;
     ucc_schedule_t  *frag = (ucc_schedule_t *)calloc(1, sizeof(*frag));
     ucc_coll_task_t *task = (ucc_coll_task_t *)calloc(1, sizeof(*task));
 
@@ -173,6 +217,9 @@ static ucc_status_t test_pipelined_frag_init(
     ucc_coll_task_construct(task);
     EXPECT_EQ(UCC_OK, ucc_schedule_init(frag, coll_args, team));
     EXPECT_EQ(UCC_OK, ucc_coll_task_init(task, coll_args, team));
+    if (t->async) {
+        task->post = test_pipelined_async_post;
+    }
     EXPECT_EQ(UCC_OK, ucc_schedule_add_task(frag, task));
     EXPECT_EQ(
         UCC_OK,
@@ -188,6 +235,9 @@ static ucc_status_t test_pipelined_frag_setup(
 {
     test_pipelined_schedule_t *t = (test_pipelined_schedule_t *)sp;
 
+    if (t->mt && !ucc_recursive_spin_is_owner(&sp->lock, pthread_self())) {
+        t->setup_unlocked++;
+    }
     return (frag_num == t->fail_frag_num) ? UCC_ERR_NO_RESOURCE : UCC_OK;
 }
 
@@ -206,12 +256,13 @@ class test_schedule_pipelined : public ucc::test {
 
     void init(
         test_pipelined_schedule_t *t, ucc_thread_mode_t tm, int depth,
-        int n_frags_total, int fail_frag_num)
+        int n_frags_total, int fail_frag_num, int async = 0)
     {
         ucc_coll_task_t *task = &t->super.super.super;
 
         *t                    = test_pipelined_schedule_t();
         t->fail_frag_num      = fail_frag_num;
+        t->async              = async;
         t->mt                 = (tm == UCC_THREAD_MULTIPLE);
         core_ctx.thread_mode  = tm;
         ucc_coll_task_construct(task);
@@ -254,6 +305,7 @@ UCC_TEST_F(test_schedule_pipelined, nested_completion)
             EXPECT_EQ(UCC_OK, t.super.super.super.super.status);
             EXPECT_EQ(n_frags_total, t.super.n_frags_started);
             EXPECT_EQ(0, t.lock_held);
+            EXPECT_EQ(0, t.setup_unlocked);
         }
         finalize(&t);
     }
@@ -273,8 +325,45 @@ UCC_TEST_F(test_schedule_pipelined, nested_failure)
         EXPECT_EQ(UCC_ERR_NO_RESOURCE, t.super.super.super.super.status);
         EXPECT_EQ(fail_frag_num, t.super.n_frags_started);
         EXPECT_EQ(0, t.lock_held);
+        EXPECT_EQ(0, t.setup_unlocked);
         finalize(&t);
     }
+}
+
+/* post starts the first frags under the lock */
+UCC_TEST_F(test_schedule_pipelined, post_starts_frags_locked)
+{
+    test_pipelined_schedule_t t;
+
+    init(&t, UCC_THREAD_MULTIPLE, 4, 4, -1);
+    ucc_schedule_pipelined_post(&t.super.super.super);
+    EXPECT_EQ(1, t.n_completions);
+    EXPECT_EQ(UCC_OK, t.status);
+    EXPECT_EQ(4, t.super.n_frags_started);
+    EXPECT_EQ(0, t.lock_held);
+    EXPECT_EQ(0, t.setup_unlocked);
+    finalize(&t);
+}
+
+/* frags complete on other threads while post is still starting them */
+UCC_TEST_F(test_schedule_pipelined, cross_thread_completion)
+{
+    const int                 n_frags_total = 8;
+    test_pipelined_schedule_t t;
+
+    init(&t, UCC_THREAD_MULTIPLE, 4, n_frags_total, -1, 1);
+    for (int i = 1; i <= 200; i++) {
+        ucc_schedule_pipelined_post(&t.super.super.super);
+        test_pipelined_join_threads();
+        ASSERT_EQ(i, t.n_completions);
+        EXPECT_EQ(UCC_OK, t.status);
+        EXPECT_EQ(UCC_OK, t.super.super.super.super.status);
+        EXPECT_EQ(n_frags_total, t.super.n_frags_started);
+        EXPECT_EQ(0, t.super.n_frags_in_pipeline);
+        EXPECT_EQ(0, t.lock_held);
+        EXPECT_EQ(0, t.setup_unlocked);
+    }
+    finalize(&t);
 }
 
 /* ------------------------------------------------------------------ */
