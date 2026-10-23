@@ -14,12 +14,22 @@ typedef struct ucc_service_coll_req {
     ucc_team_t      *team;
     void *           data;
     ucc_subset_t     subset;
+    uint8_t          embedded; /* req storage is caller-owned, never freed */
 } ucc_service_coll_req_t;
 
 ucc_status_t ucc_service_allreduce(ucc_team_t *team, void *sbuf, void *rbuf,
                                    ucc_datatype_t dt, size_t count,
                                    ucc_reduction_op_t op, ucc_subset_t subset,
                                    ucc_service_coll_req_t **req);
+
+/* Service allreduce over ctx->service_team; @subset maps to ctx ranks. Unlike
+   the siblings above, @req is caller-provided (embedded in the team) rather
+   than allocated here. */
+ucc_status_t ucc_service_allreduce_ctx(ucc_team_t *team, void *sbuf,
+                                       void *rbuf, ucc_datatype_t dt,
+                                       size_t count, ucc_reduction_op_t op,
+                                       ucc_subset_t subset,
+                                       ucc_service_coll_req_t *req);
 
 ucc_status_t ucc_service_allgather(ucc_team_t *team, void *sbuf, void *rbuf,
                                    size_t msgsize, ucc_subset_t subset,
