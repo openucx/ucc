@@ -5,6 +5,7 @@
  * See file LICENSE for terms.
  */
 
+#include <cctype>
 #include <getopt.h>
 #include <sstream>
 #include <algorithm>
@@ -598,10 +599,16 @@ void ProcessArgs(int argc, char** argv)
     }
 }
 
+/* The report table has one row per collective type; the team-cache suite is not
+   a collective type, so it gets the trailing row. */
+#define UCC_TEST_TEAM_CACHE_ROW (ucc_ilog2(UCC_COLL_TYPE_LAST) + 1)
+
 int main(int argc, char *argv[])
 {
     int failed = 0;
-    int total_done_skipped_failed[ucc_ilog2(UCC_COLL_TYPE_LAST) + 1][4];
+    int total_done_skipped_failed[UCC_TEST_TEAM_CACHE_ROW + 1][4];
+    ucc_test_suite_result_t tc_result = {0, 0, 0};
+    ucc_context_h cache_ctx = NULL;
     std::chrono::steady_clock::time_point begin;
     int size, required, provided, completed, rank;
     UccTestMpi *test;
@@ -712,6 +719,28 @@ int main(int argc, char *argv[])
     }
     std::cout << std::flush;
 
+    /* Team-cache correctness suite. Requested with
+       UCC_TEAM_CACHE_CORRECTNESS_TESTS=y (and UCC_TEAM_CACHE_ENABLE=y); its
+       results are tallied below so that a failure fails the job and a wholly
+       skipped run is reported as skipped rather than as a pass.
+
+       The harness teams are destroyed first. They are live, cacheable and of
+       world membership, which would otherwise divert the suite's creates onto
+       the derived-from-live path and occupy the cache entries that the eviction
+       tests reason about. */
+    if (!test->teams.empty()) {
+        const char *cache_tests_env =
+            getenv("UCC_TEAM_CACHE_CORRECTNESS_TESTS");
+
+        if (cache_tests_env &&
+            (tolower((unsigned char)cache_tests_env[0]) == 'y' ||
+             cache_tests_env[0] == '1')) {
+            cache_ctx = test->teams[0].ctx;
+            test->destroy_teams();
+            tc_result = run_team_cache_tests(cache_ctx, rank, size);
+        }
+    }
+
     for (auto s : test->results) {
         int coll_num = ucc_ilog2(std::get<0>(s));
         switch(std::get<1>(s)) {
@@ -727,6 +756,11 @@ int main(int argc, char *argv[])
         }
         total_done_skipped_failed[coll_num][0]++;
     }
+    total_done_skipped_failed[UCC_TEST_TEAM_CACHE_ROW][0] =
+        tc_result.passed + tc_result.failed + tc_result.skipped;
+    total_done_skipped_failed[UCC_TEST_TEAM_CACHE_ROW][1] = tc_result.passed;
+    total_done_skipped_failed[UCC_TEST_TEAM_CACHE_ROW][2] = tc_result.skipped;
+    total_done_skipped_failed[UCC_TEST_TEAM_CACHE_ROW][3] = tc_result.failed;
     MPI_Iallreduce(MPI_IN_PLACE, total_done_skipped_failed,
                    sizeof(total_done_skipped_failed)/sizeof(int),
                    MPI_INT, MPI_MAX, MPI_COMM_WORLD, &req);
@@ -770,6 +804,21 @@ int main(int argc, char *argv[])
                 std::setw(10) << std::right << total_done_skipped_failed[coll_num][2] <<
                 std::endl;
 
+        }
+        if (total_done_skipped_failed[UCC_TEST_TEAM_CACHE_ROW][0] != 0) {
+            int *row = total_done_skipped_failed[UCC_TEST_TEAM_CACHE_ROW];
+
+            num_all     += row[0];
+            num_done    += row[1];
+            num_skipped += row[2];
+            num_failed  += row[3];
+            std::cout <<
+                std::setw(22) << std::left << "team_cache" <<
+                std::setw(10) << std::right << row[0] <<
+                std::setw(10) << std::right << row[1] <<
+                std::setw(10) << std::right << row[3] <<
+                std::setw(10) << std::right << row[2] <<
+                std::endl;
         }
         std::cout <<
             " \n===== UCC MPI TEST SUMMARY =====\n" <<
