@@ -41,18 +41,25 @@ void ucc_internal_oob_finalize(ucc_team_oob_coll_t *oob);
 ucc_status_t ucc_collective_finalize_internal(ucc_coll_task_t *task);
 
 /**
- * Create datatype validation schedule for rooted collectives
+ * Create a non-blocking datatype-consistency wrapper for rooted collectives.
  *
- * This function checks if datatype validation is needed and creates a schedule
- * with validation logic if required. If validation is not needed, returns the
- * original task unchanged.
+ * Must be called for every gather/scatter collective on every rank when
+ * check_asymmetric_dt is enabled, regardless of whether local ucc_coll_init
+ * succeeded.  Ranks that failed init contribute a sentinel value to the
+ * service allreduce so that all ranks obtain a uniform result at post/progress
+ * time rather than hanging.
  *
- * @param team The UCC team
- * @param task The actual collective task (already created by TL/CL)
- * @param status_out If non-NULL, set to the error status when returning NULL
- * @return Schedule with validation (as ucc_coll_task_t*), or original task, or NULL on error
+ * @param team         Core UCC team.
+ * @param coll_args    Original user collective arguments (always valid).
+ * @param local_status Result of the local ucc_coll_init call.
+ * @param task         Task returned by ucc_coll_init, or NULL if it failed.
+ * @param status_out   Set to the error when NULL is returned.
+ * @return Wrapper schedule task, or NULL on internal error.
  */
-ucc_coll_task_t* ucc_service_dt_check(ucc_team_t *team, ucc_coll_task_t *task,
-                                      ucc_status_t *status_out);
+ucc_coll_task_t* ucc_service_dt_check(ucc_team_t            *team,
+                                      const ucc_coll_args_t *coll_args,
+                                      ucc_status_t           local_status,
+                                      ucc_coll_task_t       *task,
+                                      ucc_status_t          *status_out);
 
 #endif
