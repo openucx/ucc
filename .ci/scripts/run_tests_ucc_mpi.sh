@@ -202,6 +202,34 @@ for MT in "" "-T"; do
     echo "INFO: UCC MPI unit tests (CL/HIER+2step bcast) ... DONE"
 done
 
+# Team-cache correctness tests: exercise dormant reuse and eviction under
+# pressure. UCC_TEAM_CACHE_MAX_SIZE=2 keeps the cache tiny so the overlapping
+# subcommunicator test forces divergent per-rank eviction, the case the
+# cross-rank agreement must reconcile.
+echo "INFO: UCC team-cache correctness tests (world,half,odd_even) ..."
+# shellcheck disable=SC2046,SC2086  # MPI argument fragments intentionally word-split.
+cache_args=" -x UCC_TEAM_CACHE_ENABLE=y -x UCC_TEAM_CACHE_MAX_SIZE=2 -x UCC_TEAM_CACHE_CORRECTNESS_TESTS=y "
+mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $cache_args $EXE -c barrier -t world,half,odd_even
+echo "INFO: UCC team-cache correctness tests (world,half,odd_even) ... DONE"
+
+# Second pass with UCC_TEAM_CACHE_RESEAT=y. The knob is off by default, so
+# without this leg the reseat path (derived_reuse[drift] and the update_id
+# fanout it drives) skips itself and ships untested.
+echo "INFO: UCC team-cache correctness tests (RESEAT) ..."
+# shellcheck disable=SC2046,SC2086  # MPI argument fragments intentionally word-split.
+reseat_args="${cache_args} -x UCC_TEAM_CACHE_RESEAT=y "
+mpirun $(mpi_params $PPN) $ucx_tls_no_cuda_ipc $reseat_args $EXE -c barrier -t world,half,odd_even
+echo "INFO: UCC team-cache correctness tests (RESEAT) ... DONE"
+
+# Team-cache enabled-vs-disabled equivalence pass. The script runs ucc_test_mpi
+# with cache on, then off, using its built-in per-collective correctness checks
+# as the equivalence oracle.
+echo "INFO: UCC team-cache enabled-vs-disabled equivalence test (8 ranks) ..."
+# shellcheck disable=SC2086
+MPIRUN="$(command -v mpirun)" EXE="${EXE%% *}" \
+    bash "${SCRIPT_DIR}/../../test/mpi/run_cache_equivalence.sh" 8
+echo "INFO: UCC team-cache enabled-vs-disabled equivalence test (8 ranks) ... DONE"
+
 end=`date +%s`
 
 echo Tests took $((end - start)) seconds
