@@ -2,6 +2,10 @@
 # Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
+allgather =                          \
+	allgather/allgather.h            \
+	allgather/allgather.c
+
 allgatherv =                         \
 	allgatherv/unpack.h              \
 	allgatherv/unpack.c              \
@@ -44,6 +48,7 @@ sources =                            \
 	cl_hier_team.c                   \
 	cl_hier_coll.c                   \
 	cl_hier_coll.h                   \
+	$(allgather)                     \
 	$(allgatherv)                    \
 	$(allreduce)                     \
 	$(alltoallv)                     \

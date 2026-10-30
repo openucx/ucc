@@ -15,9 +15,10 @@
 #include "barrier/barrier.h"
 #include "bcast/bcast.h"
 #include "reduce/reduce.h"
+#include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
 
-#define UCC_CL_HIER_N_DEFAULT_ALG_SELECT_STR 4
+#define UCC_CL_HIER_N_DEFAULT_ALG_SELECT_STR 5
 
 extern const char
     *ucc_cl_hier_default_alg_select_str[UCC_CL_HIER_N_DEFAULT_ALG_SELECT_STR];
