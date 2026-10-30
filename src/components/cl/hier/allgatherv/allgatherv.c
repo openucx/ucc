@@ -209,14 +209,16 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
         total_count = ucc_coll_args_get_total_count(&args.args,
                             args.args.dst.info_v.counts, team_size);
     }
+    /* Keep the 64-bit count/displacement arrays ahead of the data buffer,
+       whose size is not a multiple of 8, so they stay aligned */
     scratch_size       = node_counts_size + node_disps_size
-                         + leader_counts_size + leader_disps_size;
+                         + leader_counts_size + leader_disps_size
+                         + ag_counts_disps_size;
     /* If the dst buf isn't contig, allocate and work on a contig scratch buffer */
     scratch_size      += (is_contig ? 0 : (total_count * dt_size));
 
     UCC_CHECK_GOTO(
-        ucc_mc_alloc(&cl_schedule->scratch, scratch_size + ag_counts_disps_size,
-                     UCC_MEMORY_TYPE_HOST),
+        ucc_mc_alloc(&cl_schedule->scratch, scratch_size, UCC_MEMORY_TYPE_HOST),
         free_sched, status);
     memset(cl_schedule->scratch->addr, 0, scratch_size);
 
@@ -224,9 +226,10 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     node_disps         = PTR_OFFSET(node_counts, node_counts_size);
     leader_counts      = PTR_OFFSET(node_disps, node_disps_size);
     leader_disps       = PTR_OFFSET(leader_counts, leader_counts_size);
-    scratch_tail       = PTR_OFFSET(leader_disps, leader_disps_size);
+    scratch_tail       = PTR_OFFSET(leader_disps, leader_disps_size +
+                                    ag_counts_disps_size);
     if (is_allgather) {
-        ag_counts_disps = PTR_OFFSET(cl_schedule->scratch->addr, scratch_size);
+        ag_counts_disps = PTR_OFFSET(leader_disps, leader_disps_size);
         for (i = 0; i < team_size; i++) {
             ag_counts_disps[i] =
                 ucc_buffer_block_count(total_count, team_size, i);
