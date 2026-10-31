@@ -399,6 +399,27 @@ failed:
     return status;
 }
 
+/* post the MIN-allreduce of this rank's @ready, which tells every rank
+ * whether all the ranks are able to use mcast on this team */
+static ucc_status_t ucc_tl_mlx5_mcast_transport_ready_post(ucc_tl_mlx5_team_t *tl_team,
+                                                           int ready)
+{
+    ucc_tl_mlx5_mcast_coll_comm_t *comm = tl_team->mcast->mcast_comm;
+    ucc_status_t                   status;
+
+    comm->mcast_transport_ready = ready;
+    status = comm->service_coll.allreduce_post(comm->p2p_ctx,
+                                               &comm->mcast_transport_ready,
+                                               &comm->transport_ready_global,
+                                               1, UCC_DT_INT32, UCC_OP_MIN,
+                                               &comm->transport_ready_req);
+    if (status != UCC_OK) {
+        return status;
+    }
+    tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_RELIAB_SYNC;
+    return UCC_INPROGRESS;
+}
+
 ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
 {
     ucc_tl_mlx5_team_t            *tl_team  = ucc_derived_of(team, ucc_tl_mlx5_team_t);
@@ -465,10 +486,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     if (status) {
                         tl_error(comm->lib, "couldn't leave mcast group");
                     }
-                    if (comm->group_setup_info) {
-                        ucc_free(comm->group_setup_info);
-                        comm->group_setup_info = NULL;
-                    }
+                    /* @data is the bcast payload: it is freed once the bcast
+                     * completes, after rank 0 checks its status */
                     data->status = UCC_ERR_NO_RESOURCE;
                 }
 
@@ -512,33 +531,15 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     comm->group_setup_info = NULL;
                 }
 
-                /* Try to setup per-rank multicast communication resources. If this
-                 * fails on any rank we still need to participate in the global
-                 * readiness allreduce so that OTHER ranks learn about the
-                 * failure and gracefully fall back. Therefore, don’t return
-                 * immediately on error – instead record the failure by keeping
-                 * mcast_transport_ready at 0 and continue. On success the helper
-                 * already sets mcast_transport_ready to 1. */
+                /* report a failure in the allreduce so every rank falls back */
                 status = ucc_tl_mlx5_mcast_coll_setup_comm_resources(comm);
                 if (UCC_OK != status) {
                     tl_debug(comm->lib,
                              "mcast_coll_setup_comm_resources failed on rank %d, will fallback",
                              comm->rank);
-                    /* Ensure we report failure in the upcoming MIN-allreduce. */
-                    comm->mcast_transport_ready = 0;
                 }
 
-                /* post readiness allreduce */
-                status = comm->service_coll.allreduce_post(comm->p2p_ctx,
-                                                           &comm->mcast_transport_ready,
-                                                           &comm->transport_ready_global,
-                                                           1, UCC_DT_INT32, UCC_OP_MIN,
-                                                           &comm->transport_ready_req);
-                if (status != UCC_OK) {
-                    return status;
-                }
-                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_RELIAB_SYNC;
-                return UCC_INPROGRESS;
+                return ucc_tl_mlx5_mcast_transport_ready_post(tl_team, status == UCC_OK);
             }
 
             case TL_MLX5_TEAM_STATE_MCAST_RELIAB_SYNC:
@@ -664,7 +665,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                                  status);
                         ucc_free(data);
                         comm->group_setup_info = NULL;
-                        return status;
+                        tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_FAILED;
+                        return UCC_INPROGRESS;
                     }
                     comm->mcast.groups[i].mcast_addr = net_addr;
                 }
@@ -685,11 +687,9 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
 
             case TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_FAILED:
             {
-                status = ucc_tl_mlx5_leave_mcast_groups(comm->ctx, comm);
-                if (status) {
-                    tl_error(comm->lib, "couldn't leave mcast group");
-                }
-                return UCC_ERR_NO_RESOURCE;
+                /* rank 0 and the other ranks may have joined and wait in the
+                 * readiness allreduce: join it with a failure */
+                return ucc_tl_mlx5_mcast_transport_ready_post(tl_team, 0);
             }
 
             case TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_READY:
@@ -699,19 +699,9 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     tl_debug(comm->lib,
                              "mcast_coll_setup_comm_resources failed on rank %d, will fallback",
                              comm->rank);
-                    comm->mcast_transport_ready = 0;
                 }
 
-                status = comm->service_coll.allreduce_post(comm->p2p_ctx,
-                                                           &comm->mcast_transport_ready,
-                                                           &comm->transport_ready_global,
-                                                           1, UCC_DT_INT32, UCC_OP_MIN,
-                                                           &comm->transport_ready_req);
-                if (status != UCC_OK) {
-                    return status;
-                }
-                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_RELIAB_SYNC;
-                return UCC_INPROGRESS;
+                return ucc_tl_mlx5_mcast_transport_ready_post(tl_team, status == UCC_OK);
             }
 
             case TL_MLX5_TEAM_STATE_MCAST_RELIAB_SYNC:
