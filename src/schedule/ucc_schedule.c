@@ -220,6 +220,14 @@ ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                 if (ucc_unlikely(status != UCC_OK)) {
                     return status;
                 }
+                if (event == UCC_EVENT_COMPLETED_SCHEDULE) {
+                    /* the only listener is the schedule of parent_task. It can
+                       complete and be finalized by the user from the completion
+                       callback, which returns parent_task to the mpool. Another
+                       thread can then reuse it with new listeners: don't touch
+                       its em list anymore */
+                    return UCC_OK;
+                }
             }
         }
     }
