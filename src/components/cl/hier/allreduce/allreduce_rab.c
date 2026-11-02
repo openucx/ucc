@@ -63,9 +63,10 @@ ucc_cl_hier_allreduce_rab_frag_setup(ucc_schedule_pipelined_t *schedule_p,
         task->bargs.args.dst.info.count  = frag_count;
         task->bargs.args.dst.info.buffer =
             PTR_OFFSET(args->dst.info.buffer, frag_offset * dt_size);
+        /* args->root is undefined for allreduce, use root of the node reduce */
         if ((task->bargs.args.coll_type == UCC_COLL_TYPE_BCAST) ||
             (task->bargs.args.coll_type == UCC_COLL_TYPE_REDUCE && inplace &&
-             (SBGP_RANK(cl_team, NODE) != args->root))) {
+             (SBGP_RANK(cl_team, NODE) != task->bargs.args.root))) {
             task->bargs.args.src.info.buffer =
                 PTR_OFFSET(args->dst.info.buffer, frag_offset * dt_size);
         } else {
