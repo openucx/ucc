@@ -22,8 +22,17 @@
 static inline ucc_rank_t
 ucc_tl_ucp_alltoall_pairwise_auto_num_posts(ucc_rank_t tsize,
                                              size_t total_size,
-                                             size_t peer_size)
+                                             size_t peer_size,
+                                             ucc_memory_type_t src_mem_type,
+                                             ucc_memory_type_t dst_mem_type)
 {
+    /* Preserve legacy CPU posting until host-specific tuning is validated. */
+    if (src_mem_type == UCC_MEMORY_TYPE_HOST &&
+        dst_mem_type == UCC_MEMORY_TYPE_HOST) {
+        return total_size > UCC_TL_UCP_ALLTOALL_TOTAL_SMALL && tsize > 32
+                   ? 1 : tsize;
+    }
+
     if (total_size <= UCC_TL_UCP_ALLTOALL_TOTAL_SMALL || tsize <= 8) {
         return tsize;
     }
