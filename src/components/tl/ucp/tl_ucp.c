@@ -28,7 +28,15 @@ const char *ucc_tl_ucp_alltoall_onesided_names[] = {
     [UCC_TL_UCP_ALLTOALL_ONESIDED_PUT]   = "put",
     [UCC_TL_UCP_ALLTOALL_ONESIDED_GET]   = "get",
     [UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO]  = "auto",
+    [UCC_TL_UCP_ALLTOALL_ONESIDED_MIXED] = "mixed",
     [UCC_TL_UCP_ALLTOALL_ONESIDED_LAST]  = NULL
+};
+
+const char *ucc_tl_ucp_alltoall_onesided_order_names[] = {
+    [UCC_TL_UCP_ALLTOALL_ONESIDED_ORDER_SEQ]    = "seq",
+    [UCC_TL_UCP_ALLTOALL_ONESIDED_ORDER_STRIDE] = "stride",
+    [UCC_TL_UCP_ALLTOALL_ONESIDED_ORDER_FULL]   = "full",
+    [UCC_TL_UCP_ALLTOALL_ONESIDED_ORDER_LAST]   = NULL
 };
 
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib,
@@ -110,7 +118,27 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
     {"ALLTOALL_ONESIDED_ALG", "auto",
      "Algorithm to be used with onesided Alltoall",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_alg),
-     UCC_CONFIG_TYPE_ENUM(ucc_tl_ucp_alltoall_onesided_names)},
+    UCC_CONFIG_TYPE_ENUM(ucc_tl_ucp_alltoall_onesided_names)},
+
+    {"ALLTOALL_ONESIDED_ORDER", "seq",
+     "Peer issue order for onesided Alltoall: seq, stride, or full",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_order),
+     UCC_CONFIG_TYPE_ENUM(ucc_tl_ucp_alltoall_onesided_order_names)},
+
+    {"ALLTOALL_ONESIDED_NFRAGS", "0",
+     "Per-peer message fragment count for onesided Alltoall. 0 selects the "
+     "count automatically (see ALLTOALL_ONESIDED_FRAG_SIZE); 1 disables "
+     "fragmentation; a value >1 forces that many fragments (bounded by the "
+     "same safety limits as the automatic path)",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_nfrags),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALL_ONESIDED_FRAG_SIZE", "0",
+     "Fixed fragment size (bytes) for onesided Alltoall fragmentation. "
+     "When > 0, nfrags = ceil(per_peer_bytes / FRAG_SIZE). 0 falls back to "
+     "the token-budget heuristic",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_frag_size),
+     UCC_CONFIG_TYPE_MEMUNITS},
 
     {"KN_RADIX", "0",
      "Radix of all algorithms based on knomial pattern. When set to a "
@@ -130,7 +158,6 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
     {"FANOUT_KN_RADIX", "4", "Radix of the knomial tree fanout algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, fanout_kn_radix),
      UCC_CONFIG_TYPE_UINT},
-
     {"ALLREDUCE_KN_RADIX", "auto",
      "Radix of the recursive-knomial allreduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_kn_radix),

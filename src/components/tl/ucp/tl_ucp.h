@@ -47,9 +47,17 @@ typedef enum ucc_tl_ucp_alltoall_onesided_alg_type {
     UCC_TL_UCP_ALLTOALL_ONESIDED_PUT,
     UCC_TL_UCP_ALLTOALL_ONESIDED_GET,
     UCC_TL_UCP_ALLTOALL_ONESIDED_AUTO,
+    UCC_TL_UCP_ALLTOALL_ONESIDED_MIXED,
     UCC_TL_UCP_ALLTOALL_ONESIDED_LAST
 } ucc_tl_ucp_alltoall_onesided_alg_t;
 
+
+typedef enum ucc_tl_ucp_alltoall_onesided_order_type {
+    UCC_TL_UCP_ALLTOALL_ONESIDED_ORDER_SEQ,
+    UCC_TL_UCP_ALLTOALL_ONESIDED_ORDER_STRIDE,
+    UCC_TL_UCP_ALLTOALL_ONESIDED_ORDER_FULL,
+    UCC_TL_UCP_ALLTOALL_ONESIDED_ORDER_LAST
+} ucc_tl_ucp_alltoall_onesided_order_t;
 typedef struct ucc_tl_ucp_lib_config {
     ucc_tl_lib_config_t                super;
     uint32_t                           kn_radix;
@@ -89,7 +97,10 @@ typedef struct ucc_tl_ucp_lib_config {
     ucc_ternary_auto_value_t           use_topo;
     int                                use_reordering;
     uint32_t                           alltoall_onesided_percent_bw;
-    ucc_tl_ucp_alltoall_onesided_alg_t alltoall_onesided_alg;
+    ucc_tl_ucp_alltoall_onesided_alg_t   alltoall_onesided_alg;
+    ucc_tl_ucp_alltoall_onesided_order_t alltoall_onesided_order;
+    uint32_t                             alltoall_onesided_nfrags;
+    size_t                               alltoall_onesided_frag_size;
 } ucc_tl_ucp_lib_config_t;
 
 typedef enum ucc_tl_ucp_local_copy_type {
