@@ -6,6 +6,9 @@
 #include "test_mem_map.h"
 #include <cstring>
 #include <random>
+extern "C" {
+#include "core/ucc_context.h"
+}
 
 test_mem_map::test_mem_map() : ctx_h(nullptr), ctx_config(nullptr)
 {
@@ -394,5 +397,136 @@ UCC_TEST_F(test_mem_map_export, stress_test)
         EXPECT_NE(nullptr, memh);
 
         EXPECT_EQ(UCC_OK, ucc_mem_unmap(&memh));
+    }
+}
+
+/* Test that unmap-export before unmap-import is safe (reverse lifecycle order).
+ * basic_import only exercises unmap-import first; this covers the other path
+ * through ucc_tl_nccl_team_deregister_memhs and ucc_tl_nccl_mem_unmap. */
+UCC_TEST_F(test_mem_map_import, unmap_export_before_import)
+{
+    ucc_mem_map_t        seg      = {test_buffer, buffer_size};
+    ucc_mem_map_params_t params   = {&seg, 1};
+    ucc_mem_map_mem_h    exp      = nullptr;
+    ucc_mem_map_mem_h    imp      = nullptr;
+    size_t               exp_size = 0;
+    size_t               imp_size = 0;
+
+    if (ucc_mem_map(ctx_h, UCC_MEM_MAP_MODE_EXPORT, &params,
+                    &exp_size, &exp) != UCC_OK) {
+        GTEST_SKIP() << "export not supported";
+    }
+    imp = malloc(exp_size);
+    ASSERT_NE(nullptr, imp);
+    memcpy(imp, exp, exp_size);
+
+    ucc_status_t st = ucc_mem_map(ctx_h, UCC_MEM_MAP_MODE_IMPORT,
+                                  &params, &imp_size, &imp);
+    if (st != UCC_OK) {
+        free(imp);
+        ucc_mem_unmap(&exp);
+        GTEST_SKIP() << "import not supported";
+    }
+
+    /* Destroy export first, then the import handle. */
+    EXPECT_EQ(UCC_OK, ucc_mem_unmap(&exp));
+    EXPECT_EQ(UCC_OK, ucc_mem_unmap(&imp));
+}
+
+/* Test that import does not overwrite memh->address/len with the local VA.
+ * basic_import passes the same params to both export and import so it cannot
+ * distinguish a bug where the remote address is silently replaced.  This test
+ * uses a separate local buffer so the two addresses are distinct. */
+UCC_TEST_F(test_mem_map_import, import_preserves_remote_address)
+{
+    ucc_mem_map_t        seg      = {test_buffer, buffer_size};
+    ucc_mem_map_params_t params   = {&seg, 1};
+    ucc_mem_map_mem_h    exp      = nullptr;
+    ucc_mem_map_mem_h    imp      = nullptr;
+    size_t               exp_size = 0;
+    size_t               imp_size = 0;
+    void                *local_buf;
+
+    if (ucc_mem_map(ctx_h, UCC_MEM_MAP_MODE_EXPORT, &params,
+                    &exp_size, &exp) != UCC_OK) {
+        GTEST_SKIP() << "export not supported";
+    }
+    imp = malloc(exp_size);
+    ASSERT_NE(nullptr, imp);
+    memcpy(imp, exp, exp_size);
+
+    /* Use a distinct local buffer so remote VA != local VA. */
+    local_buf = malloc(buffer_size);
+    ASSERT_NE(nullptr, local_buf);
+    ucc_mem_map_t        local_seg    = {local_buf, buffer_size};
+    ucc_mem_map_params_t local_params = {&local_seg, 1};
+
+    ucc_status_t st = ucc_mem_map(ctx_h, UCC_MEM_MAP_MODE_IMPORT,
+                                  &local_params, &imp_size, &imp);
+    if (st == UCC_OK) {
+        ucc_mem_map_memh_t *ih = (ucc_mem_map_memh_t *)imp;
+
+        /* address/len must still carry the remote (export) values. */
+        EXPECT_EQ(test_buffer, ih->address)
+            << "import must not overwrite memh->address with local VA";
+        EXPECT_EQ(buffer_size, ih->len)
+            << "import must not overwrite memh->len";
+
+        /* Local values are in the dedicated import fields. */
+        EXPECT_EQ(local_buf,   ih->local_address);
+        EXPECT_EQ(buffer_size, ih->local_len);
+
+        EXPECT_EQ(UCC_OK, ucc_mem_unmap(&imp));
+    } else {
+        free(imp);
+    }
+    free(local_buf);
+    EXPECT_EQ(UCC_OK, ucc_mem_unmap(&exp));
+}
+
+/* Test repeated export+import+unmap cycles to catch cumulative leaks or
+ * corruption in the bookkeeping arrays.  Alternates unmap order each cycle. */
+UCC_TEST_F(test_mem_map_import, repeated_export_import_cycles)
+{
+    const int            num_cycles = 20;
+    ucc_mem_map_t        seg        = {test_buffer, buffer_size};
+    ucc_mem_map_params_t params     = {&seg, 1};
+    bool                 skipped    = false;
+
+    for (int c = 0; c < num_cycles; c++) {
+        ucc_mem_map_mem_h exp      = nullptr;
+        ucc_mem_map_mem_h imp      = nullptr;
+        size_t            exp_size = 0;
+        size_t            imp_size = 0;
+
+        if (ucc_mem_map(ctx_h, UCC_MEM_MAP_MODE_EXPORT, &params,
+                        &exp_size, &exp) != UCC_OK) {
+            skipped = true;
+            break;
+        }
+        imp = malloc(exp_size);
+        ASSERT_NE(nullptr, imp);
+        memcpy(imp, exp, exp_size);
+
+        ucc_status_t st = ucc_mem_map(ctx_h, UCC_MEM_MAP_MODE_IMPORT,
+                                      &params, &imp_size, &imp);
+        if (st != UCC_OK) {
+            free(imp);
+            ucc_mem_unmap(&exp);
+            skipped = true;
+            break;
+        }
+
+        if (c % 2 == 0) {
+            EXPECT_EQ(UCC_OK, ucc_mem_unmap(&imp));
+            EXPECT_EQ(UCC_OK, ucc_mem_unmap(&exp));
+        } else {
+            EXPECT_EQ(UCC_OK, ucc_mem_unmap(&exp));
+            EXPECT_EQ(UCC_OK, ucc_mem_unmap(&imp));
+        }
+    }
+
+    if (skipped) {
+        GTEST_SKIP() << "export/import not supported";
     }
 }
