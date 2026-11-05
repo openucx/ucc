@@ -468,7 +468,8 @@ static inline int resolve_segment(const void *va, size_t *key_sizes,
 static inline ucc_status_t
 ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
                              ucc_rank_t peer, uint64_t *rva, ucp_rkey_h *rkey,
-                             int *segment, ucc_mem_map_mem_h *dst_memh)
+                             int *segment, ucc_mem_map_mem_h *dst_memh,
+                             int prefer_context)
 {
     ucc_tl_ucp_context_t *ctx            = UCC_TL_UCP_TEAM_CTX(team);
     ucc_rank_t            grank          = UCC_TL_TEAM_RANK(team);
@@ -503,9 +504,10 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     rvas        = (uint64_t *)base_offset;
     key_sizes   = PTR_OFFSET(base_offset, (section_offset * 2));
     keys        = PTR_OFFSET(base_offset, (section_offset * 3));
-    /* per-task handles (dynamic or user global memh) are authoritative;
-       only fall back to context segments when none were supplied */
-    *segment    = dst_memh ? -1
+    /* Data transfers use supplied handles first. Synchronization atomics
+       prefer context segments because their work buffer may be separate
+       from the destination buffer covered by those handles. */
+    *segment    = (dst_memh && !prefer_context) ? -1
                            : resolve_segment(va, key_sizes, &key_offset,
                                              ctx->n_rinfo_segs, ctx->remote_info);
     if (*segment >= 0) {
@@ -618,7 +620,7 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
     }
 
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
-                                          &rva, &rkey, &segment, dest_memh);
+                                          &rva, &rkey, &segment, dest_memh, 0);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
@@ -678,7 +680,7 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
     }
 
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
-                                          &rva, &rkey, &segment, dest_memh);
+                                          &rva, &rkey, &segment, dest_memh, 0);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
@@ -728,7 +730,7 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
     }
 
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
-                                          &rva, &rkey, &segment, dest_memh);
+                                          &rva, &rkey, &segment, dest_memh, 1);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
