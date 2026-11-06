@@ -311,6 +311,49 @@ void ucc_topo_cleanup(ucc_topo_t *topo)
     }
 }
 
+#define UCC_TOPO_PREP_FATAL(_status) ((_status) == UCC_ERR_NO_MEMORY)
+
+ucc_status_t ucc_topo_prepare_shared(ucc_topo_t *topo)
+{
+    ucc_sbgp_t  *sbgps;
+    ucc_rank_t  *node_leaders;
+    ucc_status_t status;
+    int          n_sbgps, i;
+
+    if (!topo) {
+        return UCC_OK;
+    }
+
+    /* Each sbgp records a terminal status, so a failure is never retried */
+    for (i = 0; i < UCC_SBGP_LAST; i++) {
+        (void)ucc_topo_get_sbgp(topo, (ucc_sbgp_type_t)i);
+    }
+
+    /* The all_* arrays stay NULL and retryable on failure, so report it */
+    status = ucc_topo_get_all_sockets(topo, &sbgps, &n_sbgps);
+    if (UCC_TOPO_PREP_FATAL(status)) {
+        return status;
+    }
+    status = ucc_topo_get_all_numas(topo, &sbgps, &n_sbgps);
+    if (UCC_TOPO_PREP_FATAL(status)) {
+        return status;
+    }
+    status = ucc_topo_get_all_nodes(topo, &sbgps, &n_sbgps);
+    if (UCC_TOPO_PREP_FATAL(status)) {
+        return status;
+    }
+
+    /* The node leaders map is only defined for multi-node teams */
+    if (topo->topo->nnodes > 1) {
+        status = ucc_topo_get_node_leaders(topo, &node_leaders);
+        if (UCC_TOPO_PREP_FATAL(status)) {
+            return status;
+        }
+    }
+
+    return UCC_OK;
+}
+
 ucc_sbgp_t *ucc_topo_get_sbgp(ucc_topo_t *topo, ucc_sbgp_type_t type)
 {
     if (topo->sbgps[type].status == UCC_SBGP_NOT_INIT) {

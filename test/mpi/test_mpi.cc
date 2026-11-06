@@ -14,8 +14,8 @@ END_C_DECLS
 #include <random>
 #include <pthread.h>
 
-static ucc_status_t oob_allgather(void *sbuf, void *rbuf, size_t msglen,
-                                  void *coll_info, void **req)
+ucc_status_t oob_allgather(void *sbuf, void *rbuf, size_t msglen,
+                           void *coll_info, void **req)
 {
     MPI_Comm    comm = (MPI_Comm)(uintptr_t)coll_info;
     MPI_Request request;
@@ -25,7 +25,7 @@ static ucc_status_t oob_allgather(void *sbuf, void *rbuf, size_t msglen,
     return UCC_OK;
 }
 
-static ucc_status_t oob_allgather_test(void *req)
+ucc_status_t oob_allgather_test(void *req)
 {
     MPI_Request request = (MPI_Request)(uintptr_t)req;
     int         completed;
@@ -33,7 +33,7 @@ static ucc_status_t oob_allgather_test(void *req)
     return completed ? UCC_OK : UCC_INPROGRESS;
 }
 
-static ucc_status_t oob_allgather_free(void *req)
+ucc_status_t oob_allgather_free(void *req)
 {
     return UCC_OK;
 }
@@ -161,14 +161,23 @@ void UccTestMpi::create_teams(std::vector<ucc_test_mpi_team_t> &test_teams,
     }
 }
 
-UccTestMpi::~UccTestMpi()
+/* Destroy every harness team; safe to call more than once. The team-cache
+   suite runs on a context that must not hold unrelated live teams. */
+void UccTestMpi::destroy_teams()
 {
     for (auto &t : teams) {
         destroy_team(t);
     }
+    teams.clear();
     for (auto &t : onesided_teams) {
         destroy_team(t);
     }
+    onesided_teams.clear();
+}
+
+UccTestMpi::~UccTestMpi()
+{
+    destroy_teams();
     if (onesided_buffers[0]) {
         for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
             ucc_free(onesided_buffers[i]);
@@ -180,18 +189,21 @@ UccTestMpi::~UccTestMpi()
     UCC_CHECK(ucc_finalize(lib));
 }
 
-ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm, bool is_onesided)
+ucc_team_h ucc_test_create_team(ucc_context_h ctx, MPI_Comm comm,
+                                const ucc_ep_map_t *ep_map, uint64_t ext_id,
+                                bool work_buffer)
 {
-    ucc_context_h     team_ctx = ctx;
-    int               rank, size;
+    int               rank, size, tmp, completed;
     ucc_team_h        team;
     ucc_team_params_t team_params;
     ucc_status_t      status;
+    MPI_Request       req;
+
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    /* Create UCC TEAM for comm world */
-    team_params.mask               = UCC_TEAM_PARAM_FIELD_EP       |
+    memset(&team_params, 0, sizeof(team_params));
+    team_params.mask          = UCC_TEAM_PARAM_FIELD_EP       |
         UCC_TEAM_PARAM_FIELD_EP_RANGE |
         UCC_TEAM_PARAM_FIELD_OOB;
     team_params.oob.allgather = oob_allgather;
@@ -203,19 +215,25 @@ ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm, bool is_onesided)
     team_params.ep            = rank;
     team_params.ep_range      = UCC_COLLECTIVE_EP_RANGE_CONTIG;
 
-    if (is_onesided) {
+    /* Optional fields: only the team-cache tests exercise these. */
+    if (ep_map) {
+        team_params.mask  |= UCC_TEAM_PARAM_FIELD_EP_MAP;
+        team_params.ep_map = *ep_map;
+    }
+    if (ext_id != 0) {
+        team_params.mask |= UCC_TEAM_PARAM_FIELD_ID;
+        team_params.id    = ext_id;
+    }
+    if (work_buffer) {
         team_params.mask |= UCC_TEAM_PARAM_FIELD_FLAGS;
         team_params.flags = UCC_TEAM_FLAG_COLL_WORK_BUFFER;
-        team_ctx          = onesided_ctx;
     }
-    UCC_CHECK(ucc_team_create_post(&team_ctx, 1, &team_params, &team));
+    UCC_CHECK(ucc_team_create_post(&ctx, 1, &team_params, &team));
 
-    MPI_Request req;
-    int tmp;
-    int completed;
+    /* Keep MPI progressing while UCC drives the OOB allgather. */
     MPI_Irecv(&tmp, 1, MPI_INT, rank, 123, comm, &req);
     while (UCC_INPROGRESS == (status = ucc_team_create_test(team))) {
-        ucc_context_progress(team_ctx);
+        ucc_context_progress(ctx);
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
     };
     MPI_Send(&tmp, 1, MPI_INT, rank, 123, comm);
@@ -225,6 +243,12 @@ ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm, bool is_onesided)
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
     return team;
+}
+
+ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm, bool is_onesided)
+{
+    return ucc_test_create_team(is_onesided ? onesided_ctx : ctx, comm, NULL, 0,
+                                is_onesided);
 }
 
 void UccTestMpi::create_team(ucc_test_mpi_team_t t, bool is_onesided)
