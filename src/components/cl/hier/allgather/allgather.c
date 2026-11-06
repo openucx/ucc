@@ -33,7 +33,7 @@ UCC_CL_HIER_PROFILE_FUNC(
     ucc_coll_task_t **task)
 {
     ucc_cl_hier_team_t *cl_team = ucc_derived_of(team, ucc_cl_hier_team_t);
-    ucc_topo_t          *topo    = team->params.team->topo;
+    ucc_topo_t         *topo    = team->params.team->topo;
 
     if (topo->node_leader_rank_id != 0) {
         return UCC_ERR_NOT_SUPPORTED;

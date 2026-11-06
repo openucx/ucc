@@ -143,6 +143,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     int                     in_place         = 0;
     int                     is_contig        = 1;
     size_t                  disp_counter     = 0;
+    size_t                  total_count      = 0;
     ucc_schedule_t         *schedule;
     ucc_cl_hier_schedule_t *cl_schedule;
     ucc_status_t            status;
@@ -153,7 +154,6 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     size_t                  node_disps_size;
     size_t                  leader_counts_size;
     size_t                  leader_disps_size;
-    size_t                  total_count = 0;
     void                   *buffer;
     void                   *scratch_tail;
     void                   *node_gathered_data;
