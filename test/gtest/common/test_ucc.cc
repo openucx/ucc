@@ -404,12 +404,20 @@ void proc_context_create(UccProcess_h proc, int id, ThreadAllgather *ta, bool is
         proc->ctx_params.oob.oob_ep    = id;
 
 
-        /* Simulate multi-node topology for larger gtest coverage */
+        /* Simulate multi-node topology for larger gtest coverage.
+           Ranks are placed on nodes in blocks, or round robin if
+           UCC_GTEST_NODE_ROUND_ROBIN is set. */
         job_size = ta->n_procs;
-        block = ucc_buffer_block_count(job_size, nnodes, 0);
-        node    = id / block;
-        local_ppn = ucc_buffer_block_count(job_size, nnodes, node);
-        local_rank = id - ucc_buffer_block_offset(job_size, nnodes, node);
+        if (std::getenv("UCC_GTEST_NODE_ROUND_ROBIN")) {
+            node       = id % nnodes;
+            local_ppn  = ucc_buffer_block_count(job_size, nnodes, node);
+            local_rank = id / nnodes;
+        } else {
+            block      = ucc_buffer_block_count(job_size, nnodes, 0);
+            node       = id / block;
+            local_ppn  = ucc_buffer_block_count(job_size, nnodes, node);
+            local_rank = id - ucc_buffer_block_offset(job_size, nnodes, node);
+        }
 
         proc_info.host_hash = node + 1;
         block = ucc_buffer_block_count(local_ppn, nsockets, 0);

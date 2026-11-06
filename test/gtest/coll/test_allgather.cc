@@ -308,3 +308,62 @@ INSTANTIATE_TEST_CASE_P(
             name += std::string("_")+std::get<4>(info.param);
             return name;
         });
+
+class test_allgather_hier : public test_allgather,
+        public ::testing::WithParamInterface<Param_1> {
+public:
+    /* 15 ranks give nodes of 8 and 7 ranks (allgatherv between node leaders),
+       16 ranks give equal nodes (plain allgather between node leaders).
+       SET_MEM_TYPE must come after the UccJob ctor: it calls
+       ucc_mc_available(), which only reports the truth once ucc_init() has
+       loaded the mc components. */
+    void run_gab(bool round_robin)
+    {
+        const ucc_datatype_t      dtype    = std::get<0>(GetParam());
+        const ucc_memory_type_t   mem_type = std::get<1>(GetParam());
+        const int                 count    = std::get<2>(GetParam());
+        const gtest_ucc_inplace_t inplace  = std::get<3>(GetParam());
+
+        for (int n_procs : {15, 16}) {
+            ucc_job_env_t env = {
+                {"UCC_CL_HIER_TUNE", "allgather:@gab:0-inf:inf"},
+                {"UCC_CLS", "all"}};
+            if (round_robin) {
+                env.push_back({"UCC_GTEST_NODE_ROUND_ROBIN", "1"});
+            }
+            UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+            UccTeam_h     team = job.create_team(n_procs);
+            UccCollCtxVec ctxs;
+
+            set_inplace(inplace);
+            SET_MEM_TYPE(mem_type);
+
+            data_init(n_procs, dtype, count, ctxs, false);
+            UccReq req(team, ctxs);
+            req.start();
+            req.wait();
+            EXPECT_EQ(true, data_validate(ctxs));
+            data_fini(ctxs);
+        }
+    }
+};
+
+UCC_TEST_P(test_allgather_hier, gab)
+{
+    run_gab(false);
+}
+
+/* Interleaved rank placement: the team is not block ordered, so the gathered
+   data is staged and unpacked into the user dst in team rank order. */
+UCC_TEST_P(test_allgather_hier, gab_round_robin)
+{
+    run_gab(true);
+}
+
+INSTANTIATE_TEST_CASE_P(
+    , test_allgather_hier,
+    ::testing::Combine(
+        ::testing::Values(UCC_DT_INT8, UCC_DT_INT32, UCC_DT_FLOAT32),
+        ::testing::Values(UCC_MEMORY_TYPE_HOST),
+        ::testing::Values(1, 3, 8192), // count
+        ::testing::Values(TEST_INPLACE, TEST_NO_INPLACE)));
