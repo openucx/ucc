@@ -724,6 +724,26 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_triggered_post(
     return status;
 }
 
+/* Whether a buffer is checked for an IPC handle depends on this rank's own
+ * counts: a rank that sends nothing skips the check. Falling back to another
+ * TL here could leave the ranks of one alltoallv on different TLs, so a buffer
+ * without an IPC handle stays an error. */
+static ucc_status_t ucc_tl_cuda_alltoallv_mem_info_get(
+    ucc_tl_cuda_team_t *team, void *ptr, size_t length,
+    ucc_tl_cuda_mem_info_t *mi)
+{
+    ucc_status_t status = ucc_tl_cuda_mem_info_get(ptr, length, mi);
+
+    if (ucc_unlikely(status == UCC_ERR_NOT_SUPPORTED)) {
+        tl_error(
+            UCC_TL_TEAM_LIB(team),
+            "alltoallv buffer %p has no CUDA IPC handle",
+            ptr);
+        return UCC_ERR_INVALID_PARAM;
+    }
+    return status;
+}
+
 ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
@@ -752,8 +772,11 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
     data_len                      = ucc_dt_size(args->src.info_v.datatype) *
                ucc_coll_args_get_total_count(
                    args, args->src.info_v.counts, UCC_TL_TEAM_SIZE(team));
-    status = ucc_tl_cuda_mem_info_get(
-        args->src.info_v.buffer, data_len, &task->alltoallv_ce.mem_info_src);
+    status = ucc_tl_cuda_alltoallv_mem_info_get(
+        team,
+        args->src.info_v.buffer,
+        data_len,
+        &task->alltoallv_ce.mem_info_src);
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
     }
@@ -762,7 +785,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
         data_len = ucc_dt_size(args->dst.info_v.datatype) *
                    ucc_coll_args_get_total_count(
                        args, args->dst.info_v.counts, UCC_TL_TEAM_SIZE(team));
-        status = ucc_tl_cuda_mem_info_get(
+        status = ucc_tl_cuda_alltoallv_mem_info_get(
+            team,
             args->dst.info_v.buffer,
             data_len,
             &task->alltoallv_ce.mem_info_dst);
