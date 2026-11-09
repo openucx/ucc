@@ -47,6 +47,7 @@ ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
 {
     ucc_mem_attr_t mem_attr;
     ucc_status_t   status;
+    cudaError_t    cuda_st;
 
     if (ptr == NULL || length == 0) {
         mi->ptr    = NULL;
@@ -65,9 +66,20 @@ ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
     mi->ptr    = mem_attr.base_address;
     mi->length = mem_attr.alloc_length;
     mi->offset = (ptrdiff_t)ptr - (ptrdiff_t)mi->ptr;
-    CUDA_CHECK_GOTO(cudaIpcGetMemHandle(&mi->handle, mi->ptr), exit, status);
-exit:
-    return status;
+    cuda_st    = cudaIpcGetMemHandle(&mi->handle, mi->ptr);
+    if (cuda_st != cudaSuccess) {
+        /* Legacy IPC handles exist only for cudaMalloc memory, buffers from
+         * cuMemCreate or a stream-ordered memory pool are rejected. Report
+         * NOT_SUPPORTED so that collective init can fall back to another TL */
+        cudaGetLastError();
+        ucc_debug(
+            "cudaIpcGetMemHandle() failed for %p: %d(%s)",
+            mi->ptr,
+            cuda_st,
+            cudaGetErrorString(cuda_st));
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    return UCC_OK;
 }
 
 ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
