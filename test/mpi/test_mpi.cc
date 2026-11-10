@@ -41,11 +41,11 @@ static ucc_status_t oob_allgather_free(void *req)
 UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
                        int is_local, bool with_onesided)
 {
+    ucc_mem_map_t        segments[UCC_TEST_N_MEM_SEGMENTS] = {0};
     ucc_lib_config_h     lib_config;
     ucc_context_config_h ctx_config;
     int                  size, rank;
     char                *prev_env;
-    ucc_mem_map_t        segments[UCC_TEST_N_MEM_SEGMENTS];
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
