@@ -1,0 +1,14 @@
+# Python bytecode / caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Tuner output artifacts
+ucc_tuned.conf
+ucc_tuned_env.sh
+fingerprint.json
+results.json
+knob_conflicts.txt
+findings.json
+findings.md
+tuning_summary.txt
