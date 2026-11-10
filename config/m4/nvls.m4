@@ -25,7 +25,7 @@ AS_IF([test "x$nvls_checked" != "xyes"],[
             # Check for CUDA 12.0+ which supports NVLS
             AS_IF([test $CUDA_MAJOR_VERSION -ge 12],
             [
-                # NVLS requires NVSwitch (datacenter only): Hopper (CC 9.0), Blackwell (CC 10.0)
+                # NVLS requires NVSwitch (datacenter only): Hopper (CC 9.0), Blackwell (CC 10.0, 10.3)
                 nvls_arch_supported="no"
                 AS_IF([echo "$NVCC_ARCH" | grep -E "$ARCH_NVLS_LIST" >/dev/null 2>&1],
                       [nvls_arch_supported="yes"])
@@ -39,10 +39,10 @@ AS_IF([test "x$nvls_checked" != "xyes"],[
                     nvls_happy="no"
                     AS_IF([test "x$with_nvls" = "xyes"],
                     [
-                        AC_MSG_ERROR([NVLS support is requested but target architecture does not support it. NVLS requires datacenter GPUs: Hopper (CC 9.0) or Blackwell (CC 10.0). Current NVCC_ARCH: $NVCC_ARCH])
+                        AC_MSG_ERROR([NVLS support is requested but target architecture does not support it. NVLS requires datacenter GPUs: Hopper (CC 9.0) or Blackwell (CC 10.0, 10.3). Current NVCC_ARCH: $NVCC_ARCH])
                     ],
                     [
-                        AC_MSG_NOTICE([NVLS requires datacenter GPUs: Hopper (CC 9.0) or Blackwell (CC 10.0), but NVCC_ARCH does not include sm_90/sm_100: $NVCC_ARCH])
+                        AC_MSG_NOTICE([NVLS requires datacenter GPUs: Hopper (CC 9.0) or Blackwell (CC 10.0, 10.3), but NVCC_ARCH does not include sm_90/sm_100/sm_103: $NVCC_ARCH])
                     ])
                 ])
             ],

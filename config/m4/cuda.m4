@@ -6,7 +6,7 @@
 CUDA_MIN_REQUIRED_MAJOR=11
 CUDA_MIN_REQUIRED_MINOR=0
 
-ARCH_NVLS_LIST="sm_90|sm_100"
+ARCH_NVLS_LIST="sm_90|sm_100|sm_103"
 
 ARCH7_CODE="-gencode=arch=compute_52,code=sm_52"
 ARCH8_CODE="-gencode=arch=compute_60,code=sm_60 -gencode=arch=compute_61,code=sm_61"
@@ -196,15 +196,19 @@ AS_IF([test "x$cuda_checked" != "xyes"],
             # Generate NVLS-specific architecture codes (TL CUDA only)
             AS_IF([test "x$tl_cuda_will_be_available" = "xyes"],
             [
-                # NVLS requires NVSwitch (datacenter only): Hopper (CC 9.0), Blackwell (CC 10.0)
-                # Filter NVCC_ARCH to keep only sm_90 and sm_100 gencode flags
-                # Handle both "-gencode=arch=..." (single token) and "-gencode arch=..." (two tokens)
+                # NVLS requires NVSwitch (datacenter only): Hopper (CC 9.0), Blackwell (CC 10.0, 10.3)
+                # Filter NVCC_ARCH to keep only sm_90, sm_100 and sm_103 gencode flags
+                # Handle both "-gencode=arch=..." (single token) and "-gencode arch=..." (two tokens),
+                # including the long "--generate-code" and "-arch"/"--gpu-architecture" spellings
                 NVCC_ARCH_NVLS=""
                 _ucc_pending_gencode=""
                 for _ucc_nvls_flag in $NVCC_ARCH
                 do
-                    if test "x$_ucc_nvls_flag" = "x-gencode"; then
-                        _ucc_pending_gencode="-gencode"
+                    if test "x$_ucc_nvls_flag" = "x-gencode" -o \
+                            "x$_ucc_nvls_flag" = "x--generate-code" -o \
+                            "x$_ucc_nvls_flag" = "x-arch" -o \
+                            "x$_ucc_nvls_flag" = "x--gpu-architecture"; then
+                        _ucc_pending_gencode="$_ucc_nvls_flag"
                         continue
                     fi
                     if echo "$_ucc_nvls_flag" | grep -q -E "$ARCH_NVLS_LIST" 2>/dev/null; then
