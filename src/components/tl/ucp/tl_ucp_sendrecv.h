@@ -77,6 +77,20 @@ void ucc_tl_ucp_send_recv_counter_inc_st(uint32_t *counter);
 
 void ucc_tl_ucp_send_recv_counter_inc_mt(uint32_t *counter);
 
+static inline ucc_status_t find_tl_index(ucc_mem_map_mem_h map_memh, int *tl_index)
+{
+    ucc_mem_map_memh_t *memh = (ucc_mem_map_memh_t *)map_memh;
+    int                 i    = 0;
+
+    for (; i < memh->num_tls; i++) {
+        if (strncmp(memh->tl_h[i].tl_name, "ucp", 3) == 0) {
+            *tl_index = i;
+            return UCC_OK;
+        }
+    }
+    return UCC_ERR_NOT_FOUND;
+}
+
 static inline ucs_status_ptr_t
 ucc_tl_ucp_send_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                        ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
@@ -102,6 +116,34 @@ ucc_tl_ucp_send_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     req_param.cb.send     = cb;
     req_param.memory_type = ucc_memtype_to_ucs[mtype];
     req_param.user_data   = user_data;
+    if ((args->mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH) &&
+        args->src_memh.local_memh) {
+        ucc_mem_map_memh_t *mh = (ucc_mem_map_memh_t *)args->src_memh.local_memh;
+        uintptr_t          buf = (uintptr_t)buffer;
+        uintptr_t          base = (uintptr_t)mh->address;
+
+        if (buf >= base) {
+            size_t offset = (size_t)(buf - base);
+
+            if (offset + msglen <= mh->len) {
+                void        *ucp_memh = NULL;
+                int          tl_index  = 0;
+                ucc_status_t gh_st;
+
+                gh_st = find_tl_index(args->src_memh.local_memh, &tl_index);
+                if (gh_st == UCC_OK) {
+                    ucc_tl_ucp_memh_data_t *tl_data =
+                        (ucc_tl_ucp_memh_data_t *)mh->tl_h[tl_index].tl_data;
+
+                    ucp_memh = tl_data->rinfo.mem_h;
+                    if (ucc_likely(ucp_memh != NULL)) {
+                        req_param.op_attr_mask |= UCP_OP_ATTR_FIELD_MEMH;
+                        req_param.memh = ucp_memh;
+                    }
+                }
+            }
+        }
+    }
     task->tagged.send_posted++;
     return ucp_tag_send_nbx(ep, buffer, 1, ucp_tag, &req_param);
 }
@@ -204,6 +246,34 @@ ucc_tl_ucp_recv_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     req_param.cb.recv     = cb;
     req_param.memory_type = ucc_memtype_to_ucs[mtype];
     req_param.user_data   = user_data;
+    if ((args->mask & UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH) &&
+        args->dst_memh.local_memh) {
+        ucc_mem_map_memh_t *mh = (ucc_mem_map_memh_t *)args->dst_memh.local_memh;
+        uintptr_t          buf = (uintptr_t)buffer;
+        uintptr_t          base = (uintptr_t)mh->address;
+
+        if (buf >= base) {
+            size_t offset = (size_t)(buf - base);
+
+            if (offset + msglen <= mh->len) {
+                void        *ucp_memh = NULL;
+                int          tl_index  = 0;
+                ucc_status_t gh_st;
+
+                gh_st = find_tl_index(args->dst_memh.local_memh, &tl_index);
+                if (gh_st == UCC_OK) {
+                    ucc_tl_ucp_memh_data_t *tl_data =
+                        (ucc_tl_ucp_memh_data_t *)mh->tl_h[tl_index].tl_data;
+
+                    ucp_memh = tl_data->rinfo.mem_h;
+                    if (ucc_likely(ucp_memh != NULL)) {
+                        req_param.op_attr_mask |= UCP_OP_ATTR_FIELD_MEMH;
+                        req_param.memh = ucp_memh;
+                    }
+                }
+            }
+        }
+    }
     task->tagged.recv_posted++;
     return ucp_tag_recv_nbx(team->worker->ucp_worker, buffer, 1, ucp_tag,
                             ucp_tag_mask, &req_param);
@@ -358,20 +428,6 @@ static inline ucc_status_t ucc_tl_ucp_recv_nz(void *buffer, size_t msglen,
 {
     return UCC_TL_UCP_TEAM_CTX(team)->sendrecv_cbs.ucc_tl_ucp_recv_nz(
         buffer, msglen, mtype, dest_group_rank, team, task);
-}
-
-static inline ucc_status_t find_tl_index(ucc_mem_map_mem_h map_memh, int *tl_index)
-{
-    ucc_mem_map_memh_t *memh = (ucc_mem_map_memh_t *)map_memh;
-    int                 i    = 0;
-
-    for (; i < memh->num_tls; i++) {
-        if (strncmp(memh->tl_h[i].tl_name, "ucp", 3) == 0) {
-            *tl_index = i;
-            return UCC_OK;
-        }
-    }
-    return UCC_ERR_NOT_FOUND;
 }
 
 static inline ucc_status_t ucc_tl_ucp_get_memh(ucc_tl_ucp_team_t *team,
