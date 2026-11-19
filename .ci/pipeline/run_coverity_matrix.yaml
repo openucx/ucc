@@ -3,9 +3,9 @@ job: "run-coverity"
 
 credentials:
   - {
-      credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0",
-      usernameVariable: "UCC_USERNAME",
-      passwordVariable: "UCC_PASSWORD",
+      credentialsId: "svcnbu-swx-hpcx-coverity-authkey",
+      type: "file",
+      variable: "COV_AUTH_KEY",
     }
 
 registry_host: "harbor.mellanox.com"
@@ -34,11 +34,9 @@ timeout_minutes: 60
 
 steps:
   - name: Run Coverity
-    credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0"
+    credentialsId: "svcnbu-swx-hpcx-coverity-authkey"
     containerSelector: "{name: 'coverity'}"
     run: |
-      export UCC_PASSWORD=$UCC_PASSWORD
-      export UCC_USERNAME=$UCC_USERNAME
       export MODULEPATH="/hpc/local/etc/modulefiles"
       echo "Running coverity"
       ${WORKSPACE}/.ci/scripts/coverity.sh

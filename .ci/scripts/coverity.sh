@@ -20,8 +20,6 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 # This script runs static code analysis using Coverity.
 # The script needs to be run from the main directory.
 #
-export UCC_PASSWORD=$UCC_PASSWORD
-export UCC_USERNAME=$UCC_USERNAME
 topdir=$(git rev-parse --show-toplevel)
 cd "$topdir" || exit 1
 
@@ -142,11 +140,9 @@ function main() {
         fi
     fi
 
-    echo "Uploading to synopsys main coverity server"
-    set +x -v
-    cov-commit-defects --ssl --on-new-cert trust --host coverity.mellanox.com --port 8443 \
-    --user "${UCC_USERNAME}" --password "${UCC_PASSWORD}" --dir "$COV_BUILD_DIR" --stream ucc_master
-    set +v -x
+    echo "Uploading to nbu-coverity server"
+    cov-commit-defects --on-new-cert trust --url https://nbu-coverity.mec01-asgard.nvidia.com \
+    --auth-key-file "${COV_AUTH_KEY}" --dir "$COV_BUILD_DIR" --stream ucc-master
     return 0
 }
 
