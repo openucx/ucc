@@ -28,7 +28,7 @@ mkdir -p $pic_dir
 
 tmpcmd="${@:3}"
 if [[ "$tmpcmd" == *"amdclang"* ]]; then
-  cmd="${@:3:2} -x hip -target x86_64-unknown-linux-gnu ${@:5} -fPIC -O3 -o ${pic_filepath}"
+  cmd="${@:3:2} -x hip ${@:5} -fPIC -O3 -o ${pic_filepath}"
 elif [[ "$tmpcmd" == *"hipcc"* ]]; then
   cmd="${@:3} -fPIC -o ${pic_filepath}"
 else
@@ -38,7 +38,7 @@ echo $cmd
 $cmd
 
 if [[ "$tmpcmd" == *"amdclang"* ]]; then
-  cmd="${@:3:2} -x hip -target x86_64-unknown-linux-gnu ${@:5} -O3 -o ${npic_filepath}"
+  cmd="${@:3:2} -x hip ${@:5} -O3 -o ${npic_filepath}"
   echo $cmd
   $cmd
 else
