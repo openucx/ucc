@@ -175,11 +175,41 @@ class test_asymmetric_memory_v : public ucc::test,
 {
 public:
     UccCollCtxVec ctxs;
+    /* v-buffer layout: blocks separated by GAP elements (including a leading
+       and trailing gap), and rank 1 has zero count with an out-of-range
+       displacement that must be ignored. */
+    static const int     GAP           = 16;
+    static const int     ZERO_RANK     = 1;
+    static const int     ZERO_DISPL    = 1 << 24;
+    static const uint8_t GAP_SENTINEL  = 0xa5;
+
+    static size_t rank_count(int r, int nprocs, size_t count) {
+        return (r == ZERO_RANK) ? 0 : (nprocs - r) * count;
+    }
+
+    /* returns extent in elements */
+    static size_t make_layout(int nprocs, size_t count, int *counts,
+                              int *displs) {
+        size_t pos = GAP;
+        for (int i = 0; i < nprocs; i++) {
+            counts[i] = rank_count(i, nprocs, count);
+            if (counts[i] == 0) {
+                displs[i] = ZERO_DISPL;
+            } else {
+                displs[i] = pos;
+                pos += counts[i] + GAP;
+            }
+        }
+        return pos;
+    }
+
     void data_init(ucc_coll_type_t coll_type, ucc_memory_type_t src_mem_type,
                    ucc_memory_type_t dst_mem_type, UccTeam_h team) {
         int              nprocs = team->n_procs;
         size_t           count  = 2048;
         ucc_rank_t       root   = 0;
+        const ucc_datatype_t dt     = UCC_DT_INT32;
+        const size_t     dt_sz  = ucc_dt_size(dt);
         ucc_coll_args_t *coll;
         int             *counts, *displs;
         size_t           my_count, all_counts;
@@ -187,7 +217,7 @@ public:
         ctxs.resize(nprocs);
         for (auto r = 0; r < nprocs; r++) {
             coll = (ucc_coll_args_t *)calloc(1, sizeof(ucc_coll_args_t));
-            my_count = (nprocs - r) * count;
+            my_count = rank_count(r, nprocs, count);
             ctxs[r] =
                 (gtest_ucc_coll_ctx_t *)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
             ctxs[r]->args           = coll;
@@ -198,74 +228,66 @@ public:
             if (coll_type == UCC_COLL_TYPE_GATHERV) {
                 coll->src.info.mem_type = src_mem_type;
                 coll->src.info.count    = (ucc_count_t)my_count;
-                coll->src.info.datatype = UCC_DT_INT8;
+                coll->src.info.datatype = dt;
 
                 ctxs[r]->init_buf =
-                    ucc_malloc(ucc_dt_size(UCC_DT_INT8) * my_count, "init buf");
+                    ucc_malloc(dt_sz * my_count + 1, "init buf");
                 EXPECT_NE(ctxs[r]->init_buf, nullptr);
-                for (int i = 0; i < my_count * ucc_dt_size(UCC_DT_INT8); i++) {
+                for (int i = 0; i < my_count * dt_sz; i++) {
                     uint8_t *sbuf = (uint8_t *)ctxs[r]->init_buf;
                     sbuf[i]       = ((i + r) % 256);
                 }
 
                 if (r == root) {
-                    all_counts = 0;
                     counts = (int*)malloc(sizeof(int) * nprocs);
                     EXPECT_NE(counts, nullptr);
                     displs = (int*)malloc(sizeof(int) * nprocs);
                     EXPECT_NE(displs, nullptr);
-
-                    for (int i = 0; i < nprocs; i++) {
-                        counts[i] = (nprocs - i) * count;
-                        displs[i] = all_counts;
-                        all_counts += counts[i];
-                    }
+                    all_counts = make_layout(nprocs, count, counts, displs);
 
                     coll->dst.info_v.mem_type      = dst_mem_type;
                     coll->dst.info_v.counts        = (ucc_count_t *)counts;
                     coll->dst.info_v.displacements = (ucc_aint_t *)displs;
-                    coll->dst.info_v.datatype      = UCC_DT_INT8;
+                    coll->dst.info_v.datatype      = dt;
 
-                    ctxs[r]->rbuf_size = ucc_dt_size(UCC_DT_INT8) * all_counts;
+                    ctxs[r]->rbuf_size = dt_sz * all_counts;
                     UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_mc_header,
                                         ctxs[r]->rbuf_size, dst_mem_type));
                     coll->dst.info_v.buffer = ctxs[r]->dst_mc_header->addr;
+                    /* gaps must keep this value after the gatherv */
+                    UCC_CHECK(ucc_mc_memset(coll->dst.info_v.buffer,
+                                            GAP_SENTINEL, ctxs[r]->rbuf_size,
+                                            dst_mem_type));
                 }
 
                 UCC_CHECK(ucc_mc_alloc(&ctxs[r]->src_mc_header,
-                                        ucc_dt_size(UCC_DT_INT8) * my_count,
+                                        dt_sz * my_count,
                                         src_mem_type));
                 coll->src.info.buffer = ctxs[r]->src_mc_header->addr;
                 UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer,
                                         ctxs[r]->init_buf,
-                                        ucc_dt_size(UCC_DT_INT8) * my_count,
+                                        dt_sz * my_count,
                                         src_mem_type, UCC_MEMORY_TYPE_HOST));
             } else {
                 // scatterv
                 coll->dst.info.mem_type = dst_mem_type;
                 coll->dst.info.count    = (ucc_count_t)my_count;
-                coll->dst.info.datatype = UCC_DT_INT8;
+                coll->dst.info.datatype = dt;
 
                 if (r == root) {
-                    all_counts = 0;
                     counts = (int*)malloc(sizeof(int) * nprocs);
                     EXPECT_NE(counts, nullptr);
                     displs = (int*)malloc(sizeof(int) * nprocs);
                     EXPECT_NE(displs, nullptr);
+                    all_counts = make_layout(nprocs, count, counts, displs);
 
-                    for (int i = 0; i < nprocs; i++) {
-                        counts[i] = (nprocs - i) * count;
-                        displs[i] = all_counts;
-                        all_counts += counts[i];
-                    }
-                    
                     ctxs[r]->init_buf =
-                        ucc_malloc(ucc_dt_size(UCC_DT_INT8) * all_counts, "init buf");
+                        ucc_malloc(dt_sz * all_counts, "init buf");
                     EXPECT_NE(ctxs[r]->init_buf, nullptr);
                     uint8_t *sbuf = (uint8_t*)ctxs[r]->init_buf;
                     for (int p = 0; p < nprocs; p++) {
-                        for (int i = 0; i < ucc_dt_size(UCC_DT_INT8) * counts[p]; i++) {
-                            sbuf[(displs[p] * ucc_dt_size(UCC_DT_INT8) + i)] =
+                        for (int i = 0; i < dt_sz * counts[p]; i++) {
+                            sbuf[(displs[p] * dt_sz + i)] =
                                 (uint8_t)((i + p) % 256);
                         }
                     }
@@ -273,18 +295,18 @@ public:
                     coll->src.info_v.mem_type      = src_mem_type;
                     coll->src.info_v.counts        = (ucc_count_t *)counts;
                     coll->src.info_v.displacements = (ucc_aint_t *)displs;
-                    coll->src.info_v.datatype      = UCC_DT_INT8;
+                    coll->src.info_v.datatype      = dt;
 
                     UCC_CHECK(ucc_mc_alloc(&ctxs[r]->src_mc_header,
-                                        ucc_dt_size(UCC_DT_INT8) * all_counts,
+                                        dt_sz * all_counts,
                                         src_mem_type));
                     coll->src.info_v.buffer = ctxs[r]->src_mc_header->addr;
                     UCC_CHECK(ucc_mc_memcpy(coll->src.info_v.buffer,
-                            ctxs[r]->init_buf, ucc_dt_size(UCC_DT_INT8) * all_counts,
+                            ctxs[r]->init_buf, dt_sz * all_counts,
                             src_mem_type, UCC_MEMORY_TYPE_HOST));
                 }
                 UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_mc_header,
-                                    ucc_dt_size(UCC_DT_INT8) * my_count,
+                                    dt_sz * my_count + 1,
                                     dst_mem_type));
                 coll->dst.info.buffer = ctxs[r]->dst_mc_header->addr;
             }
@@ -314,14 +336,22 @@ public:
                 dsts = (uint8_t *)ctxs[root]->args->dst.info_v.buffer;
             }
 
+            std::vector<bool> in_block(ctxs[root]->rbuf_size, false);
             for (int r = 0; r < ctxs.size(); r++) {
                 my_count = ctxs[r]->args->src.info.count;
                 for (int i = 0; i < my_count * dt_size; i++) {
+                    in_block[displs[r] * dt_size + i] = true;
                     if ((uint8_t)((i + r) % 256) !=
                         dsts[(displs[r] * dt_size + i)]) {
                         ret = false;
                         break;
                     }
+                }
+            }
+            for (size_t i = 0; i < ctxs[root]->rbuf_size; i++) {
+                if (!in_block[i] && dsts[i] != GAP_SENTINEL) {
+                    ret = false;
+                    break;
                 }
             }
 
@@ -335,7 +365,7 @@ public:
                 dt_size  = ucc_dt_size((ctxs[r])->args->dst.info.datatype);
                 my_count = (ctxs[r])->args->dst.info.count;
                 if (UCC_MEMORY_TYPE_HOST != dst_mem_type) {
-                    dsts = (uint8_t *)ucc_malloc(my_count * dt_size, "dsts buf");
+                    dsts = (uint8_t *)ucc_malloc(my_count * dt_size + 1, "dsts buf");
                     ucc_assert(dsts != nullptr);
                     UCC_CHECK(ucc_mc_memcpy(dsts, ctxs[r]->args->dst.info.buffer,
                                             my_count * dt_size,

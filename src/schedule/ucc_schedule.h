@@ -240,10 +240,8 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 
     if (ucc_likely(status == UCC_OK)) {
         ucc_buffer_info_asymmetric_memtype_t *save = &task->bargs.asymmetric_save_info;
-        if (save->scratch &&
-            task->bargs.args.coll_type != UCC_COLL_TYPE_SCATTERV &&
-            task->bargs.args.coll_type != UCC_COLL_TYPE_SCATTER) {
-            status = ucc_copy_asymmetric_buffer(task);
+        if (save->scratch && save->copy_out) {
+            status = ucc_copy_asymmetric_buffer(task, 0);
             if (status != UCC_OK) {
                 ucc_error("failure copying out asymmetric buffer: %s",
                           ucc_status_string(status));

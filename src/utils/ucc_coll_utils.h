@@ -10,6 +10,7 @@
 #include "config.h"
 #include "ucc_datastruct.h"
 #include "ucc_math.h"
+#include "core/ucc_dt.h"
 #include "utils/ucc_time.h"
 #include "utils/ucc_assert.h"
 #include <string.h>
@@ -179,27 +180,30 @@ static inline int ucc_coll_args_is_disp_contig(const ucc_coll_args_t *args,
     return 1;
 }
 
+/* Extent in bytes of a v-buffer: max(displacement + count) over ranks with
+   non-zero count (displacements of zero-count ranks are unused) */
 static inline size_t
-ucc_coll_args_get_v_buffer_size(const ucc_coll_args_t *args,
-                                const ucc_count_t *counts,
-                                const ucc_aint_t *displacements,
-                                ucc_rank_t size)
+ucc_coll_args_get_v_buffer_size(const ucc_coll_args_t          *args,
+                                const ucc_coll_buffer_info_v_t *info,
+                                ucc_rank_t                      size)
 {
+    size_t     max_end = 0;
+    size_t     count;
     ucc_rank_t i;
-    size_t max_disp, idx_count;
 
-    max_disp = ucc_coll_args_get_displacement(args, displacements, 0);
-    idx_count = ucc_coll_args_get_count(args, counts, 0);
-    for (i = 1; i < size; i++) {
-        size_t disp_i = ucc_coll_args_get_displacement(args, displacements, i);
-        if (disp_i > max_disp) {
-            max_disp = disp_i;
-            idx_count = ucc_coll_args_get_count(args, counts, i);
+    for (i = 0; i < size; i++) {
+        count = ucc_coll_args_get_count(args, info->counts, i);
+        if (count == 0) {
+            continue;
         }
+        max_end = ucc_max(max_end,
+                          ucc_coll_args_get_displacement(args,
+                                                         info->displacements,
+                                                         i) + count);
     }
-
-    return max_disp + idx_count;
+    return max_end * ucc_dt_size(info->datatype);
 }
+
 typedef struct ucc_base_coll_args ucc_base_coll_args_t;
 
 ucc_coll_type_t   ucc_coll_type_from_str(const char *str);
@@ -429,6 +433,6 @@ ucc_coll_args_init_asymmetric_buffer(ucc_coll_args_t *args,
 ucc_status_t
 ucc_coll_args_free_asymmetric_buffer(ucc_coll_task_t *task);
 
-ucc_status_t ucc_copy_asymmetric_buffer(ucc_coll_task_t *task);
+ucc_status_t ucc_copy_asymmetric_buffer(ucc_coll_task_t *task, int copy_in);
 
 #endif

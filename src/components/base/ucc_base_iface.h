@@ -189,10 +189,11 @@ enum {
 };
 
 typedef struct ucc_buffer_info_asymmetric_memtype {
-    union {
-        ucc_coll_buffer_info_t      info;
-        ucc_coll_buffer_info_v_t    info_v;
-    } old_asymmetric_buffer;
+    void                   *old_buffer;   /* user buffer replaced by scratch */
+    ucc_memory_type_t       old_mem_type;
+    size_t                  size;         /* bytes to copy, = scratch size */
+    uint8_t                 copy_in;      /* user buffer -> scratch on post */
+    uint8_t                 copy_out;     /* scratch -> user buffer on done */
     ucc_mc_buffer_header_t *scratch;
 } ucc_buffer_info_asymmetric_memtype_t;
 

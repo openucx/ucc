@@ -395,9 +395,8 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
     }
 
     if (task->bargs.asymmetric_save_info.scratch != NULL &&
-        (task->bargs.args.coll_type == UCC_COLL_TYPE_SCATTER ||
-         task->bargs.args.coll_type == UCC_COLL_TYPE_SCATTERV)) {
-        status = ucc_copy_asymmetric_buffer(task);
+        task->bargs.asymmetric_save_info.copy_in) {
+        status = ucc_copy_asymmetric_buffer(task, 1);
         if (status != UCC_OK) {
             ucc_error("failure copying in asymmetric buffer: %s",
                         ucc_status_string(status));
