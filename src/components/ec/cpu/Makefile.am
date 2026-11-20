@@ -4,8 +4,15 @@
 
 sources =    \
 	ec_cpu.h \
+	ec_cpu_reduce.h \
 	ec_cpu.c \
-	ec_cpu_reduce.c
+	ec_cpu_reduce.c \
+	ec_cpu_reduce_int8.c \
+	ec_cpu_reduce_int16.c \
+	ec_cpu_reduce_int32.c \
+	ec_cpu_reduce_int64.c \
+	ec_cpu_reduce_float.c \
+	ec_cpu_reduce_complex.c
 
 module_LTLIBRARIES        = libucc_ec_cpu.la
 libucc_ec_cpu_la_SOURCES  = $(sources)
