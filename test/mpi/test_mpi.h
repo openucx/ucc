@@ -351,6 +351,7 @@ public:
     UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm, int is_local,
                bool with_onesided);
     ~UccTestMpi();
+    void destroy_teams();
     void set_msgsizes(size_t min, size_t max, size_t power);
     void set_dtypes(std::vector<ucc_datatype_t> &_dtypes);
     void set_colls(std::vector<ucc_coll_type_t> &_colls);
@@ -546,5 +547,45 @@ ucc_status_t compare_buffers(void *rst, void *expected, size_t count,
 ucc_status_t divide_buffer(void *expected, size_t divider, size_t count,
                            ucc_datatype_t dt);
 
+/* OOB allgather callbacks over an MPI communicator, shared by the context,
+   the harness teams and the team-cache suite. @coll_info is the MPI_Comm. */
+ucc_status_t oob_allgather(void *sbuf, void *rbuf, size_t msglen,
+                           void *coll_info, void **req);
+ucc_status_t oob_allgather_test(void *req);
+ucc_status_t oob_allgather_free(void *req);
+
+/**
+ * ucc_test_create_team - blocking ucc team create over @comm.
+ *
+ * Drives ucc_team_create_test to completion while keeping MPI progressing, and
+ * aborts the job on error. @ep_map and @ext_id are optional (NULL / 0) and are
+ * only used by the team-cache suite; @work_buffer requests the onesided flag.
+ */
+ucc_team_h ucc_test_create_team(ucc_context_h ctx, MPI_Comm comm,
+                                const ucc_ep_map_t *ep_map, uint64_t ext_id,
+                                bool work_buffer);
+
+/* Per-test outcome tally for a suite that is not a collective type. */
+typedef struct ucc_test_suite_result {
+    int passed;
+    int failed;
+    int skipped;
+} ucc_test_suite_result_t;
+
+/**
+ * run_team_cache_tests - multi-rank team-cache correctness test suite.
+ *
+ * Run when UCC_TEAM_CACHE_CORRECTNESS_TESTS=y is set in the environment (and
+ * UCC_TEAM_CACHE_ENABLE=y). These tests manage team create/destroy lifecycle
+ * directly, so they must run after the harness teams have been destroyed.
+ *
+ * @param ctx         UCC context for this process (same across all ranks).
+ * @param world_rank  MPI rank in MPI_COMM_WORLD.
+ * @param world_size  Total number of MPI ranks.
+ *
+ * @return per-test tally; a disabled cache reports every test as skipped.
+ */
+ucc_test_suite_result_t run_team_cache_tests(ucc_context_h ctx, int world_rank,
+                                             int world_size);
 
 #endif

@@ -78,6 +78,7 @@ gtest_SOURCES =                           \
 	core/test_mc_reduce.cc                \
 	core/test_team.cc                     \
 	core/test_team_id_pool.cc             \
+	core/test_team_cache.cc               \
 	core/test_schedule.cc                 \
 	core/test_topo.cc                     \
 	core/test_service_coll.cc             \
